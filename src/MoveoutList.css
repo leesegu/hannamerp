@@ -1,0 +1,289 @@
+/* 전체 컨테이너 스타일 */
+.list-container {
+  padding: 30px;
+  font-family: 'Pretendard', sans-serif;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 100vh;        /* ✅ 페이지 높이 확보 */
+  overflow-y: auto;         /* ✅ 스크롤 허용 */
+}
+
+/* 제목 */
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.search-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+/* 테이블 스크롤 래퍼 */
+.scroll-table {
+  overflow-x: auto;
+}
+
+/* ✅ 드롭다운 + 총액 + 검색창 한 줄 정렬용 */
+.top-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 좌측/우측 나눔 */
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* ✅ 왼쪽 영역: 드롭다운 + 총액 */
+.left-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 드롭다운 스타일 */
+.status-filter-dropdown {
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+/* 총액 표시 */
+.deposit-total {
+  font-weight: bold;
+  font-size: 14px;
+  color: #e74c3c;
+}
+
+/* 검색창 오른쪽 배치 */
+.search-input {
+  padding: 10px;
+  width: 280px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+/* 테이블 기본 스타일 */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.data-table th {
+  background-color: #f4f6f8;
+  color: #333;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.data-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.data-table tr:hover {
+  background-color: #f1f1f1;
+}
+
+/* 버튼 스타일 */
+.data-table button {
+  padding: 4px 8px;
+  margin: 2px;
+  border: none;
+  border-radius: 4px;
+  background-color: #ccc;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.data-table button:hover {
+  background-color: #bbb;
+}
+
+/* 강조 버튼: 내용있음 */
+.filled-button {
+  background-color: #ff6600 !important;
+  color: #fff !important;
+  font-weight: bold;
+}
+
+/* ✅ 정산진행현황 상태 표시 원형 색상 */
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+/* ✅ 팝업 (Modal) 스타일 */
+.modal {
+  position: fixed;
+  top: 10%;
+  left: 30%;
+  right: 30%;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: white;
+  padding: 20px;
+  border: 1px solid #aaa;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  border-radius: 8px;
+}
+
+/* 모달 내부 요소 */
+.modal h4 {
+  margin-bottom: 10px;
+  font-size: 18px;
+  color: #444;
+}
+
+.modal p,
+.modal ul {
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.modal button {
+  padding: 6px 12px;
+  background-color: #777;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.modal img {
+  max-width: 100%;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.modal input,
+.modal select,
+.modal textarea {
+  width: 100%;
+  padding: 6px 10px;
+  margin-top: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* 반응형 모바일 대응 */
+@media (max-width: 768px) {
+  .top-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .left-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input,
+  .status-filter-dropdown {
+    width: 100%;
+  }
+}
+
+/* PC용 넓은 팝업을 위한 클래스 */
+.wide-modal {
+  width: 1000px;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+}
+
+.form-container.force-pc {
+  display: flex !important;
+  flex-direction: column;
+}
+/* ✅ 모바일 목록 한 줄 정렬용 */
+.mobile-one-line {
+  white-space: nowrap;     /* 줄바꿈 방지 */
+  font-size: 12px;         /* 글자 크기 축소 */
+  overflow-x: auto;        /* 넘치면 스크롤 */
+  min-width: 0;            /* grid에서 텍스트 압축 허용 */
+}
+/* ✅ 모바일 목록 셀 테두리 및 셀 스타일 */
+.mobile-item {
+  border: 1px solid #ccc;
+  margin: 6px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  font-size: 14px;
+}
+
+/* 각 행 구조 */
+.mobile-row1,
+.mobile-row2 {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee;
+}
+
+/* 각 셀 */
+.mobile-row1 div,
+.mobile-row2 div {
+  flex: 1;
+  padding: 6px 12px;
+  border-right: 1px solid #eee;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 100px;               /* 최소 너비 추가 */
+  font-size: 15px; 
+}
+
+/* 마지막 셀은 오른쪽 테두리 제거 */
+.mobile-row1 div:last-child,
+.mobile-row2 div:last-child {
+  border-right: none;
+}
+
+/* 확장 영역 (하자/비고/사진/수정삭제) */
+.mobile-expand {
+  padding: 8px 12px;
+  background: #f9f9f9;
+  font-size: 13px;
+  border-top: 1px solid #eee;
+}
+
+/* 하자/비고/사진 상태 표시 원 */
+.dot-green {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: limegreen;
+}
+
+.dot-gray {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ccc;
+}

@@ -1,0 +1,18 @@
+/* src/MainPage.css */
+
+.main-page {
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(to bottom right, #ffffff, #f0f0f0);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.main-inner {
+  text-align: center;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}

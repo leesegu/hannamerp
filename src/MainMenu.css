@@ -1,0 +1,136 @@
+/* ✅ 최상단 루트 요소도 꽉 채우도록 보장 (필수) */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ✅ 메인 레이아웃 */
+.main-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw; /* ⬅ 추가 */
+  font-family: "Segoe UI", sans-serif;
+  overflow: hidden; /* 세로 스크롤 방지 시 */
+}
+
+/* ✅ 사이드바 */
+.sidebar {
+  width: 220px;
+  background-color: #f5dabb;
+  padding: 20px;
+  border-right: 1px solid #f0c088;
+  box-sizing: border-box;
+}
+
+/* ✅ 로고 */
+.logo {
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+  color: #e0701f;
+  text-shadow: 1px 1px 2px rgba(255, 153, 0, 0.3);
+  letter-spacing: 1.2px;
+}
+
+/* 로그인 유저 정보 */
+.user-info {
+  display: flex;
+  flex-direction: column;  /* 추가 */
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.logged-in-user {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.logout-button {
+  background-color: #ff7f50;
+  color: white;
+  font-size: 13px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.logout-button:hover {
+  background-color: #e76030;
+}
+
+/* 메뉴그룹 */
+.menu-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 메뉴 항목 */
+.menu-item {
+  padding: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background-color: #ffe9d2;
+  font-weight: 500;
+  color: #4a1b00;
+}
+
+.menu-item:hover {
+  background-color: #ff7f50;
+}
+
+/* 서브메뉴 */
+.submenu {
+  padding-left: 12px;
+}
+
+.submenu-item {
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 4px;
+  background-color: #fdf5ed;
+  border-left: 4px solid #ffae42;
+  color: #3b2a0a;
+}
+
+.submenu-item:hover {
+  background-color: #ff7f50;
+}
+
+/* ✅ 콘텐츠 영역 */
+.main-content {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  background-color: #fff;
+  border-left: 1px solid #eee0d0;
+  height: 100vh; /* ⬅ 추가 */
+  box-sizing: border-box;
+}
+
+/* ✅ Toast 메시지 텍스트 한글자만 나오는 문제 해결용 추가 스타일 */
+.Toastify__toast {
+  max-width: 90% !important;
+  width: auto !important;
+  white-space: pre-line !important;
+  text-align: center !important;
+  justify-content: center !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.Toastify__toast-body {
+  display: block !important;
+  width: auto !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  white-space: pre-line !important;
+}
