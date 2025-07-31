@@ -1,212 +1,232 @@
-.form-container {
-  padding: 2rem;
-  display: flex;
-  justify-content: center;
-  position: relative;
+  /* ✅ 이 부분을 추가하세요 */
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;  /* 💡 가로 스크롤 막기 */
 }
 
-.form-inner {
-  max-width: 950px;
-  width: 100%;
-  font-family: sans-serif;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.input-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.input-group label {
-  margin-bottom: 0.25rem;
-  font-weight: bold;
-}
-
-.input-group input,
-.input-group select,
-.input-group button {
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
-
-.input-group input[readonly] {
-  background-color: #f5f5f5;
-}
-
-.defect-list-container {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.defect-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: none;
-  border: none;
-  padding: 4px 0;
-  font-size: 13px;
-  color: #333;
-  border-bottom: 1px solid #ddd;
-}
-
-.defect-desc {
-  flex: 2;
-  word-break: break-word;
-}
-
-.defect-amount {
-  flex: 1;
-  text-align: right;
-  margin-right: 0.75rem;
-}
-
-.defect-actions {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.defect-actions button {
-  padding: 4px 6px;
-  background-color: #ff8c00;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.image-slider-single {
-  margin-top: 1rem;
-  text-align: center;
-}
-
-.slider-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
-}
-
-.slider-image-container {
-  position: relative;
-  display: inline-block;
-}
-
-.slider-image-container img {
-  max-width: 100%;
-  max-height: 300px;
-  border-radius: 8px;
-  object-fit: contain;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.slider-indicator {
-  margin-top: 5px;
-  font-size: 13px;
-  color: #666;
-}
-
-.modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: #fff;
-  padding: 20px;
-  width: 90%;
-  max-width: 400px;
-  z-index: 9999;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  box-sizing: border-box;
-}
-
-.modal textarea {
-  width: 100%;
-  height: 100px;
-  resize: vertical;
-  margin-bottom: 12px;
-  font-size: 14px;
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-}
-
-.save-button {
-  margin-top: 1.5rem;
-  padding: 12px;
-  font-size: 16px;
-  background-color: orange;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  width: 100%;
-  cursor: pointer;
-}
-
-.custom-datepicker {
-  width: 100%;
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  box-sizing: border-box;
-}
-
-/* ✅ 모바일 대응: 2열 구성 + 여백 조정 */
-@media (max-width: 768px) {
   .form-container {
-    padding: 1rem;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    position: relative;
   }
 
   .form-inner {
-    padding: 0 0.5rem;
+    max-width: 950px;
+    width: 100%;
+    font-family: sans-serif;
   }
 
   .grid {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* 모바일에서 2열 구성 */
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
   }
 
   .input-group {
-    width: 100%;
+    display: flex;
+    flex-direction: column;
   }
 
-  .save-button {
-    font-size: 15px;
+  .input-group label {
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+  }
+
+  .input-group input,
+  .input-group select,
+  .input-group button {
     padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  .input-group input[readonly] {
+    background-color: #f5f5f5;
+  }
+
+  .defect-list-container {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .defect-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    font-size: 13px;
+    color: #333;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .defect-desc {
+    flex: 2;
+    word-break: break-word;
+  }
+
+  .defect-amount {
+    flex: 1;
+    text-align: right;
+    margin-right: 0.75rem;
+  }
+
+  .defect-actions {
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  .defect-actions button {
+    padding: 4px 6px;
+    background-color: #ff8c00;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .image-slider-single {
+    margin-top: 1rem;
+    text-align: center;
+  }
+
+  .slider-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .slider-image-container {
+    position: relative;
+    display: inline-block;
   }
 
   .slider-image-container img {
-    max-height: 200px;
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    object-fit: contain;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
-  .modal {
-    width: 90%;
-    max-width: 400px;
+  .slider-indicator {
+    margin-top: 5px;
+    font-size: 13px;
+    color: #666;
   }
-}
-.form-container.force-pc {
-  padding: 2rem !important;
+
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  min-width: 300px;
+  max-width: 90%;
+  max-height: 80%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.form-container.force-pc .grid {
-  grid-template-columns: 1fr 1fr !important;
-  gap: 1rem !important;
+.modal-wrapper {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center; /* 또는 flex-start + padding-top */
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 9999;
 }
 
-.form-container.force-pc .slider-image-container img {
-  max-height: 300px !important;
-}
+
+  .modal textarea {
+    width: 100%;
+    height: 100px;
+    resize: vertical;
+    margin-bottom: 12px;
+    font-size: 14px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+
+  .save-button {
+    margin-top: 1.5rem;
+    padding: 12px;
+    font-size: 16px;
+    background-color: orange;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .custom-datepicker {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+  }
+
+  /* ✅ 모바일 대응: 2열 구성 + 여백 조정 */
+  @media (max-width: 768px) {
+    .form-container {
+      padding: 1rem;
+    }
+
+    .form-inner {
+      padding: 0 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr; /* 모바일에서 2열 구성 */
+      gap: 0.75rem;
+    }
+
+    .input-group {
+      width: 100%;
+    }
+
+    .save-button {
+      font-size: 15px;
+      padding: 10px;
+    }
+
+    .slider-image-container img {
+      max-height: 200px;
+    }
+
+    .modal {
+      width: 90%;
+      max-width: 400px;
+    }
+  }
+  .form-container.force-pc {
+    padding: 2rem !important;
+  }
+
+  .form-container.force-pc .grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .form-container.force-pc .slider-image-container img {
+    max-height: 300px !important;
+  }

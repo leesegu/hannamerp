@@ -42,11 +42,12 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   const [imagePreviews, setImagePreviews] = useState([]);
   const [existingImageUrls, setExistingImageUrls] = useState([]); // ✅ 기존 이미지 URL 저장
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const modalRef = useRef();  // 모달창에 접근할 수 있도록 ref 생성
 
   const inputRefs = useRef([]);
   const defectDescRef = useRef();
   const defectAmountRef = useRef();
-
+  
   const numberFieldsWithComma = ["arrears", "currentFee", "electricity", "gas", "cleaning", "waterUnit", "waterCost", "defectAmount", "total"];
   const numberOnlyFields = ["waterPrev", "waterCurr"];
   const parseNumber = (str) => parseInt((str || "0").replace(/,/g, "")) || 0;
@@ -420,7 +421,7 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
     {/* ✅ 모달은 form-inner 바깥에서 렌더링 */}
     {noteModalOpen && (
   <div className="modal-wrapper">
-    <div className="modal">
+    <div className="modal" ref={modalRef}>
       <textarea
         value={noteText}
         onChange={(e) => setNoteText(e.target.value)}

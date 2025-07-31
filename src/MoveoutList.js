@@ -272,25 +272,30 @@ export default function MoveoutList({ employeeId, userId }) {
       </div>
 
       {selectedDefects.length > 0 && (
-        <div className="modal wide-modal">
+        <div className="modal-center">
+        <div className="modal-content">
           <h4>하자내역</h4>
           <ul>{selectedDefects.map((d, i) => (
             <li key={i}>{d.desc} - {d.amount}원</li>
           ))}</ul>
           <button onClick={() => setSelectedDefects([])}>닫기</button>
         </div>
+      </div>
       )}
 
       {selectedNote && (
-        <div className="modal wide-modal">
+        <div className="modal-center">
+        <div className="modal-content">
           <h4>비고</h4>
           <p>{selectedNote}</p>
           <button onClick={() => setSelectedNote("")}>닫기</button>
         </div>
+      </div>
       )}
 
       {selectedImages.length > 0 && (
-        <div className="modal">
+        <div className="modal-center">
+        <div className="modal-content">
           <h4>사진</h4>
           {selectedImages.map((url, idx) => (
             <img
@@ -303,6 +308,7 @@ export default function MoveoutList({ employeeId, userId }) {
           ))}
           <button onClick={() => setSelectedImages([])}>닫기</button>
         </div>
+      </div>
       )}
 
       {showPopup && editItem && (
