@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef  } from "react";
-import { db } from "./firebase";
+import { db, storage } from "./firebase"; // ✅ db와 storage 가져오기
 import {
   collection,
   query,
@@ -7,13 +7,24 @@ import {
   onSnapshot,
   deleteDoc,
   doc,
-  setDoc
+  setDoc,
+  deleteField
 } from "firebase/firestore";
 import MoveoutForm from "./MoveoutForm";
 import { FiX, FiArrowLeft } from "react-icons/fi";
 import { useNavigate } from "react-router-dom"; // ✅ 추가
 import "./MoveoutList.css";
 import * as htmlToImage from 'html-to-image';
+import { Timestamp } from "firebase/firestore";
+
+
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+};
 
 export default function MoveoutList({ employeeId, userId }) {
   const [dataList, setDataList] = useState([]);
@@ -24,6 +35,7 @@ export default function MoveoutList({ employeeId, userId }) {
   const [selectedDefects, setSelectedDefects] = useState([]);
   const [selectedImages, setSelectedImages] = useState([]);
   const [editItem, setEditItem] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const isMobileDevice = window.innerWidth <= 768;
   const navigate = useNavigate(); // ✅ 추가
@@ -31,6 +43,35 @@ export default function MoveoutList({ employeeId, userId }) {
   const receiptRef = useRef(null); // 캡처할 DOM 참조
   const [currentReceiptItem, setCurrentReceiptItem] = useState(null); // 현재 선택된 항목
   const [previewImage, setPreviewImage] = useState(null);
+
+const handleDownloadImage = async () => {
+  if (!receiptRef.current) return;
+
+  const node = receiptRef.current;
+  try {
+    const dataUrl = await htmlToImage.toJpeg(node);
+    const link = document.createElement("a");
+    link.download = "영수증.jpg";
+    link.href = dataUrl;
+    link.click();
+  } catch (error) {
+    console.error("이미지 저장 실패:", error);
+  }
+};
+
+  useEffect(() => {
+  if (!currentReceiptItem || !receiptRef.current) return;
+
+  setTimeout(() => {
+    htmlToImage.toPng(receiptRef.current)
+      .then((dataUrl) => {
+        setPreviewImage(dataUrl); // ✅ 팝업으로 띄울 이미지 저장
+      })
+      .catch((err) => {
+        console.error("이미지 생성 실패:", err);
+      });
+  }, 100);
+}, [currentReceiptItem]);
 
   const tableColumns = [
     "moveOutDate", "name", "roomNumber", "arrears", "currentFee",
@@ -54,35 +95,6 @@ export default function MoveoutList({ employeeId, userId }) {
     return () => unsubscribe();
   }, [userId]);
 
-  useEffect(() => {
-  if (!currentReceiptItem) return;
-
-  if (currentReceiptItem.receiptImageUrl) {
-    setPreviewImage(currentReceiptItem.receiptImageUrl); // ✅ 기존 이미지 사용
-    return;
-  }
-
-  const timer = setTimeout(async () => {
-    if (receiptRef.current) {
-      try {
-        const dataUrl = await htmlToImage.toPng(receiptRef.current);
-        setPreviewImage(dataUrl);
-
-        const docRef = doc(db, "moveoutData", currentReceiptItem.docId);
-        await setDoc(docRef, {
-          receiptIssued: true,
-          receiptImageUrl: dataUrl
-        }, { merge: true });
-
-      } catch (error) {
-        console.error("❌ 이미지 생성 실패:", error);
-      }
-    }
-  }, 300); // 300ms 기다려서 렌더링 완료 보장
-
-  return () => clearTimeout(timer);
-}, [currentReceiptItem]);
-
   const handleDelete = async (docId) => {
     if (!docId) {
       alert("❌ 삭제할 문서 ID가 없습니다.");
@@ -100,8 +112,11 @@ export default function MoveoutList({ employeeId, userId }) {
   };
 
 const handleShowReceipt = (item) => {
-  setPreviewImage(null);             // 초기화
-  setCurrentReceiptItem(item);       // 선택된 항목 저장
+  setPreviewImage(null);           // 기존 미리보기 제거
+  setCurrentReceiptItem(null);     // 먼저 null로 설정해서 동일 항목도 리셋
+  setTimeout(() => {
+    setCurrentReceiptItem(item);   // 50ms 후 재설정 → useEffect 재실행
+  }, 50);
 };
 
   const handleEdit = (item) => {
@@ -161,14 +176,25 @@ const handleShowReceipt = (item) => {
     }
   };
 
-  const downloadImage = (format) => {
-  if (!receiptRef.current) return;
+const downloadImage = (format) => {
+  if (!receiptRef.current || !currentReceiptItem) return;
+
+  // ✅ 파일명 구성: 날짜 + 빌라명 + 호수
+  const rawDate = new Date(currentReceiptItem.moveOutDate);
+  const yyyy = rawDate.getFullYear();
+  const mm = String(rawDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(rawDate.getDate()).padStart(2, "0");
+  const formattedDate = `${yyyy}${mm}${dd}`;
+
+  const namePart = (currentReceiptItem.name || "").trim();
+  const roomPart = (currentReceiptItem.roomNumber || "").trim();
+  const fileName = `${formattedDate}${namePart}${roomPart}`;
 
   htmlToImage.toPng(receiptRef.current).then((dataUrl) => {
     const link = document.createElement("a");
 
     if (format === "jpg") {
-      link.download = "receipt.jpg";
+      link.download = `${fileName}.jpg`;  // ✅ 동적 파일명
       link.href = dataUrl;
       link.click();
     } else if (format === "pdf") {
@@ -178,7 +204,7 @@ const handleShowReceipt = (item) => {
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
         pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-        pdf.save("receipt.pdf");
+        pdf.save(`${fileName}.pdf`);      // ✅ 동적 파일명
       });
     }
   });
@@ -230,7 +256,7 @@ if (isMobileDevice) {
                 </div>
                 <div className="mobile-buttons">
                   <button onClick={() => handleEdit(item)}>수정</button>
-                  <button onClick={() => alert('영수증 전송 기능은 추후 구현됩니다.')}>영수증 전송</button>
+                  <button onClick={() => handleShowReceipt(item)}>영수증 전송</button>
                 </div>
               </div>
             )}
@@ -412,10 +438,10 @@ if (isMobileDevice) {
 </td>
 <td>
 <button
-  className={item.receiptImageUrl ? "filled-button" : ""}
+  className="blue-button"
   onClick={() => handleShowReceipt(item)}
 >
-  출력
+  생성
 </button>
 
 </td>
@@ -468,7 +494,7 @@ if (isMobileDevice) {
         </div>
       </div>
       )}
-
+      
       {showPopup && editItem && (
   <div
     style={{
@@ -582,23 +608,28 @@ if (isMobileDevice) {
 <p><strong>빌라명:</strong> {currentReceiptItem.name}</p>
 <p><strong>호수:</strong> {currentReceiptItem.roomNumber}</p>
 
-{!!currentReceiptItem.arrears && Number(currentReceiptItem.arrears) > 0 && (
-  <p><strong>미납관리비:</strong> {Number(currentReceiptItem.arrears).toLocaleString()}원</p>
+{!!currentReceiptItem.arrears && parseFloat((currentReceiptItem.arrears || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>미납관리비:</strong> {parseFloat((currentReceiptItem.arrears || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
-{!!currentReceiptItem.currentFee && Number(currentReceiptItem.currentFee) > 0 && (
-  <p><strong>당월관리비:</strong> {Number(currentReceiptItem.currentFee).toLocaleString()}원</p>
+
+{!!currentReceiptItem.currentFee && parseFloat((currentReceiptItem.currentFee || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>당월관리비:</strong> {parseFloat((currentReceiptItem.currentFee || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
-{!!currentReceiptItem.waterCost && Number(currentReceiptItem.waterCost) > 0 && (
-  <p><strong>수도요금:</strong> {Number(currentReceiptItem.waterCost).toLocaleString()}원</p>
+
+{!!currentReceiptItem.waterCost && parseFloat((currentReceiptItem.waterCost || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>수도요금:</strong> {parseFloat((currentReceiptItem.waterCost || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
-{!!currentReceiptItem.electricity && Number(currentReceiptItem.electricity) > 0 && (
-  <p><strong>전기요금:</strong> {Number(currentReceiptItem.electricity).toLocaleString()}원</p>
+
+{!!currentReceiptItem.electricity && parseFloat((currentReceiptItem.electricity || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>전기요금:</strong> {parseFloat((currentReceiptItem.electricity || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
-{!!currentReceiptItem.gas && Number(currentReceiptItem.gas) > 0 && (
-  <p><strong>가스요금:</strong> {Number(currentReceiptItem.gas).toLocaleString()}원</p>
+
+{!!currentReceiptItem.gas && parseFloat((currentReceiptItem.gas || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>가스요금:</strong> {parseFloat((currentReceiptItem.gas || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
-{!!currentReceiptItem.cleaning && Number(currentReceiptItem.cleaning) > 0 && (
-  <p><strong>청소비용:</strong> {Number(currentReceiptItem.cleaning).toLocaleString()}원</p>
+
+{!!currentReceiptItem.cleaning && parseFloat((currentReceiptItem.cleaning || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>청소비용:</strong> {parseFloat((currentReceiptItem.cleaning || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
 
 {Array.isArray(currentReceiptItem.defects) && currentReceiptItem.defects.length > 0 && (
@@ -607,7 +638,7 @@ if (isMobileDevice) {
     <ul style={{ paddingLeft: "1.2rem" }}>
       {currentReceiptItem.defects.map((def, i) => (
         <li key={i}>
-          {def.desc} - {Number(def.amount).toLocaleString()}원
+          {def.desc} - {parseFloat((def.amount || "0").toString().replace(/,/g, "")).toLocaleString()}원
         </li>
       ))}
     </ul>
@@ -615,7 +646,7 @@ if (isMobileDevice) {
 )}
 
 <hr />
-<p><strong>총 이사정산 금액:</strong> {Number(currentReceiptItem.total).toLocaleString()}원</p>
+<p><strong>총 이사정산 금액:</strong> {parseFloat((currentReceiptItem.total || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 <p style={{ fontSize: "12px", color: "#999", marginTop: "20px" }}>
   ※ 본 영수증은 발급일 기준이며, 내용은 변동될 수 있습니다.
 </p>

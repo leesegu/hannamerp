@@ -398,3 +398,18 @@ h2 {
   font-size: 15px;
   vertical-align: middle;
 }
+
+.blue-button {
+  background-color: #007bff !important;
+  color: white !important;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.blue-button:hover {
+  background-color: #0056b3 !important;
+}
