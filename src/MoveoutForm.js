@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ 추가
+import { useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { db, storage } from "./firebase";
@@ -271,9 +271,19 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   return (
   <div className="form-container">
     {/* ✅ 뒤로가기 버튼 (모바일 전용) */}
-    {isMobileDevice && (
+{isMobileDevice && (
   <button
-    onClick={() => navigate("/main")}
+    onClick={() => {
+      if (typeof onDone === "function") {
+        onDone();  // ✅ 모바일 팝업 닫기용 콜백
+      } else {
+        if (editItem) {
+          navigate("/list");  // PC fallback
+        } else {
+          navigate("/main");
+        }
+      }
+    }}
     style={{
       position: "absolute",
       top: "16px",
