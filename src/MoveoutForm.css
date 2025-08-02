@@ -5,30 +5,36 @@ html, body {
   overflow-x: hidden;  /* 💡 가로 스크롤 막기 */
 }
 
-  .form-container {
-    padding: 2rem;
-    display: flex;
-    justify-content: center;
-    position: relative;
-  }
+.form-container {
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding-bottom: 20px;
+  box-sizing: border-box;
+}
 
-  .form-inner {
-    max-width: 950px;
-    width: 100%;
-    font-family: sans-serif;
-  }
+.form-inner {
+  max-width: 950px;
+  width: 100%;
+  font-family: sans-serif;
+  max-height: calc(100vh - 100px); /* 💡 화면 넘지 않도록 제한 */
+  overflow-y: auto;
+}
 
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* ← 3열 고정 */
+  gap: 1rem;
+}
 
-  .input-group {
-    display: flex;
-    flex-direction: column;
-  }
+.input-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;  /* 이거 중요 */
+}
 
   .input-group label {
     margin-bottom: 0.25rem;

@@ -11,8 +11,21 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+/* src/index.css 또는 App.css 상단에 추가 */
+
 html, body, #root {
-  height: 100%;
   margin: 0;
   padding: 0;
+  overflow-y: hidden;
+}
+
+.main-layout {
+  height: 100%;
+  display: flex;
+}
+
+.list-container {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
 }

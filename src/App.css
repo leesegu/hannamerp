@@ -1,5 +1,9 @@
 .App {
   text-align: center;
+  min-height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .App-logo {
@@ -15,7 +19,7 @@
 
 .App-header {
   background-color: #282c34;
-  min-height: 100vh;
+  min-height: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -35,9 +39,4 @@
   to {
     transform: rotate(360deg);
   }
-}
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
 }

@@ -59,29 +59,36 @@ function App() {
           }
         />
 
-        <Route
-          path="/moveout"
-          element={
-            !isLoggedIn ? (
-              <Navigate to="/login" />
-            ) : isMobile ? (
-              <MoveoutForm employeeId={employeeId} userId={userId} userName={userName} />
-            ) : (
-              <MainMenu
-                employeeId={employeeId}
-                userId={userId}
-                userName={userName}
-                content={
-                  <MoveoutForm
-                    employeeId={employeeId}
-                    userId={userId}
-                    userName={userName}
-                  />
-                }
-              />
-            )
-          }
-        />
+<Route
+  path="/moveout"
+  element={
+    !isLoggedIn ? (
+      <Navigate to="/login" />
+    ) : isMobile ? (
+      <MoveoutForm
+        key={Date.now()} // ✅ 이 줄 추가!
+        employeeId={employeeId}
+        userId={userId}
+        userName={userName}
+      />
+    ) : (
+      <MainMenu
+        employeeId={employeeId}
+        userId={userId}
+        userName={userName}
+        content={
+          <MoveoutForm
+            key={Date.now()} // ✅ 이 줄 추가!
+            employeeId={employeeId}
+            userId={userId}
+            userName={userName}
+          />
+        }
+      />
+    )
+  }
+/>
+
 
         <Route
           path="/moveout-list"

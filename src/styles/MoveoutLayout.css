@@ -1,0 +1,154 @@
+/* ✅ 폼 전체 컨테이너 */
+.form-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  background-color: #ffffff;
+  padding: 0rem;
+}
+
+/* ✅ 내부 폼 박스 */
+.form-inner {
+  width: 100%;
+  max-width: 950px;
+  background: white;
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.form-inner h2 {
+  margin-top: 0;  /* 위 여백 제거 */
+  margin-bottom: 1rem;  /* 아래 여백은 유지 */
+}
+
+/* ✅ 3열 고정 그리드 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 항상 3열 */
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+/* ✅ 각 입력 항목 그룹 */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.input-group label {
+  font-weight: bold;
+  margin-bottom: 2px;
+  font-size: 14px;
+  line-height: 1.4;
+  padding-left: 2px;
+}
+
+.input-group input,
+.input-group select,
+.input-group button {
+  padding: 8px 8px;
+  font-size: 13.5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.contact-field {
+  grid-column: 3 !important;
+  grid-row: 1;
+}
+
+/* ✅ 반응형 대응: 모바일은 1열 */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr; /* 모바일: 한 줄에 하나씩 */
+  }
+}
+
+/* ✅ 슬라이더 버튼과 사진 간격 */
+.slider-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* ✅ 비고 모달 */
+.modal-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modal {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal textarea {
+  min-height: 100px;
+  padding: 8px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.save-button {
+  margin-top: 1.5rem;
+  padding: 8px 10px;         /* ← 버튼 높이/너비 조절 */
+  font-size: 16px;            /* ← 글자 크기 */
+  font-weight: bold;
+  background-color: #ff8c00;  /* 오렌지색 (CI 컬러) */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 20%;                /* 또는 고정폭: 200px */
+  max-width: 300px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: background-color 0.2s;
+}
+
+.save-button:hover {
+  background-color: #e67600;
+}
+
+.save-button {
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* ✅ 연락처 입력창: 밑줄 스타일 전용 */
+.input-group.contact-underline input {
+  border: none;
+  border-bottom: 2px solid #ccc;
+  border-radius: 0;
+  padding: 8px 4px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  background-color: transparent;
+  transition: border-color 0.3s;
+}
+
+.input-group.contact-underline input:focus {
+  border-bottom-color: #ff8c00;
+}

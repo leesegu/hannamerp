@@ -4,7 +4,7 @@
   font-family: 'Pretendard', sans-serif;
   max-width: 100%;
   box-sizing: border-box;
-  min-height: 100vh;        /* ✅ 페이지 높이 확보 */
+  min-height: calc(100vh - 1px);        /* ✅ 페이지 높이 확보 */
   overflow-y: auto;         /* ✅ 스크롤 허용 */
 }
 

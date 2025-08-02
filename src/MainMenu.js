@@ -89,11 +89,17 @@ function MainMenu({ content, employeeId, userId, userName }) {
             <div className="submenu">
               <div
                 className="submenu-item"
-                onClick={() =>
-                  handleNavigate(
-                    <MoveoutForm employeeId={employeeId} userId={userId} userName={userName} />
-                  )
-                }
+onClick={() =>
+  handleNavigate(
+    <MoveoutForm
+      key={Date.now()} // ✅ 매번 새로운 키로 강제 리렌더링
+      employeeId={employeeId}
+      userId={userId}
+      userName={userName}
+    />
+  )
+}
+
               >
                 이사정산입력
               </div>

@@ -1,23 +1,28 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
+import { useNavigate, useLocation } from "react-router-dom";  // ✅ useLocation 추가
 import "react-datepicker/dist/react-datepicker.css";
+import { ko } from "date-fns/locale";
+import { format } from "date-fns";
 import { db, storage } from "./firebase";
 import { collection, addDoc, setDoc, doc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import "./MoveoutForm.css";
 import { FiArrowLeft } from "react-icons/fi";
-
+import FormLayout from "./components/FormLayout";
+import { formatPhoneNumber } from "./utils/formatting";
 
 export default function MoveoutForm({ employeeId, userId, editItem, onDone, showCancel, isMobile }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobileDevice = typeof isMobile === "boolean" ? isMobile : window.innerWidth <= 768;
   
   const [form, setForm] = useState({
     moveOutDate: "",
     name: "",
     roomNumber: "",
+    contact: "",
     arrears: "",
     currentFee: "",
     waterCurr: "",
@@ -25,7 +30,7 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
     waterCost: "",
     waterUnit: "",
     electricity: "",
-    gas: "",
+    tvFee: "",
     cleaning: "",
     defectDesc: "",
     defectAmount: "",
@@ -48,7 +53,7 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   const defectDescRef = useRef();
   const defectAmountRef = useRef();
   
-  const numberFieldsWithComma = ["arrears", "currentFee", "electricity", "gas", "cleaning", "waterUnit", "waterCost", "defectAmount", "total"];
+  const numberFieldsWithComma = ["arrears", "currentFee", "electricity", "tvFee", "cleaning", "waterUnit", "waterCost", "defectAmount", "total"];
   const numberOnlyFields = ["waterPrev", "waterCurr"];
   const parseNumber = (str) => parseInt((str || "0").replace(/,/g, "")) || 0;
 
@@ -71,18 +76,55 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
     }
   }, [editItem]);
 
-  const handleChange = (id, value) => {
-    if (numberFieldsWithComma.includes(id)) {
-      const numeric = value.replace(/[^0-9]/g, "");
-      const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      setForm({ ...form, [id]: formatted });
-    } else if (numberOnlyFields.includes(id)) {
-      const numeric = value.replace(/[^0-9]/g, "");
-      setForm({ ...form, [id]: numeric });
-    } else {
-      setForm({ ...form, [id]: value });
-    }
-  };
+  useEffect(() => {
+  if (!editItem) {
+    setForm({
+      moveOutDate: "",
+      name: "",
+      roomNumber: "",
+      contact: "",
+      arrears: "",
+      currentFee: "",
+      waterCurr: "",
+      waterPrev: "",
+      waterCost: "",
+      waterUnit: "",
+      electricity: "",
+      tvFee: "",
+      cleaning: "",
+      defectDesc: "",
+      defectAmount: "",
+      total: "",
+      notes: "",
+      status: "정산대기",
+    });
+    setNoteText("");
+    setDefects([]);
+    setImages([]);
+    setImagePreviews([]);
+    setExistingImageUrls([]);
+    setCurrentImageIndex(0);
+    setEditingIndex(null);
+    setNoteModalOpen(false);
+  }
+}, [location.pathname]); // ← 반드시 location.pathname으로!
+
+const handleChange = (id, value) => {
+  if (id === "contact") {
+    const formatted = formatPhoneNumber(value); // 유틸에서 가져온 함수
+    setForm({ ...form, [id]: formatted });
+  } else if (numberFieldsWithComma.includes(id)) {
+    const numeric = value.replace(/[^0-9]/g, "");
+    const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    setForm({ ...form, [id]: formatted });
+  } else if (numberOnlyFields.includes(id)) {
+    const numeric = value.replace(/[^0-9]/g, "");
+    setForm({ ...form, [id]: numeric });
+  } else {
+    setForm({ ...form, [id]: value });
+  }
+};
+
 
   const handleKeyDown = (e, index) => {
     if (e.key === "Enter") {
@@ -204,6 +246,7 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
         moveOutDate: "",
         name: "",
         roomNumber: "",
+        contact: "",
         arrears: "",
         currentFee: "",
         waterCurr: "",
@@ -211,7 +254,7 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
         waterCost: "",
         waterUnit: "",
         electricity: "",
-        gas: "",
+        tvFee: "",
         cleaning: "",
         defectDesc: "",
         defectAmount: "",
@@ -245,28 +288,28 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   }, [form.waterPrev, form.waterCurr, form.waterUnit]);
 
   useEffect(() => {
-    const totalSum = ["arrears", "currentFee", "waterCost", "electricity", "gas", "cleaning"].reduce(
+    const totalSum = ["arrears", "currentFee", "waterCost", "electricity", "tvFee", "cleaning"].reduce(
       (sum, key) => sum + parseNumber(form[key]),
       0
     );
     const defectSum = defects.reduce((sum, d) => sum + parseNumber(d.amount), 0);
     setForm((prevForm) => ({ ...prevForm, total: (totalSum + defectSum).toLocaleString() }));
-  }, [form.arrears, form.currentFee, form.waterCost, form.electricity, form.gas, form.cleaning, defects]);
+  }, [form.arrears, form.currentFee, form.waterCost, form.electricity, form.tvFee, form.cleaning, defects]);
 
   const inputList = [
-    { id: "moveOutDate", label: "이사날짜", type: "date" },
-    { id: "name", label: "빌라명" },
-    { id: "roomNumber", label: "호수" },
-    { id: "arrears", label: "미납관리비" },
-    { id: "currentFee", label: "당월관리비" },
-    { id: "waterCurr", label: "당월지침" },
-    { id: "waterPrev", label: "전월지침" },
-    { id: "waterCost", label: "수도요금", readOnly: true },
-    { id: "waterUnit", label: "수도단가" },
-    { id: "electricity", label: "전기요금" },
-    { id: "gas", label: "가스요금" },
-    { id: "cleaning", label: "청소비용" },
-  ];
+  { id: "moveOutDate", label: "이사날짜", type: "date" },
+  { id: "name", label: "빌라명" },
+  { id: "roomNumber", label: "호수" },
+  { id: "arrears", label: "미납관리비" },
+  { id: "currentFee", label: "당월관리비" },
+  { id: "waterCurr", label: "당월지침" },
+  { id: "waterPrev", label: "전월지침" },
+  { id: "waterCost", label: "수도요금", readOnly: true },
+  { id: "waterUnit", label: "수도단가" },
+  { id: "electricity", label: "전기요금" },
+  { id: "tvFee", label: "TV수신료" }, // ✅ 수정됨
+  { id: "cleaning", label: "청소비용" },
+];
 
   return (
   <div className="form-container">
@@ -306,20 +349,34 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   </button>
 )}
 
-    <div className="form-inner">
+    <FormLayout>
 <h2>이사정산 입력</h2>
         {/* (이하 동일 - 생략 없이 반영됨) */}
-        <div className="grid">
+<div className="grid">
+  {/* ✅ 1줄: 비워둠, 비워둠, 연락처 */}
+  <div className="input-group" />
+  <div className="input-group" />
+<div className="input-group contact-underline contact-field">
+  <input
+    type="text"
+    value={form.contact}
+    onChange={(e) => handleChange("contact", e.target.value)}
+    placeholder="Phone number"
+  />
+</div>
+        
           {inputList.map(({ id, label, type, readOnly }, index) => (
             <div key={id} className="input-group">
               <label>{label}</label>
               {id === "moveOutDate" ? (
-                <DatePicker
-                  selected={form.moveOutDate ? new Date(form.moveOutDate) : null}
-                  onChange={(date) => handleChange("moveOutDate", date.toISOString().split("T")[0])}
-                  dateFormat="yyyy-MM-dd"
-                  className="custom-datepicker"
-                />
+<DatePicker
+  selected={form.moveOutDate ? new Date(form.moveOutDate) : null}
+  onChange={(date) => handleChange("moveOutDate", format(date, "yyyy-MM-dd"))}
+  dateFormat="yyyy-MM-dd"
+  locale={ko}
+  className="custom-datepicker"
+/>
+
               ) : (
                 <input
                   ref={(el) => (inputRefs.current[index] = el)}
@@ -336,38 +393,38 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
 
         {/* 하자입력 */}
         <div className="grid">
-          <div className="input-group">
-            <label>하자내역</label>
-            <input
-              ref={defectDescRef}
-              value={form.defectDesc}
-              onChange={(e) => handleChange("defectDesc", e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && defectAmountRef.current?.focus()}
-            />
-          </div>
-          <div className="input-group">
-            <label>하자금액</label>
-            <input
-              ref={defectAmountRef}
-              value={form.defectAmount}
-              onChange={(e) => handleChange("defectAmount", e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddDefect()}
-            />
-          </div>
-        </div>
+  <div className="input-group">
+    <label>추가내역</label> {/* ✅ 수정됨 */}
+    <input
+      ref={defectDescRef}
+      value={form.defectDesc}
+      onChange={(e) => handleChange("defectDesc", e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && defectAmountRef.current?.focus()}
+    />
+  </div>
+  <div className="input-group">
+    <label>추가금액</label> {/* ✅ 수정됨 */}
+    <input
+      ref={defectAmountRef}
+      value={form.defectAmount}
+      onChange={(e) => handleChange("defectAmount", e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && handleAddDefect()}
+    />
+  </div>
+</div>
 
-        <div className="defect-list-container">
-          {defects.map((d, i) => (
-            <div key={i} className="defect-row">
-              <span className="defect-desc">{d.desc}</span>
-              <span className="defect-amount">{d.amount}원</span>
-              <div className="defect-actions">
-                <button onClick={() => handleStartEditDefect(i)}>수정</button>
-                <button onClick={() => handleDeleteDefect(i)}>삭제</button>
-              </div>
-            </div>
-          ))}
-        </div>
+<div className="defect-list-container">
+  {defects.map((d, i) => (
+    <div key={i} className="defect-row">
+      <span className="defect-desc">{d.desc}</span>
+      <span className="defect-amount">{d.amount}원</span>
+      <div className="defect-actions">
+        <button onClick={() => handleStartEditDefect(i)}>수정</button>
+        <button onClick={() => handleDeleteDefect(i)}>삭제</button>
+      </div>
+    </div>
+  ))}
+</div>
 
         <div className="grid">
           <div className="input-group">
@@ -426,7 +483,7 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
       <button className="save-button" onClick={handleSave}>
         저장
       </button>
-    </div>
+    </FormLayout>
 
     {/* ✅ 모달은 form-inner 바깥에서 렌더링 */}
     {noteModalOpen && (

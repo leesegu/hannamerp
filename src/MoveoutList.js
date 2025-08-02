@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef  } from "react";
+// MoveoutList.js 상단 import 구간
+import { sortByTodayFirst } from "./utils/sortByTodayFirst"; // 경로 확인
 import { db, storage } from "./firebase"; // ✅ db와 storage 가져오기
 import {
   collection,
@@ -34,6 +36,7 @@ export default function MoveoutList({ employeeId, userId }) {
   const [selectedNote, setSelectedNote] = useState("");
   const [selectedDefects, setSelectedDefects] = useState([]);
   const [selectedImages, setSelectedImages] = useState([]);
+  const [showFormPopup, setShowFormPopup] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
@@ -76,7 +79,7 @@ const handleDownloadImage = async () => {
   const tableColumns = [
     "moveOutDate", "name", "roomNumber", "arrears", "currentFee",
     "waterCurr", "waterPrev", "waterCost", "waterUnit", "electricity",
-    "gas", "cleaning", "total", "status"
+    "tvFee", "cleaning", "total", "status"
   ];
 
   useEffect(() => {
@@ -85,12 +88,10 @@ const handleDownloadImage = async () => {
     const q = query(collection(db, "moveoutData"), where("groupId", "==", userId));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({
-        ...doc.data(),
-        docId: doc.id
-      }));
-      setDataList(list);
-    });
+  const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const sorted = sortByTodayFirst(items); // ✅ 오늘 날짜 우선 정렬
+  setDataList(sorted);
+});
 
     return () => unsubscribe();
   }, [userId]);
@@ -219,10 +220,10 @@ if (isMobileDevice) {
         <h2 style={{ textAlign: "center", marginTop: 60 }}>이사정산 조회</h2>
 
         {filtered.map((item, idx) => (
-          <div key={item.docId} className="mobile-item">
+          <div key={item.id} className="mobile-item">
             <div
               className="mobile-row1"
-              onClick={() => setExpandedId(expandedId === item.docId ? null : item.docId)}
+              onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
             >
               <div>{idx + 1}</div>
               <div>{item.moveOutDate}</div>
@@ -238,13 +239,13 @@ if (isMobileDevice) {
               <div>{Number(item.total).toLocaleString()}원</div>
             </div>
 
-            {expandedId === item.docId && (
+            {expandedId === item.id && (
               <div className="mobile-expand">
                 <div className="mobile-icons">
                   <div
                     className={`icon-badge ${item.defects?.length > 0 ? "has-content" : ""}`}
                     onClick={() => setSelectedDefects(item.defects || [])}
-                  >하자</div>
+                  >추가내역</div>
                   <div
                     className={`icon-badge ${item.notes?.trim() ? "has-content" : ""}`}
                     onClick={() => setSelectedNote(item.notes || "")}
@@ -266,7 +267,7 @@ if (isMobileDevice) {
         {selectedDefects.length > 0 && (
           <div className="modal-center">
             <div className="modal-content">
-              <h4>하자내역</h4>
+              <h4>추가내역</h4>
               <ul>{selectedDefects.map((d, i) => (
                 <li key={i}>{d.desc} - {d.amount}원</li>
               ))}</ul>
@@ -379,14 +380,14 @@ if (isMobileDevice) {
                     waterCost: "수도요금",
                     waterUnit: "단가",
                     electricity: "전기",
-                    gas: "가스",
+                    tvFee: "TV수신료",
                     cleaning: "청소",
                     total: "총액",
                     status: "진행현황"
                   }[key] || key}
                 </th>
               ))}
-              <th>하자</th>
+              <th>추가내역</th>
               <th>비고</th>
               <th>사진</th>
               <th>영수증</th>
@@ -395,7 +396,7 @@ if (isMobileDevice) {
           </thead>
           <tbody>
             {filtered.map((item, i) => (
-              <tr key={`row-${item.docId}`}>
+              <tr key={`row-${item.id}`}>
                 <td>{i + 1}</td>
                 <td>{item.moveOutDate}</td>
                 <td>{item.name}</td>
@@ -407,7 +408,7 @@ if (isMobileDevice) {
                 <td>{item.waterCost}</td>
                 <td>{item.waterUnit}</td>
                 <td>{item.electricity}</td>
-                <td>{item.gas}</td>
+                <td>{item.tvFee}</td>
                 <td>{item.cleaning}</td>
                 <td>{Number(item.total).toLocaleString()}</td>
                 <td>
@@ -447,7 +448,7 @@ if (isMobileDevice) {
 </td>
 <td>
   <button onClick={() => handleEdit(item)}>수정</button>
-  <button onClick={() => handleDelete(item.docId)}>삭제</button>
+  <button onClick={() => handleDelete(item.id)}>삭제</button>
 </td>
               </tr>
             ))}
@@ -458,7 +459,7 @@ if (isMobileDevice) {
       {selectedDefects.length > 0 && (
         <div className="modal-center">
         <div className="modal-content">
-          <h4>하자내역</h4>
+          <h4>추가내역</h4>
           <ul>{selectedDefects.map((d, i) => (
             <li key={i}>{d.desc} - {d.amount}원</li>
           ))}</ul>
@@ -624,8 +625,8 @@ if (isMobileDevice) {
   <p><strong>전기요금:</strong> {parseFloat((currentReceiptItem.electricity || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
 
-{!!currentReceiptItem.gas && parseFloat((currentReceiptItem.gas || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>가스요금:</strong> {parseFloat((currentReceiptItem.gas || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
+{!!currentReceiptItem.tvFee && parseFloat((currentReceiptItem.tvFee || "0").toString().replace(/,/g, "")) > 0 && (
+  <p><strong>TV수신료:</strong> {parseFloat((currentReceiptItem.tvFee || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
 )}
 
 {!!currentReceiptItem.cleaning && parseFloat((currentReceiptItem.cleaning || "0").toString().replace(/,/g, "")) > 0 && (
@@ -634,7 +635,7 @@ if (isMobileDevice) {
 
 {Array.isArray(currentReceiptItem.defects) && currentReceiptItem.defects.length > 0 && (
   <>
-    <p><strong>하자내역:</strong></p>
+    <p><strong>추가내역:</strong></p>
     <ul style={{ paddingLeft: "1.2rem" }}>
       {currentReceiptItem.defects.map((def, i) => (
         <li key={i}>
