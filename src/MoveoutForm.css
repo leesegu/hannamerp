@@ -5,23 +5,46 @@ html, body {
   overflow-x: hidden;  /* 💡 가로 스크롤 막기 */
 }
 
+/* ✅ MoveoutForm.css */
+
 .form-container {
-  padding: 2rem;
+  width: 100%;
+  max-height: 75vh !important;
+  overflow-y: auto !important;  /* 스크롤 절대 없게 */
+  background: rgb(255, 255, 255);       /* 배경 투명하게 */
+  box-shadow: none;              /* 중복된 그림자 제거 */
+  padding: 0;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0; /* top, right, bottom, left = 0 */
   display: flex;
   justify-content: center;
-  position: relative;
-  max-height: 100vh;
+  align-items: flex-start; /* ✅ 세로 위쪽 정렬 */
+  padding-top: 30px;
+  background-color: rgba(0, 0, 0, 0.2); /* 어두운 배경 */
+  z-index: 9999;
   overflow-y: auto;
-  padding-bottom: 20px;
-  box-sizing: border-box;
+}
+
+.popup-container {
+  background-color: white;
+  border-radius: 10px;
+  padding: 30px;
+  width: 800px;
+  max-height: 90vh; /* 너무 길면 스크롤 */
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .form-inner {
-  max-width: 950px;
-  width: 100%;
-  font-family: sans-serif;
-  max-height: calc(100vh - 100px); /* 💡 화면 넘지 않도록 제한 */
-  overflow-y: auto;
+  overflow: visible !important;
+  padding: 0;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .grid {
@@ -46,8 +69,8 @@ html, body {
   .input-group button {
     padding: 10px;
     font-size: 14px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+    border: 1px solid #ffffff;
+    border-radius: 1px;
   }
 
   .input-group input[readonly] {
@@ -70,7 +93,7 @@ html, body {
     padding: 4px 0;
     font-size: 13px;
     color: #333;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid #ffffff;
   }
 
   .defect-desc {
@@ -119,9 +142,9 @@ html, body {
   .slider-image-container img {
     max-width: 100%;
     max-height: 300px;
-    border-radius: 8px;
+    border-radius: 1px;
     object-fit: contain;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
   }
 
   .slider-indicator {
@@ -135,31 +158,34 @@ html, body {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
-  background: transparent;
+  height: 100vh; /* 화면 전체 높이 고정 */
+  background: rgba(0, 0, 0, 0.2); /* 반투명 배경 */
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* 상단 정렬 */
+  padding-top: 30px; /* 약간 아래에서 시작 */
+  overflow-y: auto; /* 내부 스크롤 허용 */
   z-index: 9999;
 }
 
 .modal {
-  position: fixed !important;           /* 부모 영향 제거 */
+  position: fixed !important;
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
   background: white;
   width: 360px;
-  padding: 16px 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  padding: 20px 20px 10px 20px !important;  /* 하단 padding ↓ */
+  border-radius: 1px;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 14px;
   max-height: 80vh;
   overflow-y: auto;
-  z-index: 10000;                        /* 다른 컴포넌트 위에 올라오도록 */
+  margin-bottom: 0 !important;     /* ✅ 추가 */
 }
+
 
   .modal textarea {
   height: 80px;
@@ -179,107 +205,14 @@ html, body {
     border-radius: 8px;
     width: 100%;
     cursor: pointer;
+    margin-bottom: 0 !important;
   }
 
   .custom-datepicker {
     width: 100%;
     padding: 10px;
     font-size: 14px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+    border: 1px solid #ffffff;
+    border-radius: 1px;
     box-sizing: border-box;
   }
-
-@media (max-width: 768px) {
-  .form-container {
-    padding: 1rem;
-  }
-
-  .form-inner {
-    padding: 0 0.5rem;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* 모바일에서 2열 구성 */
-    gap: 0.75rem;
-  }
-
-  .input-group {
-    width: 100%;
-  }
-
-  .save-button {
-    font-size: 15px;
-    padding: 10px;
-  }
-
-  .slider-image-container img {
-    max-height: 200px;
-  }
-
-  /* ✅ 모바일 팝업창 크기 및 위치 */
-  .modal {
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-
-    width: 90% !important;
-    max-width: 320px !important;
-    padding: 14px !important;
-    height: auto !important;
-    max-height: 70vh !important;
-  }
-
-  .modal textarea {
-    height: 100px !important;
-    font-size: 14px !important;
-    padding: 8px !important;
-    resize: vertical !important;
-    border-radius: 6px !important;
-  }
-}
-
-  .form-container.force-pc {
-    padding: 2rem !important;
-  }
-
-  .form-container.force-pc .grid {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 1rem !important;
-  }
-
-  .form-container.force-pc .slider-image-container img {
-    max-height: 300px !important;
-  }
-
-@media (min-width: 769px) {
-  .modal-wrapper {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: transparent;          /* ✅ 회색 배경 제거 */
-    z-index: 9999;
-
-    display: flex;                    /* ✅ 중앙 정렬 유지 */
-    justify-content: center;
-    align-items: center;
-  }
-
-  .modal {
-    position: relative;
-    width: 360px;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-}

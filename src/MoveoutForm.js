@@ -14,6 +14,13 @@ import FormLayout from "./components/FormLayout";
 import { formatPhoneNumber } from "./utils/formatting";
 
 export default function MoveoutForm({ employeeId, userId, editItem, onDone, showCancel, isMobile }) {
+  useEffect(() => {
+  document.body.style.overflow = "hidden";
+  return () => {
+    document.body.style.overflow = "auto";
+  };
+}, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const isMobileDevice = typeof isMobile === "boolean" ? isMobile : window.innerWidth <= 768;
@@ -350,7 +357,7 @@ const handleChange = (id, value) => {
 )}
 
     <FormLayout>
-<h2>이사정산 입력</h2>
+<h2>이사정산 등록</h2>
         {/* (이하 동일 - 생략 없이 반영됨) */}
 <div className="grid">
   {/* ✅ 1줄: 비워둠, 비워둠, 연락처 */}
@@ -441,10 +448,35 @@ const handleChange = (id, value) => {
           </div>
         </div>
 
-        <div className="input-group">
-          <label>사진첨부</label>
-          <input type="file" multiple onChange={handleImageChange} />
-        </div>
+<div className="grid-2col">
+  {/* 사진첨부 버튼 */}
+  <div className="input-group">
+    <label>사진첨부</label>
+    <input
+      type="file"
+      id="file-upload"
+      multiple
+      onChange={handleImageChange}
+      style={{ display: "none" }}
+    />
+    <button
+      type="button"
+      className="custom-button green"
+      onClick={() => document.getElementById("file-upload").click()}
+    >
+      + 사진첨부
+    </button>
+  </div>
+
+  {/* 비고 버튼 */}
+  <div className="input-group">
+    <label>비고</label>
+    <button className="custom-button orange" onClick={openNoteModal}>
+      {form.notes ? "내용있음" : "내용없음"}
+    </button>
+  </div>
+</div>
+
 
         {imagePreviews.length > 0 && (
           <div className="image-slider-single">
@@ -471,13 +503,6 @@ const handleChange = (id, value) => {
             <div className="slider-indicator">{currentImageIndex + 1} / {imagePreviews.length}</div>
           </div>
         )}
-
-        <div className="input-group">
-        <label>비고</label>
-        <button onClick={openNoteModal}>
-          {form.notes ? "내용있음" : "내용없음"}
-        </button>
-      </div>
 
       {/* ✅ 저장 버튼 */}
       <button className="save-button" onClick={handleSave}>

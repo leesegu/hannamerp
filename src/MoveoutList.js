@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef  } from "react";
-// MoveoutList.js 상단 import 구간
 import { sortByTodayFirst } from "./utils/sortByTodayFirst"; // 경로 확인
 import { db, storage } from "./firebase"; // ✅ db와 storage 가져오기
 import {
@@ -14,10 +13,12 @@ import {
 } from "firebase/firestore";
 import MoveoutForm from "./MoveoutForm";
 import { FiX, FiArrowLeft } from "react-icons/fi";
-import { useNavigate } from "react-router-dom"; // ✅ 추가
+import { FaEdit } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import "./MoveoutList.css";
 import * as htmlToImage from 'html-to-image';
-import { Timestamp } from "firebase/firestore";
+import "./components/DataTable.css";
+import ReceiptTemplate from "./components/ReceiptTemplate";
 
 
 const formatDate = (dateStr) => {
@@ -122,7 +123,7 @@ const handleShowReceipt = (item) => {
 
   const handleEdit = (item) => {
     window.lastSavedItem = JSON.stringify(item);
-    setEditItem({ ...item, fromEdit: true });
+    setEditItem({ ...item, docId: item.id });
     setShowPopup(true);
   };
 
@@ -337,30 +338,45 @@ if (isMobileDevice) {
     return (
     <div className="list-container">
       <h2>이사정산 조회</h2>
-      <div className="top-controls">
-        <div className="left-controls">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="status-filter-dropdown"
-          >
-            <option value="">전체</option>
-            <option value="정산대기">정산대기</option>
-            <option value="입금대기">입금대기</option>
-            <option value="입금완료">입금완료</option>
-          </select>
-          {statusFilter === "입금대기" && (
-            <div className="deposit-total">총액 합계: {depositTotal}원</div>
-          )}
-        </div>
-        <input
-          type="text"
-          placeholder="빌라명, 호수, 날짜, 총액 검색"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className="search-input"
-        />
-      </div>
+<div className="top-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+  <div className="left-controls">
+    <select
+      value={statusFilter}
+      onChange={(e) => setStatusFilter(e.target.value)}
+      className="status-filter-dropdown"
+    >
+      <option value="">전체</option>
+      <option value="정산대기">정산대기</option>
+      <option value="입금대기">입금대기</option>
+      <option value="입금완료">입금완료</option>
+    </select>
+    {statusFilter === "입금대기" && (
+      <div className="deposit-total">총액 합계: {depositTotal}원</div>
+    )}
+  </div>
+
+  {/* 🔽 오른쪽에 검색창 + 등록버튼 나란히 */}
+  <div className="right-controls" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+    <button
+      className="register-button"
+      onClick={() => {
+        setEditItem(null);
+        setShowPopup(true);
+      }}
+    >
+      <FaEdit style={{ marginRight: 6 }} />
+      등록
+    </button>
+    <input
+      type="text"
+      placeholder="빌라명, 호수, 날짜, 총액 검색"
+      value={searchText}
+      onChange={(e) => setSearchText(e.target.value)}
+      className="search-input"
+    />
+  </div>
+</div>
+
 
       <div className="scroll-table">
         <table className="data-table">
@@ -496,168 +512,71 @@ if (isMobileDevice) {
       </div>
       )}
       
-      {showPopup && editItem && (
-  <div
-    style={{
-      position: "fixed",
-      top: "2%",
-      left: "50%",
-      transform: "translateX(-50%)",
-      background: "#fff",
-      borderRadius: "12px",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-      padding: "30px",
-      zIndex: 9999,
-      maxHeight: "90vh",
-      overflowY: "auto",
-      width: "calc(100vw - 100px)",
-      maxWidth: "1000px"
-    }}
-  >
-    <MoveoutForm
-      employeeId={employeeId}
-      userId={userId}
-      editItem={editItem}
-      onDone={handleEditDone}
-      showCancel={true}
-      isMobile={false}
-    />
-    <button
-      onClick={async () => {
-        const saved = JSON.stringify(editItem);
-        const current = JSON.stringify(window.editingFormData);
-        if (!window.editingFormData || saved === current) {
-          setEditItem(null);
-          setShowPopup(false);
-          return;
-        }
-        const confirmClose = window.confirm("변경된 내용이 있습니다. 저장하시겠습니까?");
-        if (confirmClose) {
-          document.querySelector(".save-button")?.click();
-        } else {
-          setEditItem(null);
-          setShowPopup(false);
-        }
-      }}
-      style={{
-        position: "absolute",
-        top: "10px",
-        right: "15px",
-        background: "transparent",
-        border: "none",
-        fontSize: "24px",
-        color: "#333",
-        cursor: "pointer"
-      }}
-    >
-      <FiX />
-    </button>
-  </div>  
+{showPopup && (
+  <div className="backdrop">
+    <div className="popup-container">
+      <MoveoutForm
+        userId={userId}
+        employeeId={employeeId}
+        editItem={editItem}
+        onDone={handleEditDone}
+        showCancel={true}
+        isMobile={false}
+      />
+
+      <button
+        onClick={async () => {
+          const saved = JSON.stringify(editItem || {});
+          const current = JSON.stringify(window.editingFormData);
+          if (!window.editingFormData || saved === current) {
+            setEditItem(null);
+            setShowPopup(false);
+            return;
+          }
+          const confirmClose = window.confirm("변경된 내용이 있습니다. 저장하시겠습니까?");
+          if (confirmClose) {
+            document.querySelector(".save-button")?.click();
+          } else {
+            setEditItem(null);
+            setShowPopup(false);
+          }
+        }}
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "15px",
+          background: "transparent",
+          border: "none",
+          fontSize: "24px",
+          color: "#333",
+          cursor: "pointer"
+        }}
+      >
+        <FiX />
+      </button>
+    </div>
+  </div>
 )}
 
-{previewImage && (
-  <div className="modal-center">
-    <div className="modal-content" style={{ textAlign: "center" }}>
-      <h4>영수증 미리보기</h4>
-      <img
-        src={previewImage}
-        alt="Receipt Preview"
-        style={{ maxWidth: "100%", maxHeight: "80vh", marginBottom: 12 }}
-      />
-      {isMobileDevice ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <a href={previewImage} download="receipt.jpg">이미지 다운로드</a>
-          <button onClick={() => {
-            if (navigator.share) {
-              navigator.share({
-                title: '이사정산 영수증',
-                text: '영수증을 확인해주세요.',
-                url: previewImage
-              });
-            } else {
-              alert("공유 기능을 지원하지 않는 기기입니다.");
-            }
-          }}>문자 / 카카오톡 공유</button>
-          <button onClick={() => setPreviewImage(null)}>닫기</button>
+      {previewImage && (
+        <div className="modal-center">
+          <div className="modal-content" style={{ textAlign: "center" }}>
+            <h4>영수증 미리보기</h4>
+            <img src={previewImage} alt="Receipt Preview" style={{ maxWidth: "100%", maxHeight: "80vh", marginBottom: 12 }} />
+            <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+              <button onClick={() => downloadImage("jpg")}>JPG 저장</button>
+              <button onClick={() => downloadImage("pdf")}>PDF 저장</button>
+              <button onClick={() => setPreviewImage(null)}>닫기</button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-          <button onClick={() => downloadImage("jpg")}>JPG 저장</button>
-          <button onClick={() => downloadImage("pdf")}>PDF 저장</button>
-          <button onClick={() => setPreviewImage(null)}>닫기</button>
+      )}
+
+      {currentReceiptItem && (
+        <div style={{ position: "absolute", top: 0, left: 0, zIndex: -9999, opacity: 0, pointerEvents: "none" }}>
+          <ReceiptTemplate item={currentReceiptItem} refProp={receiptRef} />
         </div>
       )}
     </div>
-  </div>
-)}
-{currentReceiptItem && (
-  <div style={{ position: "absolute", top: 0, left: 0, zIndex: -9999, opacity: 0, pointerEvents: "none" }}>
-    <div
-      ref={receiptRef}
-      style={{
-        width: "360px",
-        border: "1px solid #ddd",
-        padding: "20px",
-        background: "#fff",
-        fontFamily: "'Noto Sans KR', sans-serif",
-        fontSize: "14px"
-      }}
-    >
-<h2 style={{ textAlign: "center", color: "#333" }}>이사 정산 영수증</h2>
-<hr />
-<p><strong>이사날짜:</strong> {currentReceiptItem.moveOutDate}</p>
-<p><strong>빌라명:</strong> {currentReceiptItem.name}</p>
-<p><strong>호수:</strong> {currentReceiptItem.roomNumber}</p>
-
-{!!currentReceiptItem.arrears && parseFloat((currentReceiptItem.arrears || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>미납관리비:</strong> {parseFloat((currentReceiptItem.arrears || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-)}
-
-{!!currentReceiptItem.currentFee && parseFloat((currentReceiptItem.currentFee || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>당월관리비:</strong> {parseFloat((currentReceiptItem.currentFee || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-)}
-
-{!!currentReceiptItem.waterCost && parseFloat((currentReceiptItem.waterCost || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>수도요금:</strong> {parseFloat((currentReceiptItem.waterCost || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-)}
-
-{!!currentReceiptItem.electricity && parseFloat((currentReceiptItem.electricity || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>전기요금:</strong> {parseFloat((currentReceiptItem.electricity || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-)}
-
-{!!currentReceiptItem.tvFee && parseFloat((currentReceiptItem.tvFee || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>TV수신료:</strong> {parseFloat((currentReceiptItem.tvFee || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-)}
-
-{!!currentReceiptItem.cleaning && parseFloat((currentReceiptItem.cleaning || "0").toString().replace(/,/g, "")) > 0 && (
-  <p><strong>청소비용:</strong> {parseFloat((currentReceiptItem.cleaning || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-)}
-
-{Array.isArray(currentReceiptItem.defects) && currentReceiptItem.defects.length > 0 && (
-  <>
-    <p><strong>추가내역:</strong></p>
-    <ul style={{ paddingLeft: "1.2rem" }}>
-      {currentReceiptItem.defects.map((def, i) => (
-        <li key={i}>
-          {def.desc} - {parseFloat((def.amount || "0").toString().replace(/,/g, "")).toLocaleString()}원
-        </li>
-      ))}
-    </ul>
-  </>
-)}
-
-<hr />
-<p><strong>총 이사정산 금액:</strong> {parseFloat((currentReceiptItem.total || "0").toString().replace(/,/g, "")).toLocaleString()}원</p>
-<p style={{ fontSize: "12px", color: "#999", marginTop: "20px" }}>
-  ※ 본 영수증은 발급일 기준이며, 내용은 변동될 수 있습니다.
-</p>
-    </div>
-  </div>
-)}
-
-
-</div>
-
-);
-
+  );
 }

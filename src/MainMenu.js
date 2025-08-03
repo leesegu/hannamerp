@@ -85,36 +85,25 @@ function MainMenu({ content, employeeId, userId, userName }) {
           <div className="menu-item" onClick={() => toggleMenu("moveout")}>
             📦 이사정산
           </div>
-          {openMenu === "moveout" && (
-            <div className="submenu">
-              <div
-                className="submenu-item"
-onClick={() =>
-  handleNavigate(
-    <MoveoutForm
-      key={Date.now()} // ✅ 매번 새로운 키로 강제 리렌더링
-      employeeId={employeeId}
-      userId={userId}
-      userName={userName}
-    />
-  )
-}
+{openMenu === "moveout" && (
+  <div className="submenu">
+    <div
+      className="submenu-item"
+      onClick={() =>
+        handleNavigate(
+          <MoveoutList
+            employeeId={employeeId}
+            userId={userId}
+            userName={userName}
+          />
+        )
+      }
+    >
+      이사정산 등록/조회
+    </div>
+  </div>
+)}
 
-              >
-                이사정산입력
-              </div>
-              <div
-                className="submenu-item"
-                onClick={() =>
-                  handleNavigate(
-                    <MoveoutList employeeId={employeeId} userId={userId} userName={userName} />
-                  )
-                }
-              >
-                이사정산조회
-              </div>
-            </div>
-          )}
 
           <div className="menu-item">📒 거래처관리</div>
           <div className="menu-item">🧾 영수증발행</div>

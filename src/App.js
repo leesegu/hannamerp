@@ -4,9 +4,12 @@ import LoginPage from "./LoginPage";
 import MainMenu from "./MainMenu";
 import MoveoutForm from "./MoveoutForm";
 import MoveoutList from "./MoveoutList";
-import MobileLayout from "./components/MobileLayout";
 import UserRegisterPage from "./UserRegisterPage";
+import MobileMainPage from "./components/MobileMainPage";
+import MobileMoveoutForm from "./components/MobileMoveoutForm";
+import MobileMoveoutList from "./components/MobileMoveoutList";
 import "./App.css";
+
 
 function App() {
   const [isMobile, setIsMobile] = useState(false);
@@ -46,27 +49,13 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
 
-        <Route
-          path="/main"
-          element={
-            !isLoggedIn ? (
-              <Navigate to="/login" />
-            ) : isMobile ? (
-              <MobileLayout />
-            ) : (
-              <MainMenu employeeId={employeeId} userId={userId} userName={userName} />
-            )
-          }
-        />
-
 <Route
-  path="/moveout"
+  path="/main"
   element={
     !isLoggedIn ? (
       <Navigate to="/login" />
     ) : isMobile ? (
-      <MoveoutForm
-        key={Date.now()} // ✅ 이 줄 추가!
+      <MobileMainPage
         employeeId={employeeId}
         userId={userId}
         userName={userName}
@@ -76,19 +65,33 @@ function App() {
         employeeId={employeeId}
         userId={userId}
         userName={userName}
-        content={
-          <MoveoutForm
-            key={Date.now()} // ✅ 이 줄 추가!
-            employeeId={employeeId}
-            userId={userId}
-            userName={userName}
-          />
-        }
       />
     )
   }
 />
 
+        <Route
+          path="/moveout-form"
+          element={
+            !isLoggedIn ? (
+              <Navigate to="/login" />
+            ) : isMobile ? (
+              <MobileMoveoutForm employeeId={employeeId} userId={userId} />
+            ) : (
+              <MainMenu
+                employeeId={employeeId}
+                userId={userId}
+                userName={userName}
+                content={
+                  <MoveoutForm
+                    employeeId={employeeId}
+                    userId={userId}
+                  />
+                }
+              />
+            )
+          }
+        />
 
         <Route
           path="/moveout-list"
@@ -96,7 +99,7 @@ function App() {
             !isLoggedIn ? (
               <Navigate to="/login" />
             ) : isMobile ? (
-              <MoveoutList employeeId={employeeId} userId={userId} userName={userName} />
+              <MobileMoveoutList employeeId={employeeId} userId={userId} />
             ) : (
               <MainMenu
                 employeeId={employeeId}

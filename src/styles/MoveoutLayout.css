@@ -13,9 +13,11 @@
   width: 100%;
   max-width: 950px;
   background: white;
-  padding: 2rem;
+  padding: 1rem;
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
 }
 
 .form-inner h2 {
@@ -52,6 +54,15 @@
   font-size: 13.5px;
   border: 1px solid #ccc;
   border-radius: 4px;
+}
+
+/* 기존에 input-group, form-container 등 정의되어 있을 부분 하단에 추가 */
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .contact-field {
@@ -152,3 +163,70 @@
 .input-group.contact-underline input:focus {
   border-bottom-color: #ff8c00;
 }
+
+.custom-file-button {
+  display: inline-block;
+  width: 50%;
+  max-width: 380px;
+  padding: 10px 16px;
+  font-size: 14px;
+  background-color: #28a745; /* ✅ 초록색 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 6px;
+  transition: background-color 0.2s;
+}
+
+.custom-file-button:hover {
+  background-color: #218838; /* hover 시 진한 초록 */
+}
+.custom-note-button {
+  display: inline-block;
+  padding: 10px 16px;
+  font-size: 14px;
+  background-color: #ff8c00;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 50%;              /* 반 너비 */
+  max-width: 240px;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.custom-note-button:hover {
+  background-color: #e67600;
+}
+
+.custom-button {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+/* 사진첨부 - 부드러운 민트/그린 */
+.custom-button.green {
+  background-color: #c7e8ca;
+}
+.custom-button.green:hover {
+  background-color: #a4d3a6;
+}
+
+/* 비고 - 부드러운 오렌지/살구 */
+.custom-button.orange {
+  background-color: #f6d1a7;
+}
+.custom-button.orange:hover {
+  background-color: #f1bd83;
+}
+
