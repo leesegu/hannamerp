@@ -6,17 +6,16 @@ import MoveoutForm from "./MoveoutForm";
 import MoveoutList from "./MoveoutList";
 import UserRegisterPage from "./UserRegisterPage";
 import MobileMainPage from "./components/MobileMainPage";
-import MobileMoveoutForm from "./components/MobileMoveoutForm";
-import MobileMoveoutList from "./components/MobileMoveoutList";
 import "./App.css";
-
 
 function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
+  const [loading, setLoading] = useState(true);
 
+  // 로그인 정보 로딩
   useEffect(() => {
     const stored = localStorage.getItem("autoLogin");
     if (stored) {
@@ -25,8 +24,10 @@ function App() {
       setEmployeeId(employeeNo);
       setUserName(name);
     }
+    setLoading(false);
   }, []);
 
+  // 모바일 여부 판단
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -44,80 +45,68 @@ function App() {
 
   const isLoggedIn = employeeId && userId;
 
+  // ✅ 로그인 정보까지 준비될 때까지 렌더링 지연
+  if (loading || !userId || !employeeId) return null;
+
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
 
-<Route
-  path="/main"
-  element={
-    !isLoggedIn ? (
-      <Navigate to="/login" />
-    ) : isMobile ? (
-      <MobileMainPage
-        employeeId={employeeId}
-        userId={userId}
-        userName={userName}
-      />
-    ) : (
-      <MainMenu
-        employeeId={employeeId}
-        userId={userId}
-        userName={userName}
-      />
-    )
-  }
-/>
-
         <Route
-          path="/moveout-form"
+          path="/main"
           element={
             !isLoggedIn ? (
               <Navigate to="/login" />
             ) : isMobile ? (
-              <MobileMoveoutForm employeeId={employeeId} userId={userId} />
+              <MobileMainPage
+                employeeId={employeeId}
+                userId={userId}
+                userName={userName}
+              />
             ) : (
               <MainMenu
                 employeeId={employeeId}
                 userId={userId}
                 userName={userName}
-                content={
-                  <MoveoutForm
-                    employeeId={employeeId}
-                    userId={userId}
-                  />
-                }
               />
             )
           }
         />
 
         <Route
-          path="/moveout-list"
+          path="/mobile/form"
           element={
             !isLoggedIn ? (
               <Navigate to="/login" />
-            ) : isMobile ? (
-              <MobileMoveoutList employeeId={employeeId} userId={userId} />
             ) : (
-              <MainMenu
+              <MoveoutForm
                 employeeId={employeeId}
                 userId={userId}
-                userName={userName}
-                content={
-                  <MoveoutList
-                    employeeId={employeeId}
-                    userId={userId}
-                    userName={userName}
-                  />
-                }
+                isMobile={true}
+                onDone={() => window.location.href = "/main"}
+              />
+            )
+          }
+        />
+
+        <Route
+          path="/mobile/list"
+          element={
+            !isLoggedIn ? (
+              <Navigate to="/login" />
+            ) : (
+              <MoveoutList
+                employeeId={employeeId}
+                userId={userId}
+                isMobile={true}
               />
             )
           }
         />
 
         <Route path="/register" element={<UserRegisterPage />} />
+
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </Router>

@@ -1,31 +1,40 @@
-  /* ✅ 이 부분을 추가하세요 */
+/* MoveoutForm.css - PC 전용 */
+
 html, body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;  /* 💡 가로 스크롤 막기 */
+  overflow-x: hidden;
 }
 
-/* ✅ MoveoutForm.css */
+.form-header {
+  font-size: 20px;
+  text-align: center;
+  font-weight: bold;
+  margin-top: 0;
+  padding-top: 8px;
+  margin-bottom: 12px;
+}
 
 .form-container {
   width: 100%;
-  max-height: 75vh !important;
-  overflow-y: auto !important;  /* 스크롤 절대 없게 */
-  background: rgb(255, 255, 255);       /* 배경 투명하게 */
-  box-shadow: none;              /* 중복된 그림자 제거 */
+  height: auto;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #fff;
+  box-shadow: none;
   padding: 0;
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
+  margin-bottom: 0;
+  position: relative;
 }
 
 .backdrop {
   position: fixed;
-  inset: 0; /* top, right, bottom, left = 0 */
+  inset: 0;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* ✅ 세로 위쪽 정렬 */
+  align-items: flex-start;
   padding-top: 30px;
-  background-color: rgba(0, 0, 0, 0.2); /* 어두운 배경 */
+  background-color: rgba(0, 0, 0, 0.2);
   z-index: 9999;
   overflow-y: auto;
 }
@@ -35,184 +44,125 @@ html, body {
   border-radius: 10px;
   padding: 30px;
   width: 800px;
-  max-height: 90vh; /* 너무 길면 스크롤 */
+  max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .form-inner {
-  overflow: visible !important;
+  overflow: visible;
   padding: 0;
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
+  margin-bottom: 0;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* ← 3열 고정 */
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
 }
 
 .input-group {
   display: flex;
   flex-direction: column;
-  width: 100%;  /* 이거 중요 */
+  width: 100%;
 }
 
-  .input-group label {
-    margin-bottom: 0.25rem;
-    font-weight: bold;
-  }
-
-  .input-group input,
-  .input-group select,
-  .input-group button {
-    padding: 10px;
-    font-size: 14px;
-    border: 1px solid #ffffff;
-    border-radius: 1px;
-  }
-
-  .input-group input[readonly] {
-    background-color: #f5f5f5;
-  }
-
-  .defect-list-container {
-    margin-top: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .defect-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: none;
-    border: none;
-    padding: 4px 0;
-    font-size: 13px;
-    color: #333;
-    border-bottom: 1px solid #ffffff;
-  }
-
-  .defect-desc {
-    flex: 2;
-    word-break: break-word;
-  }
-
-  .defect-amount {
-    flex: 1;
-    text-align: right;
-    margin-right: 0.75rem;
-  }
-
-  .defect-actions {
-    display: flex;
-    gap: 0.3rem;
-  }
-
-  .defect-actions button {
-    padding: 4px 6px;
-    background-color: #ff8c00;
-    color: white;
-    border: none;
-    border-radius: 3px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .image-slider-single {
-    margin-top: 1rem;
-    text-align: center;
-  }
-
-  .slider-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-  }
-
-  .slider-image-container {
-    position: relative;
-    display: inline-block;
-  }
-
-  .slider-image-container img {
-    max-width: 100%;
-    max-height: 300px;
-    border-radius: 1px;
-    object-fit: contain;
-    box-shadow: none;
-  }
-
-  .slider-indicator {
-    margin-top: 5px;
-    font-size: 13px;
-    color: #666;
-  }
-
-.modal-wrapper {
-  position: fixed !important;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh; /* 화면 전체 높이 고정 */
-  background: rgba(0, 0, 0, 0.2); /* 반투명 배경 */
-  display: flex;
-  justify-content: center;
-  align-items: flex-start; /* 상단 정렬 */
-  padding-top: 30px; /* 약간 아래에서 시작 */
-  overflow-y: auto; /* 내부 스크롤 허용 */
-  z-index: 9999;
+.input-group label {
+  margin-bottom: 0.25rem;
+  font-weight: bold;
 }
 
-.modal {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  background: white;
-  width: 360px;
-  padding: 20px 20px 10px 20px !important;  /* 하단 padding ↓ */
-  border-radius: 1px;
-  box-shadow: none;
+.input-group input,
+.input-group select,
+.input-group button {
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.input-group input[readonly] {
+  background-color: #f5f5f5;
+}
+
+.note-btn {
+  padding: 6px 14px;
+  background: #f4f4f4;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.note-btn:hover {
+  background: #eaeaea;
+}
+
+.save-button {
+  margin-top: 1.5rem;
+  padding: 12px 28px;
+  font-size: 16px;
+  background-color: orange;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  float: right;
+}
+
+.close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+}
+
+.close-button:hover {
+  color: #ff8c00;
+}
+.extra-list-container {
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-height: 80vh;
-  overflow-y: auto;
-  margin-bottom: 0 !important;     /* ✅ 추가 */
+  gap: 4px;
 }
 
-
-  .modal textarea {
-  height: 80px;
+.extra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
   font-size: 14px;
-  padding: 8px;
-  resize: vertical;
-  border-radius: 6px;
+  border-bottom: 1px solid #eee;
 }
- 
-  .save-button {
-    margin-top: 1.5rem;
-    padding: 12px;
-    font-size: 16px;
-    background-color: orange;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    width: 100%;
-    cursor: pointer;
-    margin-bottom: 0 !important;
-  }
 
-  .custom-datepicker {
-    width: 100%;
-    padding: 10px;
-    font-size: 14px;
-    border: 1px solid #ffffff;
-    border-radius: 1px;
-    box-sizing: border-box;
-  }
+.extra-desc {
+  flex: 2;
+  word-break: break-word;
+}
+
+.extra-amount {
+  flex: 1;
+  text-align: right;
+  margin-right: 1rem;
+  white-space: nowrap;
+}
+
+.extra-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.extra-actions button {
+  background-color: #ff8c00;
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}

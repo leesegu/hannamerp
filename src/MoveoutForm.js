@@ -12,9 +12,17 @@ import "./MoveoutForm.css";
 import { FiArrowLeft } from "react-icons/fi";
 import FormLayout from "./components/FormLayout";
 import { formatPhoneNumber } from "./utils/formatting";
+import "./MoveoutForm.css"; // PC 기본 스타일
+import "./MoveoutForm.mobile.css"; // 모바일 대응 스타일 (media query 적용됨)
+// MoveoutForm.js 상단
+import { FiX } from "react-icons/fi";
+
+
+console.log("✅ MoveoutForm 로딩됨");
 
 export default function MoveoutForm({ employeeId, userId, editItem, onDone, showCancel, isMobile }) {
   useEffect(() => {
+    console.log("✅ MoveoutForm 렌더됨 / isMobile:", isMobile);
   document.body.style.overflow = "hidden";
   return () => {
     document.body.style.overflow = "auto";
@@ -22,6 +30,9 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
 }, []);
 
   const navigate = useNavigate();
+  const handleBack = () => {
+  navigate("/main");
+};
   const location = useLocation();
   const isMobileDevice = typeof isMobile === "boolean" ? isMobile : window.innerWidth <= 768;
   
@@ -157,15 +168,15 @@ const handleChange = (id, value) => {
     }
   };
 
-  const handleStartEditDefect = (index) => {
-    setForm({
-      ...form,
-      defectDesc: defects[index].desc,
-      defectAmount: defects[index].amount,
-    });
-    setEditingIndex(index);
-    defectDescRef.current?.focus();
-  };
+const handleEditDefect = (index) => {
+  setForm({
+    ...form,
+    defectDesc: defects[index].desc,
+    defectAmount: defects[index].amount,
+  });
+  setEditingIndex(index);
+  defectDescRef.current?.focus();
+};
 
   const handleDeleteDefect = (index) => {
     const updated = [...defects];
@@ -212,6 +223,7 @@ const handleChange = (id, value) => {
   };
 
   const handleSave = async () => {
+    console.log("✅ handleSave 실행됨", { employeeId, userId, form });
     try {
       const imageUrls = [...existingImageUrls]; // ✅ 기존 이미지 URL 포함
       for (const image of images) {
@@ -318,42 +330,22 @@ const handleChange = (id, value) => {
   { id: "cleaning", label: "청소비용" },
 ];
 
+console.log("MoveoutForm 컴포넌트 렌더됨");
   return (
-  <div className="form-container">
+  <div className={`form-container ${isMobileDevice ? "mobile" : ""}`}>
+    {!isMobile && (
+  <button className="close-button" onClick={onDone}>
+    <FiX />
+  </button>
+)}
     {/* ✅ 뒤로가기 버튼 (모바일 전용) */}
 {isMobileDevice && (
-  <button
-    onClick={() => {
-      if (typeof onDone === "function") {
-        onDone();  // ✅ 모바일 팝업 닫기용 콜백
-      } else {
-        if (editItem) {
-          navigate("/list");  // PC fallback
-        } else {
-          navigate("/main");
-        }
-      }
-    }}
-    style={{
-      position: "absolute",
-      top: "16px",
-      left: "16px",
-      backgroundColor: "#ffffff",
-      border: "1px solid #ccc",
-      borderRadius: "8px",
-      padding: "6px 12px",
-      display: "flex",
-      alignItems: "center",
-      fontSize: "14px",
-      color: "#333",
-      cursor: "pointer",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-      zIndex: 1000,
-    }}
-  >
-    <FiArrowLeft size={18} color="#ff8c00" style={{ marginRight: "6px" }} />
-    뒤로가기
-  </button>
+  <div className="mobile-back-button-wrapper">
+    <button className="mobile-back-button" onClick={handleBack}>
+      <FiArrowLeft size={20} />
+      <span>뒤로가기</span>
+    </button>
+  </div>
 )}
 
     <FormLayout>
@@ -381,8 +373,21 @@ const handleChange = (id, value) => {
   onChange={(date) => handleChange("moveOutDate", format(date, "yyyy-MM-dd"))}
   dateFormat="yyyy-MM-dd"
   locale={ko}
-  className="custom-datepicker"
+  className={`custom-datepicker ${isMobileDevice ? "mobile" : ""}`}
+  popperPlacement="bottom-end"
+  popperProps={{
+    modifiers: [
+      {
+        name: "offset",
+        options: {
+          offset: [0, 8],
+        },
+      },
+    ],
+  }}
 />
+
+
 
               ) : (
                 <input
@@ -398,6 +403,7 @@ const handleChange = (id, value) => {
           ))}
         </div>
 
+<div style={{ marginTop: "16px" }} />
         {/* 하자입력 */}
         <div className="grid">
   <div className="input-group">
@@ -420,19 +426,21 @@ const handleChange = (id, value) => {
   </div>
 </div>
 
-<div className="defect-list-container">
-  {defects.map((d, i) => (
-    <div key={i} className="defect-row">
-      <span className="defect-desc">{d.desc}</span>
-      <span className="defect-amount">{d.amount}원</span>
-      <div className="defect-actions">
-        <button onClick={() => handleStartEditDefect(i)}>수정</button>
-        <button onClick={() => handleDeleteDefect(i)}>삭제</button>
+<div className="extra-list-container">
+  {defects.map((item, index) => (
+    <div key={index} className="extra-row">
+      <div className="extra-desc">{item.desc}</div>
+      <div className="extra-amount">{item.amount}원</div>
+      <div className="extra-actions">
+        <button onClick={() => handleEditDefect(index)}>수정</button>
+        <button onClick={() => handleDeleteDefect(index)}>삭제</button>
       </div>
     </div>
   ))}
 </div>
 
+
+<div style={{ marginTop: "16px" }} />
         <div className="grid">
           <div className="input-group">
             <label>총 이사정산 금액</label>
@@ -447,6 +455,8 @@ const handleChange = (id, value) => {
             </select>
           </div>
         </div>
+
+<div style={{ marginTop: "16px" }} />
 
 <div className="grid-2col">
   {/* 사진첨부 버튼 */}

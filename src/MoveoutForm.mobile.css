@@ -1,0 +1,217 @@
+/* MoveoutForm.mobile.css - 모바일 전용 */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Noto Sans KR', sans-serif;
+  background: linear-gradient(180deg, #7f53ac, #ff6a6a); /* 💡 배경 그라데이션 */
+  overflow-x: hidden;
+}
+
+.form-container.mobile {
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  background-color: transparent; /* ✅ 내부 배경 제거 */
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.form-header.mobile {
+  font-size: 20px;
+  text-align: center;
+  font-weight: bold;
+  margin-top: 0;
+  padding-top: 8px;
+  margin-bottom: 20px;
+  color: #222;
+}
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-group label {
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.input-group input,
+.input-group select,
+.input-group textarea {
+  width: 100%;
+  height: 38px;
+  font-size: 14px;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: #fff; /* ✅ 입력창은 하얀 배경 유지 */
+}
+
+.input-group input[readonly] {
+  background-color: #f7f7f7;
+}
+
+.save-button {
+  margin-top: 32px;
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  background-color: #ff8c00;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.note-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  background: #eee;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.image-slider-single {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.image-slider-single img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+}
+
+.slider-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.slider-indicator {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.modal-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+
+.modal {
+  background-color: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-size: 14px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.modal button {
+  margin-top: 4px;
+  padding: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .close-button {
+    display: none;
+  }
+}
+
+.extra-list-container {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.extra-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  border-bottom: 1px solid #eee;
+  padding: 6px 0;
+}
+
+.extra-desc {
+  flex: 2;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.extra-amount {
+  flex: 1;
+  text-align: right;
+  font-size: 13px;
+  margin-left: 12px;
+  white-space: nowrap;
+}
+
+.extra-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.extra-actions button {
+  background-color: #ff8c00;
+  border: none;
+  color: white;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.back-button-mobile {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: #ff8c00;
+  margin-bottom: 12px;
+  cursor: pointer;
+  padding: 0;
+}

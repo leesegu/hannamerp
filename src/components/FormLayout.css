@@ -1,0 +1,9 @@
+/* src/components/FormLayout.css */
+.form-layout {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 900px;
+  margin: 0 auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
