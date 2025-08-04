@@ -19,6 +19,7 @@ import "./MoveoutList.css";
 import * as htmlToImage from 'html-to-image';
 import "./components/DataTable.css";
 import ReceiptTemplate from "./components/ReceiptTemplate";
+import "./MoveoutList.mobile.css"; // PC용 CSS는 이미 있으니 이 줄만 추가
 
 
 const formatDate = (dateStr) => {
@@ -47,11 +48,16 @@ export default function MoveoutList({ employeeId, userId }) {
   const receiptRef = useRef(null); // 캡처할 DOM 참조
   const [currentReceiptItem, setCurrentReceiptItem] = useState(null); // 현재 선택된 항목
   const [previewImage, setPreviewImage] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState("");
+
+const handleStatusChange = (e) => {
+  setSelectedStatus(e.target.value);
+};
 
 const handleDownloadImage = async () => {
   if (!receiptRef.current) return;
 
-  const node = receiptRef.current;
+    const node = receiptRef.current;
   try {
     const dataUrl = await htmlToImage.toJpeg(node);
     const link = document.createElement("a");
@@ -212,58 +218,100 @@ const downloadImage = (format) => {
   });
 };
 
+
 if (isMobileDevice) {
     return (
-      <div className="list-container">
-        <button onClick={() => navigate("/main")} className="back-button">
-          <FiArrowLeft size={18} color="#ff8c00" /> 뒤로가기
-        </button>
-        <h2 style={{ textAlign: "center", marginTop: 60 }}>이사정산 조회</h2>
+<div className="list-container">
+<button className="back-icon-button" onClick={() => navigate("/main")}>
+  <FiArrowLeft />
+</button>
 
-        {filtered.map((item, idx) => (
-          <div key={item.id} className="mobile-item">
-            <div
-              className="mobile-row1"
-              onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-            >
-              <div>{idx + 1}</div>
-              <div>{item.moveOutDate}</div>
-              <div className="status-box">
-                <span className="status-dot" style={{ backgroundColor: getStatusDotColor(item.status) }}></span>
-                {item.status}
-              </div>
-            </div>
+  <div className="mobile-header-wrapper">
+    <h2 className="mobile-title">이사정산 조회</h2>
 
-            <div className="mobile-row2">
-              <div>{item.name}</div>
-              <div>{item.roomNumber}</div>
-              <div>{Number(item.total).toLocaleString()}원</div>
-            </div>
+    <div className="mobile-controls">
+      <select
+        className="status-filter"
+        value={selectedStatus}
+        onChange={handleStatusChange}
+      >
+        <option value="">전체</option>
+        <option value="정산대기">정산대기</option>
+        <option value="입금대기">입금대기</option>
+        <option value="입금완료">입금완료</option>
+      </select>
 
-            {expandedId === item.id && (
-              <div className="mobile-expand">
-                <div className="mobile-icons">
-                  <div
-                    className={`icon-badge ${item.defects?.length > 0 ? "has-content" : ""}`}
-                    onClick={() => setSelectedDefects(item.defects || [])}
-                  >추가내역</div>
-                  <div
-                    className={`icon-badge ${item.notes?.trim() ? "has-content" : ""}`}
-                    onClick={() => setSelectedNote(item.notes || "")}
-                  >비고</div>
-                  <div
-                    className={`icon-badge ${item.images?.length > 0 ? "has-content" : ""}`}
-                    onClick={() => setSelectedImages(item.images || [])}
-                  >사진</div>
-                </div>
-                <div className="mobile-buttons">
-                  <button onClick={() => handleEdit(item)}>수정</button>
-                  <button onClick={() => handleShowReceipt(item)}>영수증 전송</button>
-                </div>
-              </div>
-            )}
+      <input
+        className="search-input"
+        type="text"
+        placeholder="검색어 입력"
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+      />
+    </div>
+  </div>
+            
+{filtered
+  .filter(item => !selectedStatus || item.status === selectedStatus)
+  .map((item, idx) => (
+    <div key={item.id} className="mobile-item">
+    {/* 날짜 + 상태 */}
+    <div
+      className="info-line top-line"
+      onClick={() =>
+        setExpandedId(expandedId === item.id ? null : item.id)
+      }
+    >
+      <span>📅 {item.moveOutDate}</span>
+      <span className="status">
+        <span
+          className="status-dot"
+          style={{ backgroundColor: getStatusDotColor(item.status) }}
+        ></span>
+        {item.status}
+      </span>
+    </div>
+
+    {/* 빌라명 + 호수 + 총액 */}
+    <div className="info-line bottom-line">
+      <span>🏢 {item.name || "-"}</span>
+      <span>🚪 {item.roomNumber || "-"}</span>
+      <span>💰 {Number(item.total || 0).toLocaleString()}원</span>
+    </div>
+
+    {/* 펼쳐지는 상세 정보 */}
+    {expandedId === item.id && (
+      <div className="mobile-expand">
+        <div className="mobile-icons">
+          <div
+            className={`icon-badge ${item.defects?.length > 0 ? "has-content" : ""}`}
+            onClick={() => setSelectedDefects(item.defects || [])}
+          >
+            추가내역
           </div>
-        ))}
+          <div
+            className={`icon-badge ${item.notes?.trim() ? "has-content" : ""}`}
+            onClick={() => setSelectedNote(item.notes || "")}
+          >
+            비고
+          </div>
+          <div
+            className={`icon-badge ${item.images?.length > 0 ? "has-content" : ""}`}
+            onClick={() => setSelectedImages(item.images || [])}
+          >
+            사진
+          </div>
+        </div>
+        <div className="mobile-buttons">
+          <button className="edit-btn" onClick={() => handleEdit(item)}>✏️ 수정</button>
+          <button className="receipt-btn" onClick={() => handleShowReceipt(item)}>📩 영수증</button>
+        </div>
+      </div>
+    )}
+  </div>
+))}
+
+
 
         {selectedDefects.length > 0 && (
           <div className="modal-center">

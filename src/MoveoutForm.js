@@ -29,6 +29,12 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   };
 }, []);
 
+// MoveoutList.js 맨 위쪽 useState 등 아래에 추가
+const handleEdit = (item) => {
+  localStorage.setItem("editItem", JSON.stringify(item));  // 기존 데이터를 localStorage에 저장
+  navigate("/mobile/form");  // 입력 페이지로 이동
+};
+
   const navigate = useNavigate();
   const handleBack = () => {
   navigate("/main");
@@ -74,6 +80,38 @@ export default function MoveoutForm({ employeeId, userId, editItem, onDone, show
   const numberFieldsWithComma = ["arrears", "currentFee", "electricity", "tvFee", "cleaning", "waterUnit", "waterCost", "defectAmount", "total"];
   const numberOnlyFields = ["waterPrev", "waterCurr"];
   const parseNumber = (str) => parseInt((str || "0").replace(/,/g, "")) || 0;
+
+  useEffect(() => {
+  let parsed = null;
+
+  // 1. editItem props로 전달된 게 있으면 그걸 사용
+  if (editItem) {
+    parsed = editItem;
+  } else {
+    // 2. 없으면 localStorage에서 "editItem"을 꺼내서 사용
+    const saved = localStorage.getItem("editItem");
+    if (saved) parsed = JSON.parse(saved);
+  }
+
+  // 3. parsed 값이 있으면 폼에 입력값을 채워 넣는다
+  if (parsed) {
+    setForm({
+      ...parsed,
+      defectDesc: "",
+      defectAmount: ""
+    });
+
+    setNoteText(parsed.notes || "");
+    setDefects(parsed.defects || []);
+
+    const imageUrls = (parsed.images || []).slice().reverse();
+    setImagePreviews(imageUrls);
+    setImages([]);
+    setExistingImageUrls(imageUrls);
+
+    window.lastSavedItem = parsed;
+  }
+}, []);
 
   useEffect(() => {
     if (editItem) {
