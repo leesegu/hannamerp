@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
 import LoginPage from "./LoginPage";
 import MainMenu from "./MainMenu";
 import MoveoutForm from "./MoveoutForm";
@@ -8,6 +14,74 @@ import UserRegisterPage from "./UserRegisterPage";
 import MobileMainPage from "./components/MobileMainPage";
 import "./App.css";
 
+// ✅ 내부 라우터를 사용하기 위한 래퍼 컴포넌트
+function AppRoutes({ employeeId, userId, userName, isMobile }) {
+  const navigate = useNavigate();
+  const isLoggedIn = employeeId && userId;
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage onLogin={() => {}} />} />
+
+      <Route
+        path="/main"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" />
+          ) : isMobile ? (
+            <MobileMainPage
+              employeeId={employeeId}
+              userId={userId}
+              userName={userName}
+            />
+          ) : (
+            <MainMenu
+              employeeId={employeeId}
+              userId={userId}
+              userName={userName}
+            />
+          )
+        }
+      />
+
+      <Route
+        path="/mobile/form"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" />
+          ) : (
+            <MoveoutForm
+              employeeId={employeeId}
+              userId={userId}
+              isMobile={true}
+              onDone={() => navigate(-1)} // ✅ 저장 후 뒤로가기
+            />
+          )
+        }
+      />
+
+      <Route
+        path="/mobile/list"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" />
+          ) : (
+            <MoveoutList
+              employeeId={employeeId}
+              userId={userId}
+              isMobile={true}
+            />
+          )
+        }
+      />
+
+      <Route path="/register" element={<UserRegisterPage />} />
+      <Route path="*" element={<Navigate to="/login" />} />
+    </Routes>
+  );
+}
+
+// ✅ 메인 App 컴포넌트
 function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
@@ -37,78 +111,23 @@ function App() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // 로그인 완료 시 처리
   const handleLogin = ({ employeeNo, id, name }) => {
     setEmployeeId(employeeNo);
     setUserId(id);
     setUserName(name);
   };
 
-  const isLoggedIn = employeeId && userId;
-
-  // ✅ 로그인 정보까지 준비될 때까지 렌더링 지연
-  if (loading || !userId || !employeeId) return null;
+  if (loading) return null;
 
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-
-        <Route
-          path="/main"
-          element={
-            !isLoggedIn ? (
-              <Navigate to="/login" />
-            ) : isMobile ? (
-              <MobileMainPage
-                employeeId={employeeId}
-                userId={userId}
-                userName={userName}
-              />
-            ) : (
-              <MainMenu
-                employeeId={employeeId}
-                userId={userId}
-                userName={userName}
-              />
-            )
-          }
-        />
-
-        <Route
-          path="/mobile/form"
-          element={
-            !isLoggedIn ? (
-              <Navigate to="/login" />
-            ) : (
-              <MoveoutForm
-                employeeId={employeeId}
-                userId={userId}
-                isMobile={true}
-                onDone={() => window.location.href = "/main"}
-              />
-            )
-          }
-        />
-
-        <Route
-          path="/mobile/list"
-          element={
-            !isLoggedIn ? (
-              <Navigate to="/login" />
-            ) : (
-              <MoveoutList
-                employeeId={employeeId}
-                userId={userId}
-                isMobile={true}
-              />
-            )
-          }
-        />
-
-        <Route path="/register" element={<UserRegisterPage />} />
-
-        <Route path="*" element={<Navigate to="/login" />} />
-      </Routes>
+      <AppRoutes
+        employeeId={employeeId}
+        userId={userId}
+        userName={userName}
+        isMobile={isMobile}
+      />
     </Router>
   );
 }

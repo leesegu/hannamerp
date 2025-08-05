@@ -1,0 +1,58 @@
+.image-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.image-slider-wrapper.mobile {
+  width: 100%;
+}
+
+.image-slider {
+  width: 100%;
+  max-width: 300px;
+  height: 200px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.image-slider img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slider-button {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  margin: 4px;
+}
+
+.slider-indicators {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.slider-indicators span {
+  font-size: 14px;
+  color: gray;
+}
+
+.slider-indicators .active {
+  color: black;
+}
+
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+  cursor: pointer;
+}

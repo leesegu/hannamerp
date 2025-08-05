@@ -1,4 +1,4 @@
-/* MoveoutForm.css - PC 전용 */
+/* MoveoutForm.css - PC 전용 */back-icon-button
 
 html, body {
   margin: 0;
@@ -85,18 +85,62 @@ html, body {
   background-color: #f5f5f5;
 }
 
-.note-btn {
-  padding: 6px 14px;
-  background: #f4f4f4;
-  border: 1px solid #ccc;
+.note-modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.3);
+  z-index: 9998;
+}
+
+.note-modal.pc {
+  position: fixed;
+  top: 20vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-modal.pc textarea {
+  min-height: 150px;
+  font-size: 14px;
+  resize: none;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.note-modal-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.note-modal-buttons button {
+  flex: 1;
+  padding: 10px;
   border-radius: 6px;
   font-size: 14px;
+  border: none;
+  color: white;
   cursor: pointer;
 }
 
-.note-btn:hover {
-  background: #eaeaea;
+.note-modal-buttons .save {
+  background-color: #28a745;
 }
+.note-modal-buttons .cancel {
+  background-color: #dc3545;
+}
+
 
 .save-button {
   margin-top: 1.5rem;
@@ -110,20 +154,34 @@ html, body {
   float: right;
 }
 
-.close-button {
+/* ✅ PC 전용 닫기(X) 버튼 스타일 - 우측 상단 고정 */
+/* 우측 상단 X 버튼 (PC 전용) */
+.close-icon-button {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  background: none;
+  top: 50px;
+  right: 580px;
+  z-index: 100;
+  width: 36px;
+  height: 36px;
   border: none;
-  font-size: 24px;
-  color: #999;
+  border-radius: 50%;
+  background: #fff;
+  color: #ff4d4f;
+  font-size: 28px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.08);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.close-icon-button:hover {
+  background: #ffeded;
+  color: #d30000;
 }
 
-.close-button:hover {
-  color: #ff8c00;
-}
+
+
 .extra-list-container {
   margin-top: 12px;
   display: flex;

@@ -14,13 +14,13 @@ import FormLayout from "./components/FormLayout";
 import { formatPhoneNumber } from "./utils/formatting";
 import "./MoveoutForm.css"; // PC 기본 스타일
 import "./MoveoutForm.mobile.css"; // 모바일 대응 스타일 (media query 적용됨)
-// MoveoutForm.js 상단
 import { FiX } from "react-icons/fi";
+
 
 
 console.log("✅ MoveoutForm 로딩됨");
 
-export default function MoveoutForm({ employeeId, userId, editItem, onDone, showCancel, isMobile }) {
+export default function MoveoutForm({ employeeId, userId, editItem, onDone, showCancel = true, isMobile }) {
   useEffect(() => {
     console.log("✅ MoveoutForm 렌더됨 / isMobile:", isMobile);
   document.body.style.overflow = "hidden";
@@ -72,6 +72,8 @@ const handleEdit = (item) => {
   const [existingImageUrls, setExistingImageUrls] = useState([]); // ✅ 기존 이미지 URL 저장
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const modalRef = useRef();  // 모달창에 접근할 수 있도록 ref 생성
+  // 💡 기존의 useState들 아래에 추가
+  const [imageUrls, setImageUrls] = useState([]);  // 이미지 URL 목록
 
   const inputRefs = useRef([]);
   const defectDescRef = useRef();
@@ -133,36 +135,38 @@ const handleEdit = (item) => {
   }, [editItem]);
 
   useEffect(() => {
-  if (!editItem) {
-    setForm({
-      moveOutDate: "",
-      name: "",
-      roomNumber: "",
-      contact: "",
-      arrears: "",
-      currentFee: "",
-      waterCurr: "",
-      waterPrev: "",
-      waterCost: "",
-      waterUnit: "",
-      electricity: "",
-      tvFee: "",
-      cleaning: "",
-      defectDesc: "",
-      defectAmount: "",
-      total: "",
-      notes: "",
-      status: "정산대기",
-    });
-    setNoteText("");
-    setDefects([]);
-    setImages([]);
-    setImagePreviews([]);
-    setExistingImageUrls([]);
-    setCurrentImageIndex(0);
-    setEditingIndex(null);
-    setNoteModalOpen(false);
-  }
+if (!editItem?.docId) {
+  // ✅ 등록일 때만 초기화
+  setForm({
+    moveOutDate: "",
+    name: "",
+    roomNumber: "",
+    contact: "",
+    arrears: "",
+    currentFee: "",
+    waterCurr: "",
+    waterPrev: "",
+    waterCost: "",
+    waterUnit: "",
+    electricity: "",
+    tvFee: "",
+    cleaning: "",
+    defectDesc: "",
+    defectAmount: "",
+    total: "",
+    notes: "",
+    status: "정산대기",
+  });
+  setNoteText("");
+  setDefects([]);
+  setImages([]);
+  setImagePreviews([]);
+  setExistingImageUrls([]);
+  setCurrentImageIndex(0);
+  setEditingIndex(null);
+  setNoteModalOpen(false);
+}
+
 }, [location.pathname]); // ← 반드시 location.pathname으로!
 
 const handleChange = (id, value) => {
@@ -296,6 +300,7 @@ const handleEditDefect = (index) => {
       }
 
       alert("정산내역 저장 완료 ✅");
+      localStorage.removeItem("editItem");  // ✅ 수정 항목 삭제
       if (onDone) onDone();
 
       // 초기화
@@ -368,65 +373,66 @@ const handleEditDefect = (index) => {
   { id: "cleaning", label: "청소비용" },
 ];
 
-console.log("MoveoutForm 컴포넌트 렌더됨");
-  return (
-  <div className={`form-container ${isMobileDevice ? "mobile" : ""}`}>
-    {!isMobile && (
-  <button className="close-button" onClick={onDone}>
+return (
+  <>
+    {/* ✅ form-container 바깥에 고정 버튼 렌더링 */}
+    {isMobileDevice && (
+      <button className="back-icon-button" onClick={handleBack}>
+        <FiArrowLeft />
+      </button>
+    )}
+
+    {!isMobileDevice && showCancel && (
+  <button className="close-icon-button" onClick={onDone}>
     <FiX />
   </button>
 )}
-    {/* ✅ 뒤로가기 버튼 (모바일 전용) */}
-{isMobileDevice && (
-  <div className="mobile-back-button-wrapper">
-    <button className="mobile-back-button" onClick={handleBack}>
-      <FiArrowLeft size={20} />
-      <span>뒤로가기</span>
-    </button>
-  </div>
-)}
 
-    <FormLayout>
-<h2>이사정산 등록</h2>
-        {/* (이하 동일 - 생략 없이 반영됨) */}
-<div className="grid">
-  {/* ✅ 1줄: 비워둠, 비워둠, 연락처 */}
-  <div className="input-group" />
-  <div className="input-group" />
-<div className="input-group contact-underline contact-field">
-  <input
-    type="text"
-    value={form.contact}
-    onChange={(e) => handleChange("contact", e.target.value)}
-    placeholder="Phone number"
-  />
-</div>
-        
+    {/* ✅ 입력 폼 컨테이너 */}
+    <div className={`form-container ${isMobileDevice ? "mobile" : ""}`}>
+      <FormLayout>
+        <h2>
+  {isMobileDevice && (editItem || localStorage.getItem("editItem"))
+    ? "이사정산 수정"
+    : "이사정산 등록"}
+</h2>
+
+        <div className="grid">
+          <div className="input-group" />
+          <div className="input-group" />
+          <div className="input-group contact-underline contact-field">
+            <input
+              type="text"
+              value={form.contact}
+              onChange={(e) => handleChange("contact", e.target.value)}
+              placeholder="Phone number"
+            />
+          </div>
+
           {inputList.map(({ id, label, type, readOnly }, index) => (
             <div key={id} className="input-group">
               <label>{label}</label>
               {id === "moveOutDate" ? (
-<DatePicker
-  selected={form.moveOutDate ? new Date(form.moveOutDate) : null}
-  onChange={(date) => handleChange("moveOutDate", format(date, "yyyy-MM-dd"))}
-  dateFormat="yyyy-MM-dd"
-  locale={ko}
-  className={`custom-datepicker ${isMobileDevice ? "mobile" : ""}`}
-  popperPlacement="bottom-end"
-  popperProps={{
-    modifiers: [
-      {
-        name: "offset",
-        options: {
-          offset: [0, 8],
-        },
-      },
-    ],
-  }}
-/>
-
-
-
+                <DatePicker
+                  selected={form.moveOutDate ? new Date(form.moveOutDate) : null}
+                  onChange={(date) =>
+                    handleChange("moveOutDate", format(date, "yyyy-MM-dd"))
+                  }
+                  dateFormat="yyyy-MM-dd"
+                  locale={ko}
+                  className={`custom-datepicker ${isMobileDevice ? "mobile" : ""}`}
+                  popperPlacement="bottom-end"
+                  popperProps={{
+                    modifiers: [
+                      {
+                        name: "offset",
+                        options: {
+                          offset: [0, 8],
+                        },
+                      },
+                    ],
+                  }}
+                />
               ) : (
                 <input
                   ref={(el) => (inputRefs.current[index] = el)}
@@ -441,44 +447,44 @@ console.log("MoveoutForm 컴포넌트 렌더됨");
           ))}
         </div>
 
-<div style={{ marginTop: "16px" }} />
+        <div style={{ marginTop: "16px" }} />
+
         {/* 하자입력 */}
         <div className="grid">
-  <div className="input-group">
-    <label>추가내역</label> {/* ✅ 수정됨 */}
-    <input
-      ref={defectDescRef}
-      value={form.defectDesc}
-      onChange={(e) => handleChange("defectDesc", e.target.value)}
-      onKeyDown={(e) => e.key === "Enter" && defectAmountRef.current?.focus()}
-    />
-  </div>
-  <div className="input-group">
-    <label>추가금액</label> {/* ✅ 수정됨 */}
-    <input
-      ref={defectAmountRef}
-      value={form.defectAmount}
-      onChange={(e) => handleChange("defectAmount", e.target.value)}
-      onKeyDown={(e) => e.key === "Enter" && handleAddDefect()}
-    />
-  </div>
-</div>
+          <div className="input-group">
+            <label>추가내역</label>
+            <input
+              ref={defectDescRef}
+              value={form.defectDesc}
+              onChange={(e) => handleChange("defectDesc", e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && defectAmountRef.current?.focus()}
+            />
+          </div>
+          <div className="input-group">
+            <label>추가금액</label>
+            <input
+              ref={defectAmountRef}
+              value={form.defectAmount}
+              onChange={(e) => handleChange("defectAmount", e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddDefect()}
+            />
+          </div>
+        </div>
 
-<div className="extra-list-container">
-  {defects.map((item, index) => (
-    <div key={index} className="extra-row">
-      <div className="extra-desc">{item.desc}</div>
-      <div className="extra-amount">{item.amount}원</div>
-      <div className="extra-actions">
-        <button onClick={() => handleEditDefect(index)}>수정</button>
-        <button onClick={() => handleDeleteDefect(index)}>삭제</button>
-      </div>
-    </div>
-  ))}
-</div>
+        <div className="extra-list-container">
+          {defects.map((item, index) => (
+            <div key={index} className="extra-row">
+              <div className="extra-desc">{item.desc}</div>
+              <div className="extra-amount">{item.amount}원</div>
+              <div className="extra-actions">
+                <button onClick={() => handleEditDefect(index)}>수정</button>
+                <button onClick={() => handleDeleteDefect(index)}>삭제</button>
+              </div>
+            </div>
+          ))}
+        </div>
 
-
-<div style={{ marginTop: "16px" }} />
+        <div style={{ marginTop: "16px" }} />
         <div className="grid">
           <div className="input-group">
             <label>총 이사정산 금액</label>
@@ -486,7 +492,10 @@ console.log("MoveoutForm 컴포넌트 렌더됨");
           </div>
           <div className="input-group">
             <label>정산진행현황</label>
-            <select value={form.status} onChange={(e) => handleChange("status", e.target.value)}>
+            <select
+              value={form.status}
+              onChange={(e) => handleChange("status", e.target.value)}
+            >
               <option value="정산대기">정산대기</option>
               <option value="입금대기">입금대기</option>
               <option value="입금완료">입금완료</option>
@@ -494,84 +503,111 @@ console.log("MoveoutForm 컴포넌트 렌더됨");
           </div>
         </div>
 
-<div style={{ marginTop: "16px" }} />
+        <div style={{ marginTop: "16px" }} />
+        <div className="grid-2col">
+          <div className="input-group">
+            <label>사진첨부</label>
+            <input
+              type="file"
+              id="file-upload"
+              multiple
+              onChange={handleImageChange}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              className="custom-button green"
+              onClick={() => document.getElementById("file-upload").click()}
+            >
+              + 사진첨부
+            </button>
+          </div>
 
-<div className="grid-2col">
-  {/* 사진첨부 버튼 */}
-  <div className="input-group">
-    <label>사진첨부</label>
-    <input
-      type="file"
-      id="file-upload"
-      multiple
-      onChange={handleImageChange}
-      style={{ display: "none" }}
-    />
-    <button
-      type="button"
-      className="custom-button green"
-      onClick={() => document.getElementById("file-upload").click()}
-    >
-      + 사진첨부
-    </button>
-  </div>
-
-  {/* 비고 버튼 */}
-  <div className="input-group">
-    <label>비고</label>
-    <button className="custom-button orange" onClick={openNoteModal}>
-      {form.notes ? "내용있음" : "내용없음"}
-    </button>
-  </div>
-</div>
-
+          <div className="input-group">
+            <label>비고</label>
+            <button className="custom-button orange" onClick={openNoteModal}>
+              {form.notes ? "내용있음" : "내용없음"}
+            </button>
+          </div>
+        </div>
 
         {imagePreviews.length > 0 && (
           <div className="image-slider-single">
             <div className="slider-controls">
-              <button onClick={() => setCurrentImageIndex(prev => prev > 0 ? prev - 1 : imagePreviews.length - 1)}>◀</button>
+              <button
+                onClick={() =>
+                  setCurrentImageIndex((prev) =>
+                    prev > 0 ? prev - 1 : imagePreviews.length - 1
+                  )
+                }
+              >
+              </button>
               <div className="slider-image-container" style={{ position: "relative" }}>
                 <img
                   src={imagePreviews[currentImageIndex]}
                   alt={`preview-${currentImageIndex}`}
-                  style={{ maxWidth: "100%", maxHeight: "300px", borderRadius: "8px" }}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "300px",
+                    borderRadius: "8px",
+                  }}
                 />
                 <button
                   onClick={() => handleImageDelete(currentImageIndex)}
                   style={{
-                    position: "absolute", top: 0, right: 0, background: "red",
-                    color: "white", border: "none", cursor: "pointer", padding: "2px 6px"
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    background: "red",
+                    color: "white",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "2px 6px",
                   }}
                 >
                   X
                 </button>
               </div>
-              <button onClick={() => setCurrentImageIndex(prev => prev < imagePreviews.length - 1 ? prev + 1 : 0)}>▶</button>
+              <button
+                onClick={() =>
+                  setCurrentImageIndex((prev) =>
+                    prev < imagePreviews.length - 1 ? prev + 1 : 0
+                  )
+                }
+              >
+              </button>
             </div>
-            <div className="slider-indicator">{currentImageIndex + 1} / {imagePreviews.length}</div>
+            <div className="slider-indicator">
+              {currentImageIndex + 1} / {imagePreviews.length}
+            </div>
           </div>
         )}
 
-      {/* ✅ 저장 버튼 */}
-      <button className="save-button" onClick={handleSave}>
-        저장
-      </button>
-    </FormLayout>
+        {/* ✅ 저장 버튼 */}
+        <button className="save-button" onClick={handleSave}>
+          저장
+        </button>
+      </FormLayout>
+    </div>
 
-    {/* ✅ 모달은 form-inner 바깥에서 렌더링 */}
-    {noteModalOpen && (
-  <div className="modal-wrapper">
-    <div className="modal" ref={modalRef}>
+    {/* ✅ 비고 입력 모달 */}
+{noteModalOpen && (
+  <>
+    <div className="note-modal-overlay" onClick={() => setNoteModalOpen(false)} />
+    <div className={`note-modal ${isMobileDevice ? 'mobile' : 'pc'}`}>
       <textarea
         value={noteText}
         onChange={(e) => setNoteText(e.target.value)}
         placeholder="비고 입력"
       />
-      <button onClick={saveNote}>저장</button>
-      <button onClick={() => setNoteModalOpen(false)}>닫기</button>
+      <div className="note-modal-buttons">
+        <button className="save" onClick={saveNote}>저장</button>
+        <button className="cancel" onClick={() => setNoteModalOpen(false)}>닫기</button>
+      </div>
     </div>
-  </div>
+  </>
 )}
-  </div> 
-);        
+
+  </>
+);
 }

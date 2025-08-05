@@ -1,25 +1,62 @@
 /* MoveoutForm.mobile.css - 모바일 전용 */
 
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  font-family: 'Noto Sans KR', sans-serif;
-  background: linear-gradient(180deg, #7f53ac, #ff6a6a); /* 💡 배경 그라데이션 */
-  overflow-x: hidden;
-}
+@media (max-width: 768px) {
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: white !important;
+  }
 
-.form-container.mobile {
-  width: 100%;
-  min-height: 100vh;
-  box-sizing: border-box;
-  padding: 24px 16px;
-  background-color: transparent; /* ✅ 내부 배경 제거 */
-  display: flex;
-  flex-direction: column;
-  overflow-x: hidden;
-  border-radius: 0;
-  box-shadow: none;
+  #root, .App {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .form-wrapper {
+    height: 100vh;
+    width: 100%;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-container.mobile {
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: 480px;
+    height: 100vh;
+    margin: 0 auto;
+    padding: 0 16px;
+    background-color: white !important;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    justify-content: space-between;
+    overflow-y: auto;
+    box-sizing: border-box;
+    z-index: 9999;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    position: relative;
+  }
+
+  form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 }
 
 .form-header.mobile {
@@ -60,7 +97,7 @@ html, body {
   border: 1px solid #ccc;
   border-radius: 6px;
   box-sizing: border-box;
-  background-color: #fff; /* ✅ 입력창은 하얀 배경 유지 */
+  background-color: #fff;
 }
 
 .input-group input[readonly] {
@@ -69,25 +106,69 @@ html, body {
 
 .save-button {
   margin-top: 32px;
+  margin-bottom: 24px;
   width: 100%;
-  padding: 16px;
-  font-size: 16px;
+  padding: 10px;
+  font-size: 20px;
   background-color: #ff8c00;
-  color: #fff;
+  color: #ffffff;
   border: none;
   border-radius: 8px;
   cursor: pointer;
 }
 
-.note-btn {
-  width: 100%;
-  padding: 10px;
-  font-size: 14px;
-  background: #eee;
+/* ✅ 모바일 비고 입력 모달 */
+.note-modal.mobile {
+  position: fixed;
+  bottom: 35vh;
+  left: 0;
+  width: 100vw;
+  height: 30vh;
+  background: white;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  z-index: 9999;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.note-modal.mobile textarea {
+  flex: 1;
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  resize: none;
+  border: 1px solid #ccc;
+}
+
+.note-modal-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.note-modal-buttons button {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
+  color: white;
   cursor: pointer;
 }
+
+.note-modal-buttons .save {
+  background-color: #28a745;
+}
+.note-modal-buttons .cancel {
+  background-color: #dc3545;
+}
+
+
 
 .image-slider-single {
   margin-top: 16px;
@@ -203,15 +284,25 @@ html, body {
   cursor: pointer;
 }
 
-.back-button-mobile {
+.back-icon-button {
+  position: fixed; /* ✅ 절대 중요 */
+  top: 12px;
+  left: 16px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background-color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  font-size: 14px;
-  background: none;
-  border: none;
-  color: #ff8c00;
-  margin-bottom: 12px;
+  justify-content: center;
+  font-size: 18px;
+  color: #ff6600;
+  z-index: 10001 !important; /* ✅ 다른 요소 위에 떠 있게 */
   cursor: pointer;
-  padding: 0;
+}
+
+.back-icon-button:hover {
+  background-color: #ffe5cc;
 }
