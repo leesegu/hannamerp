@@ -15,6 +15,7 @@ import { formatPhoneNumber } from "./utils/formatting";
 import "./MoveoutForm.css"; // PC 기본 스타일
 import "./MoveoutForm.mobile.css"; // 모바일 대응 스타일 (media query 적용됨)
 import { FiX } from "react-icons/fi";
+import ImageSlider from "./components/ImageSlider";
 
 
 
@@ -74,6 +75,7 @@ const handleEdit = (item) => {
   const modalRef = useRef();  // 모달창에 접근할 수 있도록 ref 생성
   // 💡 기존의 useState들 아래에 추가
   const [imageUrls, setImageUrls] = useState([]);  // 이미지 URL 목록
+  const isEditMode = !!editItem || !!localStorage.getItem("editItem");
 
   const inputRefs = useRef([]);
   const defectDescRef = useRef();
@@ -376,20 +378,19 @@ const handleEditDefect = (index) => {
 return (
   <>
     {/* ✅ form-container 바깥에 고정 버튼 렌더링 */}
-    {isMobileDevice && (
+    {isMobileDevice && !editItem && (
       <button className="back-icon-button" onClick={handleBack}>
         <FiArrowLeft />
       </button>
     )}
 
-    {!isMobileDevice && showCancel && (
-  <button className="close-icon-button" onClick={onDone}>
-    <FiX />
-  </button>
-)}
-
-    {/* ✅ 입력 폼 컨테이너 */}
-    <div className={`form-container ${isMobileDevice ? "mobile" : ""}`}>
+  {/* ✅ 버튼을 폼 안쪽으로 옮김 */}
+  <div className={`form-container ${isMobileDevice ? "mobile" : ""} ${isEditMode ? "edit-mode" : ""}`}>  
+  {!isMobileDevice && showCancel && (
+    <button className="close-icon-button" onClick={onDone}>
+      <FiX />
+    </button>
+  )}
       <FormLayout>
         <h2>
   {isMobileDevice && (editItem || localStorage.getItem("editItem"))
@@ -523,6 +524,11 @@ return (
             </button>
           </div>
 
+  <ImageSlider
+    imageUrls={imageUrls}
+    setImageUrls={setImageUrls}
+    isMobile={isMobile}
+  />          
           <div className="input-group">
             <label>비고</label>
             <button className="custom-button orange" onClick={openNoteModal}>

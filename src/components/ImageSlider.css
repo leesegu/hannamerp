@@ -11,8 +11,9 @@
 
 .image-slider {
   width: 100%;
-  max-width: 300px;
-  height: 200px;
+  max-width: 600px;
+  height: 300px;
+  position: relative; /* 버튼 겹치게 하려면 필수 */
   overflow: hidden;
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -24,27 +25,35 @@
   object-fit: cover;
 }
 
+/* ▶ ◀ 버튼 공통 스타일 */
 .slider-button {
-  background: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.5);  /* ✅ 반투명 검정 배경 */
+  color: white;                          /* ✅ 흰색 아이콘 */
+  font-size: 24px;
+  padding: 10px;
+  border-radius: 50%;
   border: none;
-  font-size: 22px;
   cursor: pointer;
-  margin: 4px;
+  z-index: 2;
+}
+
+/* 좌측 버튼 */
+.slider-button.left {
+  left: 12px;
+}
+
+/* 우측 버튼 */
+.slider-button.right {
+  right: 12px;
 }
 
 .slider-indicators {
-  display: flex;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.slider-indicators span {
+  margin-top: 6px;
   font-size: 14px;
-  color: gray;
-}
-
-.slider-indicators .active {
-  color: black;
+  color: #555;
 }
 
 .delete-button {

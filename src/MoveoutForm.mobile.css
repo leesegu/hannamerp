@@ -51,6 +51,19 @@
     position: relative;
   }
 
+.form-container.mobile.edit-mode {
+  width: 100%;                  /* 💡 부모 기준으로 꽉 채움 */
+  max-width: 690px;             /* ✅ 너무 넓어지지 않도록 제한 (선택 사항) */
+  margin: 0 auto;               /* ✅ 화면 정중앙에 배치 */
+  padding: 0;               /* 💡 좌우 최소 여백 */
+  box-sizing: border-box;
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+
+
   form {
     flex: 1;
     display: flex;
@@ -93,7 +106,7 @@
   width: 100%;
   height: 38px;
   font-size: 14px;
-  padding: 6px 10px;
+  padding: 2px 2px;
   border: 1px solid #ccc;
   border-radius: 6px;
   box-sizing: border-box;

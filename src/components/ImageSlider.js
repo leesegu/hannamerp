@@ -1,5 +1,6 @@
 import React from "react";
 import "./ImageSlider.css";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
 export default function ImageSlider({ imageUrls = [], setImageUrls, isMobile }) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -17,37 +18,30 @@ export default function ImageSlider({ imageUrls = [], setImageUrls, isMobile }) 
 
   return (
     <div className={sliderClass}>
-      <button
-        className="slider-button left"
-        onClick={() =>
-          setCurrentIndex((prev) => (prev === 0 ? imageUrls.length - 1 : prev - 1))
-        }
-      >
-        ◀
-      </button>
-
       <div className="image-slider">
         <img src={imageUrls[currentIndex]} alt={`사진 ${currentIndex + 1}`} />
+
+        <button
+          className="slider-button left"
+          onClick={() =>
+            setCurrentIndex((prev) => (prev === 0 ? imageUrls.length - 1 : prev - 1))
+          }
+        >
+          <FaChevronLeft />
+        </button>
+
+        <button
+          className="slider-button right"
+          onClick={() =>
+            setCurrentIndex((prev) => (prev === imageUrls.length - 1 ? 0 : prev + 1))
+          }
+        >
+          <FaChevronRight />
+        </button>
       </div>
 
-      <button
-        className="slider-button right"
-        onClick={() =>
-          setCurrentIndex((prev) => (prev === imageUrls.length - 1 ? 0 : prev + 1))
-        }
-      >
-        ▶
-      </button>
-
       <div className="slider-indicators">
-        {imageUrls.map((_, idx) => (
-          <span
-            key={idx}
-            className={idx === currentIndex ? "active" : ""}
-          >
-            ●
-          </span>
-        ))}
+        <span>{currentIndex + 1} / {imageUrls.length}</span>
       </div>
 
       <button className="delete-button" onClick={handleDelete}>

@@ -127,6 +127,62 @@ const handleShowReceipt = (item) => {
   }, 50);
 };
 
+const waitForReceiptRef = async (timeout = 3000) => {
+  const start = Date.now();
+
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      if (receiptRef.current) {
+        resolve(receiptRef.current);
+      } else if (Date.now() - start > timeout) {
+        reject(new Error("receiptRef timeout"));
+      } else {
+        requestAnimationFrame(check); // 다음 프레임에서 다시 시도
+      }
+    };
+    check();
+  });
+};
+
+const handleMobileReceiptOptions = async (item) => {
+  setCurrentReceiptItem(null); // 리셋
+  await new Promise((r) => setTimeout(r, 50)); // 렌더링 준비
+  setCurrentReceiptItem(item); // 렌더링 시작
+
+  try {
+    const node = await waitForReceiptRef(); // receiptRef 기다림
+    const blob = await htmlToImage.toBlob(node);
+    const file = new File([blob], "receipt.jpg", { type: "image/jpeg" });
+
+    const choice = window.prompt("원하는 기능을 선택하세요:\n1. 문자 발송\n2. 공유\n3. 다운로드");
+
+    if (choice === "1") {
+      if (!item.contact) return alert("연락처 정보가 없습니다.");
+      window.location.href = `sms:${item.contact}`;
+    } else if (choice === "2") {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "이사정산 영수증",
+          text: "영수증을 공유합니다.",
+        });
+      } else {
+        alert("이 기기에서 공유 기능을 지원하지 않습니다.");
+      }
+    } else if (choice === "3") {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "receipt.jpg";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch (err) {
+    console.error("❌ 영수증 생성 실패:", err);
+    alert("영수증 준비 중입니다. 다시 시도해주세요.");
+  }
+};
+
   const handleEdit = (item) => {
     window.lastSavedItem = JSON.stringify(item);
     setEditItem({ ...item, docId: item.id });
@@ -304,7 +360,7 @@ if (isMobileDevice) {
         </div>
         <div className="mobile-buttons">
           <button className="edit-btn" onClick={() => handleEdit(item)}>✏️ 수정</button>
-          <button className="receipt-btn" onClick={() => handleShowReceipt(item)}>📩 영수증</button>
+          <button className="receipt-btn" onClick={() => handleMobileReceiptOptions(item)}>📩 영수증</button>
         </div>
       </div>
     )}
