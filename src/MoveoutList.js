@@ -38,6 +38,7 @@ export default function MoveoutList({ employeeId, userId }) {
   const [selectedNote, setSelectedNote] = useState("");
   const [selectedDefects, setSelectedDefects] = useState([]);
   const [selectedImages, setSelectedImages] = useState([]);
+  const [toastVisible, setToastVisible] = useState(false);
   const [showFormPopup, setShowFormPopup] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -69,19 +70,51 @@ const handleDownloadImage = async () => {
   }
 };
 
-  useEffect(() => {
-  if (!currentReceiptItem || !receiptRef.current) return;
+const waitForReceiptRef = () => {
+  return new Promise((resolve, reject) => {
+    const maxAttempts = 60; // 3초 정도 (60 * 16ms ≈ 1000ms)
+    let attempts = 0;
 
-  setTimeout(() => {
-    htmlToImage.toPng(receiptRef.current)
-      .then((dataUrl) => {
-        setPreviewImage(dataUrl); // ✅ 팝업으로 띄울 이미지 저장
-      })
-      .catch((err) => {
-        console.error("이미지 생성 실패:", err);
-      });
-  }, 100);
+    const check = () => {
+      if (receiptRef.current) {
+        resolve(receiptRef.current);
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        requestAnimationFrame(check);
+      } else {
+        reject(new Error("receiptRef timeout"));
+      }
+    };
+
+    check();
+  });
+};
+
+
+useEffect(() => {
+  if (!currentReceiptItem) return;
+
+  const run = async () => {
+    try {
+      const node = await waitForReceiptRef(); // maxAttempts 동안 기다림
+      const blob = await htmlToImage.toBlob(node);
+      const file = new File([blob], "receipt.jpg", { type: "image/jpeg" });
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "receipt.jpg";
+      a.click();
+      URL.revokeObjectURL(url);
+      setToastVisible(true);
+      setTimeout(() => setToastVisible(false), 2500);
+    } catch (err) {
+      console.error("❌ 영수증 생성 실패:", err);
+    }
+  };
+
+  run(); // ✅ 즉시 실행으로 변경
 }, [currentReceiptItem]);
+
 
   const tableColumns = [
     "moveOutDate", "name", "roomNumber", "arrears", "currentFee",
@@ -124,63 +157,14 @@ const handleShowReceipt = (item) => {
   setCurrentReceiptItem(null);     // 먼저 null로 설정해서 동일 항목도 리셋
   setTimeout(() => {
     setCurrentReceiptItem(item);   // 50ms 후 재설정 → useEffect 재실행
-  }, 50);
-};
-
-const waitForReceiptRef = async (timeout = 3000) => {
-  const start = Date.now();
-
-  return new Promise((resolve, reject) => {
-    const check = () => {
-      if (receiptRef.current) {
-        resolve(receiptRef.current);
-      } else if (Date.now() - start > timeout) {
-        reject(new Error("receiptRef timeout"));
-      } else {
-        requestAnimationFrame(check); // 다음 프레임에서 다시 시도
-      }
-    };
-    check();
-  });
+  }, 100);
 };
 
 const handleMobileReceiptOptions = async (item) => {
-  setCurrentReceiptItem(null); // 리셋
-  await new Promise((r) => setTimeout(r, 50)); // 렌더링 준비
-  setCurrentReceiptItem(item); // 렌더링 시작
-
-  try {
-    const node = await waitForReceiptRef(); // receiptRef 기다림
-    const blob = await htmlToImage.toBlob(node);
-    const file = new File([blob], "receipt.jpg", { type: "image/jpeg" });
-
-    const choice = window.prompt("원하는 기능을 선택하세요:\n1. 문자 발송\n2. 공유\n3. 다운로드");
-
-    if (choice === "1") {
-      if (!item.contact) return alert("연락처 정보가 없습니다.");
-      window.location.href = `sms:${item.contact}`;
-    } else if (choice === "2") {
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "이사정산 영수증",
-          text: "영수증을 공유합니다.",
-        });
-      } else {
-        alert("이 기기에서 공유 기능을 지원하지 않습니다.");
-      }
-    } else if (choice === "3") {
-      const url = URL.createObjectURL(file);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "receipt.jpg";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  } catch (err) {
-    console.error("❌ 영수증 생성 실패:", err);
-    alert("영수증 준비 중입니다. 다시 시도해주세요.");
-  }
+  setPreviewImage(null);
+  setCurrentReceiptItem(null);  // 리셋
+  await new Promise((r) => setTimeout(r, 50));  // 렌더링 대기
+  setCurrentReceiptItem(item);  // 렌더링 시작 → 이미지 생성은 useEffect에서 실행됨
 };
 
   const handleEdit = (item) => {
@@ -199,6 +183,14 @@ const handleMobileReceiptOptions = async (item) => {
       sortConfig.key === key && sortConfig.direction === "asc" ? "desc" : "asc";
     setSortConfig({ key, direction });
   };
+
+  const handleClickReceipt = async (item) => {
+  if (isMobileDevice) {
+    await handleMobileReceiptOptions(item);
+  } else {
+    handleShowReceipt(item);
+  }
+};
 
   const sortedList = [...dataList].sort((a, b) => {
     if (!sortConfig.key) return 0;
@@ -360,7 +352,7 @@ if (isMobileDevice) {
         </div>
         <div className="mobile-buttons">
           <button className="edit-btn" onClick={() => handleEdit(item)}>✏️ 수정</button>
-          <button className="receipt-btn" onClick={() => handleMobileReceiptOptions(item)}>📩 영수증</button>
+          <button className="receipt-btn" onClick={() => handleClickReceipt(item)}>📩 영수증</button>
         </div>
       </div>
     )}
@@ -681,6 +673,23 @@ if (isMobileDevice) {
           <ReceiptTemplate item={currentReceiptItem} refProp={receiptRef} />
         </div>
       )}
-    </div>
-  );
+              {toastVisible && (
+          <div style={{
+            position: "fixed",
+            bottom: "60px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "#333",
+            color: "#fff",
+            padding: "12px 20px",
+            borderRadius: "20px",
+            fontSize: "14px",
+            zIndex: 9999,
+            opacity: 0.9
+          }}>
+            영수증이 다운로드 되었습니다
+          </div>
+    )}
+  </div>
+);
 }
