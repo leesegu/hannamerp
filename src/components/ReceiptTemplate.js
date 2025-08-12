@@ -94,7 +94,7 @@ export default function ReceiptTemplate({ item, refProp }) {
         </p>
       </div>
 
-      {/* ✅ 추가 안내문 */}
+      {/* 안내문 */}
       <div style={{
         marginTop: "16px",
         fontSize: "13.3px",
@@ -150,6 +150,15 @@ export default function ReceiptTemplate({ item, refProp }) {
             </tr>
           </tbody>
         </table>
+
+        {/* 👇 추가된 하단 브랜드명 문구 */}
+        <div style={{
+          marginTop: "10px",
+          fontSize: "16.5px",
+          color: "#999",
+        }}>
+          한남주택관리
+        </div>
       </div>
     </div>
   );

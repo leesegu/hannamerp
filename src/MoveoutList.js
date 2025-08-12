@@ -50,6 +50,8 @@ export default function MoveoutList({ employeeId, userId }) {
   const [currentReceiptItem, setCurrentReceiptItem] = useState(null); // 현재 선택된 항목
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
 const handleStatusChange = (e) => {
   setSelectedStatus(e.target.value);
@@ -90,32 +92,6 @@ const waitForReceiptRef = () => {
   });
 };
 
-
-useEffect(() => {
-  if (!currentReceiptItem) return;
-
-  const run = async () => {
-    try {
-      const node = await waitForReceiptRef(); // maxAttempts 동안 기다림
-      const blob = await htmlToImage.toBlob(node);
-      const file = new File([blob], "receipt.jpg", { type: "image/jpeg" });
-      const url = URL.createObjectURL(file);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "receipt.jpg";
-      a.click();
-      URL.revokeObjectURL(url);
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 2500);
-    } catch (err) {
-      console.error("❌ 영수증 생성 실패:", err);
-    }
-  };
-
-  run(); // ✅ 즉시 실행으로 변경
-}, [currentReceiptItem]);
-
-
   const tableColumns = [
     "moveOutDate", "name", "roomNumber", "arrears", "currentFee",
     "waterCurr", "waterPrev", "waterCost", "waterUnit", "electricity",
@@ -151,6 +127,20 @@ useEffect(() => {
       }
     }
   };
+
+  const formatReceiptFileName = (item) => {
+  if (!item) return "영수증";
+
+  const rawDate = new Date(item.moveOutDate);
+  const yyyy = rawDate.getFullYear();
+  const mm = String(rawDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(rawDate.getDate()).padStart(2, "0");
+  const formattedDate = `${yyyy}${mm}${dd}`;
+  const namePart = (item.name || "").replace(/\s/g, "");
+  const roomPart = (item.roomNumber || "").replace(/\s/g, "");
+  return `${formattedDate}${namePart}${roomPart}`;
+};
+
 
 const handleShowReceipt = (item) => {
   setPreviewImage(null);           // 기존 미리보기 제거
@@ -192,20 +182,29 @@ const handleMobileReceiptOptions = async (item) => {
   }
 };
 
-  const sortedList = [...dataList].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-    const valA = (a[sortConfig.key] ?? "").toString();
-    const valB = (b[sortConfig.key] ?? "").toString();
-    if (!isNaN(Number(valA)) && !isNaN(Number(valB))) {
-      return sortConfig.direction === "asc"
-        ? Number(valA) - Number(valB)
-        : Number(valB) - Number(valA);
-    } else {
-      return sortConfig.direction === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
-    }
-  });
+const sortedList = [...dataList].sort((a, b) => {
+  if (!sortConfig.key) return 0;
+
+  const rawA = a[sortConfig.key];
+  const rawB = b[sortConfig.key];
+
+  const valA = typeof rawA === "string" ? rawA.replace(/,/g, "") : rawA;
+  const valB = typeof rawB === "string" ? rawB.replace(/,/g, "") : rawB;
+
+  const numA = Number(valA);
+  const numB = Number(valB);
+
+  if (!isNaN(numA) && !isNaN(numB)) {
+    return sortConfig.direction === "asc"
+      ? numA - numB
+      : numB - numA;
+  } else {
+    return sortConfig.direction === "asc"
+      ? String(rawA).localeCompare(String(rawB))
+      : String(rawB).localeCompare(String(rawA));
+  }
+});
+
 
   const filtered = sortedList.filter((item) => {
     const lower = searchText.toLowerCase();
@@ -217,6 +216,12 @@ const handleMobileReceiptOptions = async (item) => {
     const matchStatus = statusFilter ? item.status === statusFilter : true;
     return matchText && matchStatus;
   });
+
+  // ✅ 필터된 데이터를 페이지 단위로 분할
+const totalPages = Math.ceil(filtered.length / itemsPerPage); // 전체 페이지 수 계산
+const startIndex = (currentPage - 1) * itemsPerPage;          // 현재 페이지의 시작 인덱스
+const currentData = filtered.slice(startIndex, startIndex + itemsPerPage); // 현재 페이지 데이터
+
 
   const depositTotal = filtered
     .filter(item => item.status === "입금대기")
@@ -249,20 +254,23 @@ const downloadImage = (format) => {
   htmlToImage.toPng(receiptRef.current).then((dataUrl) => {
     const link = document.createElement("a");
 
-    if (format === "jpg") {
-      link.download = `${fileName}.jpg`;  // ✅ 동적 파일명
-      link.href = dataUrl;
-      link.click();
-    } else if (format === "pdf") {
-      import("jspdf").then((jsPDF) => {
-        const pdf = new jsPDF.jsPDF();
-        const imgProps = pdf.getImageProperties(dataUrl);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`${fileName}.pdf`);      // ✅ 동적 파일명
+if (format === "pdf") {
+  import("jspdf").then((jsPDF) => {
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = () => {
+      const pdf = new jsPDF.jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [img.width, img.height]  // ✅ 이미지 크기 그대로 PDF 크기 설정
       });
-    }
+
+      pdf.addImage(img, "PNG", 0, 0, img.width, img.height);
+      pdf.save(`${fileName}.pdf`);
+    };
+  });
+}
+
   });
 };
 
@@ -472,33 +480,44 @@ if (isMobileDevice) {
     />
   </div>
 </div>
-
-
       <div className="scroll-table">
         <table className="data-table">
           <thead>
             <tr>
               <th>번호</th>
-              {tableColumns.map((key) => (
-                <th key={key} onClick={() => handleSort(key)} style={{ cursor: "pointer" }}>
-                  {{
-                    moveOutDate: "이사날짜",
-                    name: "빌라명",
-                    roomNumber: "호수",
-                    arrears: "미납",
-                    currentFee: "당월",
-                    waterCurr: "당월지침",
-                    waterPrev: "전월지침",
-                    waterCost: "수도요금",
-                    waterUnit: "단가",
-                    electricity: "전기",
-                    tvFee: "TV수신료",
-                    cleaning: "청소",
-                    total: "총액",
-                    status: "진행현황"
-                  }[key] || key}
-                </th>
-              ))}
+{tableColumns.map((key) => {
+  const isSorted = sortConfig.key === key;
+  const directionSymbol = isSorted
+    ? sortConfig.direction === "asc" ? " ▲" : " ▼"
+    : "";
+
+  return (
+    <th
+      key={key}
+      onClick={() => handleSort(key)}
+      style={{ cursor: "pointer" }}
+    >
+      {{
+        moveOutDate: "이사날짜",
+        name: "빌라명",
+        roomNumber: "호수",
+        arrears: "미납",
+        currentFee: "당월",
+        waterCurr: "당월지침",
+        waterPrev: "전월지침",
+        waterCost: "수도요금",
+        waterUnit: "단가",
+        electricity: "전기",
+        tvFee: "TV수신료",
+        cleaning: "청소",
+        total: "총액",
+        status: "진행현황"
+      }[key] || key}
+      {directionSymbol}
+    </th>
+  );
+})}
+
               <th>추가내역</th>
               <th>비고</th>
               <th>사진</th>
@@ -506,10 +525,10 @@ if (isMobileDevice) {
               <th>관리</th>
             </tr>
           </thead>
-          <tbody>
-            {filtered.map((item, i) => (
-              <tr key={`row-${item.id}`}>
-                <td>{i + 1}</td>
+<tbody>
+  {currentData.map((item, i) => (
+    <tr key={`row-${item.id}`}>
+      <td>{startIndex + i + 1}</td>  {/* ✅ 전체 순번 유지 */}
                 <td>{item.moveOutDate}</td>
                 <td>{item.name}</td>
                 <td>{item.roomNumber}</td>
@@ -529,84 +548,200 @@ if (isMobileDevice) {
                     {item.status}
                   </div>
                 </td>
-                <td>
-                  <button className={item.defects?.length > 0 ? "filled-button" : ""}
-                          onClick={() => setSelectedDefects(item.defects || [])}>
-                    {item.defects?.length > 0 ? "내용있음" : "없음"}
-                  </button>
-                </td>
-                <td>
-                  <button className={item.notes && item.notes.trim() !== "" ? "filled-button" : ""}
-                          onClick={() => setSelectedNote(item.notes || "")}>
-                    {item.notes && item.notes.trim() !== "" ? "내용있음" : "없음"}
-                  </button>
-                </td>
+
+{/* 추가내역 */}
 <td>
   <button
-    className={item.images?.length > 0 ? "filled-button" : ""}
-    onClick={() => setSelectedImages(item.images || [])}
+    className="icon-button"
+    onClick={() => setSelectedDefects(item.defects || [])}
+    title="추가내역"
   >
-    {item.images?.length > 0 ? "사진있음" : "없음"}
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={item.defects?.length > 0 ? "#FF9800" : "#BDBDBD"} // 선 색상
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" /> {/* 리스트 줄 3개 */}
+    </svg>
   </button>
 </td>
-<td>
-<button
-  className="blue-button"
-  onClick={() => handleShowReceipt(item)}
->
-  생성
-</button>
 
-</td>
+{/* 비고 */}
 <td>
-  <button onClick={() => handleEdit(item)}>수정</button>
-  <button onClick={() => handleDelete(item.id)}>삭제</button>
+  <button
+    className="icon-button"
+    onClick={() => setSelectedNote(item.notes || "")}
+    title="비고"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={item.notes?.trim() ? "#3F51B5" : "#BDBDBD"}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 4h16v16H4z" /> {/* 사각형 */}
+      <path d="M8 8h8M8 12h8M8 16h8" /> {/* 줄 3개 */}
+    </svg>
+  </button>
 </td>
+
+{/* 사진 */}
+<td>
+  <button
+    className="icon-button"
+    onClick={() => setSelectedImages(item.images || [])}
+    title="사진"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={item.images?.length > 0 ? "#4CAF50" : "#BDBDBD"}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /> {/* 테두리 */}
+      <circle cx="8.5" cy="8.5" r="1.5" /> {/* 렌즈 */}
+      <path d="M21 15l-5-5L5 21" /> {/* 산 + 배경 */}
+    </svg>
+  </button>
+</td>
+{/* 영수증 */}
+<td>
+  <button
+    className="icon-button"
+    onClick={() => handleShowReceipt(item)}
+    title="영수증"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg"
+         width="15" height="15" viewBox="0 0 24 24"
+         fill="none"
+         stroke="#007bff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9V2h12v7"/>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+      <rect x="6" y="14" width="12" height="8" rx="2"/>
+    </svg>
+  </button>
+</td>
+
+{/* 관리 (수정 + 삭제 버튼 하나의 셀에 넣기) */}
+<td>
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "6px" }}>
+    {/* 수정 */}
+    <button
+      className="icon-button"
+      onClick={() => handleEdit(item)}
+      title="수정"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg"
+           width="15" height="15" viewBox="0 0 24 24"
+           fill="none"
+           stroke="#ff9800" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+      </svg>
+    </button>
+
+    {/* 삭제 */}
+    <button
+      className="icon-button"
+      onClick={() => handleDelete(item.id)}
+      title="삭제"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg"
+           width="15" height="15" viewBox="0 0 24 24"
+           fill="none"
+           stroke="#e53935" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
+      </svg>
+    </button>
+  </div>
+</td>
+
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {selectedDefects.length > 0 && (
-        <div className="modal-center">
-        <div className="modal-content">
-          <h4>추가내역</h4>
-          <ul>{selectedDefects.map((d, i) => (
-            <li key={i}>{d.desc} - {d.amount}원</li>
-          ))}</ul>
-          <button onClick={() => setSelectedDefects([])}>닫기</button>
-        </div>
-      </div>
-      )}
+      <div className="pagination">
+  <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>◀</button>
+  {Array.from({ length: totalPages }, (_, idx) => (
+    <button
+      key={idx}
+      className={currentPage === idx + 1 ? "active" : ""}
+      onClick={() => setCurrentPage(idx + 1)}
+    >
+      {idx + 1}
+    </button>
+  ))}
+  <button onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>▶</button>
+</div>
 
-      {selectedNote && (
-        <div className="modal-center">
-        <div className="modal-content">
-          <h4>비고</h4>
-          <p>{selectedNote}</p>
-          <button onClick={() => setSelectedNote("")}>닫기</button>
-        </div>
-      </div>
-      )}
+{selectedDefects.length > 0 && (
+  <div className="modal-center">
+    <div className="modal-content" style={{ position: "relative" }}>
+      <button className="close-button-top-right" onClick={() => setSelectedDefects([])}>×</button>
+      <h4>추가내역</h4>
+      <ul>
+        {selectedDefects.map((d, i) => (
+          <li key={i}>{d.desc} - {d.amount}원</li>
+        ))}
+      </ul>
+    </div>
+  </div>
+)}
 
-      {selectedImages.length > 0 && (
-        <div className="modal-center">
-        <div className="modal-content">
-          <h4>사진</h4>
-          {selectedImages.map((url, idx) => (
-            <img
-              key={url + idx}
-              src={url}
-              alt={`img-${idx}`}
-              style={{ maxWidth: "100%", marginBottom: 8, cursor: "pointer" }}
-              onClick={() => window.open(url, "_blank")}
-            />
-          ))}
-          <button onClick={() => setSelectedImages([])}>닫기</button>
-        </div>
+
+
+{selectedNote && (
+  <div className="modal-center">
+    <div className="modal-content" style={{ position: "relative" }}>
+      <button className="close-button-top-right" onClick={() => setSelectedNote("")}>×</button>
+      <h4>비고</h4>
+      <p>{selectedNote}</p>
+    </div>
+  </div>
+)}
+
+
+
+{selectedImages.length > 0 && (
+  <div className="modal-center">
+    <div className="modal-content image-modal">
+      <button className="close-button-top-right" onClick={() => setSelectedImages([])}>×</button>
+      <h4>사진</h4>
+      <div className="thumbnail-grid">
+        {selectedImages.map((url, idx) => (
+          <img
+            key={url + idx}
+            src={url}
+            alt={`img-${idx}`}
+            className="thumbnail"
+            onClick={() => window.open(url, "_blank")}
+          />
+        ))}
       </div>
-      )}
+    </div>
+  </div>
+)}
       
 {showPopup && (
   <div className="backdrop">
@@ -654,19 +789,25 @@ if (isMobileDevice) {
   </div>
 )}
 
-      {previewImage && (
-        <div className="modal-center">
-          <div className="modal-content" style={{ textAlign: "center" }}>
-            <h4>영수증 미리보기</h4>
-            <img src={previewImage} alt="Receipt Preview" style={{ maxWidth: "100%", maxHeight: "80vh", marginBottom: 12 }} />
-            <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-              <button onClick={() => downloadImage("jpg")}>JPG 저장</button>
-              <button onClick={() => downloadImage("pdf")}>PDF 저장</button>
-              <button onClick={() => setPreviewImage(null)}>닫기</button>
-            </div>
-          </div>
-        </div>
-      )}
+{currentReceiptItem && (
+  <div className="modal-center">
+    <div className="modal-content" style={{ textAlign: "center", position: "relative" }}>
+      <button className="close-button-top-right" onClick={() => setCurrentReceiptItem(null)}>×</button>
+      <h4>영수증 미리보기</h4>
+      <div style={{ marginBottom: "16px", fontSize: "14px", color: "#555" }}>
+        파일명: <strong>{formatReceiptFileName(currentReceiptItem)}.jpg / .pdf</strong>
+      </div>
+
+      <ReceiptTemplate item={currentReceiptItem} refProp={receiptRef} />
+
+      <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "16px" }}>
+        <button className="blue-button" onClick={() => downloadImage("jpg")}>JPG 저장</button>
+        <button className="blue-button" onClick={() => downloadImage("pdf")}>PDF 저장</button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {currentReceiptItem && (
         <div style={{ position: "absolute", top: 0, left: 0, zIndex: -9999, opacity: 0, pointerEvents: "none" }}>

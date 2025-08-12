@@ -1,3 +1,9 @@
+/* ✅ Tailwind 지시어 추가 (맨 위에 위치해야 함) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ✅ 기존 스타일 보존 및 병합 */
 body {
   margin: 0;
   font-family: 'Spoqa Han Sans Neo', 'Noto Sans KR', -apple-system, BlinkMacSystemFont,
@@ -9,8 +15,7 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 html, body, #root {

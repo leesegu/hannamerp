@@ -391,12 +391,11 @@ return (
       <FiX />
     </button>
   )}
-      <FormLayout>
-        <h2>
-  {isMobileDevice && (editItem || localStorage.getItem("editItem"))
-    ? "이사정산 수정"
-    : "이사정산 등록"}
-</h2>
+<FormLayout>
+  <h2 className="form-title">
+    {isEditMode ? "이사정산 수정" : "이사정산 등록"}
+  </h2>
+
 
         <div className="grid">
           <div className="input-group" />

@@ -7,11 +7,12 @@ import {
   useNavigate,
 } from "react-router-dom";
 import LoginPage from "./LoginPage";
-import MainMenu from "./MainMenu";
+import TrezoSidebar from "./components/TrezoSidebar";
 import MoveoutForm from "./MoveoutForm";
 import MoveoutList from "./MoveoutList";
 import UserRegisterPage from "./UserRegisterPage";
 import MobileMainPage from "./components/MobileMainPage";
+import VillaCodePage from "./pages/VillaCodePage"; // ✅ 추가
 import "./App.css";
 
 // ✅ 내부 라우터를 사용하기 위한 래퍼 컴포넌트
@@ -21,8 +22,10 @@ function AppRoutes({ employeeId, userId, userName, isMobile }) {
 
   return (
     <Routes>
+      {/* 로그인 페이지 */}
       <Route path="/login" element={<LoginPage onLogin={() => {}} />} />
 
+      {/* 메인 페이지 (사이드바 or 모바일) */}
       <Route
         path="/main"
         element={
@@ -35,7 +38,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile }) {
               userName={userName}
             />
           ) : (
-            <MainMenu
+            <TrezoSidebar
               employeeId={employeeId}
               userId={userId}
               userName={userName}
@@ -44,6 +47,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile }) {
         }
       />
 
+      {/* 모바일 이사정산 등록 */}
       <Route
         path="/mobile/form"
         element={
@@ -60,6 +64,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile }) {
         }
       />
 
+      {/* 모바일 이사정산 조회 */}
       <Route
         path="/mobile/list"
         element={
@@ -75,7 +80,22 @@ function AppRoutes({ employeeId, userId, userName, isMobile }) {
         }
       />
 
+      {/* ✅ 코드별빌라 페이지 추가 */}
+      <Route
+        path="/villa"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" />
+          ) : (
+            <VillaCodePage />
+          )
+        }
+      />
+
+      {/* 사원등록 */}
       <Route path="/register" element={<UserRegisterPage />} />
+
+      {/* 그 외 경로는 로그인으로 이동 */}
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );

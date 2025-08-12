@@ -4,15 +4,17 @@
   font-family: 'Pretendard', sans-serif;
   max-width: 100%;
   box-sizing: border-box;
-  min-height: calc(100vh - 1px);        /* ✅ 페이지 높이 확보 */
-  overflow-y: auto;         /* ✅ 스크롤 허용 */
+  height: 100vh;          /* ✅ 전체 페이지 높이 고정 */
+  overflow: hidden;       /* ✅ 스크롤 제거 */
 }
 
 /* 제목 */
 h2 {
-  text-align: center;
-  margin-bottom: 20px;
-  color: #333;
+  font-size: 28px;
+  font-weight: bold;
+  text-align: left;
+  margin: 0 0 20px 6px;
+  color: #222;
 }
 
 .search-wrapper {
@@ -23,28 +25,25 @@ h2 {
 
 /* 테이블 스크롤 래퍼 */
 .scroll-table {
-  max-height: calc(100vh - 150px);      /* or calc(100vh - 250px) 등으로 화면에 맞게 조정 */
-  overflow-y: auto;      /* 세로 스크롤 추가 */
-  overflow-x: auto;      /* 기존대로 가로 스크롤 유지 */
+  flex: 1;
+  overflow: hidden;        /* ✅ 스크롤 제거 */
+  max-height: none;
 }
 
-/* ✅ 드롭다운 + 총액 + 검색창 한 줄 정렬용 */
 .top-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between; /* 좌측/우측 나눔 */
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 20px;
 }
 
-/* ✅ 왼쪽 영역: 드롭다운 + 총액 */
 .left-controls {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-/* 드롭다운 스타일 */
 .status-filter-dropdown {
   padding: 8px 12px;
   font-size: 14px;
@@ -52,27 +51,25 @@ h2 {
   border: 1px solid #ccc;
 }
 
-/* 총액 표시 */
 .deposit-total {
   font-weight: bold;
   font-size: 14px;
   color: #e74c3c;
 }
 
-/* 검색창 오른쪽 배치 */
 .search-input {
   padding: 10px;
   width: 280px;
-  border: 1px solid #bbb;  /* 기존 #ddd → 더 진한 #bbb */
+  border: 1px solid #bbb;
   border-radius: 6px;
 }
 
 .search-input:focus {
-  border: 2px solid #ff6a00;  /* 더 진한 오렌지 */
-  box-shadow: 0 0 4px 2px rgba(255, 106, 0, 0.5); /* 더 강한 glow 효과 */
+  border: 2px solid #ff6a00;
+  box-shadow: 0 0 4px 2px rgba(255, 106, 0, 0.5);
   outline: none;
 }
-/* 테이블 기본 스타일 */
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -85,7 +82,7 @@ h2 {
   padding: 5px;
   text-align: center;
   white-space: nowrap;
-  height: 10px; /* ✅ 목록 셀 높이 설정 */
+  height: 10px;
   line-height: 5px;
 }
 
@@ -106,13 +103,11 @@ h2 {
   background-color: #f1f1f1;
 }
 
-/* 버튼 스타일 */
 .data-table button {
   padding: 4px 8px;
   margin: 2px;
   border: none;
   border-radius: 4px;
-  background-color: #ccc;
   color: #333;
   font-size: 12px;
   cursor: pointer;
@@ -123,14 +118,12 @@ h2 {
   background-color: #bbb;
 }
 
-/* 강조 버튼: 내용있음 */
 .filled-button {
   background-color: #ff6600 !important;
   color: #fff !important;
   font-weight: bold;
 }
 
-/* ✅ 정산진행현황 상태 표시 원형 색상 */
 .status-dot {
   display: inline-block;
   width: 10px;
@@ -139,7 +132,6 @@ h2 {
   margin-right: 6px;
 }
 
-/* ✅ 팝업 (Modal) 스타일 */
 .modal {
   position: fixed;
   top: 10%;
@@ -161,23 +153,26 @@ h2 {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 9999;
+  background-color: rgba(0, 0, 0, 0.3);
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.3); /* 배경 흐리게 */
+  z-index: 9999;
 }
 
 .modal-content {
+  position: relative;
   background: white;
   padding: 24px;
   border-radius: 12px;
   max-width: 90vw;
   max-height: 90vh;
+  min-width: 360px;
+  min-height: 240px;
   overflow-y: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
-/* 모달 내부 요소 */
+
 .modal h4 {
   margin-bottom: 10px;
   font-size: 18px;
@@ -219,7 +214,6 @@ h2 {
   box-sizing: border-box;
 }
 
-/* PC용 넓은 팝업을 위한 클래스 */
 .wide-modal {
   width: 1000px;
   left: 50% !important;
@@ -289,10 +283,104 @@ h2 {
 
 .popup-container {
   background: white;
-  width: 920px; /* ✅ PC 전용 폭 고정 */
+  width: 920px;
   max-height: 90vh;
-  overflow-y: auto;  /* ✅ 세로 스크롤만 제한적으로 */
+  overflow-y: auto;
   border-radius: 12px;
   padding: 24px 36px;
   box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 1px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.icon-button:hover {
+  background: transparent;
+  border: 0 solid #ccc;
+}
+
+.icon-button svg {
+  display: block;
+  transition: stroke 0.2s ease;
+}
+
+.icon-button:hover svg {
+  stroke: #000;
+}
+
+.modal-content.image-modal {
+  position: relative;
+  padding-top: 40px;
+}
+
+.close-button-top-right {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  font-weight: bold;
+  color: #444;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.thumbnail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.thumbnail {
+  width: 120px;
+  height: auto;
+  max-height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  transition: transform 0.2s ease;
+}
+
+.thumbnail:hover {
+  transform: scale(1.05);
+  border-color: #888;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin: 16px 0;
+  gap: 6px;
+}
+
+.pagination button {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.pagination button.active {
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

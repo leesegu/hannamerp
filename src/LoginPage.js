@@ -3,8 +3,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from './firebase';
-import './LoginPage.css';
-import { FaUser, FaLock, FaIdBadge } from 'react-icons/fa'; // 아이콘 추가
 
 const LoginPage = ({ onLogin }) => {
   const [id, setId] = useState('');
@@ -22,7 +20,7 @@ const LoginPage = ({ onLogin }) => {
     if (stored) {
       const { id, employeeNo, name } = JSON.parse(stored);
       onLogin({ id, employeeNo, name });
-      navigate('/main');
+      navigate('/main', { replace: true });
     }
   }, [onLogin, navigate]);
 
@@ -40,7 +38,6 @@ const LoginPage = ({ onLogin }) => {
       }
 
       const userData = userSnap.data();
-
       const correctPassword = userData.passwords?.[employeeNo];
       const isEmployeeValid = userData.employeeNos?.includes(employeeNo);
 
@@ -49,7 +46,11 @@ const LoginPage = ({ onLogin }) => {
         const loginData = { employeeNo, id, name };
         localStorage.setItem('autoLogin', JSON.stringify(loginData));
         onLogin(loginData);
-        navigate('/main');
+
+        // 🔹 상태 반영 후 페이지 이동
+        setTimeout(() => {
+          navigate('/main', { replace: true });
+        }, 0);
       } else {
         setError('❌ 아이디, 사원번호 또는 비밀번호가 일치하지 않습니다.');
       }
@@ -71,51 +72,63 @@ const LoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="login-wrapper">
-      <div className="login-container">
-        <form className="login-form" onSubmit={handleLogin}>
-          <h2>한남주택관리</h2>
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="bg-white rounded-2xl overflow-hidden w-full max-w-[900px] flex">
+        {/* 왼쪽 이미지 */}
+        <div
+          className="hidden md:block md:w-1/2 bg-cover bg-center rounded-2xl overflow-hidden"
+          style={{ backgroundImage: "url('/images/sign-in.jpg')" }}
+        />
 
-          <div className="input-icon-wrapper">
-            <FaUser className="input-icon" />
-            <input
-              type="text"
-              placeholder="아이디"
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              ref={idRef}
-              onKeyDown={(e) => handleKeyDown(e, employeeNoRef)}
-            />
+        {/* 오른쪽 로그인 폼 */}
+        <div className="w-full md:w-1/2 flex items-center justify-center py-12 md:py-16 px-6 md:px-8">
+          <div className="w-full max-w-[360px]">
+            <div className="flex justify-center mb-6">
+              <img src="/images/logo.svg" alt="logo" className="h-16 md:h-20" />
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <input
+                type="text"
+                placeholder="아이디"
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+                ref={idRef}
+                onKeyDown={(e) => handleKeyDown(e, employeeNoRef)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <input
+                type="text"
+                placeholder="사원번호"
+                value={employeeNo}
+                onChange={(e) => setEmployeeNo(e.target.value)}
+                ref={employeeNoRef}
+                onKeyDown={(e) => handleKeyDown(e, passwordRef)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <input
+                type="password"
+                placeholder="비밀번호"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                ref={passwordRef}
+                onKeyDown={(e) => handleKeyDown(e)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+
+              {error && (
+                <p className="text-red-500 text-sm text-center">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg py-3 rounded-lg transition duration-200"
+              >
+                로그인
+              </button>
+            </form>
           </div>
-
-          <div className="input-icon-wrapper">
-            <FaIdBadge className="input-icon" />
-            <input
-              type="text"
-              placeholder="사원번호"
-              value={employeeNo}
-              onChange={(e) => setEmployeeNo(e.target.value)}
-              ref={employeeNoRef}
-              onKeyDown={(e) => handleKeyDown(e, passwordRef)}
-            />
-          </div>
-
-          <div className="input-icon-wrapper">
-            <FaLock className="input-icon" />
-            <input
-              type="password"
-              placeholder="비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              ref={passwordRef}
-              onKeyDown={(e) => handleKeyDown(e)}
-            />
-          </div>
-
-          {error && <p className="error-message">{error}</p>}
-
-          <button type="submit">로그인</button>
-        </form>
+        </div>
       </div>
     </div>
   );
