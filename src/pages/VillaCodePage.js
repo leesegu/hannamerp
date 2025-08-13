@@ -90,7 +90,6 @@ export default function VillaCodePage() {
       <DataTable
         columns={columns}
         data={data}
-        searchableKeys={["code", "name", "address"]}
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}

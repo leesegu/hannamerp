@@ -14,10 +14,10 @@ export default function PublicElectricPage() {
   useEffect(() => {
     const q = query(collection(db, "villas"), where("publicElectric", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => {
-        const data = doc.data();
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
         return {
-          id: doc.id,
+          id: d.id,
           code: data.code || "",
           name: data.name || "",
           district: data.district || "",
@@ -55,10 +55,44 @@ export default function PublicElectricPage() {
     { label: "비고", key: "publicElectricNote" },
   ];
 
+  // ✅ 엑셀 업/다운로드용 필드 매핑 (헤더 ↔ 키 1:1)
+  const excelFields = [
+    { label: "코드번호", key: "code" },
+    { label: "빌라명", key: "name" },
+    { label: "구", key: "district" },
+    { label: "주소", key: "address" },
+    { label: "공용전기", key: "publicElectric" },
+    { label: "명의", key: "publicElectricOwner" },
+    { label: "비고", key: "publicElectricNote" },
+  ];
+
   return (
     <div className="page-wrapper">
       <PageTitle>공용전기 정보</PageTitle>
-      <DataTable columns={columns} data={villas} onEdit={handleEdit} />
+
+      <DataTable
+        columns={columns}
+        data={villas}
+        onEdit={handleEdit}
+        // 🔽 엑셀 업/다운로드 활성화 (DataTable.js의 AoA 다운로드 & 강화 업로드 매칭 사용)
+        enableExcel={true}
+        excelFields={excelFields}
+        // (선택) 검색 키 지정
+        searchableKeys={[
+          "code",
+          "name",
+          "district",
+          "address",
+          "publicElectric",
+          "publicElectricOwner",
+          "publicElectricNote",
+        ]}
+        // (선택) 기본 정렬/페이지 크기
+        // itemsPerPage={15}
+        // sortKey="code"
+        // sortOrder="asc"
+      />
+
       <GenericEditModal
         villa={selectedVilla}
         isOpen={isModalOpen}

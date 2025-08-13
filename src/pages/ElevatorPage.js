@@ -1,3 +1,4 @@
+// src/pages/ElevatorPage.js
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
 import {
@@ -17,13 +18,14 @@ export default function ElevatorPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // 🔍 승강기 필드가 있는 문서만 가져오기
   useEffect(() => {
     const q = query(collection(db, "villas"), where("elevator", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => {
-        const data = doc.data();
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
         return {
-          id: doc.id,
+          id: d.id,
           code: data.code || "",
           name: data.name || "",
           district: data.district || "",
@@ -48,11 +50,13 @@ export default function ElevatorPage() {
     return () => unsubscribe();
   }, []);
 
+  // ✏ 수정 버튼 클릭 시
   const handleEdit = (villa) => {
     setSelectedVilla(villa);
     setIsModalOpen(true);
   };
 
+  // 💾 저장
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
     await updateDoc(doc(db, "villas", id), data);
@@ -60,6 +64,7 @@ export default function ElevatorPage() {
     setSelectedVilla(null);
   };
 
+  // 📋 테이블 컬럼 정의
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -67,7 +72,14 @@ export default function ElevatorPage() {
     { label: "주소", key: "address" },
     { label: "승강기", key: "elevator" },
     { label: "제조사", key: "manufacturer" },
-    { label: "금액", key: "elevatorAmount" },
+    {
+      label: "금액",
+      key: "elevatorAmount",
+      format: (value) => {
+        const num = Number(String(value).replace(/,/g, ""));
+        return isNaN(num) ? (value ?? "-") : num.toLocaleString();
+      },
+    },
     { label: "제조번호", key: "serialNumber" },
     { label: "안전관리자", key: "safetyManager" },
     { label: "정기신청", key: "regularApply" },
@@ -79,11 +91,40 @@ export default function ElevatorPage() {
     { label: "비고", key: "elevatorNote" },
   ];
 
+  // 📑 엑셀 import/export 필드
+  const excelFields = [
+    "code",
+    "name",
+    "district",
+    "address",
+    "elevator",
+    "manufacturer",
+    "elevatorAmount",
+    "serialNumber",
+    "safetyManager",
+    "regularApply",
+    "regularExpire",
+    "inspectionApply",
+    "insuranceCompany",
+    "contractStart",
+    "contractEnd",
+    "elevatorNote",
+  ];
+
   return (
     <div className="page-wrapper">
       <PageTitle>승강기 정보</PageTitle>
 
-      <DataTable columns={columns} data={villas} onEdit={handleEdit} />
+      <DataTable
+        columns={columns}
+        data={villas}
+        onEdit={handleEdit}
+        sortKey="code"
+        sortOrder="asc"
+        itemsPerPage={15}
+        enableExcel={true}       // 📌 통신사 페이지와 동일하게 엑셀 기능 활성화
+        excelFields={excelFields} // 📌 내보내기/업로드 필드 순서 지정
+      />
 
       <GenericEditModal
         villa={selectedVilla}
@@ -121,7 +162,11 @@ export default function ElevatorPage() {
           contractEnd: "계약만기",
           elevatorNote: "비고",
         }}
-        types={{}}
+        types={{
+          elevatorAmount: "amount", // 금액: 쉼표 포맷
+          contractStart: "date",    // 계약일: 날짜 포맷
+          contractEnd: "date",      // 계약만기: 날짜 포맷
+        }}
         gridClass="modal-grid-2"
       />
     </div>

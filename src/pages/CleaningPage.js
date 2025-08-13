@@ -11,13 +11,20 @@ export default function CleaningPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // 화면 표시 전용: 금액 쉼표 포맷
+  const formatAmount = (v) => {
+    if (v === null || v === undefined || v === "") return "";
+    const n = Number(String(v).replace(/[^\d.-]/g, ""));
+    return isNaN(n) ? v : n.toLocaleString();
+  };
+
   useEffect(() => {
     const q = query(collection(db, "villas"), where("cleaning", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => {
-        const data = doc.data();
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
         return {
-          id: doc.id,
+          id: d.id,
           code: data.code || "",
           name: data.name || "",
           district: data.district || "",
@@ -55,6 +62,19 @@ export default function CleaningPage() {
     { label: "건물청소", key: "cleaning" },
     { label: "요일", key: "cleaningDay" },
     { label: "주", key: "cleaningWeek" },
+    { label: "금액", key: "cleaningAmount", format: (v) => formatAmount(v) },
+    { label: "비고", key: "cleaningNote" },
+  ];
+
+  // ✅ 엑셀 업/다운로드용 필드 매핑 (헤더 ↔ 키 1:1)
+  const excelFields = [
+    { label: "코드번호", key: "code" },
+    { label: "빌라명", key: "name" },
+    { label: "구", key: "district" },
+    { label: "주소", key: "address" },
+    { label: "건물청소", key: "cleaning" },
+    { label: "요일", key: "cleaningDay" },
+    { label: "주", key: "cleaningWeek" },
     { label: "금액", key: "cleaningAmount" },
     { label: "비고", key: "cleaningNote" },
   ];
@@ -62,7 +82,32 @@ export default function CleaningPage() {
   return (
     <div className="page-wrapper">
       <PageTitle>건물청소 정보</PageTitle>
-      <DataTable columns={columns} data={villas} onEdit={handleEdit} />
+
+      <DataTable
+        columns={columns}
+        data={villas}
+        onEdit={handleEdit}
+        // 🔽 엑셀 업/다운로드 활성화 (DataTable.js의 AoA 다운로드 & 강화 업로드 매칭 사용)
+        enableExcel={true}
+        excelFields={excelFields}
+        // (선택) 검색 키 지정
+        searchableKeys={[
+          "code",
+          "name",
+          "district",
+          "address",
+          "cleaning",
+          "cleaningDay",
+          "cleaningWeek",
+          "cleaningAmount",
+          "cleaningNote",
+        ]}
+        // (선택) 기본 정렬/페이지 크기
+        // itemsPerPage={15}
+        // sortKey="code"
+        // sortOrder="asc"
+      />
+
       <GenericEditModal
         villa={selectedVilla}
         isOpen={isModalOpen}
@@ -76,14 +121,14 @@ export default function CleaningPage() {
           "cleaningDay",
           "cleaningWeek",
           "cleaningAmount",
-          "cleaningNote"
+          "cleaningNote",
         ]}
         labels={{
           cleaning: "건물청소",
           cleaningDay: "요일",
           cleaningWeek: "주",
           cleaningAmount: "금액",
-          cleaningNote: "비고"
+          cleaningNote: "비고",
         }}
         types={{}}
         gridClass="modal-grid-2"

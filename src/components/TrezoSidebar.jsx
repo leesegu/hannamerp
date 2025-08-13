@@ -13,6 +13,7 @@ import PublicElectricPage from "../pages/PublicElectricPage";
 import CleaningPage from "../pages/CleaningPage";
 import CctvPage from "../pages/CctvPage";
 import VendorRegisterPage from "../pages/VendorRegisterPage";
+import VendorsMainPage from "../pages/VendorsMainPage.js"; // ✅ 추가: 주메뉴용 메인 페이지
 
 import "remixicon/fonts/remixicon.css";
 
@@ -45,9 +46,11 @@ const SidebarSubmenu = ({ items = [], onClick, activeMenu }) => (
       <li
         key={item}
         className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer transition-colors
-          ${activeMenu === item
-            ? "bg-purple-100 text-purple-600"
-            : "hover:bg-purple-50 hover:text-purple-600"}
+          ${
+            activeMenu === item
+              ? "bg-purple-100 text-purple-600"
+              : "hover:bg-purple-50 hover:text-purple-600"
+          }
         `}
         onClick={() => onClick?.(item)}
       >
@@ -143,16 +146,16 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
                   onClick={(item) => {
                     setActiveMenu(item);
                     const pages = {
-                      "코드별빌라": <VillaCodePage />,
-                      "통신사": <TelcoPage />,
-                      "승강기": <ElevatorPage />,
-                      "정화조": <SepticPage />,
-                      "소방안전": <FireSafetyPage />,
-                      "전기안전": <ElectricSafetyPage />,
-                      "상수도": <WaterPage />,
-                      "공용전기": <PublicElectricPage />,
-                      "건물청소": <CleaningPage />,
-                      "CCTV": <CctvPage />,
+                      코드별빌라: <VillaCodePage />,
+                      통신사: <TelcoPage />,
+                      승강기: <ElevatorPage />,
+                      정화조: <SepticPage />,
+                      소방안전: <FireSafetyPage />,
+                      전기안전: <ElectricSafetyPage />,
+                      상수도: <WaterPage />,
+                      공용전기: <PublicElectricPage />,
+                      건물청소: <CleaningPage />,
+                      CCTV: <CctvPage />,
                     };
                     handleNavigate(pages[item], item);
                   }}
@@ -167,20 +170,24 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               onClick={() => {
                 setOpenMenu("");
                 handleNavigate(
-                  <MoveoutList employeeId={employeeId} userId={userId} userName={userName} />,
+                  <MoveoutList
+                    employeeId={employeeId}
+                    userId={userId}
+                    userName={userName}
+                  />,
                   "이사정산"
                 );
               }}
               active={activeMenu === "이사정산"}
             />
 
-            {/* 거래처관리 */}
+            {/* 거래처관리 (주메뉴) -> ✅ VendorsMainPage 로 이동 */}
             <SidebarItem
               icon="ri-booklet-line"
               label="거래처관리"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(<VendorRegisterPage />, "거래처관리");
+                handleNavigate(<VendorsMainPage />, "거래처관리"); // ← 변경 포인트
               }}
               active={activeMenu === "거래처관리"}
             />
@@ -230,7 +237,7 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
                     if (item === "사원코드생성") {
                       handleNavigate(<UserRegisterPage />, item);
                     } else if (item === "거래처등록") {
-                      handleNavigate(<VendorRegisterPage />, item);
+                      handleNavigate(<VendorRegisterPage />, item); // ← 기초등록 전용 등록 페이지
                     }
                   }}
                 />
@@ -241,9 +248,7 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
       </aside>
 
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 p-6 bg-gray-50 overflow-auto">
-        {activeContent}
-      </main>
+      <main className="flex-1 p-6 bg-gray-50 overflow-auto">{activeContent}</main>
     </div>
   );
 };
