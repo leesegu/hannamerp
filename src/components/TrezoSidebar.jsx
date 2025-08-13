@@ -3,6 +3,17 @@ import { useNavigate } from "react-router-dom";
 import MoveoutList from "../MoveoutList";
 import UserRegisterPage from "../UserRegisterPage";
 import VillaCodePage from "../pages/VillaCodePage";
+import TelcoPage from "../pages/TelcoPage";
+import ElevatorPage from "../pages/ElevatorPage";
+import SepticPage from "../pages/SepticPage";
+import FireSafetyPage from "../pages/FireSafetyPage";
+import ElectricSafetyPage from "../pages/ElectricSafetyPage";
+import WaterPage from "../pages/WaterPage";
+import PublicElectricPage from "../pages/PublicElectricPage";
+import CleaningPage from "../pages/CleaningPage";
+import CctvPage from "../pages/CctvPage";
+import VendorRegisterPage from "../pages/VendorRegisterPage";
+
 import "remixicon/fonts/remixicon.css";
 
 const SidebarItem = ({ icon, label, onClick, active, hasChildren, isOpen }) => (
@@ -126,16 +137,24 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
                     "상수도",
                     "공용전기",
                     "건물청소",
-                    "CCTV"
+                    "CCTV",
                   ]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
-                    if (item === "코드별빌라") {
-                      handleNavigate(<VillaCodePage />, item);
-                    } else {
-                      alert(`${item} 페이지는 아직 준비 중입니다.`);
-                    }
+                    const pages = {
+                      "코드별빌라": <VillaCodePage />,
+                      "통신사": <TelcoPage />,
+                      "승강기": <ElevatorPage />,
+                      "정화조": <SepticPage />,
+                      "소방안전": <FireSafetyPage />,
+                      "전기안전": <ElectricSafetyPage />,
+                      "상수도": <WaterPage />,
+                      "공용전기": <PublicElectricPage />,
+                      "건물청소": <CleaningPage />,
+                      "CCTV": <CctvPage />,
+                    };
+                    handleNavigate(pages[item], item);
                   }}
                 />
               )}
@@ -148,11 +167,7 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               onClick={() => {
                 setOpenMenu("");
                 handleNavigate(
-                  <MoveoutList
-                    employeeId={employeeId}
-                    userId={userId}
-                    userName={userName}
-                  />,
+                  <MoveoutList employeeId={employeeId} userId={userId} userName={userName} />,
                   "이사정산"
                 );
               }}
@@ -165,7 +180,7 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               label="거래처관리"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(null, "거래처관리");
+                handleNavigate(<VendorRegisterPage />, "거래처관리");
               }}
               active={activeMenu === "거래처관리"}
             />
@@ -210,15 +225,12 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
                 <SidebarSubmenu
                   items={["사원코드생성", "거래처등록"]}
                   activeMenu={activeMenu}
-                  onClick={async (item) => {
+                  onClick={(item) => {
                     setActiveMenu(item);
                     if (item === "사원코드생성") {
                       handleNavigate(<UserRegisterPage />, item);
                     } else if (item === "거래처등록") {
-                      const module = await import("../pages/VendorRegisterPage");
-                      handleNavigate(<module.default />, item);
-                    } else {
-                      alert("준비 중입니다.");
+                      handleNavigate(<VendorRegisterPage />, item);
                     }
                   }}
                 />

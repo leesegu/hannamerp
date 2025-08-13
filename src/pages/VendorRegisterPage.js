@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { db } from "../firebase"; // Firebase 초기화 파일
+import { getDoc, doc, setDoc } from "firebase/firestore";
 
 export default function VendorRegisterPage() {
   const categories = [
@@ -11,18 +13,37 @@ export default function VendorRegisterPage() {
     "CCTV",
   ];
 
+  // ✅ 항목별 데이터 상태
   const [vendorData, setVendorData] = useState(
     Object.fromEntries(categories.map((cat) => [cat, [""]]))
   );
 
-  // 값 변경
+  // ✅ Firestore에서 데이터 불러오기
+  useEffect(() => {
+    const fetchData = async () => {
+      const newData = {};
+      for (const category of categories) {
+        const snap = await getDoc(doc(db, "vendors", category));
+        if (snap.exists()) {
+          newData[category] = snap.data().items || [""];
+        } else {
+          newData[category] = [""];
+        }
+      }
+      setVendorData(newData);
+    };
+
+    fetchData();
+  }, []);
+
+  // ✅ 값 변경
   const handleChange = (category, index, value) => {
     const updated = [...vendorData[category]];
     updated[index] = value;
     setVendorData({ ...vendorData, [category]: updated });
   };
 
-  // 항목별 행 추가
+  // ✅ 항목별 행 추가
   const handleAdd = (category) => {
     setVendorData({
       ...vendorData,
@@ -30,7 +51,7 @@ export default function VendorRegisterPage() {
     });
   };
 
-  // 항목별 행 삭제
+  // ✅ 항목별 행 삭제
   const handleDelete = (category, index) => {
     const updated = vendorData[category].filter((_, i) => i !== index);
     setVendorData({
@@ -39,10 +60,24 @@ export default function VendorRegisterPage() {
     });
   };
 
-  const handleSave = () => {
-    console.log("✅ 저장된 거래처 목록:", vendorData);
-    alert("저장되었습니다. (콘솔 출력)");
-  };
+  // ✅ Firebase에 저장
+const handleSave = async () => {
+  try {
+    for (const category in vendorData) {
+      const cleanedItems = vendorData[category]
+        .map((item) => item.trim())
+        .filter((item) => item !== ""); // ❗빈 문자열 제거
+
+      await setDoc(doc(db, "vendors", category), {
+        items: cleanedItems.length ? cleanedItems : [""], // 최소 1개는 유지
+      });
+    }
+    alert("✅ Firebase에 저장 완료!");
+  } catch (error) {
+    console.error("Firebase 저장 오류:", error);
+    alert("❌ 저장 실패");
+  }
+};
 
   return (
     <div className="p-6">
@@ -53,7 +88,7 @@ export default function VendorRegisterPage() {
           <thead className="bg-gray-100 text-gray-700">
             <tr>
               {categories.map((cat) => (
-                <th key={cat} className="border px-3 py-2 whitespace-nowrap">
+                <th key={cat} className="border px-3 py-2 whitespace-nowrap align-top">
                   <div className="flex justify-center items-center gap-2">
                     {cat}
                     <button
@@ -68,29 +103,21 @@ export default function VendorRegisterPage() {
             </tr>
           </thead>
           <tbody>
-            {/* 최대 행 길이 계산 */}
-            {Array.from({
-              length: Math.max(
-                ...categories.map((cat) => vendorData[cat].length)
-              ),
-            }).map((_, rowIndex) => (
-              <tr key={rowIndex}>
-                {categories.map((cat) => {
-                  const value = vendorData[cat][rowIndex] ?? "";
-                  return (
-                    <td key={cat} className="border px-2 py-1">
-                      <div className="flex items-center gap-1">
+            <tr>
+              {categories.map((cat) => (
+                <td key={cat} className="border px-2 py-2 align-top">
+                  <div className="flex flex-col gap-1">
+                    {vendorData[cat].map((value, idx) => (
+                      <div key={idx} className="flex items-center gap-1">
                         <input
                           value={value}
-                          onChange={(e) =>
-                            handleChange(cat, rowIndex, e.target.value)
-                          }
+                          onChange={(e) => handleChange(cat, idx, e.target.value)}
                           className="w-full border rounded px-2 py-1 text-sm"
                           placeholder={cat}
                         />
                         {vendorData[cat].length > 1 && (
                           <button
-                            onClick={() => handleDelete(cat, rowIndex)}
+                            onClick={() => handleDelete(cat, idx)}
                             className="text-red-500 text-xs hover:underline"
                             title="삭제"
                           >
@@ -98,11 +125,11 @@ export default function VendorRegisterPage() {
                           </button>
                         )}
                       </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                    ))}
+                  </div>
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
       </div>

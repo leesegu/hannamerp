@@ -1,0 +1,211 @@
+/* ====== 오버레이 ====== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ====== 모달 박스 ====== */
+.modal-box {
+  background: #fff;
+  width: 700px;
+  max-width: 90vw;
+  max-height: 90vh;
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ====== 헤더 ====== */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #666;
+}
+
+/* ====== 내용 영역 ====== */
+.modal-content {
+  padding: 24px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ====== 푸터 ====== */
+.modal-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 24px;
+  background: #fff;
+  border-top: 1px solid #eee;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.03);
+  z-index: 1;
+}
+
+/* ====== 입력 레이아웃 ====== */
+.modal-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+.modal-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+.modal-grid-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+
+/* ✅ 필드 블록: label + input 묶음 */
+.modal-grid-3 .form-field,
+.modal-grid-2 .form-field,
+.modal-grid-1 .form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ====== label ====== */
+.form-field label {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+/* ====== 입력 요소 ====== */
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border: 2px solid #7A5FFF;
+  box-shadow: 0 0 0 3px rgba(122, 95, 255, 0.2);
+  background-color: #fdfaff;
+}
+
+/* ====== 구분선 ====== */
+hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 24px 0;
+}
+
+/* ====== 버튼 ====== */
+.save-btn,
+.close-btn {
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.save-btn {
+  background-color: #7A5FFF;
+  color: white;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.save-btn:hover {
+  background-color: #9B7DFF;
+  border: 2px solid #BFAEFF;
+  box-shadow: 0 0 0 3px rgba(122, 95, 255, 0.3);
+}
+
+.close-btn {
+  background-color: #ccc;
+  color: black;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background-color: #e0e0e0;
+  border: 2px solid #aaa;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ====== 반응형 ====== */
+@media (max-width: 1024px) {
+  .modal-box {
+    width: 92vw;
+  }
+  .modal-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .modal-grid-3,
+  .modal-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.readonly-inline {
+  margin-bottom: 24px;
+  padding: 12px 20px;
+  background-color: #f8f8f8;
+  font-size: 14px;
+  font-weight: 500;
+  color: #444;
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readonly-inline span {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
