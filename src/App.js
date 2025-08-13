@@ -14,7 +14,6 @@ import MoveoutList from "./MoveoutList";
 import UserRegisterPage from "./UserRegisterPage";
 import MobileMainPage from "./components/MobileMainPage";
 
-// 각 페이지 import
 import VillaCodePage from "./pages/VillaCodePage";
 import TelcoPage from "./pages/TelcoPage";
 import ElevatorPage from "./pages/ElevatorPage";
@@ -29,14 +28,14 @@ import VendorRegisterPage from "./pages/VendorRegisterPage";
 
 import "./App.css";
 
-function AppRoutes({ employeeId, userId, userName, isMobile }) {
+function AppRoutes({ employeeId, userId, userName, isMobile, onLogin }) {
   const navigate = useNavigate();
   const isLoggedIn = employeeId && userId;
 
   return (
     <Routes>
       {/* 로그인 */}
-      <Route path="/login" element={<LoginPage onLogin={() => {}} />} />
+      <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
 
       {/* 메인 */}
       <Route
@@ -93,7 +92,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile }) {
         }
       />
 
-      {/* 💡 빌라 및 세부 항목 */}
+      {/* 빌라 및 세부 항목 */}
       <Route path="/villa" element={!isLoggedIn ? <Navigate to="/login" /> : <VillaCodePage />} />
       <Route path="/telco" element={!isLoggedIn ? <Navigate to="/login" /> : <TelcoPage />} />
       <Route path="/elevator" element={!isLoggedIn ? <Navigate to="/login" /> : <ElevatorPage />} />
@@ -124,6 +123,15 @@ function App() {
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // ✅ 로그인 후 상태 저장 함수
+  const handleLogin = ({ id, employeeNo, name }) => {
+    setUserId(id);
+    setEmployeeId(employeeNo);
+    setUserName(name);
+    localStorage.setItem("autoLogin", JSON.stringify({ id, employeeNo, name }));
+  };
+
+  // ✅ 초기 로그인 정보 불러오기
   useEffect(() => {
     const stored = localStorage.getItem("autoLogin");
     if (stored) {
@@ -153,6 +161,7 @@ function App() {
         userId={userId}
         userName={userName}
         isMobile={isMobile}
+        onLogin={handleLogin} // ✅ 전달
       />
     </Router>
   );

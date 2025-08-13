@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { db } from "../firebase";
 import { doc, setDoc } from "firebase/firestore";
@@ -23,13 +23,34 @@ export default function DataTable({
   const [sortKey, setSortKey] = useState(initialSortKey ?? defaultSortKey);
   const [sortOrder, setSortOrder] = useState(initialSortOrder);
 
+  // ✅ 엑셀 작업용 비밀번호
+  const EXCEL_PASSWORD = "20453948";
+
+  // ✅ 업로드 input 참조 + 업로드 허용 플래그
+  const fileInputRef = useRef(null);
+  const allowUploadRef = useRef(false);
+
+  // ✅ 엑셀 작업 전 비밀번호 확인
+  const askPassword = () => {
+    const input = window.prompt("엑셀 작업 비밀번호를 입력하세요");
+    if (input === null) return false; // 취소
+    if (input !== EXCEL_PASSWORD) {
+      alert("비밀번호가 틀렸습니다.");
+      return false;
+    }
+    return true;
+  };
+
   const sortedData = useMemo(() => {
     const copied = [...data];
     if (sortKey) {
       copied.sort((a, b) => {
         const valA = a[sortKey] ?? "";
         const valB = b[sortKey] ?? "";
-        return valA.toString().localeCompare(valB.toString()) * (sortOrder === "asc" ? 1 : -1);
+        return (
+          valA.toString().localeCompare(valB.toString()) *
+          (sortOrder === "asc" ? 1 : -1)
+        );
       });
     }
     return copied;
@@ -39,7 +60,10 @@ export default function DataTable({
     if (!searchText) return sortedData;
     return sortedData.filter((row) =>
       searchableKeys.some((key) =>
-        (row[key] || "").toString().toLowerCase().includes(searchText.toLowerCase())
+        (row[key] || "")
+          .toString()
+          .toLowerCase()
+          .includes(searchText.toLowerCase())
       )
     );
   }, [sortedData, searchText, searchableKeys]);
@@ -57,8 +81,10 @@ export default function DataTable({
     }
   };
 
-  // 📤 엑셀 다운로드
+  // 📤 엑셀 다운로드 (비번 확인 후 진행)
   const handleExcelDownload = () => {
+    if (!askPassword()) return;
+
     const confirmDownload = window.confirm("엑셀 파일을 다운로드하시겠습니까?");
     if (!confirmDownload) return;
 
@@ -69,20 +95,47 @@ export default function DataTable({
       });
       return entry;
     });
+
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "빌라정보");
     XLSX.writeFile(wb, "빌라목록.xlsx");
   };
 
-  // 📥 엑셀 업로드
-  const handleExcelUpload = async (event) => {
-    const confirmUpload = window.confirm("이 엑셀 파일을 업로드하여 데이터를 변경하시겠습니까?");
-    if (!confirmUpload) return;
+  // 📂 업로드 버튼 클릭 → 비번 확인 후 파일 선택창 열기
+  const openUploadDialog = () => {
+    if (!askPassword()) return;
+    allowUploadRef.current = true; // 이번 onChange는 허용
+    fileInputRef.current?.click();
+  };
 
-    const file = event.target.files[0];
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
+  // 📥 엑셀 업로드 (onChange 진입 시 2중 가드)
+  const handleExcelUpload = async (event) => {
+    const inputEl = event.target;
+
+    // 만약 드래그&드롭 등으로 직접 onChange만 들어오면 여기서도 비번 확인
+    if (!allowUploadRef.current) {
+      if (!askPassword()) {
+        inputEl.value = "";
+        return;
+      }
+    }
+    // 한 번만 허용하고 바로 리셋
+    allowUploadRef.current = false;
+
+    const confirmUpload = window.confirm(
+      "이 엑셀 파일을 업로드하여 데이터를 변경하시겠습니까?"
+    );
+    if (!confirmUpload) {
+      inputEl.value = "";
+      return;
+    }
+
+    const file = inputEl.files?.[0];
+    if (!file) return;
+
+    const buf = await file.arrayBuffer();
+    const workbook = XLSX.read(buf);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(sheet);
 
@@ -93,6 +146,7 @@ export default function DataTable({
     }
 
     alert("엑셀 업로드 완료! 페이지를 새로고침 해주세요.");
+    inputEl.value = ""; // 같은 파일 재업로드 허용
   };
 
   return (
@@ -132,7 +186,9 @@ export default function DataTable({
                 >
                   {col.label}
                   {sortKey === col.key && (
-                    <span className="sort-arrow">{sortOrder === "asc" ? " ▲" : " ▼"}</span>
+                    <span className="sort-arrow">
+                      {sortOrder === "asc" ? " ▲" : " ▼"}
+                    </span>
                   )}
                 </th>
               ))}
@@ -150,12 +206,30 @@ export default function DataTable({
                 ))}
                 {(onEdit || onDelete) && (
                   <td>
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "6px",
+                        justifyContent: "center",
+                      }}
+                    >
                       {onEdit && (
-                        <button className="icon-button" onClick={() => onEdit(row)} title="수정">✏️</button>
+                        <button
+                          className="icon-button"
+                          onClick={() => onEdit(row)}
+                          title="수정"
+                        >
+                          ✏️
+                        </button>
                       )}
                       {onDelete && (
-                        <button className="icon-button" onClick={() => onDelete(row)} title="삭제">🗑️</button>
+                        <button
+                          className="icon-button"
+                          onClick={() => onDelete(row)}
+                          title="삭제"
+                        >
+                          🗑️
+                        </button>
                       )}
                     </div>
                   </td>
@@ -164,7 +238,10 @@ export default function DataTable({
             ))}
             {currentData.length === 0 && (
               <tr>
-                <td colSpan={columns.length + (onEdit || onDelete ? 2 : 1)} style={{ textAlign: "center" }}>
+                <td
+                  colSpan={columns.length + (onEdit || onDelete ? 2 : 1)}
+                  style={{ textAlign: "center" }}
+                >
                   표시할 데이터가 없습니다.
                 </td>
               </tr>
@@ -174,34 +251,36 @@ export default function DataTable({
       </div>
 
       {/* ✅ 하단: 엑셀 버튼(좌) + 페이지네이션(우) */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: "15px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="table-footer">
         {/* 📤 엑셀 버튼 좌측 */}
         {enableExcel && (
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={handleExcelDownload}>📤 엑셀 다운로드</button>
-            <label style={{ cursor: "pointer" }}>
+          <div className="excel-btn-group">
+            <button className="excel-btn" onClick={handleExcelDownload}>
+              📤 엑셀 다운로드
+            </button>
+
+            {/* ⬇ 버튼을 클릭하면 비번 확인 후 파일선택창 오픈 */}
+            <button className="excel-btn" onClick={openUploadDialog}>
               📥 엑셀 업로드
-              <input
-                type="file"
-                accept=".xlsx, .xls"
-                onChange={handleExcelUpload}
-                style={{ display: "none" }}
-              />
-            </label>
+            </button>
+
+            {/* 숨겨진 파일 input (onChange에서 실제 업로드 수행) */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleExcelUpload}
+              style={{ display: "none" }}
+            />
           </div>
         )}
 
         {/* ▶ 페이지네이션 우측 */}
         <div className="pagination">
-          <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            disabled={currentPage === 1}
+          >
             ◀
           </button>
           {Array.from({ length: totalPages }, (_, idx) => (
@@ -215,7 +294,7 @@ export default function DataTable({
           ))}
           <button
             onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || totalPages === 0}
           >
             ▶
           </button>

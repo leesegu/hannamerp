@@ -27,7 +27,7 @@
 }
 
 .data-table td {
-  padding: 6px 10px;
+  padding: 10px 12px;
   text-align: center;
   font-size: 13px;
   color: #444;
@@ -201,4 +201,50 @@ th {
   margin-left: 4px;
   color: #7e57c2; /* 보라색 화살표 */
   font-size: 11px;
+}
+
+/* ===== Excel 버튼 공통 스타일 ===== */
+.excel-btn-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.excel-btn {
+  background-color: #4caf50;
+  color: #fff;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  text-decoration: none; /* label에도 깔끔하게 */
+}
+
+.excel-btn:hover {
+  background-color: #43a047;
+}
+
+.excel-btn:active {
+  transform: translateY(0.5px);
+}
+
+/* label이 버튼처럼 보이도록 기본 스타일 초기화 */
+.excel-btn[role="button"] {
+  outline: none;
+}
+
+/* 푸터(엑셀+페이지네이션) 정렬 */
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
 }

@@ -18,13 +18,14 @@ export default function TelcoPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // 🔎 통신사 필드가 있는 문서만 가져오기
   useEffect(() => {
     const q = query(collection(db, "villas"), where("telco", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => {
-        const data = doc.data();
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
         return {
-          id: doc.id,
+          id: d.id,
           code: data.code || "",
           name: data.name || "",
           district: data.district || "",
@@ -58,6 +59,7 @@ export default function TelcoPage() {
     setSelectedVilla(null);
   };
 
+  // 📋 테이블 컬럼 정의
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -69,7 +71,7 @@ export default function TelcoPage() {
       key: "telcoAmount",
       format: (value) => {
         const num = Number(String(value).replace(/,/g, ""));
-        return isNaN(num) ? value : num.toLocaleString();
+        return isNaN(num) ? (value ?? "-") : num.toLocaleString();
       },
     },
     { label: "명의", key: "telcoName" },
@@ -81,11 +83,40 @@ export default function TelcoPage() {
     { label: "비고", key: "telcoNote" },
   ];
 
+  // 📑 엑셀 import/export 필드 (순서대로 저장/내보내기)
+  const excelFields = [
+    "code",
+    "name",
+    "district",
+    "address",
+    "telco",
+    "telcoAmount",
+    "telcoName",
+    "telcoBillNo",
+    "telcoLineCount",
+    "telcoReceiveMethod",
+    "telcoContract",
+    "telcoSupport",
+    "telcoNote",
+  ];
+
   return (
     <div className="page-wrapper">
       <PageTitle>통신사 정보</PageTitle>
 
-      <DataTable columns={columns} data={villas} onEdit={handleEdit} />
+      <DataTable
+        columns={columns}
+        data={villas}
+        onEdit={handleEdit}
+        // 🔽 검색/정렬/페이지 옵션
+        searchableKeys={["code", "name", "district", "address", "telco"]}
+        sortKey="code"
+        sortOrder="asc"
+        itemsPerPage={15}
+        // 🔽 엑셀 다운로드/업로드 활성화 (비밀번호 확인은 DataTable 내부에 적용됨)
+        enableExcel={true}
+        excelFields={excelFields}
+      />
 
       <GenericEditModal
         villa={selectedVilla}
@@ -96,9 +127,15 @@ export default function TelcoPage() {
         }}
         onSave={handleSave}
         fields={[
-          "telco", "telcoAmount", "telcoName", "telcoBillNo",
-          "telcoLineCount", "telcoReceiveMethod", "telcoContract",
-          "telcoSupport", "telcoNote"
+          "telco",
+          "telcoAmount",
+          "telcoName",
+          "telcoBillNo",
+          "telcoLineCount",
+          "telcoReceiveMethod",
+          "telcoContract",
+          "telcoSupport",
+          "telcoNote",
         ]}
         labels={{
           telco: "통신사",
@@ -109,11 +146,11 @@ export default function TelcoPage() {
           telcoReceiveMethod: "수신방법",
           telcoContract: "약정기간",
           telcoSupport: "지원금",
-          telcoNote: "비고"
+          telcoNote: "비고",
         }}
         types={{
-          telcoAmount: "amount",       // ✅ 금액 필드 → 쉼표 자동 적용
-          telcoContract: "date"        // ✅ 약정기간 필드 → 실시간 날짜 포맷
+          telcoAmount: "amount", // ✅ 금액: 쉼표 포맷
+          telcoContract: "date", // ✅ 날짜: 'YY-MM-DD' 자동 포맷
         }}
         gridClass="modal-grid-3"
       />
