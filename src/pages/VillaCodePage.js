@@ -1,3 +1,4 @@
+// src/pages/VillaCodePage.js
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import {
@@ -16,6 +17,7 @@ export default function VillaCodePage() {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
 
+  // ✅ Firestore 필드명과 동일한 key만 사용
   const columns = [
     { key: "code", label: "코드번호" },
     { key: "name", label: "빌라명" },
@@ -32,18 +34,19 @@ export default function VillaCodePage() {
     { key: "cctv", label: "CCTV" },
   ];
 
-  // ✅ 1. Firebase에서 목록 불러오기
-  useEffect(() => {
-    const fetchVillas = async () => {
-      try {
-        const snap = await getDocs(collection(db, "villas"));
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setData(list);
-      } catch (error) {
-        console.error("🔥 목록 로딩 실패:", error);
-      }
-    };
+  // ✅ 목록 재조회 함수 (업로드 후에도 사용)
+  const fetchVillas = async () => {
+    try {
+      const snap = await getDocs(collection(db, "villas"));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setData(list);
+    } catch (error) {
+      console.error("🔥 목록 로딩 실패:", error);
+    }
+  };
 
+  // ✅ 최초 1회 로딩
+  useEffect(() => {
     fetchVillas();
   }, []);
 
@@ -53,7 +56,7 @@ export default function VillaCodePage() {
     setShowModal(true);
   };
 
-  // ✅ 저장 처리
+  // ✅ 저장 처리(모달에서 저장 후 돌아올 때 리스트에 반영)
   const handleSave = (saved) => {
     setData((prev) => {
       const exists = prev.some((v) => v.id === saved.id);
@@ -93,22 +96,17 @@ export default function VillaCodePage() {
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        enableExcel={true} // ✅ 엑셀 기능 활성화
-        excelFields={[
-          "code",
-          "name",
-          "district",
-          "address",
-          "telco",
-          "elevator",
-          "septic",
-          "fireSafety",
-          "electricSafety",
-          "water",
-          "publicElectric",
-          "cleaning",
-          "cctv",
-        ]}
+        // 🔽 엑셀 업로드/다운로드 설정
+        enableExcel={true}
+        collectionName="villas"      // ✅ 빌라 전용 컬렉션만 사용
+        idKey="code"                 // ✅ 문서 ID = code
+        idAliases={["코드번호", "code"]}
+        excelFields={columns.map((c) => c.key)} // ✅ 필드명 1:1 통일
+        sortKey="code"
+        // 업로드 완료 후 목록 재조회 (getDocs 기반이므로 필요)
+        onUploadComplete={() => {
+          fetchVillas();
+        }}
       />
 
       {showModal && (

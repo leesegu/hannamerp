@@ -18,53 +18,71 @@ export default function ElevatorPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🔍 승강기 필드가 있는 문서만 가져오기
   useEffect(() => {
     const q = query(collection(db, "villas"), where("elevator", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          code: data.code || "",
-          name: data.name || "",
-          district: data.district || "",
-          address: data.address || "",
-          elevator: data.elevator || "",
-          manufacturer: data.manufacturer || "",
-          elevatorAmount: data.elevatorAmount || "",
-          serialNumber: data.serialNumber || "",
-          safetyManager: data.safetyManager || "",
-          regularApply: data.regularApply || "",
-          regularExpire: data.regularExpire || "",
-          inspectionApply: data.inspectionApply || "",
-          insuranceCompany: data.insuranceCompany || "",
-          contractStart: data.contractStart || "",
-          contractEnd: data.contractEnd || "",
-          elevatorNote: data.elevatorNote || "",
-        };
-      });
+      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setVillas(list);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // ✏ 수정 버튼 클릭 시
   const handleEdit = (villa) => {
     setSelectedVilla(villa);
     setIsModalOpen(true);
   };
 
-  // 💾 저장
+  const toYYMMDD = (date) => {
+    const yy = String(date.getFullYear()).slice(2);
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  };
+
+  const formatDateYYMMDD = (value) => {
+    if (!value && value !== 0) return "";
+    if (typeof value === "object" && value?.seconds) return toYYMMDD(new Date(value.seconds * 1000));
+    if (value instanceof Date) return toYYMMDD(value);
+    if (typeof value === "number") {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? "" : toYYMMDD(d);
+    }
+    const s = String(value).trim();
+    if (/^\d{8}$/.test(s)) return `${s.slice(2, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+    if (/^\d{6}$/.test(s)) return `${s.slice(0, 2)}-${s.slice(2, 4)}-${s.slice(4, 6)}`;
+    const parts = s.replace(/[./]/g, "-").split("-");
+    if (parts.length === 3) {
+      let [y, m, d] = parts.map((x) => x.padStart(2, "0"));
+      if (y.length === 4) y = y.slice(2);
+      return `${y}-${m}-${d}`;
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? s : toYYMMDD(d);
+  };
+
+  const normalizeAmount = (v) => {
+    const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
+
+    if (data.contractStart) data.contractStart = formatDateYYMMDD(data.contractStart);
+    if (data.contractEnd) data.contractEnd = formatDateYYMMDD(data.contractEnd);
+
+    if (data.elevatorAmount) {
+      const n = normalizeAmount(data.elevatorAmount);
+      if (n !== undefined) data.elevatorAmount = n;
+      else delete data.elevatorAmount;
+    }
+
     await updateDoc(doc(db, "villas", id), data);
     setIsModalOpen(false);
     setSelectedVilla(null);
   };
 
-  // 📋 테이블 컬럼 정의
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -86,29 +104,25 @@ export default function ElevatorPage() {
     { label: "정기만료", key: "regularExpire" },
     { label: "검사신청", key: "inspectionApply" },
     { label: "보험사", key: "insuranceCompany" },
-    { label: "계약일", key: "contractStart" },
-    { label: "계약만기", key: "contractEnd" },
+    {
+      label: "계약일",
+      key: "contractStart",
+      format: formatDateYYMMDD,
+    },
+    {
+      label: "계약만기",
+      key: "contractEnd",
+      format: formatDateYYMMDD,
+    },
     { label: "비고", key: "elevatorNote" },
   ];
 
-  // 📑 엑셀 import/export 필드
   const excelFields = [
-    "code",
-    "name",
-    "district",
-    "address",
-    "elevator",
-    "manufacturer",
-    "elevatorAmount",
-    "serialNumber",
-    "safetyManager",
-    "regularApply",
-    "regularExpire",
-    "inspectionApply",
-    "insuranceCompany",
-    "contractStart",
-    "contractEnd",
-    "elevatorNote",
+    "code", "name", "district", "address",
+    "elevator", "manufacturer", "elevatorAmount",
+    "serialNumber", "safetyManager", "regularApply",
+    "regularExpire", "inspectionApply", "insuranceCompany",
+    "contractStart", "contractEnd", "elevatorNote"
   ];
 
   return (
@@ -122,8 +136,8 @@ export default function ElevatorPage() {
         sortKey="code"
         sortOrder="asc"
         itemsPerPage={15}
-        enableExcel={true}       // 📌 통신사 페이지와 동일하게 엑셀 기능 활성화
-        excelFields={excelFields} // 📌 내보내기/업로드 필드 순서 지정
+        enableExcel={true}
+        excelFields={excelFields}
       />
 
       <GenericEditModal
@@ -135,7 +149,6 @@ export default function ElevatorPage() {
         }}
         onSave={handleSave}
         fields={[
-          "elevator",
           "manufacturer",
           "elevatorAmount",
           "serialNumber",
@@ -148,6 +161,7 @@ export default function ElevatorPage() {
           "contractEnd",
           "elevatorNote",
         ]}
+        readOnlyKeys={["elevator"]} // ✅ 읽기 전용으로 상단 표시
         labels={{
           elevator: "승강기",
           manufacturer: "제조사",
@@ -163,9 +177,9 @@ export default function ElevatorPage() {
           elevatorNote: "비고",
         }}
         types={{
-          elevatorAmount: "amount", // 금액: 쉼표 포맷
-          contractStart: "date",    // 계약일: 날짜 포맷
-          contractEnd: "date",      // 계약만기: 날짜 포맷
+          elevatorAmount: "amount",
+          contractStart: "date",
+          contractEnd: "date",
         }}
         gridClass="modal-grid-2"
       />

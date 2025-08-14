@@ -11,14 +11,21 @@ export default function DataTable({
   onAdd,
   onEdit,
   onDelete,
-  searchableKeys, // 넘어오지 않으면 모든 컬럼 + row 전체를 검색
+  searchableKeys,
   itemsPerPage = 15,
   sortKey: initialSortKey,
   sortOrder: initialSortOrder = "asc",
   enableExcel = false,
-  excelFields = [], // 문자열 키 배열 또는 {label, key} 배열 지원
+  excelFields = [],
+
+  // ⚠️ 기본값 제거: 반드시 페이지에서 명시
+  collectionName,           // 예: "villas", "vendorsAll"
+  idKey,                    // 예: "code", "vendor"
+  idAliases = [],           // 예: ["코드번호"] 또는 ["거래처","업체명"]
+  idResolver,
+  onUploadComplete,
 }) {
-  const defaultSortKey = "code";
+  const defaultSortKey = columns?.[0]?.key ?? "code";
   const [searchText, setSearchText] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortKey, setSortKey] = useState(initialSortKey ?? defaultSortKey);
@@ -40,7 +47,7 @@ export default function DataTable({
 
   // ---------- 정렬 ----------
   const sortedData = useMemo(() => {
-    const copied = [...data];
+    const copied = [...(data ?? [])];
     if (sortKey) {
       copied.sort((a, b) => {
         const valA = a?.[sortKey] ?? "";
@@ -69,9 +76,7 @@ export default function DataTable({
         : "";
     if (base) out.push(base);
     if (typeof v === "number" && Number.isFinite(v)) {
-      try {
-        out.push(v.toLocaleString());
-      } catch {}
+      try { out.push(v.toLocaleString()); } catch {}
     }
     if (/^\d{4}-\d{2}-\d{2}$/.test(base)) out.push(base.slice(2));
     if (/^\d{2}-\d{2}-\d{2}$/.test(base)) {
@@ -82,9 +87,7 @@ export default function DataTable({
   };
 
   const getSearchableStringsFromColumn = (row, col) => {
-    if (typeof col.search === "function") {
-      return normalizeForSearch(col.search(row));
-    }
+    if (typeof col.search === "function") return normalizeForSearch(col.search(row));
     if (col.key) {
       const direct = getByPath(row, col.key);
       const norm = normalizeForSearch(direct);
@@ -93,11 +96,7 @@ export default function DataTable({
     if (typeof col.format === "function") {
       try {
         const formatted = col.format(getByPath(row, col.key), row);
-        if (
-          typeof formatted === "string" ||
-          typeof formatted === "number" ||
-          typeof formatted === "boolean"
-        ) {
+        if (["string","number","boolean"].includes(typeof formatted)) {
           return normalizeForSearch(formatted);
         }
       } catch {}
@@ -122,7 +121,7 @@ export default function DataTable({
 
       let haystack = colStrings;
       if (!Array.isArray(searchableKeys) || searchableKeys.length === 0) {
-        const rowStrings = Object.values(row)
+        const rowStrings = Object.values(row ?? {})
           .flatMap((v) => normalizeForSearch(v))
           .map((s) => s.toLowerCase());
         const set = new Set(haystack);
@@ -134,17 +133,13 @@ export default function DataTable({
   }, [sortedData, searchText, activeColumns, searchableKeys]);
 
   // ---------- 페이지네이션 ----------
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil((filteredData.length || 0) / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
   const handleSort = (key) => {
-    if (sortKey === key) {
-      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortOrder("asc");
-    }
+    if (sortKey === key) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortOrder("asc"); }
   };
 
   // ---------- 금액/날짜 정규화 ----------
@@ -153,8 +148,7 @@ export default function DataTable({
     const raw = String(v).trim();
     if (raw === "" || raw === "-") return "";
     const cleaned = raw.replace(/[^\d.-]/g, "");
-    if (cleaned === "" || cleaned === "-" || cleaned === "." || cleaned === "-.")
-      return "";
+    if (cleaned === "" || cleaned === "-" || cleaned === "." || cleaned === "-.") return "";
     const n = Number(cleaned);
     return isNaN(n) ? "" : n;
   };
@@ -168,9 +162,7 @@ export default function DataTable({
 
   const normalizeDateYYMMDD = (value) => {
     if (!value && value !== 0) return "";
-    if (typeof value === "object" && value?.seconds) {
-      return toYYMMDD(new Date(value.seconds * 1000));
-    }
+    if (typeof value === "object" && value?.seconds) return toYYMMDD(new Date(value.seconds * 1000));
     if (value instanceof Date) return toYYMMDD(value);
     if (typeof value === "number") {
       const d = new Date(value);
@@ -178,18 +170,8 @@ export default function DataTable({
     }
     const s = String(value).trim();
     if (s === "" || s === "-") return "";
-    if (/^\d{8}$/.test(s)) {
-      const yy = s.slice(2, 4),
-        mm = s.slice(4, 6),
-        dd = s.slice(6, 8);
-      return `${yy}-${mm}-${dd}`;
-    }
-    if (/^\d{6}$/.test(s)) {
-      const yy = s.slice(0, 2),
-        mm = s.slice(2, 4),
-        dd = s.slice(4, 6);
-      return `${yy}-${mm}-${dd}`;
-    }
+    if (/^\d{8}$/.test(s)) return `${s.slice(2,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    if (/^\d{6}$/.test(s))  return `${s.slice(0,2)}-${s.slice(2,4)}-${s.slice(4,6)}`;
     const parts = s.replace(/[./]/g, "-").split("-");
     if (parts.length === 3) {
       let [y, m, d] = parts.map((x) => x.padStart(2, "0"));
@@ -214,42 +196,36 @@ export default function DataTable({
 
   const isAmountField = (key) => String(key).toLowerCase().endsWith("amount");
 
-  // ---------- 엑셀 필드 정규화 유틸 ----------
-  // excelFields: ["code","name"] 또는 [{label:"코드번호", key:"code"}, ...]
+  // ---------- 엑셀 필드 정규화 ----------
   const normalizeExcelFields = () => {
     if (Array.isArray(excelFields) && excelFields.length > 0) {
       return excelFields.map((f) =>
         typeof f === "string"
-          ? {
-              key: f,
-              label: columns.find((c) => c.key === f)?.label || f,
-            }
-          : {
-              key: f.key,
-              label:
-                f.label || columns.find((c) => c.key === f.key)?.label || f.key,
-            }
+          ? { key: f, label: columns.find((c) => c.key === f)?.label || f }
+          : { key: f.key, label: f.label || columns.find((c) => c.key === f.key)?.label || f.key }
       );
     }
-    // excelFields가 비어있으면 columns로 대체
     if (Array.isArray(columns) && columns.length > 0) {
-      return columns.map((c) => ({
-        key: c.key,
-        label: c.label || c.key,
-      }));
+      return columns.map((c) => ({ key: c.key, label: c.label || c.key }));
     }
-    // columns도 없으면 data[0] 키로 추정
     if (data && data.length > 0) {
       return Object.keys(data[0]).map((k) => ({ key: k, label: k }));
     }
     return [];
   };
 
-  // ---------- 엑셀 (다운로드) - AoA 방식 ----------
+  // ---------- Firestore 문서 ID 안전화 ----------
+  const safeDocId = (raw) => {
+    if (raw == null) return "";
+    let s = String(raw).trim();
+    s = s.replace(/\//g, "∕"); // 슬래시 치환
+    if (s.length > 1500) s = s.slice(0, 1500);
+    return s;
+  };
+
+  // ---------- 엑셀: 다운로드 ----------
   const handleExcelDownload = () => {
     if (!askPassword()) return;
-    if (!window.confirm("엑셀 파일을 다운로드하시겠습니까?")) return;
-
     const fields = normalizeExcelFields();
     const headerLabels = fields.map((f) => f.label);
     const headerKeys = fields.map((f) => f.key);
@@ -266,7 +242,6 @@ export default function DataTable({
     const aoa = [headerLabels, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    // 컬럼 너비 자동 추정
     const colWidths = headerLabels.map((label, idx) => {
       const maxLen = Math.max(
         String(label ?? "").length,
@@ -281,38 +256,76 @@ export default function DataTable({
     XLSX.writeFile(wb, "목록.xlsx");
   };
 
-  // ---------- 엑셀 (업로드) : 헤더 정규화/매칭 강화 ----------
+  // ---------- 엑셀: 업로드 ----------
+  const normalizeHeader = (s) =>
+    String(s || "")
+      .replace(/\ufeff/g, "")
+      .replace(/\s+/g, "")
+      .replace(/[(){}\[\]]/g, "")
+      .toLowerCase()
+      .trim();
+
   const buildKeyIndex = (rowObj) => {
     const idx = {};
     Object.keys(rowObj).forEach((k) => {
-      const norm = String(k).toLowerCase().trim();
-      idx[norm] = k; // 원래 키 보존
+      const norm = normalizeHeader(k);
+      idx[norm] = k;
     });
     return idx;
   };
 
-  const getFromRow = (rowObj, keyIndex, key, label) => {
-    if (rowObj[key] !== undefined) return rowObj[key];
+  const lookupByKeyOrLabel = (rowObj, keyIndex, key, label) => {
+    const tryKeyList = [key, (columns.find((c) => c.key === key)?.label || null), label]
+      .filter(Boolean)
+      .map((x) => normalizeHeader(x));
 
-    const normKey = String(key).toLowerCase().trim();
-    if (keyIndex[normKey] !== undefined) {
-      const realKey = keyIndex[normKey];
-      return rowObj[realKey];
-    }
-
-    if (label) {
-      if (rowObj[label] !== undefined) return rowObj[label];
-      const normLabel = String(label).toLowerCase().trim();
-      if (keyIndex[normLabel] !== undefined) {
-        const realLabelKey = keyIndex[normLabel];
-        return rowObj[realLabelKey];
+    for (const norm of tryKeyList) {
+      if (norm && keyIndex[norm] !== undefined) {
+        const realKey = keyIndex[norm];
+        return rowObj[realKey];
       }
     }
-
     return undefined;
   };
 
+  const getFromRow = (rowObj, keyIndex, key, label) => {
+    if (rowObj[key] !== undefined) return rowObj[key];
+    if (label && rowObj[label] !== undefined) return rowObj[label];
+    const val = lookupByKeyOrLabel(rowObj, keyIndex, key, label);
+    if (val !== undefined) return val;
+    return undefined;
+  };
+
+  const resolveUploadId = (originalRow, keyIndex, fields) => {
+    // idResolver 우선
+    if (typeof idResolver === "function") {
+      const v = idResolver(originalRow, keyIndex, fields);
+      if (v != null && String(v).trim() !== "") return String(v).trim();
+    }
+    // idKey 필수
+    if (idKey) {
+      const v = getFromRow(
+        originalRow,
+        keyIndex,
+        idKey,
+        columns.find((c) => c.key === idKey)?.label || idKey
+      );
+      if (v != null && String(v).trim() !== "") return String(v).trim();
+    }
+    // 보조 별칭
+    for (const alias of idAliases) {
+      const v = getFromRow(originalRow, keyIndex, alias, alias);
+      if (v != null && String(v).trim() !== "") return String(v).trim();
+    }
+    return undefined; // 안전하게 실패 처리
+  };
+
   const openUploadDialog = () => {
+    if (!enableExcel) return;
+    if (!collectionName || !idKey) {
+      alert("엑셀 업로드가 비활성화되었습니다.\n(collectionName, idKey를 컴포넌트에 명시하세요)");
+      return;
+    }
     if (!askPassword()) return;
     allowUploadRef.current = true;
     fileInputRef.current?.click();
@@ -320,6 +333,14 @@ export default function DataTable({
 
   const handleExcelUpload = async (event) => {
     const inputEl = event.target;
+
+    // 가드
+    if (!collectionName || !idKey) {
+      alert("업로드할 수 없습니다. collectionName, idKey가 설정되지 않았습니다.");
+      inputEl.value = "";
+      return;
+    }
+
     if (!allowUploadRef.current) {
       if (!askPassword()) {
         inputEl.value = "";
@@ -328,7 +349,7 @@ export default function DataTable({
     }
     allowUploadRef.current = false;
 
-    if (!window.confirm("이 엑셀 파일을 업로드하여 데이터를 변경하시겠습니까?")) {
+    if (!window.confirm(`[${collectionName}] 컬렉션에 이 엑셀을 업로드할까요?`)) {
       inputEl.value = "";
       return;
     }
@@ -339,50 +360,49 @@ export default function DataTable({
     const buf = await file.arrayBuffer();
     const workbook = XLSX.read(buf);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
+    const json = XLSX.utils.sheet_to_json(sheet); // [{헤더:값,...}]
 
     let updated = 0;
     let skipped = 0;
+    let replacedCount = 0;
 
-    const fields = normalizeExcelFields(); // [{key, label}]
+    const fields = normalizeExcelFields(); // [{key,label}]
+
     for (const originalRow of json) {
       const keyIndex = buildKeyIndex(originalRow);
 
-      const code =
-        getFromRow(originalRow, keyIndex, "code", "코드번호") ??
-        originalRow.code ??
-        originalRow["코드번호"];
+      const idValue = resolveUploadId(originalRow, keyIndex, fields);
+      if (!idValue) { skipped++; continue; }
 
-      if (!code) {
-        skipped++;
-        continue;
-      }
+      const originalId = String(idValue);
+      const docId = safeDocId(originalId);
+      if (!docId) { skipped++; continue; }
+      if (docId !== originalId) replacedCount++;
 
       const rowToSave = {};
-
       for (const f of fields) {
-        const { key, label } = f;
+        const { key } = f;
         const col = columns.find((c) => c.key === key);
-        const labelForMatch = label || col?.label || key;
+        const labelForMatch = f.label || col?.label || key;
 
         let val = getFromRow(originalRow, keyIndex, key, labelForMatch);
 
-        if (isAmountField(key)) {
-          val = normalizeAmount(val);
-        } else if (isDateField(key)) {
-          val = normalizeDateYYMMDD(val);
-        } else if (typeof val === "string") {
-          val = val.trim();
-        }
+        if (isAmountField(key))      val = normalizeAmount(val);
+        else if (isDateField(key))   val = normalizeDateYYMMDD(val);
+        else if (typeof val === "string") val = val.trim();
 
         if (val !== undefined) rowToSave[key] = val;
       }
 
-      await setDoc(doc(db, "villas", String(code)), rowToSave, { merge: true });
+      await setDoc(doc(db, collectionName, docId), rowToSave, { merge: true });
       updated++;
     }
 
-    alert(`엑셀 업로드 완료!\n업데이트: ${updated}건, 스킵: ${skipped}건`);
+    alert(
+      `엑셀 업로드 완료 (컬렉션: ${collectionName})\n업데이트: ${updated}건, 스킵: ${skipped}건` +
+      (replacedCount ? `\n(참고: '/' 포함 ID ${replacedCount}건은 '∕'로 치환됨)` : "")
+    );
+    onUploadComplete?.({ updated, skipped });
     inputEl.value = "";
   };
 
@@ -446,30 +466,12 @@ export default function DataTable({
                 })}
                 {(onEdit || onDelete) && (
                   <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "6px",
-                        justifyContent: "center",
-                      }}
-                    >
+                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                       {onEdit && (
-                        <button
-                          className="icon-button"
-                          onClick={() => onEdit(row)}
-                          title="수정"
-                        >
-                          ✏️
-                        </button>
+                        <button className="icon-button" onClick={() => onEdit(row)} title="수정">✏️</button>
                       )}
                       {onDelete && (
-                        <button
-                          className="icon-button"
-                          onClick={() => onDelete(row)}
-                          title="삭제"
-                        >
-                          🗑️
-                        </button>
+                        <button className="icon-button" onClick={() => onDelete(row)} title="삭제">🗑️</button>
                       )}
                     </div>
                   </td>
@@ -479,9 +481,7 @@ export default function DataTable({
             {currentData.length === 0 && (
               <tr>
                 <td
-                  colSpan={
-                    1 + columns.length + (onEdit || onDelete ? 1 : 0) // 번호 + 컬럼들 + 관리(옵션)
-                  }
+                  colSpan={1 + columns.length + (onEdit || onDelete ? 1 : 0)}
                   style={{ textAlign: "center" }}
                 >
                   표시할 데이터가 없습니다.
@@ -496,12 +496,8 @@ export default function DataTable({
       <div className="table-footer">
         {enableExcel && (
           <div className="excel-btn-group">
-            <button className="excel-btn" onClick={handleExcelDownload}>
-              📤 엑셀 다운로드
-            </button>
-            <button className="excel-btn" onClick={openUploadDialog}>
-              📥 엑셀 업로드
-            </button>
+            <button className="excel-btn" onClick={handleExcelDownload}>📤 엑셀 다운로드</button>
+            <button className="excel-btn" onClick={openUploadDialog}>📥 엑셀 업로드</button>
             <input
               ref={fileInputRef}
               type="file"
@@ -512,6 +508,7 @@ export default function DataTable({
           </div>
         )}
 
+        {/* 페이지네이션: 5개만 표시 */}
         <div className="pagination">
           <button
             onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
@@ -519,19 +516,27 @@ export default function DataTable({
           >
             ◀
           </button>
-          {Array.from({ length: totalPages }, (_, idx) => (
-            <button
-              key={idx}
-              className={currentPage === idx + 1 ? "active" : ""}
-              onClick={() => setCurrentPage(idx + 1)}
-            >
-              {idx + 1}
-            </button>
-          ))}
-          <button
-            onClick={() =>
-              setCurrentPage((p) => Math.min(p + 1, totalPages))
+          {(() => {
+            const pageBlockSize = 5;
+            const startPage =
+              Math.floor((currentPage - 1) / pageBlockSize) * pageBlockSize + 1;
+            const endPage = Math.min(startPage + pageBlockSize - 1, totalPages);
+            const buttons = [];
+            for (let p = startPage; p <= endPage; p++) {
+              buttons.push(
+                <button
+                  key={p}
+                  className={currentPage === p ? "active" : ""}
+                  onClick={() => setCurrentPage(p)}
+                >
+                  {p}
+                </button>
+              );
             }
+            return buttons;
+          })()}
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
             disabled={currentPage === totalPages || totalPages === 0}
           >
             ▶

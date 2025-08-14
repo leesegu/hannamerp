@@ -18,7 +18,7 @@ export default function SepticPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🔎 정화조(septic) 필드가 채워진 문서만 조회
+  // 🔍 정화조(septic) 필드가 채워진 문서만 조회
   useEffect(() => {
     const q = query(collection(db, "villas"), where("septic", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -26,15 +26,7 @@ export default function SepticPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          code: data.code || "",
-          name: data.name || "",
-          district: data.district || "",
-          address: data.address || "",
-          septic: data.septic || "",
-          septicGrate: data.septicGrate || "",
-          septicDate: data.septicDate || "",
-          septicAmount: data.septicAmount || "",
-          septicNote: data.septicNote || "",
+          ...data,
         };
       });
       setVillas(list);
@@ -43,16 +35,12 @@ export default function SepticPage() {
     return () => unsubscribe();
   }, []);
 
-  // 💰 금액 정규화: "₩12,300" -> 12300 (숫자), 빈 값/이상치 -> 빈 문자열
-  function normalizeAmount(v) {
-    if (v === null || v === undefined) return "";
-    const raw = String(v).trim();
-    if (raw === "" || raw === "-") return "";
-    const cleaned = raw.replace(/[^\d.-]/g, "");
-    if (cleaned === "" || cleaned === "-" || cleaned === "." || cleaned === "-.") return "";
+  // 💰 금액 정규화
+  const normalizeAmount = (v) => {
+    const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
     const n = Number(cleaned);
-    return isNaN(n) ? "" : n;
-  }
+    return Number.isFinite(n) ? n : undefined;
+  };
 
   // ✏ 수정
   const handleEdit = (villa) => {
@@ -60,12 +48,14 @@ export default function SepticPage() {
     setIsModalOpen(true);
   };
 
-  // 💾 저장 (금액 정규화 적용)
+  // 💾 저장
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
 
-    if ("septicAmount" in data) {
-      data.septicAmount = normalizeAmount(data.septicAmount);
+    if (data.septicAmount) {
+      const n = normalizeAmount(data.septicAmount);
+      if (n !== undefined) data.septicAmount = n;
+      else delete data.septicAmount;
     }
 
     await updateDoc(doc(db, "villas", id), data);
@@ -73,7 +63,7 @@ export default function SepticPage() {
     setSelectedVilla(null);
   };
 
-  // 📋 테이블 컬럼 (금액 포맷터 개선)
+  // 📋 테이블 컬럼
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -86,36 +76,18 @@ export default function SepticPage() {
       label: "금액",
       key: "septicAmount",
       format: (value) => {
-        // 1) 완전 빈 값 처리
-        if (value === null || value === undefined) return "-";
-        const raw = String(value).trim();
-        if (raw === "" || raw === "-") return "-";
-
-        // 2) 숫자만 추출 (통화기호/쉼표 제거)
-        const cleaned = raw.replace(/[^\d.-]/g, ""); // 예: "₩12,300" -> "12300"
-
-        // 3) 비정상/빈 문자열 처리
-        if (cleaned === "" || cleaned === "-" || cleaned === "." || cleaned === "-.") return "-";
-
-        const num = Number(cleaned);
-        if (isNaN(num)) return "-";   // 숫자 변환 실패 시 대시
-        return num.toLocaleString();  // 정상 숫자는 쉼표 포맷
+        const num = Number(String(value).replace(/[^\d.-]/g, ""));
+        return Number.isFinite(num) ? num.toLocaleString() : "-";
       },
     },
     { label: "비고", key: "septicNote" },
   ];
 
-  // 📑 엑셀 import/export 필드 (순서 고정)
+  // 📑 엑셀 필드
   const excelFields = [
-    "code",
-    "name",
-    "district",
-    "address",
-    "septic",
-    "septicGrate",
-    "septicDate",
-    "septicAmount",
-    "septicNote",
+    "code", "name", "district", "address",
+    "septic", "septicGrate", "septicDate",
+    "septicAmount", "septicNote"
   ];
 
   return (
@@ -126,11 +98,9 @@ export default function SepticPage() {
         columns={columns}
         data={villas}
         onEdit={handleEdit}
-        // 🔽 검색/정렬/페이지 옵션
         sortKey="code"
         sortOrder="asc"
         itemsPerPage={15}
-        // 🔽 엑셀 버튼/아이콘/글씨 크기 — TelcoPage와 동일 UI
         enableExcel={true}
         excelFields={excelFields}
       />
@@ -144,12 +114,12 @@ export default function SepticPage() {
         }}
         onSave={handleSave}
         fields={[
-          "septic",
           "septicGrate",
           "septicDate",
           "septicAmount",
           "septicNote",
         ]}
+        readOnlyKeys={["septic"]} // ✅ 읽기 전용 표시
         labels={{
           septic: "정화조",
           septicGrate: "창살제거",
@@ -157,10 +127,9 @@ export default function SepticPage() {
           septicAmount: "금액",
           septicNote: "비고",
         }}
-        // ✅ 금액/날짜 입력 UX 통일
         types={{
-          septicAmount: "amount", // 쉼표 포맷 자동
-          septicDate: "date",     // 날짜 포맷 자동 (GenericEditModal 공통 로직)
+          septicDate: "date",
+          septicAmount: "amount",
         }}
         gridClass="modal-grid-2"
       />

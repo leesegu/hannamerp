@@ -11,34 +11,26 @@ export default function ElectricSafetyPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 화면 표시 전용: 금액 쉼표 포맷
-  const formatAmount = (v) => {
-    if (v === null || v === undefined || v === "") return "";
-    const n = Number(String(v).replace(/[^\d.-]/g, ""));
-    return isNaN(n) ? v : n.toLocaleString();
-  };
-
   useEffect(() => {
     const q = query(collection(db, "villas"), where("electricSafety", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          code: data.code || "",
-          name: data.name || "",
-          district: data.district || "",
-          address: data.address || "",
-          electricSafety: data.electricSafety || "",
-          electricSafetyAmount: data.electricSafetyAmount || "",
-          electricSafetyNote: data.electricSafetyNote || "",
-        };
-      });
+      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setVillas(list);
     });
-
     return () => unsubscribe();
   }, []);
+
+  const formatAmount = (v) => {
+    if (v === null || v === undefined || v === "") return "-";
+    const n = Number(String(v).replace(/[^\d.-]/g, ""));
+    return isNaN(n) ? "-" : n.toLocaleString();
+  };
+
+  const normalizeAmount = (v) => {
+    const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : undefined;
+  };
 
   const handleEdit = (villa) => {
     setSelectedVilla(villa);
@@ -47,6 +39,13 @@ export default function ElectricSafetyPage() {
 
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
+
+    if (data.electricSafetyAmount) {
+      const n = normalizeAmount(data.electricSafetyAmount);
+      if (n !== undefined) data.electricSafetyAmount = n;
+      else delete data.electricSafetyAmount;
+    }
+
     await updateDoc(doc(db, "villas", id), data);
     setIsModalOpen(false);
     setSelectedVilla(null);
@@ -58,11 +57,14 @@ export default function ElectricSafetyPage() {
     { label: "구", key: "district" },
     { label: "주소", key: "address" },
     { label: "전기안전", key: "electricSafety" },
-    { label: "금액", key: "electricSafetyAmount", format: (v) => formatAmount(v) },
+    {
+      label: "금액",
+      key: "electricSafetyAmount",
+      format: (v) => formatAmount(v),
+    },
     { label: "비고", key: "electricSafetyNote" },
   ];
 
-  // ✅ 엑셀 업/다운로드용 필드 매핑
   const excelFields = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -81,15 +83,11 @@ export default function ElectricSafetyPage() {
         columns={columns}
         data={villas}
         onEdit={handleEdit}
-        // 🔽 엑셀 업/다운로드 활성화
         enableExcel={true}
         excelFields={excelFields}
-        // (선택) 검색 키 지정
-        searchableKeys={["code", "name", "district", "address", "electricSafety", "electricSafetyNote"]}
-        // (선택) 기본 정렬/페이지 크기
-        // itemsPerPage={15}
-        // sortKey="code"
-        // sortOrder="asc"
+        searchableKeys={[
+          "code", "name", "district", "address", "electricSafety", "electricSafetyNote"
+        ]}
       />
 
       <GenericEditModal
@@ -100,13 +98,16 @@ export default function ElectricSafetyPage() {
           setSelectedVilla(null);
         }}
         onSave={handleSave}
-        fields={["electricSafety", "electricSafetyAmount", "electricSafetyNote"]}
+        fields={["electricSafetyAmount", "electricSafetyNote"]}
+        readOnlyKeys={["electricSafety"]}
         labels={{
           electricSafety: "전기안전",
           electricSafetyAmount: "금액",
           electricSafetyNote: "비고",
         }}
-        types={{}}
+        types={{
+          electricSafetyAmount: "amount",
+        }}
         gridClass="modal-grid-2"
       />
     </div>

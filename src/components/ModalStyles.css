@@ -208,4 +208,5 @@ hr {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
+.readonly-chip { margin-right: 10px; color:#555; }
+.input-readonly { background:#f7f7f7; color:#666; cursor:not-allowed; }

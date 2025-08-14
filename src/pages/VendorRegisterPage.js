@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase"; // Firebase 초기화 파일
 import { getDoc, doc, setDoc } from "firebase/firestore";
+import PageTitle from "../components/PageTitle";
 
 export default function VendorRegisterPage() {
   const categories = [
@@ -80,8 +81,8 @@ const handleSave = async () => {
 };
 
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-bold mb-6">거래처등록</h2>
+    <div className="page-wrapper">
+      <PageTitle>거래처명 등록</PageTitle>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1000px] border text-sm text-center">

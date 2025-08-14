@@ -13,7 +13,8 @@ import PublicElectricPage from "../pages/PublicElectricPage";
 import CleaningPage from "../pages/CleaningPage";
 import CctvPage from "../pages/CctvPage";
 import VendorRegisterPage from "../pages/VendorRegisterPage";
-import VendorsMainPage from "../pages/VendorsMainPage.js"; // ✅ 추가: 주메뉴용 메인 페이지
+import VendorsMainPage from "../pages/VendorsMainPage.js"; // ✅ 주메뉴용 메인 페이지
+import EmployeePage from "../pages/EmployeePage";        // ✅ 추가: 사원정보 페이지
 
 import "remixicon/fonts/remixicon.css";
 
@@ -181,13 +182,13 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               active={activeMenu === "이사정산"}
             />
 
-            {/* 거래처관리 (주메뉴) -> ✅ VendorsMainPage 로 이동 */}
+            {/* 거래처관리 (주메뉴) -> VendorsMainPage */}
             <SidebarItem
               icon="ri-booklet-line"
               label="거래처관리"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(<VendorsMainPage />, "거래처관리"); // ← 변경 포인트
+                handleNavigate(<VendorsMainPage />, "거래처관리");
               }}
               active={activeMenu === "거래처관리"}
             />
@@ -203,13 +204,13 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               active={activeMenu === "영수증발행"}
             />
 
-            {/* 사원관리 */}
+            {/* 사원관리 → EmployeePage 표시 */}
             <SidebarItem
               icon="ri-user-line"
               label="사원관리"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(null, "사원관리");
+                handleNavigate(<EmployeePage />, "사원관리"); // ✅ 변경: 사원정보 페이지 연결
               }}
               active={activeMenu === "사원관리"}
             />
@@ -237,7 +238,7 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
                     if (item === "사원코드생성") {
                       handleNavigate(<UserRegisterPage />, item);
                     } else if (item === "거래처등록") {
-                      handleNavigate(<VendorRegisterPage />, item); // ← 기초등록 전용 등록 페이지
+                      handleNavigate(<VendorRegisterPage />, item);
                     }
                   }}
                 />

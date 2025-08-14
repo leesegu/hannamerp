@@ -11,47 +11,35 @@ export default function FireSafetyPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 화면 표시용 포맷터들
+  useEffect(() => {
+    const q = query(collection(db, "villas"), where("fireSafety", "!=", ""));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setVillas(list);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const formatAmount = (v) => {
-    if (v === null || v === undefined || v === "") return "";
+    if (!v) return "-";
     const n = Number(String(v).replace(/[^\d.-]/g, ""));
-    return isNaN(n) ? v : n.toLocaleString(); // 12,345 형태로 표시
+    return isNaN(n) ? "-" : n.toLocaleString();
   };
 
   const formatDateYYMMDD = (v) => {
     if (!v && v !== 0) return "";
     const s = String(v).trim();
-    // 이미 YY-MM-DD거나 YYYY-MM-DD면 그대로 표시
     if (/^\d{2}-\d{2}-\d{2}$/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // 숫자만 들어올 때도 표시 보정 (예: 250813 -> 25-08-13)
     if (/^\d{6}$/.test(s)) return `${s.slice(0,2)}-${s.slice(2,4)}-${s.slice(4,6)}`;
     if (/^\d{8}$/.test(s)) return `${s.slice(2,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
     return s;
   };
 
-  useEffect(() => {
-    // fireSafety 필드가 있는 문서만 조회
-    const q = query(collection(db, "villas"), where("fireSafety", "!=", ""));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          code: data.code || "",
-          name: data.name || "",
-          district: data.district || "",
-          address: data.address || "",
-          fireSafety: data.fireSafety || "",
-          fireSafetyAmount: data.fireSafetyAmount || "",
-          fireSafetyManager: data.fireSafetyManager || "",
-          fireSafetyTrainingDate: data.fireSafetyTrainingDate || "",
-          fireSafetyNote: data.fireSafetyNote || "",
-        };
-      });
-      setVillas(list);
-    });
-    return () => unsubscribe();
-  }, []);
+  const normalizeAmount = (v) => {
+    const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : undefined;
+  };
 
   const handleEdit = (villa) => {
     setSelectedVilla(villa);
@@ -60,6 +48,13 @@ export default function FireSafetyPage() {
 
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
+
+    if (data.fireSafetyAmount) {
+      const n = normalizeAmount(data.fireSafetyAmount);
+      if (n !== undefined) data.fireSafetyAmount = n;
+      else delete data.fireSafetyAmount;
+    }
+
     await updateDoc(doc(db, "villas", id), data);
     setIsModalOpen(false);
     setSelectedVilla(null);
@@ -74,18 +69,17 @@ export default function FireSafetyPage() {
     {
       label: "금액",
       key: "fireSafetyAmount",
-      format: (val) => formatAmount(val), // ← 화면에서만 쉼표 표시
+      format: formatAmount,
     },
     { label: "안전관리자", key: "fireSafetyManager" },
     {
       label: "교육일자",
       key: "fireSafetyTrainingDate",
-      format: (val) => formatDateYYMMDD(val), // 선택: 화면 표시에만 날짜 보정
+      format: formatDateYYMMDD,
     },
     { label: "비고", key: "fireSafetyNote" },
   ];
 
-  // ✅ 엑셀 업/다운로드용 필드 매핑 (엑셀 헤더와 Firestore 필드명 1:1)
   const excelFields = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -94,7 +88,7 @@ export default function FireSafetyPage() {
     { label: "소방안전", key: "fireSafety" },
     { label: "금액", key: "fireSafetyAmount" },
     { label: "안전관리자", key: "fireSafetyManager" },
-    { label: "교육일자", key: "fireSafetyTrainingDate" }, // 예: 25-08-13
+    { label: "교육일자", key: "fireSafetyTrainingDate" },
     { label: "비고", key: "fireSafetyNote" },
   ];
 
@@ -106,23 +100,12 @@ export default function FireSafetyPage() {
         columns={columns}
         data={villas}
         onEdit={handleEdit}
-        // 🔽 엑셀 업/다운로드 활성화
         enableExcel={true}
         excelFields={excelFields}
-        // (선택) 검색 키 지정: 미지정 시 DataTable이 전체 텍스트 기반으로 검색
         searchableKeys={[
-          "code",
-          "name",
-          "district",
-          "address",
-          "fireSafety",
-          "fireSafetyManager",
-          "fireSafetyTrainingDate",
-          "fireSafetyNote",
+          "code", "name", "district", "address",
+          "fireSafety", "fireSafetyManager", "fireSafetyTrainingDate", "fireSafetyNote"
         ]}
-        // itemsPerPage={15}
-        // sortKey="code"
-        // sortOrder="asc"
       />
 
       <GenericEditModal
@@ -134,12 +117,12 @@ export default function FireSafetyPage() {
         }}
         onSave={handleSave}
         fields={[
-          "fireSafety",
           "fireSafetyAmount",
           "fireSafetyManager",
           "fireSafetyTrainingDate",
           "fireSafetyNote",
         ]}
+        readOnlyKeys={["fireSafety"]}
         labels={{
           fireSafety: "소방안전",
           fireSafetyAmount: "금액",
@@ -147,7 +130,10 @@ export default function FireSafetyPage() {
           fireSafetyTrainingDate: "교육일자",
           fireSafetyNote: "비고",
         }}
-        types={{}}
+        types={{
+          fireSafetyAmount: "amount",
+          fireSafetyTrainingDate: "date",
+        }}
         gridClass="modal-grid-2"
       />
     </div>
