@@ -11,7 +11,7 @@ import {
 import LoginPage from "./LoginPage";
 import TrezoSidebar from "./components/TrezoSidebar";
 import MoveoutForm from "./MoveoutForm";
-import MoveoutList from "./MoveoutList";
+import MoveoutList from "./pages/MoveoutList";
 import UserRegisterPage from "./UserRegisterPage";
 import MobileMainPage from "./components/MobileMainPage";
 

@@ -18,10 +18,13 @@ export default function DataTable({
   enableExcel = false,
   excelFields = [],
 
-  // ⚠️ 기본값 제거: 반드시 페이지에서 명시
-  collectionName,           // 예: "villas", "vendorsAll"
-  idKey,                    // 예: "code", "vendor"
-  idAliases = [],           // 예: ["코드번호"] 또는 ["거래처","업체명"]
+  // 새로 추가: 좌측 커스텀 컨트롤(필터 등) 렌더 슬롯
+  leftControls = null,
+
+  // ⚠️ 아래는 엑셀 업로드에 필요 (해당 페이지에서 사용 안 하면 생략 가능)
+  collectionName,
+  idKey,
+  idAliases = [],
   idResolver,
   onUploadComplete,
 }) {
@@ -138,11 +141,12 @@ export default function DataTable({
   const currentData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
   const handleSort = (key) => {
+    if (!key) return;
     if (sortKey === key) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortOrder("asc"); }
   };
 
-  // ---------- 금액/날짜 정규화 ----------
+  // ---------- (엑셀 관련 유틸: 필요 시 사용) ----------
   const normalizeAmount = (v) => {
     if (v === null || v === undefined) return "";
     const raw = String(v).trim();
@@ -196,7 +200,6 @@ export default function DataTable({
 
   const isAmountField = (key) => String(key).toLowerCase().endsWith("amount");
 
-  // ---------- 엑셀 필드 정규화 ----------
   const normalizeExcelFields = () => {
     if (Array.isArray(excelFields) && excelFields.length > 0) {
       return excelFields.map((f) =>
@@ -214,16 +217,14 @@ export default function DataTable({
     return [];
   };
 
-  // ---------- Firestore 문서 ID 안전화 ----------
   const safeDocId = (raw) => {
     if (raw == null) return "";
     let s = String(raw).trim();
-    s = s.replace(/\//g, "∕"); // 슬래시 치환
+    s = s.replace(/\//g, "∕");
     if (s.length > 1500) s = s.slice(0, 1500);
     return s;
   };
 
-  // ---------- 엑셀: 다운로드 ----------
   const handleExcelDownload = () => {
     if (!askPassword()) return;
     const fields = normalizeExcelFields();
@@ -241,7 +242,6 @@ export default function DataTable({
 
     const aoa = [headerLabels, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-
     const colWidths = headerLabels.map((label, idx) => {
       const maxLen = Math.max(
         String(label ?? "").length,
@@ -256,7 +256,6 @@ export default function DataTable({
     XLSX.writeFile(wb, "목록.xlsx");
   };
 
-  // ---------- 엑셀: 업로드 ----------
   const normalizeHeader = (s) =>
     String(s || "")
       .replace(/\ufeff/g, "")
@@ -297,12 +296,10 @@ export default function DataTable({
   };
 
   const resolveUploadId = (originalRow, keyIndex, fields) => {
-    // idResolver 우선
     if (typeof idResolver === "function") {
       const v = idResolver(originalRow, keyIndex, fields);
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
-    // idKey 필수
     if (idKey) {
       const v = getFromRow(
         originalRow,
@@ -312,12 +309,11 @@ export default function DataTable({
       );
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
-    // 보조 별칭
     for (const alias of idAliases) {
       const v = getFromRow(originalRow, keyIndex, alias, alias);
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
-    return undefined; // 안전하게 실패 처리
+    return undefined;
   };
 
   const openUploadDialog = () => {
@@ -334,7 +330,6 @@ export default function DataTable({
   const handleExcelUpload = async (event) => {
     const inputEl = event.target;
 
-    // 가드
     if (!collectionName || !idKey) {
       alert("업로드할 수 없습니다. collectionName, idKey가 설정되지 않았습니다.");
       inputEl.value = "";
@@ -360,13 +355,13 @@ export default function DataTable({
     const buf = await file.arrayBuffer();
     const workbook = XLSX.read(buf);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet); // [{헤더:값,...}]
+    const json = XLSX.utils.sheet_to_json(sheet);
 
     let updated = 0;
     let skipped = 0;
     let replacedCount = 0;
 
-    const fields = normalizeExcelFields(); // [{key,label}]
+    const fields = normalizeExcelFields();
 
     for (const originalRow of json) {
       const keyIndex = buildKeyIndex(originalRow);
@@ -387,9 +382,10 @@ export default function DataTable({
 
         let val = getFromRow(originalRow, keyIndex, key, labelForMatch);
 
-        if (isAmountField(key))      val = normalizeAmount(val);
-        else if (isDateField(key))   val = normalizeDateYYMMDD(val);
-        else if (typeof val === "string") val = val.trim();
+        if (String(key).toLowerCase().endsWith("amount"))      val = normalizeAmount(val);
+        else if (["date","start","end","apply","expire"].some(t => String(key).toLowerCase().includes(t))) {
+          val = normalizeDateYYMMDD(val);
+        } else if (typeof val === "string") val = val.trim();
 
         if (val !== undefined) rowToSave[key] = val;
       }
@@ -408,9 +404,16 @@ export default function DataTable({
 
   return (
     <div className="data-table-wrapper">
-      {/* 상단: 등록 버튼 + 검색 */}
-      <div className="table-controls">
-        <div className="control-left">
+      {/* 상단 컨트롤 바: 좌측(커스텀) / 우측(등록+검색) */}
+      <div
+        className="table-controls"
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+      >
+        <div className="control-left-slot" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {leftControls}
+        </div>
+
+        <div className="control-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {onAdd && (
             <button className="register-button" onClick={onAdd}>
               ➕ 등록
@@ -437,15 +440,13 @@ export default function DataTable({
               <th>번호</th>
               {columns.map((col) => (
                 <th
-                  key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  style={{ cursor: "pointer" }}
+                  key={col.key || col.label}
+                  onClick={col.key ? () => handleSort(col.key) : undefined}
+                  style={{ cursor: col.key ? "pointer" : "default" }}
                 >
                   {col.label}
                   {sortKey === col.key && (
-                    <span className="sort-arrow">
-                      {sortOrder === "asc" ? " ▲" : " ▼"}
-                    </span>
+                    <span className="sort-arrow">{sortOrder === "asc" ? " ▲" : " ▼"}</span>
                   )}
                 </th>
               ))}
@@ -458,9 +459,13 @@ export default function DataTable({
                 <td>{startIndex + i + 1}</td>
                 {columns.map((col) => {
                   const val = getByPath(row, col.key);
+                  const content =
+                    typeof col.render === "function"
+                      ? col.render(row)
+                      : (col.format ? col.format(val, row) : (val ?? "-"));
                   return (
-                    <td key={col.key}>
-                      {col.format ? col.format(val, row) : val ?? "-"}
+                    <td key={col.key || col.label} style={{ whiteSpace: "nowrap", verticalAlign: "middle" }}>
+                      {content}
                     </td>
                   );
                 })}
@@ -468,10 +473,22 @@ export default function DataTable({
                   <td>
                     <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                       {onEdit && (
-                        <button className="icon-button" onClick={() => onEdit(row)} title="수정">✏️</button>
+                        <button
+                          className="icon-button"
+                          onClick={(e) => { e.stopPropagation(); onEdit(row); }}
+                          title="수정"
+                        >
+                          ✏️
+                        </button>
                       )}
                       {onDelete && (
-                        <button className="icon-button" onClick={() => onDelete(row)} title="삭제">🗑️</button>
+                        <button
+                          className="icon-button"
+                          onClick={(e) => { e.stopPropagation(); onDelete(row); }}
+                          title="삭제"
+                        >
+                          🗑️
+                        </button>
                       )}
                     </div>
                   </td>
@@ -492,7 +509,7 @@ export default function DataTable({
         </table>
       </div>
 
-      {/* 하단: 엑셀 버튼 + 페이지네이션 */}
+      {/* 하단: 엑셀 + 페이지네이션 */}
       <div className="table-footer">
         {enableExcel && (
           <div className="excel-btn-group">
@@ -508,27 +525,16 @@ export default function DataTable({
           </div>
         )}
 
-        {/* 페이지네이션: 5개만 표시 */}
         <div className="pagination">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            ◀
-          </button>
+          <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>◀</button>
           {(() => {
             const pageBlockSize = 5;
-            const startPage =
-              Math.floor((currentPage - 1) / pageBlockSize) * pageBlockSize + 1;
+            const startPage = Math.floor((currentPage - 1) / pageBlockSize) * pageBlockSize + 1;
             const endPage = Math.min(startPage + pageBlockSize - 1, totalPages);
             const buttons = [];
             for (let p = startPage; p <= endPage; p++) {
               buttons.push(
-                <button
-                  key={p}
-                  className={currentPage === p ? "active" : ""}
-                  onClick={() => setCurrentPage(p)}
-                >
+                <button key={p} className={currentPage === p ? "active" : ""} onClick={() => setCurrentPage(p)}>
                   {p}
                 </button>
               );

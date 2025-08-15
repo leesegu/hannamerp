@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import MoveoutList from "../MoveoutList";
+import MoveoutList from "../pages/MoveoutList";
 import UserRegisterPage from "../UserRegisterPage";
 import VillaCodePage from "../pages/VillaCodePage";
 import TelcoPage from "../pages/TelcoPage";
