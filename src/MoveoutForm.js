@@ -6,6 +6,18 @@ import "react-datepicker/dist/react-datepicker.css";
 import { ko } from "date-fns/locale";
 import { format } from "date-fns";
 
+/* ✅ Firebase */
+import { db, storage } from "./firebase";
+import {
+  collection,
+  addDoc,
+  doc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from "uuid";
+
 import "./MoveoutForm.css";
 import "./MoveoutForm.mobile.css";
 import FormLayout from "./components/FormLayout";
@@ -38,26 +50,44 @@ const DPInput = forwardRef(function DPInput(
   );
 });
 
-/* 숫자 파싱 */
+/* 숫자 파싱/포맷 해제 */
 const parseNumber = (v) =>
   parseInt(String(v ?? "").replace(/[^0-9]/g, ""), 10) || 0;
+const uncomma = (s) => parseNumber(s);
+const s = (v) => String(v ?? "").trim();
+
+/* 포맷 유틸 */
+const fmtComma = (n) => {
+  const v = parseNumber(n);
+  return v ? v.toLocaleString() : "";
+};
+
+/* blob URL 여부 */
+const isBlobUrl = (u) => typeof u === "string" && u.startsWith("blob:");
 
 export default function MoveoutForm({
   isMobile = false,
   showCancel = true,
   onDone,
-  asModal, // 외부에서 팝업 강제 시 true
+  asModal,
+  employeeId,
+  userId,
+  /* 🔷 추가된 편집 모드 지원 props */
+  mode = "create",                // "create" | "edit"
+  initial = null,                 // 리스트 스키마 객체 (moveDate, villaName, ...)
+  docId = null,                   // 편집할 문서 ID
+  existingPhotos = [],            // 기존 사진 URL 배열
 }) {
   const navigate = useNavigate();
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const isPopup = asModal || params.get("popup") === "1";
 
-  /* ===== 폼 상태 ===== */
+  /* ===== 폼 상태 (UI용 키) ===== */
   const [form, setForm] = useState({
-    moveOutDate: "",
+    moveOutDate: "",  // UI용 → 저장 시 moveDate 로 매핑
     name: "",
-    roomNumber: "",    // 확정 표시값 (예: "203호")
+    roomNumber: "",
     contact: "",
     arrears: "",
     currentFee: "",
@@ -75,41 +105,90 @@ export default function MoveoutForm({
     status: "정산대기",
   });
 
-  /* ===== 추가내역 리스트 & 수정 인덱스 ===== */
+  /* ===== 추가내역 리스트 ===== */
   const [extras, setExtras] = useState([]); // [{desc, amount:number}]
   const [editIndex, setEditIndex] = useState(null);
 
-  /* ===== 사진(미리보기/슬라이더) ===== */
-  const [photos, setPhotos] = useState([]); // array of objectURLs (newest first)
+  /* ===== 사진(미리보기/업로드용 파일) ===== */
+  // photos: 미리보기용 URL 배열 (기존 원격 URL + 새로 선택한 blob URL)
+  const [photos, setPhotos] = useState([]);
+  const [photoFiles, setPhotoFiles] = useState([]); // 신규 업로드용 File 배열(기존 원격 URL은 포함 X)
   const [photoIdx, setPhotoIdx] = useState(0);
   const photoInputRef = useRef(null);
-  const blobUrlsRef = useRef([]); // revoke 관리
+  const blobUrlsRef = useRef([]);
+  const didInitPhotosRef = useRef(false); // 🔸 편집 모드 최초 1회 기존 사진 주입 플래그
+
+  /* 🔹 편집 모드일 때 기존 데이터 → UI 상태로 매핑 */
+  useEffect(() => {
+    if (mode !== "edit" || !initial) return;
+    setForm((prev) => ({
+      ...prev,
+      moveOutDate: s(initial.moveDate),
+      name: s(initial.villaName),
+      roomNumber: s(initial.unitNumber),
+      contact: s(initial.payerPhone),
+      arrears: fmtComma(initial.arrears),
+      currentFee: fmtComma(initial.currentMonth),
+      waterCurr: s(initial.currentReading ?? ""),
+      waterPrev: s(initial.previousReading ?? ""),
+      waterUnit: fmtComma(initial.unitPrice),
+      // waterCost는 아래 effect에서 자동 계산
+      electricity: fmtComma(initial.electricity),
+      tvFee: fmtComma(initial.tvFee),
+      cleaning: fmtComma(initial.cleaningFee),
+      note: s(initial.note),
+      status: s(initial.status) || "정산대기",
+      // total은 아래 합계 effect에서 자동 계산
+    }));
+    setExtras(Array.isArray(initial.extras) ? initial.extras.map((e) => ({
+      desc: s(e.desc), amount: Number(e.amount) || 0
+    })) : []);
+  }, [mode, initial]);
+
+  /* 🔹 편집 모드 최초 1회: 기존 사진 표시 (원격 URL 표시) */
+  useEffect(() => {
+    if (mode !== "edit") return;
+    if (didInitPhotosRef.current) return;
+    const urls = (existingPhotos || []).filter(Boolean);
+    if (urls.length) {
+      setPhotos(urls);
+      setPhotoIdx(0);
+    }
+    didInitPhotosRef.current = true;
+  }, [mode, existingPhotos]);
 
   const addPhotos = (files) => {
     if (!files || !files.length) return;
-    const urls = Array.from(files).map((f) => {
+    const arr = Array.from(files);
+    const urls = arr.map((f) => {
       const u = URL.createObjectURL(f);
       blobUrlsRef.current.push(u);
       return u;
     });
-    // 최신이 맨 위로 보이도록 앞에 붙임
+    // 최신이 위로: 새로 추가한 것들을 앞에 배치
     setPhotos((prev) => [...urls.reverse(), ...prev]);
+    setPhotoFiles((prev) => [...arr.reverse(), ...prev]);
     setPhotoIdx(0);
   };
 
   const deleteCurrentPhoto = () => {
     if (!photos.length) return;
-    const target = photos[photoIdx];
-    try { URL.revokeObjectURL(target); } catch {}
-    blobUrlsRef.current = blobUrlsRef.current.filter((u) => u !== target);
-    const next = photos.filter((_, i) => i !== photoIdx);
-    setPhotos(next);
-    setPhotoIdx((p) => (next.length ? Math.min(p, next.length - 1) : 0));
+    const targetUrl = photos[photoIdx];
+    if (isBlobUrl(targetUrl)) {
+      try { URL.revokeObjectURL(targetUrl); } catch {}
+      blobUrlsRef.current = blobUrlsRef.current.filter((u) => u !== targetUrl);
+      // 신규 추가 파일도 같은 인덱스로 제거
+      const blobIdx = photos.slice(0, photoIdx + 1).filter(isBlobUrl).length - 1;
+      if (blobIdx >= 0) {
+        setPhotoFiles((prev) => prev.filter((_, i) => i !== blobIdx));
+      }
+    }
+    setPhotos((prev) => prev.filter((_, i) => i !== photoIdx));
+    setPhotoIdx((p) => Math.min(p, Math.max(0, photos.length - 2)));
   };
 
   useEffect(() => {
     return () => {
-      // 언마운트 시 모두 revoke
       blobUrlsRef.current.forEach((u) => {
         try { URL.revokeObjectURL(u); } catch {}
       });
@@ -117,11 +196,11 @@ export default function MoveoutForm({
     };
   }, []);
 
-  /* ===== 모달(비고) ===== */
+  /* ===== 비고 모달 ===== */
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
 
-  /* ===== Enter 이동용 refs ===== */
+  /* ===== Enter 이동 refs ===== */
   const contactRef = useRef(null);
   const dateInputRef = useRef(null);
   const nameRef = useRef(null);
@@ -137,15 +216,10 @@ export default function MoveoutForm({
   const extraDescRef = useRef(null);
   const extraAmountRef = useRef(null);
 
-  /* ===== 호 입력(편집) 전용 상태 =====
-     - 입력 중(roomEditing=true)엔 roomRaw을 그대로 보여줌 (호 미표시)
-     - IME 조합 중에는 값을 필터링하지 않음(백스페이스/커서 안정)
-     - IME 조합 종료 시 '호' 제거
-     - Enter/blur로 확정할 때만 '호' 1회 자동 부착
-  ================================= */
+  /* ===== 호 입력 편집 제어 ===== */
   const [roomEditing, setRoomEditing] = useState(false);
   const [roomComposing, setRoomComposing] = useState(false);
-  const [roomRaw, setRoomRaw] = useState(""); // 편집 중 순수값
+  const [roomRaw, setRoomRaw] = useState("");
 
   const navOrder = [
     "contact",
@@ -175,27 +249,25 @@ export default function MoveoutForm({
     waterUnit: waterUnitRef,
     electricity: electricityRef,
     tvFee: tvFeeRef,
-    cleaning: cleaningRef,
+    cleaningRef: cleaningRef,
     extraDesc: extraDescRef,
     extraAmount: extraAmountRef,
   };
   const focusId = (id) => refs[id]?.current?.focus?.();
 
-  /* ===== 숫자 포맷 / 숫자만 ===== */
+  /* ===== 제약/포맷 ===== */
   const numberFieldsWithComma = [
     "arrears", "currentFee", "electricity", "tvFee", "cleaning",
     "waterUnit", "waterCost", "total", "extraAmount",
   ];
   const numberOnlyFields = ["waterPrev", "waterCurr"];
 
-  /* ===== 일반 입력 변경 ===== */
   const handleChange = (id, value) => {
     if (id === "contact") {
-      const formatted = formatPhoneNumber(value);
-      setForm((s) => ({ ...s, [id]: formatted }));
+      setForm((s) => ({ ...s, contact: formatPhoneNumber(value) }));
       return;
     }
-    if (id === "roomNumber") return; // 별도 로직 사용
+    if (id === "roomNumber") return;
     if (numberFieldsWithComma.includes(id)) {
       const numeric = String(value || "").replace(/[^0-9]/g, "");
       const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -210,9 +282,8 @@ export default function MoveoutForm({
     setForm((s) => ({ ...s, [id]: value }));
   };
 
-  /* ===== 호 입력 전용 핸들러 ===== */
   const commitRoom = () => {
-    const raw = roomRaw.replace(/\s+/g, ""); // 사용자가 쓴 '호'는 제거됨
+    const raw = roomRaw.replace(/\s+/g, "");
     const normalized = raw ? `${raw}호` : "";
     setForm((st) => ({ ...st, roomNumber: normalized }));
     setRoomEditing(false);
@@ -224,24 +295,20 @@ export default function MoveoutForm({
   };
   const handleRoomChange = (e) => {
     const v = String(e.target.value || "");
-    if (roomComposing) setRoomRaw(v);         // 조합 중엔 손대지 않음
-    else setRoomRaw(v.replace(/호/g, ""));    // 조합 아닐 때 '호' 즉시 제거(무시)
+    if (roomComposing) setRoomRaw(v);
+    else setRoomRaw(v.replace(/호/g, ""));
   };
-  const handleRoomCompositionStart = () => setRoomComposing(true);
   const handleRoomCompositionEnd = (e) => {
     setRoomComposing(false);
-    setRoomRaw(String(e.target.value || "").replace(/호/g, "")); // 조합 끝나면 제거
+    setRoomRaw(String(e.target.value || "").replace(/호/g, ""));
   };
   const handleRoomBlur = () => commitRoom();
 
-  /* ===== 달력 오픈(Enter/클릭 지원) ===== */
   const openDatePicker = () => {
-    // 연락처 Enter 시 강제 오픈: 포커스+클릭
     dateInputRef.current?.focus();
     dateInputRef.current?.click();
   };
 
-  /* ===== Enter 이동 ===== */
   const handleEnterNext = (currentId) => (e) => {
     if (e.key !== "Enter" || e.isComposing) return;
     e.preventDefault();
@@ -249,61 +316,57 @@ export default function MoveoutForm({
     if (idx < 0) return;
 
     if (currentId === "contact") {
-      openDatePicker(); // Enter로 달력 오픈
+      openDatePicker();
       return;
     }
     if (currentId === "roomNumber") {
-      commitRoom(); // Enter로 호 확정
+      commitRoom();
     }
     if (currentId === "extraAmount") {
       addOrUpdateExtra();
       setTimeout(() => focusId("extraDesc"), 0);
       return;
     }
-
     const nextId = navOrder[idx + 1];
     if (nextId) focusId(nextId);
   };
 
-  /* ===== 자동 계산: 수도요금 ===== */
+  /* ===== 자동 계산(수도요금/총액) ===== */
   useEffect(() => {
     const prev = parseNumber(form.waterPrev);
     const curr = parseNumber(form.waterCurr);
     const unit = parseNumber(form.waterUnit);
     const usage = Math.max(0, curr - prev);
     const cost = usage * unit;
-    setForm((s) => ({ ...s, waterCost: cost ? cost.toLocaleString() : "" }));
+    setForm((s2) => ({ ...s2, waterCost: cost ? cost.toLocaleString() : "" }));
   }, [form.waterPrev, form.waterCurr, form.waterUnit]);
 
-  /* ===== 자동 합계: 총 이사정산 금액 ===== */
   useEffect(() => {
     const baseKeys = ["arrears","currentFee","waterCost","electricity","tvFee","cleaning"];
     const base = baseKeys.reduce((sum, k) => sum + parseNumber(form[k]), 0);
     const extraSum = extras.reduce((sum, x) => sum + (x?.amount || 0), 0);
-    setForm((s) => ({ ...s, total: (base + extraSum) ? (base + extraSum).toLocaleString() : "" }));
+    setForm((s2) => ({ ...s2, total: (base + extraSum) ? (base + extraSum).toLocaleString() : "" }));
   }, [form.arrears, form.currentFee, form.waterCost, form.electricity, form.tvFee, form.cleaning, extras]);
 
   /* ===== 추가내역: 추가/수정/삭제 ===== */
   const addOrUpdateExtra = () => {
-    const desc = String(form.extraDesc || "").trim();
+    const desc = s(form.extraDesc);
     const amt = parseNumber(form.extraAmount);
     if (!desc || !amt) return false;
-
     setExtras((list) => {
       const next = [...list];
       if (editIndex != null) next[editIndex] = { desc, amount: amt };
       else next.push({ desc, amount: amt });
       return next;
     });
-
-    setForm((s) => ({ ...s, extraDesc: "", extraAmount: "" }));
+    setForm((st) => ({ ...st, extraDesc: "", extraAmount: "" }));
     setEditIndex(null);
     return true;
   };
   const beginEditExtra = (index) => {
     const it = extras[index];
-    setForm((s) => ({
-      ...s,
+    setForm((st) => ({
+      ...st,
       extraDesc: it?.desc || "",
       extraAmount: it?.amount ? it.amount.toLocaleString() : "",
     }));
@@ -314,24 +377,142 @@ export default function MoveoutForm({
     setExtras((list) => list.filter((_, i) => i !== index));
     if (editIndex === index) {
       setEditIndex(null);
-      setForm((s) => ({ ...s, extraDesc: "", extraAmount: "" }));
+      setForm((st) => ({ ...st, extraDesc: "", extraAmount: "" }));
     }
   };
 
-  /* ===== 저장(임시) ===== */
-  const handleSave = () => {
-    console.log("[저장]", { ...form, extras, photos, note: form.note });
-    alert("지금은 베이스 화면입니다. 저장 로직은 다음 단계에서 추가할게요.");
+  /* ===== 저장 ===== */
+  const [saving, setSaving] = useState(false);
+
+  // 💡 리스트 스키마에 맞춰 변환
+  const buildPayloadForList = () => {
+    const moveDate = s(form.moveOutDate);               // yyyy-MM-dd
+    const villaName = s(form.name);
+    const unitNumber = s(form.roomNumber);
+    const payerPhone = s(form.contact);
+
+    const arrears = uncomma(form.arrears);
+    const currentMonth = uncomma(form.currentFee);
+    const currentReading = uncomma(form.waterCurr);
+    const previousReading = uncomma(form.waterPrev);
+    const unitPrice = uncomma(form.waterUnit);
+
+    const usage = Math.max(0, currentReading - previousReading);
+    const waterFee = usage * unitPrice;
+
+    const electricity = uncomma(form.electricity);
+    const tvFee = uncomma(form.tvFee);
+    const cleaningFee = uncomma(form.cleaning);
+
+    const extrasArray = extras.map((e) => ({ desc: s(e.desc), amount: Number(e.amount) || 0 }));
+    const extraAmount = extrasArray.reduce((sum, x) => sum + (x?.amount || 0), 0);
+
+    const totalAmount = arrears + currentMonth + waterFee + electricity + tvFee + cleaningFee + extraAmount;
+
+    return {
+      moveDate,
+      villaName,
+      unitNumber,
+      payerPhone,
+      arrears,
+      currentMonth,
+      currentReading,
+      previousReading,
+      waterFee,
+      unitPrice,
+      electricity,
+      tvFee,
+      cleaningFee,
+      extras: extrasArray,
+      extraItems: "",
+      extraAmount,
+      totalAmount,
+      status: s(form.status) || "정산대기",
+      note: s(form.note),
+      updatedAt: serverTimestamp(),
+    };
   };
 
-  /* 공용 버튼 스타일 (사진첨부/비고 동일 크기) + 색상/아이콘 */
+  const uploadAllPhotos = async (targetDocId) => {
+    if (!photoFiles.length) return [];
+    const urls = [];
+    for (let i = 0; i < photoFiles.length; i++) {
+      const file = photoFiles[i];
+      const ext = (file.name?.split(".").pop() || "jpg").toLowerCase();
+      const path = `moveouts/${targetDocId}/${uuidv4()}.${ext}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      urls.push(url);
+    }
+    return urls;
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (!form.moveOutDate) { alert("이사날짜를 선택하세요."); return; }
+    if (!s(form.name))     { alert("빌라명을 입력하세요."); return; }
+    if (!s(form.roomNumber)) { alert("호수를 입력하세요."); return; }
+
+    setSaving(true);
+    try {
+      const payload = buildPayloadForList();
+
+      if (mode === "edit" && docId) {
+        // 🔷 문서 업데이트
+        await updateDoc(doc(db, "moveouts", docId), payload);
+
+        // 사진 업로드 후 기존 photos에 이어붙이기
+        const newUrls = await uploadAllPhotos(docId);
+        if (newUrls.length) {
+          await updateDoc(doc(db, "moveouts", docId), {
+            photos: [...(existingPhotos || []), ...newUrls],
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        alert("수정되었습니다.");
+      } else {
+        // 🔷 신규 추가
+        const col = collection(db, "moveouts");
+        const docRef = await addDoc(col, {
+          ...payload,
+          photos: [],
+          createdAt: serverTimestamp(),
+          createdBy: { employeeId: employeeId || "", userId: userId || "" },
+        });
+
+        const photoUrls = await uploadAllPhotos(docRef.id);
+        if (photoUrls.length) {
+          await updateDoc(doc(db, "moveouts", docRef.id), {
+            photos: photoUrls,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        alert("저장되었습니다.");
+      }
+
+      if (onDone) onDone();    // 모달 닫기
+      else navigate(-1);       // 페이지면 뒤로가기
+    } catch (err) {
+      console.error("저장 실패:", err);
+      alert("저장 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* 공용 버튼 스타일 (사진첨부/비고 동일 크기) */
   const actionBtnStyle = (variant = "photo") => {
     const styles = {
-      photo: { border: "#60a5fa", bg: "#eff6ff", color: "#1d4ed8", emoji: "📷" },
-      note:  { border: "#f59e0b", bg: "#fff7ed", color: "#b45309", emoji: "📝" },
+      photo: { border: "#60a5fa", bg: "#eff6ff", color: "#1d4ed8" },
+      note:  { border: "#f59e0b", bg: "#fff7ed", color: "#b45309" },
     }[variant];
     return {
-      padding: "10px 12px",
+      height: 40,
+      minWidth: 185,
+      padding: "0 12px",
       borderRadius: 8,
       border: `1px solid ${styles.border}`,
       background: styles.bg,
@@ -340,15 +521,17 @@ export default function MoveoutForm({
       cursor: "pointer",
       display: "inline-flex",
       alignItems: "center",
+      justifyContent: "center",
       gap: 8,
+      lineHeight: 1,
     };
   };
 
-  /* ===== 폼 본문 렌더(내부 제목 없음) ===== */
+  /* ===== 폼 본문 ===== */
   const renderFormContent = () => (
     <FormLayout>
       <div className="grid">
-        {/* 연락처 */}
+        {/* 연락처 자리맞춤 */}
         <div className="input-group" />
         <div className="input-group" />
         <div className="input-group contact-underline contact-field">
@@ -364,15 +547,15 @@ export default function MoveoutForm({
           />
         </div>
 
-        {/* 이사날짜 (클릭/Enter 둘 다 달력 오픈) */}
+        {/* 이사날짜 */}
         <div className="input-group">
           <label>이사날짜</label>
           <DatePicker
             selected={form.moveOutDate ? new Date(form.moveOutDate) : null}
             onChange={(date) => {
               if (date) {
-                setForm((s) => ({ ...s, moveOutDate: format(date, "yyyy-MM-dd") }));
-                setTimeout(() => focusId("name"), 0); // 선택 후 빌라명으로
+                setForm((st) => ({ ...st, moveOutDate: format(date, "yyyy-MM-dd") }));
+                setTimeout(() => focusId("name"), 0);
               }
             }}
             dateFormat="yyyy-MM-dd"
@@ -402,7 +585,7 @@ export default function MoveoutForm({
           />
         </div>
 
-        {/* 호수 (편집 중엔 roomRaw, Enter/blur 확정 시 '호' 1회) */}
+        {/* 호수 */}
         <div className="input-group">
           <label>호수</label>
           <input
@@ -414,7 +597,7 @@ export default function MoveoutForm({
             onChange={handleRoomChange}
             onBlur={handleRoomBlur}
             onKeyDown={handleEnterNext("roomNumber")}
-            onCompositionStart={() => setRoomComposing(true)}
+            onCompositionStart={() => {}}
             onCompositionEnd={handleRoomCompositionEnd}
             placeholder="예: 302 / B01"
           />
@@ -539,7 +722,7 @@ export default function MoveoutForm({
         </div>
       </div>
 
-      {/* ✅ 추가내역/추가금액 + (오른쪽) 정산진행현황 */}
+      {/* 입력 + 진행현황 */}
       <div className="grid extras-grid">
         <div className="input-group">
           <label>추가내역</label>
@@ -571,112 +754,16 @@ export default function MoveoutForm({
           <select
             {...koreanInputProps}
             value={form.status}
-            onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}
+            onChange={(e) => setForm((st) => ({ ...st, status: e.target.value }))}
           >
             <option value="정산대기">정산대기</option>
             <option value="입금대기">입금대기</option>
-            <option value="입금완료">입금완료</option>
+            <option value="정산완료">정산완료</option>
           </select>
         </div>
       </div>
 
-      {/* ===== 사진 / 비고 / 총액 (총액을 비고 오른쪽으로) ===== */}
-      <div className="grid" style={{ marginTop: 12 }}>
-        {/* 사진 — 버튼만 먼저 보이고, 이미지가 있을 때만 미리보기 표시 */}
-        <div className="input-group">
-          <label>사진</label>
-          <div>
-            <button
-              type="button"
-              onClick={() => photoInputRef.current?.click()}
-              style={actionBtnStyle("photo")}
-            >
-              <span>📷</span> <span>사진첨부</span>
-            </button>
-          </div>
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            style={{ display: "none" }}
-            onChange={(e) => addPhotos(e.target.files)}
-          />
-          {/* 사진이 있을 때만 미리보기 영역 표시 */}
-          {photos.length > 0 && (
-            <div
-              onClick={() => photoInputRef.current?.click()}
-              style={{
-                marginTop: 8,
-                border: "1px solid #eee",
-                borderRadius: 8,
-                minHeight: 220,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                position: "relative",
-                background: "#fafafa",
-                cursor: "pointer",
-              }}
-            >
-              <img
-                src={photos[photoIdx]}
-                alt="미리보기"
-                style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 8 }}
-              />
-              {/* 좌우 버튼 */}
-              {photos.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="이전"
-                    onClick={(e) => { e.stopPropagation(); setPhotoIdx((p) => (p - 1 + photos.length) % photos.length); }}
-                    style={navBtnStyle("left")}
-                  >‹</button>
-                  <button
-                    type="button"
-                    aria-label="다음"
-                    onClick={(e) => { e.stopPropagation(); setPhotoIdx((p) => (p + 1) % photos.length); }}
-                    style={navBtnStyle("right")}
-                  >›</button>
-                </>
-              )}
-              {/* 삭제 버튼 */}
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); deleteCurrentPhoto(); }}
-                style={delBtnStyle}
-              >
-                삭제
-              </button>
-              {/* 인덱스 표시 */}
-              <div style={indexBadgeStyle}>
-                {photoIdx + 1} / {photos.length}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 비고 */}
-        <div className="input-group">
-          <label>비고</label>
-          <button
-            type="button"
-            onClick={() => { setNoteText(form.note || ""); setNoteOpen(true); }}
-            style={actionBtnStyle("note")}
-          >
-            <span>📝</span> <span>{form.note ? "내용있음" : "내용없음"}</span>
-          </button>
-        </div>
-
-        {/* 총 이사정산 금액 — 비고 오른쪽 */}
-        <div className="input-group">
-          <label>총 이사정산 금액</label>
-          <input {...koreanInputProps} type="text" value={form.total} readOnly />
-        </div>
-      </div>
-
-      {/* 추가내역 리스트 (수정/삭제) */}
+      {/* ✅ 리스트(사진/비고 위) */}
       <div className="extra-list-container" style={{ marginTop: 8 }}>
         {extras.map((item, index) => (
           <div
@@ -702,104 +789,159 @@ export default function MoveoutForm({
         ))}
       </div>
 
+      {/* 사진/비고/총액 */}
+      <div className="grid" style={{ marginTop: 12 }}>
+        {/* 사진 */}
+        <div className="input-group">
+          <label>사진</label>
+          <div>
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              style={actionBtnStyle("photo")}
+              disabled={saving}
+            >
+              <span>📷</span> <span>사진첨부</span>
+            </button>
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => addPhotos(e.target.files)}
+            disabled={saving}
+          />
+          {photos.length > 0 && (
+            <div
+              onClick={() => photoInputRef.current?.click()}
+              style={{
+                marginTop: 8,
+                border: "1px solid #eee",
+                borderRadius: 8,
+                minHeight: 220,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+                background: "#fafafa",
+                cursor: "pointer",
+              }}
+            >
+              <img
+                src={photos[photoIdx]}
+                alt="미리보기"
+                style={{ width: "100%", maxHeight: 300, objectFit: "contain", borderRadius: 8 }}
+              />
+              {photos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="이전"
+                    onClick={(e) => { e.stopPropagation(); setPhotoIdx((p) => (p - 1 + photos.length) % photos.length); }}
+                    style={navBtnStyle("left")}
+                    disabled={saving}
+                  >‹</button>
+                  <button
+                    type="button"
+                    aria-label="다음"
+                    onClick={(e) => { e.stopPropagation(); setPhotoIdx((p) => (p + 1) % photos.length); }}
+                    style={navBtnStyle("right")}
+                    disabled={saving}
+                  >›</button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); deleteCurrentPhoto(); }}
+                style={delBtnStyle}
+                disabled={saving}
+              >
+                삭제
+              </button>
+              <div style={indexBadgeStyle}>
+                {photoIdx + 1} / {photos.length}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 비고 */}
+        <div className="input-group">
+          <label>비고</label>
+          <button
+            type="button"
+            onClick={() => { setNoteText(form.note || ""); setNoteOpen(true); }}
+            style={actionBtnStyle("note")}
+            disabled={saving}
+          >
+            <span>📝</span> <span>{form.note ? "내용있음" : "내용없음"}</span>
+          </button>
+        </div>
+
+        {/* 총 이사정산 금액(읽기전용 미리보기) */}
+        <div className="input-group">
+          <label>총 이사정산 금액</label>
+          <input {...koreanInputProps} type="text" value={form.total} readOnly />
+        </div>
+      </div>
+
       <div style={{ marginTop: 12 }} />
     </FormLayout>
   );
 
-  /* 버튼 공통 스타일 */
-  const btnStyle = {
-    minWidth: 110,
-    height: 38,
-    padding: "0 14px",
-    borderRadius: 10,
-    border: "1px solid #e5e7eb",
-    background: "#f8fafc",
-    color: "#111827",
-    fontWeight: 600,
-    cursor: "pointer",
-  };
-
-  /* ===== 팝업(모달) ===== */
+  /* ===== 팝업 모드 ===== */
   if (isPopup) {
     return (
       <>
-        {/* 뒤쪽 리스트가 보이도록 연한 오버레이 */}
         <div
           onClick={() => (onDone ? onDone() : navigate(-1))}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.18)",
-            zIndex: 10000,
-          }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.18)", zIndex: 10000 }}
         />
         <div
           role="dialog"
           aria-modal="true"
           style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 10001,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
+            position: "fixed", inset: 0, zIndex: 10001,
+            display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none",
           }}
         >
           <div
             style={{
-              width: 640,
-              maxWidth: "90vw",
-              maxHeight: "80vh",
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 12,
-              boxShadow: "0 18px 48px rgba(0,0,0,0.25)",
-              overflow: "hidden",
-              pointerEvents: "auto",
-              display: "flex",
-              flexDirection: "column",
+              width: 720, maxWidth: "90vw", maxHeight: "90vh",
+              background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
+              boxShadow: "0 18px 48px rgba(0,0,0,0.25)", overflow: "hidden",
+              pointerEvents: "auto", display: "flex", flexDirection: "column",
             }}
           >
-            {/* 모달 헤더 제목 */}
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 14px",
-                borderBottom: "1px solid #eef2f7",
-                background: "#fafafa",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 14px", borderBottom: "1px solid #eef2f7", background: "#fafafa",
               }}
             >
-              <strong style={{ fontSize: 15 }}>이사정산 등록</strong>
+              <strong style={{ fontSize: 15 }}>
+                {mode === "edit" ? "이사정산 수정" : "이사정산 등록"}
+              </strong>
               <div />
             </div>
 
-            {/* 본문 */}
             <div style={{ padding: 14, overflow: "auto", flex: 1 }}>
               {renderFormContent()}
             </div>
 
-            {/* ✅ 버튼 순서: 저장 → 닫기 */}
             <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                padding: "10px 14px",
-                borderTop: "1px solid #eef2f7",
-                background: "#fff",
-                position: "sticky",
-                bottom: 0,
-              }}
+              className="actions-row"
+              style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7", background: "#fff", position: "sticky", bottom: 0 }}
             >
-              <button style={btnStyle} onClick={handleSave}>
-                저장
+              <button className="save-btn" onClick={handleSave} disabled={saving}>
+                {saving ? (mode === "edit" ? "수정 중..." : "저장 중...") : (mode === "edit" ? "수정" : "저장")}
               </button>
               <button
-                style={btnStyle}
+                className="close-btn"
                 onClick={() => (onDone ? onDone() : navigate(-1))}
+                disabled={saving}
               >
                 닫기
               </button>
@@ -812,18 +954,13 @@ export default function MoveoutForm({
           <>
             <div
               onClick={() => setNoteOpen(false)}
-              style={{
-                position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 10002,
-              }}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 10002 }}
             />
             <div
               style={{
-                position: "fixed",
-                top: "18vh", left: "50%", transform: "translateX(-50%)",
-                width: 420, maxWidth: "92vw",
-                background: "#fff", borderRadius: 12, padding: 16,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.25)", zIndex: 10003,
-                display: "flex", flexDirection: "column", gap: 10,
+                position: "fixed", top: "18vh", left: "50%", transform: "translateX(-50%)",
+                width: 420, maxWidth: "92vw", background: "#fff", borderRadius: 12, padding: 16,
+                boxShadow: "0 10px 30px rgba(0,0,0,0.25)", zIndex: 10003, display: "flex", flexDirection: "column", gap: 10,
               }}
             >
               <strong>비고</strong>
@@ -834,17 +971,15 @@ export default function MoveoutForm({
                 style={{ minHeight: 160, padding: 12, borderRadius: 8, border: "1px solid #ddd", resize: "vertical" }}
                 placeholder="메모를 입력하세요"
               />
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <div className="actions-row">
                 <button
-                  style={btnStyle}
-                  onClick={() => {
-                    setForm((s) => ({ ...s, note: noteText }));
-                    setNoteOpen(false);
-                  }}
+                  className="save-btn"
+                  onClick={() => { setForm((st) => ({ ...st, note: noteText })); setNoteOpen(false); }}
+                  disabled={saving}
                 >
                   저장
                 </button>
-                <button style={btnStyle} onClick={() => setNoteOpen(false)}>
+                <button className="close-btn" onClick={() => setNoteOpen(false)} disabled={saving}>
                   닫기
                 </button>
               </div>
@@ -860,39 +995,34 @@ export default function MoveoutForm({
     <div className={`form-container ${isMobile ? "mobile" : ""}`}>
       {renderFormContent()}
 
-      {/* 하단 버튼 */}
-      <div className="actions-row" style={{ justifyContent: "flex-end", gap: 8 }}>
-        <button style={btnStyle} onClick={handleSave}>
-          저장
+      <div className="actions-row">
+        <button className="save-btn" onClick={handleSave} disabled={saving}>
+          {saving ? (mode === "edit" ? "수정 중..." : "저장 중...") : (mode === "edit" ? "수정" : "저장")}
         </button>
         {showCancel && (
           <button
             type="button"
-            style={btnStyle}
+            className="close-btn"
             onClick={() => (onDone ? onDone() : navigate(-1))}
+            disabled={saving}
           >
             닫기
           </button>
         )}
       </div>
 
-      {/* 비고 모달 (전체 페이지 모드) */}
+      {/* 비고 모달 */}
       {noteOpen && (
         <>
           <div
             onClick={() => setNoteOpen(false)}
-            style={{
-              position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 10002,
-            }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 10002 }}
           />
           <div
             style={{
-              position: "fixed",
-              top: "18vh", left: "50%", transform: "translateX(-50%)",
-              width: 420, maxWidth: "92vw",
-              background: "#fff", borderRadius: 12, padding: 16,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.25)", zIndex: 10003,
-              display: "flex", flexDirection: "column", gap: 10,
+              position: "fixed", top: "18vh", left: "50%", transform: "translateX(-50%)",
+              width: 420, maxWidth: "92vw", background: "#fff", borderRadius: 12, padding: 16,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.25)", zIndex: 10003, display: "flex", flexDirection: "column", gap: 10,
             }}
           >
             <strong>비고</strong>
@@ -903,17 +1033,15 @@ export default function MoveoutForm({
               style={{ minHeight: 160, padding: 12, borderRadius: 8, border: "1px solid #ddd", resize: "vertical" }}
               placeholder="메모를 입력하세요"
             />
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <div className="actions-row">
               <button
-                style={btnStyle}
-                onClick={() => {
-                  setForm((s) => ({ ...s, note: noteText }));
-                  setNoteOpen(false);
-                }}
+                className="save-btn"
+                onClick={() => { setForm((st) => ({ ...st, note: noteText })); setNoteOpen(false); }}
+                disabled={saving}
               >
                 저장
               </button>
-              <button style={btnStyle} onClick={() => setNoteOpen(false)}>
+              <button className="close-btn" onClick={() => setNoteOpen(false)} disabled={saving}>
                 닫기
               </button>
             </div>
@@ -924,7 +1052,7 @@ export default function MoveoutForm({
   );
 }
 
-/* 사진 뷰어 보조 스타일(인라인용) */
+/* 사진 뷰어 보조 스타일 */
 const navBtnStyle = (side) => ({
   position: "absolute",
   top: "50%",

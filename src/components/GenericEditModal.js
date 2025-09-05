@@ -7,13 +7,39 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { ko } from "date-fns/locale";
 
-/* ---- 유틸 ---- */
-const parseYYYYMMDD = (s) => {
-  if (!s) return null;
-  const [y, m, d] = String(s).split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
+/* ---- 날짜 유틸 (1900년 문제 방지 & 유연 파싱) ---- */
+const normalizeDateString = (s) =>
+  String(s || "").trim().replace(/[./]/g, "-").replace(/\s+/g, "");
+
+const toFourDigitYear = (yy) => {
+  // 00~69 → 2000~, 70~99 → 1900~ (표준 규칙)
+  return yy <= 69 ? 2000 + yy : 1900 + yy;
 };
+
+const makeDate = (year, month, day) => {
+  const d = new Date(0);
+  d.setFullYear(year, month - 1, day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const parseFlexibleYMD = (input) => {
+  if (!input) return null;
+  const s = normalizeDateString(input);
+  const parts = s.split("-");
+  if (parts.length !== 3) return null;
+
+  let [y, m, d] = parts.map((x) => (x ? Number(x) : NaN));
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
+
+  if (y >= 0 && y <= 99) y = toFourDigitYear(y);
+  m = Math.min(Math.max(m, 1), 12);
+  d = Math.min(Math.max(d, 1), 31);
+
+  const date = makeDate(y, m, d);
+  return isNaN(date) ? null : date;
+};
+
 const formatYYYYMMDD = (date) => {
   if (!date || isNaN(date)) return "";
   const y = date.getFullYear();
@@ -22,6 +48,7 @@ const formatYYYYMMDD = (date) => {
   return `${y}-${m}-${d}`;
 };
 
+/* ---- 커스텀 인풋 ---- */
 const DPInput = forwardRef(function DPInput(
   { value, onClick, placeholder, disabled, className, onKeyDown, name },
   ref
@@ -45,8 +72,7 @@ const DPInput = forwardRef(function DPInput(
 /**
  * 🔹 슬림 버전 GenericEditModal
  * - 지원: text, number, amount, date, select
- * - 제거: file(사진), note(내부 팝업), extraItems/extraAmount(추가내역), variant, photoPreviews 등
- * - renderAs: "modal" | "panel" (panel은 페이지 섹션처럼 렌더)
+ * - amount: 입력 시 즉시 쉼표, 저장 시 쉼표 제거 후 숫자로 변환
  */
 export default function GenericEditModal({
   // 데이터/필드
@@ -86,12 +112,25 @@ export default function GenericEditModal({
 
   const mergedLabels = useMemo(() => ({ ...labels }), [labels]);
 
+  // ✅ 달력이 버튼 뒤에 깔리지 않도록 z-index CSS 1회 주입
+  useEffect(() => {
+    const styleId = "rdp-zfix";
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement("style");
+      s.id = styleId;
+      s.textContent = `
+        /* react-datepicker 팝퍼를 모달 버튼보다 위로 */
+        .react-datepicker-popper { z-index: 999999; }
+      `;
+      document.head.appendChild(s);
+    }
+  }, []);
+
   // 초기화
   useEffect(() => {
     if (renderAs === "modal" && !isOpen) return;
     const base = villa || {};
     const next = { ...base };
-    // 예: 특정 필드 정규화가 필요하면 여기서 처리 (formatters 사용)
     setForm(next);
     inputRefs.current = [];
   }, [isOpen, villa, renderAs]);
@@ -116,7 +155,6 @@ export default function GenericEditModal({
       newValue = value; // DatePicker에서 직접 세팅
     }
 
-    // 선택적으로 커스텀 포맷터 적용 (예: 전화번호 등)
     if (formatters?.[name]) {
       try {
         newValue = formatters[name](newValue);
@@ -132,13 +170,28 @@ export default function GenericEditModal({
       let nextIdx = idx + 1;
       while (nextIdx < inputRefs.current.length) {
         const next = inputRefs.current[nextIdx];
-        if (next && !next.disabled && !next.readOnly) { next.focus?.(); break; }
+        if (next && !next.disabled && !next.readOnly) {
+          next.focus?.();
+          break;
+        }
         nextIdx++;
       }
     }
   };
 
-  const handleSubmit = () => onSave?.(form);
+  // ✅ 저장 시 amount 타입은 쉼표 제거 후 Number로 변환
+  const handleSubmit = () => {
+    const cleaned = {};
+    for (const [k, v] of Object.entries(form)) {
+      if (types[k] === "amount") {
+        const num = v ? Number(String(v).replace(/,/g, "")) : 0;
+        cleaned[k] = Number.isFinite(num) ? num : 0;
+      } else {
+        cleaned[k] = v;
+      }
+    }
+    onSave?.(cleaned);
+  };
 
   const renderInput = (field, idx) => {
     const label = mergedLabels[field] || field;
@@ -162,7 +215,11 @@ export default function GenericEditModal({
             disabled={disabled}
             className={disabled ? "input-readonly" : ""}
           >
-            {opts.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
+            {opts.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
           </select>
         </div>
       );
@@ -170,7 +227,7 @@ export default function GenericEditModal({
 
     // date
     if (type === "date") {
-      const selectedDate = parseYYYYMMDD(val);
+      const selectedDate = parseFlexibleYMD(val);
       return (
         <div key={field} className={`form-field field-${field}`}>
           <label>{label}</label>
@@ -181,8 +238,13 @@ export default function GenericEditModal({
               handleChange({ target: { name: field, value: str } }, "date");
             }}
             locale={ko}
-            dateFormat="yyyy-MM-dd"
+            dateFormat="yyyy-MM-dd"   // 저장 포맷 기준
             disabled={disabled}
+            /* 포털 없이 '펼쳐지되' 버튼 위로 보이게 (z-index는 위에서 주입) */
+            placement="top-start"
+            popperPlacement="top-start"
+            showPopperArrow={false}
+            fixedHeight                 // ✅ 달력 높이 고정 (항상 6주 표시)
             customInput={
               <DPInput
                 name={field}
@@ -212,7 +274,9 @@ export default function GenericEditModal({
           disabled={disabled}
           readOnly={disabled}
           autoComplete="off"
-          inputMode={type === "number" || type === "amount" ? "numeric" : "text"}
+          inputMode={
+            type === "number" || type === "amount" ? "numeric" : "text"
+          }
         />
       </div>
     );
@@ -220,17 +284,19 @@ export default function GenericEditModal({
 
   const Content = (
     <>
-      <div className={gridClass}>
-        {fields.map((field, idx) => renderInput(field, idx))}
-      </div>
+      <div className={gridClass}>{fields.map((field, idx) => renderInput(field, idx))}</div>
 
       {extraContent}
 
       {showFooter && (
         <div className="modal-footer" style={{ marginTop: 12 }}>
           <div style={{ display: "flex", gap: 8, width: "100%", justifyContent: "flex-end" }}>
-            <button className="save-btn" onClick={handleSubmit}>{saveText}</button>
-            <button className="close-btn" onClick={onClose}>{closeText}</button>
+            <button className="save-btn" onClick={handleSubmit}>
+              {saveText}
+            </button>
+            <button className="close-btn" onClick={onClose}>
+              {closeText}
+            </button>
           </div>
         </div>
       )}
@@ -240,7 +306,11 @@ export default function GenericEditModal({
   if (renderAs === "panel") {
     return (
       <div className={`generic-edit-panel ${className || ""}`}>
-        {title && <div className="modal-header"><h3 className="modal-title">{title}</h3></div>}
+        {title && (
+          <div className="modal-header">
+            <h3 className="modal-title">{title}</h3>
+          </div>
+        )}
         {Content}
       </div>
     );

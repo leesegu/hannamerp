@@ -166,7 +166,7 @@ export default function TelcoPage() {
     { label: "회선수", key: "telcoLineCount" },
     { label: "수신방법", key: "telcoReceiveMethod" },
     {
-      label: "약정기간",
+      label: "약정만료",
       key: "telcoContract",
       format: (value) => formatDateYYMMDD(value), // ✅ 표시도 YY-MM-DD
     },
@@ -243,7 +243,7 @@ export default function TelcoPage() {
           telcoBillNo: "명세서번호",
           telcoLineCount: "회선수",
           telcoReceiveMethod: "수신방법",
-          telcoContract: "약정기간",
+          telcoContract: "약정만료",
           telcoSupport: "지원금",
           telcoNote: "비고",
         }}

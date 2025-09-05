@@ -38,6 +38,33 @@ export default function DataTable({
   const fileInputRef = useRef(null);
   const allowUploadRef = useRef(false);
 
+  // ====== ✅ 기본값 자동 추론 (여기만 추가됨) ======
+  const resolveIdKeyFromColumns = (cols) => {
+    if (!Array.isArray(cols)) return undefined;
+    // 1) isId 명시
+    const byIsId = cols.find((c) => c?.isId);
+    if (byIsId?.key) return byIsId.key;
+    // 2) key에 code 포함
+    const byKey = cols.find((c) =>
+      String(c?.key ?? "").toLowerCase().includes("code")
+    );
+    if (byKey?.key) return byKey.key;
+    // 3) 라벨에 "코드" 포함
+    const byLabel = cols.find((c) =>
+      String(c?.label ?? "").toLowerCase().includes("코드")
+    );
+    if (byLabel?.key) return byLabel.key;
+    // 4) 최후의 기본값
+    return "code";
+  };
+
+  const resolvedCollectionName = collectionName ?? "villas";
+  const resolvedIdKey = idKey ?? resolveIdKeyFromColumns(columns);
+  const resolvedIdAliases =
+    (Array.isArray(idAliases) && idAliases.length > 0)
+      ? idAliases
+      : ["코드", "코드번호", "빌라코드", "ID", "id"];
+
   const askPassword = () => {
     const input = window.prompt("엑셀 작업 비밀번호를 입력하세요");
     if (input === null) return false;
@@ -300,16 +327,16 @@ export default function DataTable({
       const v = idResolver(originalRow, keyIndex, fields);
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
-    if (idKey) {
+    if (resolvedIdKey) {
       const v = getFromRow(
         originalRow,
         keyIndex,
-        idKey,
-        columns.find((c) => c.key === idKey)?.label || idKey
+        resolvedIdKey,
+        columns.find((c) => c.key === resolvedIdKey)?.label || resolvedIdKey
       );
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
-    for (const alias of idAliases) {
+    for (const alias of resolvedIdAliases) {
       const v = getFromRow(originalRow, keyIndex, alias, alias);
       if (v != null && String(v).trim() !== "") return String(v).trim();
     }
@@ -318,8 +345,9 @@ export default function DataTable({
 
   const openUploadDialog = () => {
     if (!enableExcel) return;
-    if (!collectionName || !idKey) {
-      alert("엑셀 업로드가 비활성화되었습니다.\n(collectionName, idKey를 컴포넌트에 명시하세요)");
+    // ✅ 페이지에서 안 넘겨줘도 기본값으로 동작
+    if (!resolvedCollectionName || !resolvedIdKey) {
+      alert("엑셀 업로드가 비활성화되었습니다.\n(기본값 추론 실패: 컬렉션/ID 키를 확인하세요)");
       return;
     }
     if (!askPassword()) return;
@@ -330,8 +358,8 @@ export default function DataTable({
   const handleExcelUpload = async (event) => {
     const inputEl = event.target;
 
-    if (!collectionName || !idKey) {
-      alert("업로드할 수 없습니다. collectionName, idKey가 설정되지 않았습니다.");
+    if (!resolvedCollectionName || !resolvedIdKey) {
+      alert("업로드할 수 없습니다. collectionName, idKey 추론에 실패했습니다.");
       inputEl.value = "";
       return;
     }
@@ -344,7 +372,7 @@ export default function DataTable({
     }
     allowUploadRef.current = false;
 
-    if (!window.confirm(`[${collectionName}] 컬렉션에 이 엑셀을 업로드할까요?`)) {
+    if (!window.confirm(`[${resolvedCollectionName}] 컬렉션에 이 엑셀을 업로드할까요?\n(ID 키: ${resolvedIdKey})`)) {
       inputEl.value = "";
       return;
     }
@@ -390,12 +418,12 @@ export default function DataTable({
         if (val !== undefined) rowToSave[key] = val;
       }
 
-      await setDoc(doc(db, collectionName, docId), rowToSave, { merge: true });
+      await setDoc(doc(db, resolvedCollectionName, docId), rowToSave, { merge: true });
       updated++;
     }
 
     alert(
-      `엑셀 업로드 완료 (컬렉션: ${collectionName})\n업데이트: ${updated}건, 스킵: ${skipped}건` +
+      `엑셀 업로드 완료 (컬렉션: ${resolvedCollectionName}, ID 키: ${resolvedIdKey})\n업데이트: ${updated}건, 스킵: ${skipped}건` +
       (replacedCount ? `\n(참고: '/' 포함 ID ${replacedCount}건은 '∕'로 치환됨)` : "")
     );
     onUploadComplete?.({ updated, skipped });

@@ -12,6 +12,23 @@ import {
 } from "firebase/firestore";
 
 export default function VillaRegisterModal({ onClose, onSaved, editItem }) {
+  // ✅ 버튼 스타일을 전역에 주입 (이미 전역 CSS에 있으면 아래 useEffect는 무시해도 OK)
+  useEffect(() => {
+    const styleId = "vrm-btn-styles";
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement("style");
+      s.id = styleId;
+      s.textContent = `
+        .save-btn, .close-btn { font-size: 14px; padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }
+        .save-btn { background-color: #7A5FFF; color: white; border: 2px solid transparent; transition: all 0.2s ease; }
+        .save-btn:hover { background-color: #9B7DFF; border: 2px solid #BFAEFF; box-shadow: 0 0 0 3px rgba(122, 95, 255, 0.3); }
+        .close-btn { background-color: #ccc; color: black; border: 2px solid transparent; transition: all 0.2s ease; }
+        .close-btn:hover { background-color: #e0e0e0; border: 2px solid #aaa; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1); }
+      `;
+      document.head.appendChild(s);
+    }
+  }, []);
+
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -91,7 +108,7 @@ export default function VillaRegisterModal({ onClose, onSaved, editItem }) {
           if (snap.exists()) {
             const items = snap.data().items;
             options[key] = Array.isArray(items)
-              ? items.filter((item) => item.trim() !== "")
+              ? items.filter((item) => String(item).trim() !== "")
               : [];
           } else {
             options[key] = [];
@@ -106,6 +123,7 @@ export default function VillaRegisterModal({ onClose, onSaved, editItem }) {
     };
 
     fetchDropdownData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -140,8 +158,8 @@ export default function VillaRegisterModal({ onClose, onSaved, editItem }) {
       const snap = await getDocs(q);
 
       if (
-        !editItem && !snap.empty ||
-        editItem && !snap.empty && snap.docs[0].id !== editItem.id
+        (!editItem && !snap.empty) ||
+        (editItem && !snap.empty && snap.docs[0].id !== editItem.id)
       ) {
         alert("❌ 해당 코드번호는 이미 등록되어 있습니다.");
         return;
@@ -216,18 +234,13 @@ export default function VillaRegisterModal({ onClose, onSaved, editItem }) {
           })}
         </div>
 
+        {/* ✅ 버튼 순서: 저장 → 닫기 / 디자인: save-btn, close-btn */}
         <div className="flex justify-end gap-2 mt-10">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border rounded text-gray-600"
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-purple-600 text-white rounded"
-          >
+          <button onClick={handleSave} className="save-btn">
             저장
+          </button>
+          <button onClick={onClose} className="close-btn">
+            닫기
           </button>
         </div>
       </div>

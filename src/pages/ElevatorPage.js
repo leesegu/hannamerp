@@ -66,12 +66,18 @@ export default function ElevatorPage() {
     return Number.isFinite(n) ? n : undefined;
   };
 
+  // ====== 모달 저장 ======
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
 
+    // 날짜 필드 정규화 (yy-MM-dd로 저장)
     if (data.contractStart) data.contractStart = formatDateYYMMDD(data.contractStart);
     if (data.contractEnd) data.contractEnd = formatDateYYMMDD(data.contractEnd);
+    if (data.regularApply) data.regularApply = formatDateYYMMDD(data.regularApply);
+    if (data.regularExpire) data.regularExpire = formatDateYYMMDD(data.regularExpire);
+    if (data.safetyManager) data.safetyManager = formatDateYYMMDD(data.safetyManager);
 
+    // 금액 정규화
     if (data.elevatorAmount) {
       const n = normalizeAmount(data.elevatorAmount);
       if (n !== undefined) data.elevatorAmount = n;
@@ -83,6 +89,7 @@ export default function ElevatorPage() {
     setSelectedVilla(null);
   };
 
+  // ====== 표 컬럼 ======
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -99,21 +106,13 @@ export default function ElevatorPage() {
       },
     },
     { label: "제조번호", key: "serialNumber" },
-    { label: "안전관리자", key: "safetyManager" },
-    { label: "정기신청", key: "regularApply" },
-    { label: "정기만료", key: "regularExpire" },
+    { label: "안전관리자", key: "safetyManager", format: formatDateYYMMDD }, // ← 날짜로 표시
+    { label: "정기신청", key: "regularApply",  format: formatDateYYMMDD },
+    { label: "정기만료", key: "regularExpire", format: formatDateYYMMDD },
     { label: "검사신청", key: "inspectionApply" },
     { label: "보험사", key: "insuranceCompany" },
-    {
-      label: "계약일",
-      key: "contractStart",
-      format: formatDateYYMMDD,
-    },
-    {
-      label: "계약만기",
-      key: "contractEnd",
-      format: formatDateYYMMDD,
-    },
+    { label: "계약일",   key: "contractStart", format: formatDateYYMMDD },
+    { label: "계약만기", key: "contractEnd",   format: formatDateYYMMDD },
     { label: "비고", key: "elevatorNote" },
   ];
 
@@ -124,6 +123,32 @@ export default function ElevatorPage() {
     "regularExpire", "inspectionApply", "insuranceCompany",
     "contractStart", "contractEnd", "elevatorNote"
   ];
+
+  // ====== onFormUpdate: 기준일 선택 시 +1년 자동 반영 ======
+  const addYears = (yyyy_mm_dd, years = 1) => {
+    if (!yyyy_mm_dd) return "";
+    const [y, m, d] = String(yyyy_mm_dd).split("-").map(Number);
+    if (!y || !m || !d) return "";
+    const base = new Date(0);
+    base.setFullYear(y, m - 1, d);
+    base.setHours(0, 0, 0, 0);
+    base.setFullYear(base.getFullYear() + years); // 윤년 안전
+    const yy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, "0");
+    const dd = String(base.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  };
+
+  const onFormUpdate = (next, changedKey) => {
+    // 기준일이 바뀌면 만기일/정기만료를 자동 +1년으로 세팅
+    if (changedKey === "regularApply" && next.regularApply) {
+      next.regularExpire = addYears(next.regularApply, 1);
+    }
+    if (changedKey === "contractStart" && next.contractStart) {
+      next.contractEnd = addYears(next.contractStart, 1);
+    }
+    return next;
+  };
 
   return (
     <div className="page-wrapper">
@@ -148,20 +173,22 @@ export default function ElevatorPage() {
           setSelectedVilla(null);
         }}
         onSave={handleSave}
+        /* ✅ 기준일 선택 시 만기 자동 세팅 */
+        onFormUpdate={onFormUpdate}
         fields={[
           "manufacturer",
           "elevatorAmount",
           "serialNumber",
-          "safetyManager",
-          "regularApply",
-          "regularExpire",
+          "safetyManager",   // ← 달력
+          "regularApply",    // ← 달력
+          "regularExpire",   // ← 자동 +1년 (수정 가능)
           "inspectionApply",
           "insuranceCompany",
-          "contractStart",
-          "contractEnd",
+          "contractStart",   // ← 달력
+          "contractEnd",     // ← 자동 +1년 (수정 가능)
           "elevatorNote",
         ]}
-        readOnlyKeys={["elevator"]} // ✅ 읽기 전용으로 상단 표시
+        readOnlyKeys={["elevator"]} // 읽기 전용으로 상단 표시할 때 사용
         labels={{
           elevator: "승강기",
           manufacturer: "제조사",
@@ -178,8 +205,11 @@ export default function ElevatorPage() {
         }}
         types={{
           elevatorAmount: "amount",
-          contractStart: "date",
-          contractEnd: "date",
+          safetyManager: "date",   // ← 안전관리자도 달력
+          regularApply: "date",    // ← 기준일
+          regularExpire: "date",   // ← 자동 +1년(수정 가능)
+          contractStart: "date",   // ← 기준일
+          contractEnd: "date",     // ← 자동 +1년(수정 가능)
         }}
         gridClass="modal-grid-2"
       />
