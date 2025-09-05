@@ -1,3 +1,4 @@
+// src/components/TrezoSidebar.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MoveoutList from "../pages/MoveoutList";
@@ -13,8 +14,8 @@ import PublicElectricPage from "../pages/PublicElectricPage";
 import CleaningPage from "../pages/CleaningPage";
 import CctvPage from "../pages/CctvPage";
 import VendorRegisterPage from "../pages/VendorRegisterPage";
-import VendorsMainPage from "../pages/VendorsMainPage.js"; // ✅ 주메뉴용 메인 페이지
-import EmployeePage from "../pages/EmployeePage";        // ✅ 추가: 사원정보 페이지
+import VendorsMainPage from "../pages/VendorsMainPage.js";
+import EmployeePage from "../pages/EmployeePage";
 
 import "remixicon/fonts/remixicon.css";
 
@@ -164,25 +165,21 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               )}
             </div>
 
-            {/* 이사정산 */}
+            {/* 이사정산: 조회 페이지 표시 */}
             <SidebarItem
               icon="ri-truck-line"
               label="이사정산"
               onClick={() => {
                 setOpenMenu("");
                 handleNavigate(
-                  <MoveoutList
-                    employeeId={employeeId}
-                    userId={userId}
-                    userName={userName}
-                  />,
+                  <MoveoutList employeeId={employeeId} userId={userId} isMobile={false} />,
                   "이사정산"
                 );
               }}
               active={activeMenu === "이사정산"}
             />
 
-            {/* 거래처관리 (주메뉴) -> VendorsMainPage */}
+            {/* 거래처관리 (주메뉴) */}
             <SidebarItem
               icon="ri-booklet-line"
               label="거래처관리"
@@ -204,13 +201,13 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
               active={activeMenu === "영수증발행"}
             />
 
-            {/* 사원관리 → EmployeePage 표시 */}
+            {/* 사원관리 */}
             <SidebarItem
               icon="ri-user-line"
               label="사원관리"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(<EmployeePage />, "사원관리"); // ✅ 변경: 사원정보 페이지 연결
+                handleNavigate(<EmployeePage />, "사원관리");
               }}
               active={activeMenu === "사원관리"}
             />

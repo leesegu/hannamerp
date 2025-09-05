@@ -1,959 +1,695 @@
-import React, { useEffect, useState, useRef } from "react";
-import { sortByTodayFirst } from "../utils/sortByTodayFirst";
-import { db } from "../firebase";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  deleteDoc,
-  doc,
-} from "firebase/firestore";
-import MoveoutForm from "../MoveoutForm";
-import { FiX, FiArrowLeft } from "react-icons/fi";
-import { FaEdit } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
-import "./MoveoutList.css";
-import * as htmlToImage from "html-to-image";
-import "./components/DataTable.css";
-import ReceiptTemplate from "../components/ReceiptTemplate";
-import "./MoveoutList.mobile.css";
-import PageTitle from "../components/PageTitle"; // ✅ 제목 컴포넌트로 통일
+// src/MoveoutForm.js
+import React, { useState, useRef, useEffect, useMemo, forwardRef } from "react";
+import DatePicker from "react-datepicker";
+import { useNavigate, useLocation } from "react-router-dom";
+import "react-datepicker/dist/react-datepicker.css";
+import { ko } from "date-fns/locale";
+import { format } from "date-fns";
+import { db, storage } from "./firebase";
+import { collection, addDoc, setDoc, doc, Timestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from "uuid";
 
-const formatDate = (dateStr) => {
-  const date = new Date(dateStr);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}${m}${d}`;
+import "./MoveoutForm.css";
+import "./MoveoutForm.mobile.css";
+import FormLayout from "./components/FormLayout";
+import ImageSlider from "./components/ImageSlider";
+import { formatPhoneNumber } from "./utils/formatting";
+
+console.log("✅ MoveoutForm 로딩됨");
+
+// 숫자 파싱 유틸
+const parseNumber = (str) => parseInt((String(str) || "0").replace(/[^\d]/g, ""), 10) || 0;
+
+// 공통 인풋 props (한글 우선 힌트)
+const koreanInputProps = {
+  lang: "ko",
+  autoCapitalize: "none",
+  autoCorrect: "off",
+  autoComplete: "off",
 };
 
-export default function MoveoutList({ employeeId, userId }) {
-  const [dataList, setDataList] = useState([]);
-  const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [selectedNote, setSelectedNote] = useState("");
-  const [selectedDefects, setSelectedDefects] = useState([]);
-  const [selectedImages, setSelectedImages] = useState([]);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [showPopup, setShowPopup] = useState(false);
-  const isMobileDevice = window.innerWidth <= 768;
-  const navigate = useNavigate();
-  const [expandedId, setExpandedId] = useState(null);
-  const receiptRef = useRef(null);
-  const [currentReceiptItem, setCurrentReceiptItem] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+// DatePicker 커스텀 인풋
+const DPInput = forwardRef(function DPInput(
+  { value, onClick, placeholder, className, onKeyDown, readOnly = true },
+  ref
+) {
+  return (
+    <input
+      {...koreanInputProps}
+      ref={ref}
+      value={value || ""}
+      onClick={onClick}
+      placeholder={placeholder}
+      className={className}
+      onKeyDown={onKeyDown}
+      readOnly={readOnly}
+    />
+  );
+});
 
-  const handleStatusChange = (e) => {
-    setSelectedStatus(e.target.value);
+export default function MoveoutForm({
+  employeeId,
+  userId,
+  editItem, // 있으면 수정 모드
+  onDone,
+  showCancel = true,
+  isMobile,
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isMobileDevice = typeof isMobile === "boolean" ? isMobile : window.innerWidth <= 768;
+
+  // 문서 lang=ko 보장 + 스크롤 잠금
+  useEffect(() => {
+    const prevLang = document.documentElement.getAttribute("lang");
+    document.documentElement.setAttribute("lang", "ko");
+    document.body.style.overflow = "hidden";
+    return () => {
+      if (prevLang) document.documentElement.setAttribute("lang", prevLang);
+      else document.documentElement.removeAttribute("lang");
+      document.body.style.overflow = "auto";
+    };
+  }, []);
+
+  // 폼 상태
+  const [form, setForm] = useState({
+    moveOutDate: "",
+    name: "",
+    roomNumber: "",
+    contact: "",
+    arrears: "",
+    currentFee: "",
+    waterCurr: "",
+    waterPrev: "",
+    waterCost: "",
+    waterUnit: "",
+    electricity: "",
+    tvFee: "",
+    cleaning: "",
+    defectDesc: "",
+    defectAmount: "",
+    total: "",
+    notes: "",
+    status: "정산대기",
+  });
+
+  // 모드/문서 ID
+  const [docId, setDocId] = useState(null);
+
+  // 추가내역 리스트 + 인라인 편집 상태
+  const [defects, setDefects] = useState([]);
+  const [rowEdit, setRowEdit] = useState({ index: null, desc: "", amount: "" });
+
+  // 비고 모달
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+
+  // 이미지: 기존/신규/미리보기
+  const [existingImageUrls, setExistingImageUrls] = useState([]);
+  const [images, setImages] = useState([]); // 신규 File[]
+  const [imagePreviews, setImagePreviews] = useState([]); // (기존 + blob)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const previewUrlsRef = useRef([]); // blob 추적
+  const fileInputRef = useRef(null);
+
+  // 포커스 refs (입력 이동 전용)
+  const defectDescRef = useRef(null);
+  const defectAmountRef = useRef(null);
+  const listEndRef = useRef(null);
+
+  // 숫자 입력 정책
+  const numberFieldsWithComma = useMemo(
+    () => ["arrears", "currentFee", "electricity", "tvFee", "cleaning", "waterUnit", "waterCost", "defectAmount", "total"],
+    []
+  );
+  const numberOnlyFields = useMemo(() => ["waterPrev", "waterCurr"], []);
+
+  // 등록/수정 초기 로드
+  useEffect(() => {
+    let parsed = null;
+    if (editItem) parsed = editItem;
+    else {
+      const saved = localStorage.getItem("editItem");
+      if (saved) parsed = JSON.parse(saved);
+    }
+
+    if (parsed) {
+      // 수정 모드
+      setDocId(parsed.docId || null);
+      setForm((prev) => ({
+        ...prev,
+        ...parsed,
+        defectDesc: "",
+        defectAmount: "",
+      }));
+      setNoteText(parsed.notes || "");
+      setDefects(parsed.defects || []);
+
+      const urls = (parsed.images || []).slice().reverse();
+      setExistingImageUrls(urls);
+      setImagePreviews(urls);
+      setImages([]);
+    } else {
+      // 등록
+      setDocId(null);
+      resetForm();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 경로 변경 시 등록 초기화
+  useEffect(() => {
+    if (!docId && !editItem) resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // 언마운트 시 blob revoke
+  useEffect(() => {
+    return () => {
+      previewUrlsRef.current.forEach((u) => {
+        try { URL.revokeObjectURL(u); } catch {}
+      });
+      previewUrlsRef.current = [];
+    };
+  }, []);
+
+  const revokeAllBlobsInPreviews = () => {
+    imagePreviews.forEach((u) => {
+      if (typeof u === "string" && u.startsWith("blob:")) {
+        try { URL.revokeObjectURL(u); } catch {}
+      }
+    });
+    previewUrlsRef.current = [];
   };
 
-  const handleDownloadImage = async () => {
-    if (!receiptRef.current) return;
-    const node = receiptRef.current;
-    try {
-      const dataUrl = await htmlToImage.toJpeg(node);
-      const link = document.createElement("a");
-      link.download = "영수증.jpg";
-      link.href = dataUrl;
-      link.click();
-    } catch (error) {
-      console.error("이미지 저장 실패:", error);
+  const resetForm = () => {
+    revokeAllBlobsInPreviews();
+    setForm({
+      moveOutDate: "",
+      name: "",
+      roomNumber: "",
+      contact: "",
+      arrears: "",
+      currentFee: "",
+      waterCurr: "",
+      waterPrev: "",
+      waterCost: "",
+      waterUnit: "",
+      electricity: "",
+      tvFee: "",
+      cleaning: "",
+      defectDesc: "",
+      defectAmount: "",
+      total: "",
+      notes: "",
+      status: "정산대기",
+    });
+    setNoteText("");
+    setDefects([]);
+    setRowEdit({ index: null, desc: "", amount: "" });
+    setImages([]);
+    setExistingImageUrls([]);
+    setImagePreviews([]);
+    setCurrentImageIndex(0);
+  };
+
+  // 입력 변경
+  const handleChange = (id, value) => {
+    if (id === "contact") {
+      const formatted = formatPhoneNumber(value);
+      setForm((s) => ({ ...s, [id]: formatted }));
+    } else if (numberFieldsWithComma.includes(id)) {
+      const numeric = (value || "").replace(/[^\d]/g, "");
+      const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      setForm((s) => ({ ...s, [id]: formatted }));
+    } else if (numberOnlyFields.includes(id)) {
+      const numeric = (value || "").replace(/[^\d]/g, "");
+      setForm((s) => ({ ...s, [id]: numeric }));
+    } else {
+      setForm((s) => ({ ...s, [id]: value }));
     }
   };
 
-  const waitForReceiptRef = () => {
-    return new Promise((resolve, reject) => {
-      const maxAttempts = 60;
-      let attempts = 0;
-      const check = () => {
-        if (receiptRef.current) {
-          resolve(receiptRef.current);
-        } else if (attempts < maxAttempts) {
-          attempts++;
-          requestAnimationFrame(check);
-        } else {
-          reject(new Error("receiptRef timeout"));
-        }
-      };
-      check();
-    });
+  /* --------------------- 추가내역: 등록/인라인 수정 --------------------- */
+
+  // 엔터 처리 공통
+  const handleEnterOnDesc = (e) => {
+    if (e.key !== "Enter" && e.key !== "NumpadEnter") return;
+    if (e.isComposing) return; // IME 조합 중이면 무시
+    e.preventDefault();
+    e.stopPropagation();
+
+    const hasDesc = String(form.defectDesc || "").trim().length > 0;
+    const hasAmt = parseNumber(form.defectAmount) > 0;
+
+    if (hasDesc && hasAmt) {
+      addDefect();
+    } else {
+      // 빠진 입력으로 포커스 이동
+      if (!hasAmt) defectAmountRef.current?.focus();
+      else defectDescRef.current?.focus();
+    }
   };
 
-  const tableColumns = [
-    "moveOutDate",
-    "name",
-    "roomNumber",
-    "arrears",
-    "currentFee",
-    "waterCurr",
-    "waterPrev",
-    "waterCost",
-    "waterUnit",
-    "electricity",
-    "tvFee",
-    "cleaning",
-    "total",
-    "status",
-  ];
+  const handleEnterOnAmount = (e) => {
+    if (e.key !== "Enter" && e.key !== "NumpadEnter") return;
+    if (e.isComposing) return;
+    e.preventDefault();
+    e.stopPropagation();
 
+    const hasDesc = String(form.defectDesc || "").trim().length > 0;
+    const hasAmt = parseNumber(form.defectAmount) > 0;
+
+    if (hasDesc && hasAmt) {
+      addDefect();
+    } else {
+      if (!hasDesc) defectDescRef.current?.focus();
+      else defectAmountRef.current?.focus();
+    }
+  };
+
+  const addDefect = () => {
+    const desc = String(form.defectDesc || "").trim();
+    const amt = parseNumber(form.defectAmount);
+    if (!desc || !amt) return false;
+
+    setDefects((list) => [...list, { desc, amount: amt.toLocaleString() }]);
+
+    // 입력 초기화 + 포커스 + 리스트 하단 스크롤
+    setForm((s) => ({ ...s, defectDesc: "", defectAmount: "" }));
+    setTimeout(() => {
+      defectDescRef.current?.focus();
+      listEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 0);
+
+    return true;
+  };
+
+  // 리스트 인라인 수정 컨트롤
+  const beginRowEdit = (index) => {
+    const t = defects[index];
+    setRowEdit({ index, desc: t?.desc || "", amount: t?.amount || "" });
+  };
+  const saveRowEdit = () => {
+    const { index, desc, amount } = rowEdit;
+    if (index === null || index < 0) return;
+    const cleanAmt = parseNumber(amount);
+    if (!String(desc).trim() || !cleanAmt) return;
+    setDefects((list) =>
+      list.map((d, i) =>
+        i === index ? { desc: String(desc).trim(), amount: cleanAmt.toLocaleString() } : d
+      )
+    );
+    setRowEdit({ index: null, desc: "", amount: "" });
+  };
+  const cancelRowEdit = () => setRowEdit({ index: null, desc: "", amount: "" });
+  const handleDeleteDefect = (index) => {
+    setDefects((list) => list.filter((_, i) => i !== index));
+    if (rowEdit.index === index) setRowEdit({ index: null, desc: "", amount: "" });
+  };
+
+  // 이미지
+  const handleImageChange = (e) => {
+    const newFiles = Array.from(e.target.files || []);
+    if (!newFiles.length) return;
+    const createdUrls = newFiles.map((f) => URL.createObjectURL(f));
+    previewUrlsRef.current.push(...createdUrls);
+    setImages((arr) => [...arr, ...newFiles]);
+    setImagePreviews((arr) => [...arr, ...createdUrls]);
+    setCurrentImageIndex(0);
+  };
+  const handleImageDelete = (idx) => {
+    const url = imagePreviews[idx];
+    if (typeof url === "string" && existingImageUrls.includes(url)) {
+      setExistingImageUrls((arr) => arr.filter((u) => u !== url));
+    } else {
+      const newIdx = idx - existingImageUrls.length;
+      setImages((arr) => {
+        if (newIdx >= 0 && newIdx < arr.length) {
+          const next = [...arr];
+          next.splice(newIdx, 1);
+          return next;
+        }
+        return arr;
+      });
+      if (url?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(url); } catch {}
+        previewUrlsRef.current = previewUrlsRef.current.filter((u) => u !== url);
+      }
+    }
+    setImagePreviews((arr) => arr.filter((_, i) => i !== idx));
+    setCurrentImageIndex((prev) => Math.max(0, Math.min(prev, imagePreviews.length - 2)));
+  };
+
+  // 비고 모달
+  const openNoteModal = () => { setNoteText(form.notes || ""); setNoteModalOpen(true); };
+  const saveNote = () => { setForm((s) => ({ ...s, notes: noteText })); setNoteModalOpen(false); };
+
+  // 수도요금 자동
   useEffect(() => {
-    if (!userId) return;
-    const q = query(collection(db, "moveoutData"), where("groupId", "==", userId));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      const sorted = sortByTodayFirst(items);
-      setDataList(sorted);
-    });
-    return () => unsubscribe();
-  }, [userId]);
+    const prev = parseNumber(form.waterPrev);
+    const curr = parseNumber(form.waterCurr);
+    const unit = parseNumber(form.waterUnit);
+    if (!isNaN(prev) && !isNaN(curr) && !isNaN(unit)) {
+      const usage = Math.max(0, curr - prev);
+      const cost = usage * unit;
+      setForm((s) => ({ ...s, waterCost: cost.toLocaleString() }));
+    }
+  }, [form.waterPrev, form.waterCurr, form.waterUnit]);
 
-  const handleDelete = async (docId) => {
-    if (!docId) {
-      alert("❌ 삭제할 문서 ID가 없습니다.");
+  // 총합 자동
+  useEffect(() => {
+    const baseSumKeys = ["arrears", "currentFee", "waterCost", "electricity", "tvFee", "cleaning"];
+    const base = baseSumKeys.reduce((sum, k) => sum + parseNumber(form[k]), 0);
+    const extra = defects.reduce((sum, d) => sum + parseNumber(d.amount), 0);
+    setForm((s) => ({ ...s, total: (base + extra).toLocaleString() }));
+  }, [form.arrears, form.currentFee, form.waterCost, form.electricity, form.tvFee, form.cleaning, defects]);
+
+  // 저장(등록/수정 겸용)
+  const handleSave = async () => {
+    if (!form.name?.trim() || !form.roomNumber?.trim()) {
+      alert("빌라명과 호수는 필수입니다.");
       return;
     }
-    if (window.confirm("정말 삭제하시겠습니까?")) {
-      try {
-        await deleteDoc(doc(db, "moveoutData", docId));
-        alert("✅ 삭제 완료");
-      } catch (error) {
-        console.error("❌ 삭제 실패:", error.message);
-        alert("삭제 중 오류 발생: " + error.message);
+    try {
+      const uploadedUrls = [];
+      for (const file of images) {
+        const imageRef = ref(storage, `moveout/${uuidv4()}-${file.name}`);
+        const snapshot = await uploadBytes(imageRef, file);
+        const url = await getDownloadURL(snapshot.ref);
+        uploadedUrls.push(url);
       }
-    }
-  };
 
-  const formatReceiptFileName = (item) => {
-    if (!item) return "영수증";
-    const rawDate = new Date(item.moveOutDate);
-    const yyyy = rawDate.getFullYear();
-    const mm = String(rawDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(rawDate.getDate()).padStart(2, "0");
-    const formattedDate = `${yyyy}${mm}${dd}`;
-    const namePart = (item.name || "").replace(/\s/g, "");
-    const roomPart = (item.roomNumber || "").replace(/\s/g, "");
-    return `${formattedDate}${namePart}${roomPart}`;
-  };
+      const now = Timestamp.now();
+      const allowedStatuses = ["정산대기", "입금대기", "입금완료"];
+      const safeStatus = allowedStatuses.includes(form.status) ? form.status : "정산대기";
+      const validMoveOutDate = form.moveOutDate || new Date().toISOString().split("T")[0];
+      const finalImages = [...existingImageUrls, ...uploadedUrls];
 
-  const handleShowReceipt = (item) => {
-    setPreviewImage(null);
-    setCurrentReceiptItem(null);
-    setTimeout(() => {
-      setCurrentReceiptItem(item);
-    }, 100);
-  };
+      const baseData = {
+        ...form,
+        moveOutDate: validMoveOutDate,
+        total: parseNumber(form.total),
+        defects,
+        notes: form.notes || noteText || "",
+        images: finalImages,
+        groupId: userId,
+        employeeId,
+        status: safeStatus,
+      };
 
-  const handleMobileReceiptOptions = async (item) => {
-    setPreviewImage(null);
-    setCurrentReceiptItem(null);
-    await new Promise((r) => setTimeout(r, 50));
-    setCurrentReceiptItem(item);
-  };
-
-  const handleEdit = (item) => {
-    window.lastSavedItem = JSON.stringify(item);
-    setEditItem({ ...item, docId: item.id });
-    setShowPopup(true);
-  };
-
-  const handleEditDone = () => {
-    setEditItem(null);
-    setShowPopup(false);
-  };
-
-  const handleSort = (key) => {
-    const direction =
-      sortConfig.key === key && sortConfig.direction === "asc" ? "desc" : "asc";
-    setSortConfig({ key, direction });
-  };
-
-  const handleClickReceipt = async (item) => {
-    if (isMobileDevice) {
-      await handleMobileReceiptOptions(item);
-    } else {
-      handleShowReceipt(item);
-    }
-  };
-
-  const sortedList = [...dataList].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-    const rawA = a[sortConfig.key];
-    const rawB = b[sortConfig.key];
-    const valA = typeof rawA === "string" ? rawA.replace(/,/g, "") : rawA;
-    const valB = typeof rawB === "string" ? rawB.replace(/,/g, "") : rawB;
-    const numA = Number(valA);
-    const numB = Number(valB);
-    if (!isNaN(numA) && !isNaN(numB)) {
-      return sortConfig.direction === "asc" ? numA - numB : numB - numA;
-    } else {
-      return sortConfig.direction === "asc"
-        ? String(rawA).localeCompare(String(rawB))
-        : String(rawB).localeCompare(String(rawA));
-    }
-  });
-
-  const filtered = sortedList.filter((item) => {
-    const lower = searchText.toLowerCase();
-    const matchText =
-      (item.name || "").toLowerCase().includes(lower) ||
-      (item.roomNumber || "").toLowerCase().includes(lower) ||
-      (item.moveOutDate || "").includes(searchText) ||
-      (item.total || "").toString().includes(searchText);
-    const matchStatus = statusFilter ? item.status === statusFilter : true;
-    return matchText && matchStatus;
-  });
-
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentData = filtered.slice(startIndex, startIndex + itemsPerPage);
-
-  const depositTotal = filtered
-    .filter((item) => item.status === "입금대기")
-    .reduce((sum, item) => sum + (Number(item.total) || 0), 0)
-    .toLocaleString();
-
-  const getStatusDotColor = (status) => {
-    switch (status) {
-      case "정산대기":
-        return "gray";
-      case "입금대기":
-        return "red";
-      case "입금완료":
-        return "limegreen";
-      default:
-        return "transparent";
-    }
-  };
-
-  const downloadImage = (format) => {
-    if (!receiptRef.current || !currentReceiptItem) return;
-    const rawDate = new Date(currentReceiptItem.moveOutDate);
-    const yyyy = rawDate.getFullYear();
-    const mm = String(rawDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(rawDate.getDate()).padStart(2, "0");
-    const formattedDate = `${yyyy}${mm}${dd}`;
-    const namePart = (currentReceiptItem.name || "").trim();
-    const roomPart = (currentReceiptItem.roomNumber || "").trim();
-    const fileName = `${formattedDate}${namePart}${roomPart}`;
-
-    htmlToImage.toPng(receiptRef.current).then((dataUrl) => {
-      if (format === "pdf") {
-        import("jspdf").then((jsPDF) => {
-          const img = new Image();
-          img.src = dataUrl;
-          img.onload = () => {
-            const pdf = new jsPDF.jsPDF({
-              orientation: "portrait",
-              unit: "px",
-              format: [img.width, img.height],
-            });
-            pdf.addImage(img, "PNG", 0, 0, img.width, img.height);
-            pdf.save(`${fileName}.pdf`);
-          };
-        });
+      if (docId) {
+        await setDoc(doc(db, "moveoutData", docId), { ...baseData, updatedAt: now }, { merge: true });
       } else {
-        const link = document.createElement("a");
-        link.download = `${fileName}.jpg`;
-        link.href = dataUrl;
-        link.click();
-        setToastVisible(true);
-        setTimeout(() => setToastVisible(false), 1600);
+        await addDoc(collection(db, "moveoutData"), { ...baseData, createdAt: now });
       }
-    });
+
+      alert("정산내역 저장 완료 ✅");
+      localStorage.removeItem("editItem");
+      resetForm();
+
+      if (isMobileDevice) navigate("/main");
+      else if (onDone) onDone();
+    } catch (err) {
+      console.error("❌ 저장 오류:", err);
+      alert("❌ 오류 발생: " + err.message);
+    }
   };
 
-  /* =======================
-     모바일 뷰
-  ======================= */
-  if (isMobileDevice) {
-    return (
-      <div className="list-container">
-        <button className="back-icon-button" onClick={() => navigate("/main")}>
-          <FiArrowLeft />
-        </button>
+  const isEditMode = !!docId;
 
-        <div className="mobile-header-wrapper">
-          <h2 className="mobile-title">이사정산 조회</h2>
+  // 입력 목록
+  const inputList = [
+    { id: "moveOutDate", label: "이사날짜", type: "date" },
+    { id: "name", label: "빌라명" },
+    { id: "roomNumber", label: "호수" },
+    { id: "arrears", label: "미납관리비" },
+    { id: "currentFee", label: "당월관리비" },
+    { id: "waterCurr", label: "당월지침" },
+    { id: "waterPrev", label: "전월지침" },
+    { id: "waterCost", label: "수도요금", readOnly: true },
+    { id: "waterUnit", label: "수도단가" },
+    { id: "electricity", label: "전기요금" },
+    { id: "tvFee", label: "TV수신료" },
+    { id: "cleaning", label: "청소비용" },
+  ];
 
-          <div className="mobile-controls">
-            <select
-              className="status-filter"
-              value={selectedStatus}
-              onChange={handleStatusChange}
-            >
-              <option value="">전체</option>
-              <option value="정산대기">정산대기</option>
-              <option value="입금대기">입금대기</option>
-              <option value="입금완료">입금완료</option>
-            </select>
+  return (
+    <>
+      <div className={`form-container ${isMobileDevice ? "mobile" : ""} ${isEditMode ? "edit-mode" : ""}`}>
+        <FormLayout>
+          <h2 className="form-title">{isEditMode ? "이사정산 수정" : "이사정산 등록"}</h2>
 
-            <input
-              className="search-input"
-              type="text"
-              placeholder="검색어 입력"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
+          {/* 연락처 단독 라인 */}
+          <div className="grid">
+            <div className="input-group" />
+            <div className="input-group" />
+            <div className="input-group contact-underline contact-field">
+              <input
+                {...koreanInputProps}
+                type="text"
+                value={form.contact}
+                onChange={(e) => handleChange("contact", e.target.value)}
+                placeholder="Phone number"
+              />
+            </div>
+
+            {/* 메인 입력들 */}
+            {inputList.map(({ id, label, type, readOnly }) => (
+              <div key={id} className="input-group">
+                <label>{label}</label>
+                {id === "moveOutDate" ? (
+                  <DatePicker
+                    selected={form.moveOutDate ? new Date(form.moveOutDate) : null}
+                    onChange={(date) => date && handleChange("moveOutDate", format(date, "yyyy-MM-dd"))}
+                    dateFormat="yyyy-MM-dd"
+                    locale={ko}
+                    customInput={
+                      <DPInput
+                        placeholder="이사날짜"
+                        className={`custom-datepicker ${isMobileDevice ? "mobile" : ""}`}
+                      />
+                    }
+                    popperPlacement="bottom-end"
+                    popperProps={{ modifiers: [{ name: "offset", options: { offset: [0, 8] } }] }}
+                  />
+                ) : (
+                  <input
+                    {...koreanInputProps}
+                    type={type || "text"}
+                    value={form[id]}
+                    onChange={(e) => handleChange(id, e.target.value)}
+                    inputMode={
+                      numberOnlyFields.includes(id) || numberFieldsWithComma.includes(id) ? "numeric" : "text"
+                    }
+                    readOnly={readOnly}
+                  />
+                )}
+              </div>
+            ))}
           </div>
-        </div>
 
-        {filtered
-          .filter((item) => !selectedStatus || item.status === selectedStatus)
-          .map((item) => (
-            <div key={item.id} className="mobile-item">
-              {/* 날짜 + 상태 */}
-              <div
-                className="info-line top-line"
-                onClick={() =>
-                  setExpandedId(expandedId === item.id ? null : item.id)
-                }
-              >
-                <span>📅 {item.moveOutDate}</span>
-                <span className="status">
-                  <span
-                    className="status-dot"
-                    style={{ backgroundColor: getStatusDotColor(item.status) }}
-                  ></span>
-                  {item.status}
-                </span>
-              </div>
+          <div style={{ marginTop: 16 }} />
 
-              {/* 빌라명 + 호수 + 총액 */}
-              <div className="info-line bottom-line">
-                <span>🏢 {item.name || "-"}</span>
-                <span>🚪 {item.roomNumber || "-"}</span>
-                <span>💰 {Number(item.total || 0).toLocaleString()}원</span>
-              </div>
+          {/* 추가내역 상단 입력 */}
+          <div className="grid">
+            <div className="input-group">
+              <label>추가내역</label>
+              <input
+                {...koreanInputProps}
+                ref={defectDescRef}
+                value={form.defectDesc}
+                onChange={(e) => setForm((s) => ({ ...s, defectDesc: e.target.value }))}
+                onKeyDown={handleEnterOnDesc}
+                placeholder={isEditMode ? "리스트에서 수정 / 여긴 새 항목 추가" : "추가내역"}
+              />
+            </div>
+            <div className="input-group">
+              <label>추가금액</label>
+              <input
+                {...koreanInputProps}
+                ref={defectAmountRef}
+                value={form.defectAmount}
+                onChange={(e) => {
+                  const numeric = (e.target.value || "").replace(/[^\d]/g, "");
+                  const withComma = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                  setForm((s) => ({ ...s, defectAmount: withComma }));
+                }}
+                onKeyDown={handleEnterOnAmount}
+                placeholder={isEditMode ? "리스트에서 수정 / 여긴 새 항목 추가" : "추가금액"}
+                inputMode="numeric"
+              />
+            </div>
+          </div>
 
-              {/* 펼쳐지는 상세 정보 */}
-              {expandedId === item.id && (
-                <div className="mobile-expand">
-                  <div className="mobile-icons">
-                    <div
-                      className={`icon-badge ${
-                        item.defects?.length > 0 ? "has-content" : ""
-                      }`}
-                      onClick={() => setSelectedDefects(item.defects || [])}
-                    >
-                      추가내역
-                    </div>
-                    <div
-                      className={`icon-badge ${
-                        item.notes?.trim() ? "has-content" : ""
-                      }`}
-                      onClick={() => setSelectedNote(item.notes || "")}
-                    >
-                      비고
-                    </div>
-                    <div
-                      className={`icon-badge ${
-                        item.images?.length > 0 ? "has-content" : ""
-                      }`}
-                      onClick={() => setSelectedImages(item.images || [])}
-                    >
-                      사진
-                    </div>
+          {/* 리스트 (인라인 수정) */}
+          <div className="extra-list-container">
+            {defects.map((item, index) => {
+              const isRowEditing = rowEdit.index === index;
+              return (
+                <div key={index} className="extra-row">
+                  <div className="extra-desc" style={{ flex: 2 }}>
+                    {isRowEditing ? (
+                      <input
+                        {...koreanInputProps}
+                        value={rowEdit.desc}
+                        onChange={(e) => setRowEdit((s) => ({ ...s, desc: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "NumpadEnter") { e.preventDefault(); saveRowEdit(); }
+                          else if (e.key === "Escape") { e.preventDefault(); cancelRowEdit(); }
+                        }}
+                        placeholder="내역"
+                        style={{ width: "100%" }}
+                      />
+                    ) : (
+                      item.desc
+                    )}
                   </div>
-                  <div className="mobile-buttons">
-                    <button className="edit-btn" onClick={() => handleEdit(item)}>
-                      ✏️ 수정
-                    </button>
-                    <button
-                      className="receipt-btn"
-                      onClick={() => handleClickReceipt(item)}
-                    >
-                      📩 영수증
-                    </button>
+                  <div className="extra-amount" style={{ flex: 1, textAlign: "right", marginRight: "1rem" }}>
+                    {isRowEditing ? (
+                      <input
+                        {...koreanInputProps}
+                        value={rowEdit.amount}
+                        onChange={(e) => {
+                          const numeric = (e.target.value || "").replace(/[^\d]/g, "");
+                          setRowEdit((s) => ({ ...s, amount: numeric ? Number(numeric).toLocaleString() : "" }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "NumpadEnter") { e.preventDefault(); saveRowEdit(); }
+                          else if (e.key === "Escape") { e.preventDefault(); cancelRowEdit(); }
+                        }}
+                        placeholder="금액"
+                        inputMode="numeric"
+                        style={{ width: "100%", textAlign: "right" }}
+                      />
+                    ) : (
+                      `${item.amount}원`
+                    )}
+                  </div>
+                  <div className="extra-actions" style={{ display: "flex", gap: 6 }}>
+                    {isRowEditing ? (
+                      <>
+                        <button onClick={saveRowEdit}>저장</button>
+                        <button onClick={cancelRowEdit}>취소</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => beginRowEdit(index)}>수정</button>
+                        <button onClick={() => handleDeleteDefect(index)}>삭제</button>
+                      </>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
-
-        {selectedDefects.length > 0 && (
-          <div className="modal-center">
-            <div className="modal-content">
-              <h4>추가내역</h4>
-              <ul>
-                {selectedDefects.map((d, i) => (
-                  <li key={i}>
-                    {d.desc} - {d.amount}원
-                  </li>
-                ))}
-              </ul>
-              <button onClick={() => setSelectedDefects([])}>닫기</button>
-            </div>
+              );
+            })}
+            <div ref={listEndRef} /> {/* 스크롤 앵커 */}
           </div>
-        )}
 
-        {selectedNote && (
-          <div className="modal-center">
-            <div className="modal-content">
-              <h4>비고</h4>
-              <p>{selectedNote}</p>
-              <button onClick={() => setSelectedNote("")}>닫기</button>
+          <div style={{ marginTop: 16 }} />
+          <div className="grid">
+            <div className="input-group">
+              <label>총 이사정산 금액</label>
+              <input {...koreanInputProps} type="text" value={form.total} readOnly />
             </div>
-          </div>
-        )}
-
-        {selectedImages.length > 0 && (
-          <div className="modal-center">
-            <div className="modal-content">
-              <h4>사진</h4>
-              {selectedImages.map((url, idx) => (
-                <img
-                  key={url + idx}
-                  src={url}
-                  alt={`img-${idx}`}
-                  style={{ maxWidth: "100%", marginBottom: 8, cursor: "pointer" }}
-                  onClick={() => window.open(url, "_blank")}
-                />
-              ))}
-              <button onClick={() => setSelectedImages([])}>닫기</button>
-            </div>
-          </div>
-        )}
-
-        {showPopup && editItem && (
-          <div className="modal-center-mobile">
-            <div className="form-container">
-              <MoveoutForm
-                employeeId={employeeId}
-                userId={userId}
-                editItem={editItem}
-                onDone={handleEditDone}
-                onCancel={() => {
-                  setEditItem(null);
-                  setShowPopup(false);
-                }}
-                showCancel={true}
-                isMobile={true}
-              />
-              <button
-                className="close-button"
-                onClick={() => {
-                  const confirmClose = window.confirm(
-                    "변경사항을 저장하지 않고 닫으시겠습니까?"
-                  );
-                  if (confirmClose) {
-                    setEditItem(null);
-                    setShowPopup(false);
-                  }
-                }}
+            <div className="input-group">
+              <label>정산진행현황</label>
+              <select
+                {...koreanInputProps}
+                value={form.status}
+                onChange={(e) => handleChange("status", e.target.value)}
               >
+                <option value="정산대기">정산대기</option>
+                <option value="입금대기">입금대기</option>
+                <option value="입금완료">입금완료</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} />
+
+          {/* 사진첨부 & 비고 */}
+          <div className="grid-2col">
+            <div className="input-group">
+              <label>사진첨부</label>
+              <input type="file" multiple ref={fileInputRef} onChange={handleImageChange} style={{ display: "none" }} />
+              <button type="button" className="custom-button green" onClick={() => fileInputRef.current?.click()}>
+                + 사진첨부
+              </button>
+            </div>
+
+            <ImageSlider imageUrls={imagePreviews} setImageUrls={() => {}} isMobile={isMobileDevice} />
+
+            <div className="input-group">
+              <label>비고</label>
+              <button className="custom-button orange" onClick={openNoteModal}>
+                {form.notes ? "내용있음" : "내용없음"}
+              </button>
+            </div>
+          </div>
+
+          {/* 단일 슬라이더 */}
+          {imagePreviews.length > 0 && (
+            <div className="image-slider-single">
+              <div className="slider-controls">
+                <button onClick={() => setCurrentImageIndex((p) => (p > 0 ? p - 1 : imagePreviews.length - 1))} />
+                <div className="slider-image-container" style={{ position: "relative" }}>
+                  <img src={imagePreviews[currentImageIndex]} alt={`preview-${currentImageIndex}`} style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8 }} />
+                  <button
+                    onClick={() => handleImageDelete(currentImageIndex)}
+                    style={{ position: "absolute", top: 0, right: 0, background: "red", color: "white", border: "none", cursor: "pointer", padding: "2px 6px" }}
+                  >
+                    X
+                  </button>
+                </div>
+                <button onClick={() => setCurrentImageIndex((p) => (p < imagePreviews.length - 1 ? p + 1 : 0))} />
+              </div>
+              <div className="slider-indicator">{currentImageIndex + 1} / {imagePreviews.length}</div>
+            </div>
+          )}
+
+          {/* 하단 액션 버튼 */}
+          <div className="actions-row">
+            <button className="save-button" onClick={handleSave}>저장</button>
+            {showCancel && (
+              <button type="button" className="cancel-button" onClick={() => (isMobileDevice ? navigate("/main") : onDone?.())}>
                 닫기
               </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* =======================
-     PC 뷰 (DataTable 툴바 적용)
-  ======================= */
-  return (
-    <div className="list-container data-table-page">
-      <PageTitle title="이사정산 조회" />
-
-      {/* ✅ dt-page-inner: DataTable 페이지들과 동일한 내부 스코프 */}
-      <div className="dt-page-inner">
-        {/* ✅ DataTable 레이아웃과 동일한 헤더 툴바 */}
-        <div className="dt-toolbar">
-          {/* 왼쪽: 상태 필터 + 합계(입금대기일 때만) */}
-          <div className="dt-left-controls">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="status-filter-dropdown"
-            >
-              <option value="">전체</option>
-              <option value="정산대기">정산대기</option>
-              <option value="입금대기">입금대기</option>
-              <option value="입금완료">입금완료</option>
-            </select>
-
-            {statusFilter === "입금대기" && (
-              <div className="deposit-total">총액 합계: {depositTotal}원</div>
             )}
           </div>
+        </FormLayout>
+      </div>
 
-          {/* 오른쪽: 등록 버튼 + 검색창 */}
-          <div className="dt-right-controls">
-            <button
-              className="register-button"
-              onClick={() => {
-                setEditItem(null);
-                setShowPopup(true);
-              }}
-            >
-              <FaEdit className="icon-left" />
-              등록
-            </button>
-
-            <input
-              type="text"
-              placeholder="빌라명, 호수, 날짜(YYYY-MM-DD), 총액 검색"
-              value={searchText}
-              onChange={(e) => {
-                setSearchText(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="search-input"
-            />
-          </div>
-        </div>
-
-        <div className="scroll-table">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>번호</th>
-                {tableColumns.map((key) => {
-                  const isSorted = sortConfig.key === key;
-                  const directionSymbol = isSorted
-                    ? sortConfig.direction === "asc"
-                      ? " ▲"
-                      : " ▼"
-                    : "";
-                  return (
-                    <th
-                      key={key}
-                      onClick={() => handleSort(key)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      {{
-                        moveOutDate: "이사날짜",
-                        name: "빌라명",
-                        roomNumber: "호수",
-                        arrears: "미납",
-                        currentFee: "당월",
-                        waterCurr: "당월지침",
-                        waterPrev: "전월지침",
-                        waterCost: "수도요금",
-                        waterUnit: "단가",
-                        electricity: "전기",
-                        tvFee: "TV수신료",
-                        cleaning: "청소",
-                        total: "총액",
-                        status: "진행현황",
-                      }[key] || key}
-                      {directionSymbol}
-                    </th>
-                  );
-                })}
-                <th>추가내역</th>
-                <th>비고</th>
-                <th>사진</th>
-                <th>영수증</th>
-                <th>관리</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {currentData.map((item, i) => (
-                <tr key={`row-${item.id}`}>
-                  <td>{startIndex + i + 1}</td>
-                  <td>{item.moveOutDate}</td>
-                  <td>{item.name}</td>
-                  <td>{item.roomNumber}</td>
-                  <td>{item.arrears}</td>
-                  <td>{item.currentFee}</td>
-                  <td>{item.waterCurr}</td>
-                  <td>{item.waterPrev}</td>
-                  <td>{item.waterCost}</td>
-                  <td>{item.waterUnit}</td>
-                  <td>{item.electricity}</td>
-                  <td>{item.tvFee}</td>
-                  <td>{item.cleaning}</td>
-                  <td>{Number(item.total).toLocaleString()}</td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span
-                        className="status-dot"
-                        style={{ backgroundColor: getStatusDotColor(item.status) }}
-                      />
-                      {item.status}
-                    </div>
-                  </td>
-
-                  {/* 추가내역 */}
-                  <td>
-                    <button
-                      className="icon-button"
-                      onClick={() => setSelectedDefects(item.defects || [])}
-                      title="추가내역"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={item.defects?.length > 0 ? "#FF9800" : "#BDBDBD"}
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                    </button>
-                  </td>
-
-                  {/* 비고 */}
-                  <td>
-                    <button
-                      className="icon-button"
-                      onClick={() => setSelectedNote(item.notes || "")}
-                      title="비고"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={item.notes?.trim() ? "#3F51B5" : "#BDBDBD"}
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 4h16v16H4z" />
-                        <path d="M8 8h8M8 12h8M8 16h8" />
-                      </svg>
-                    </button>
-                  </td>
-
-                  {/* 사진 */}
-                  <td>
-                    <button
-                      className="icon-button"
-                      onClick={() => setSelectedImages(item.images || [])}
-                      title="사진"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={item.images?.length > 0 ? "#4CAF50" : "#BDBDBD"}
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <circle cx="8.5" cy="8.5" r="1.5" />
-                        <path d="M21 15l-5-5L5 21" />
-                      </svg>
-                    </button>
-                  </td>
-
-                  {/* 영수증 */}
-                  <td>
-                    <button
-                      className="icon-button"
-                      onClick={() => handleShowReceipt(item)}
-                      title="영수증"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#007bff"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M6 9V2h12v7" />
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                        <rect x="6" y="14" width="12" height="8" rx="2" />
-                      </svg>
-                    </button>
-                  </td>
-
-                  {/* 관리 (수정 + 삭제) */}
-                  <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <button
-                        className="icon-button"
-                        onClick={() => handleEdit(item)}
-                        title="수정"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="15"
-                          height="15"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#ff9800"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                        </svg>
-                      </button>
-
-                      <button
-                        className="icon-button"
-                        onClick={() => handleDelete(item.id)}
-                        title="삭제"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="15"
-                          height="15"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#e53935"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="pagination">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            ◀
-          </button>
-          {Array.from({ length: totalPages }, (_, idx) => (
-            <button
-              key={idx}
-              className={currentPage === idx + 1 ? "active" : ""}
-              onClick={() => setCurrentPage(idx + 1)}
-            >
-              {idx + 1}
-            </button>
-          ))}
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            ▶
-          </button>
-        </div>
-      </div>{/* /dt-page-inner */}
-
-      {selectedDefects.length > 0 && (
-        <div className="modal-center">
-          <div className="modal-content" style={{ position: "relative" }}>
-            <button
-              className="close-button-top-right"
-              onClick={() => setSelectedDefects([])}
-            >
-              ×
-            </button>
-            <h4>추가내역</h4>
-            <ul>
-              {selectedDefects.map((d, i) => (
-                <li key={i}>
-                  {d.desc} - {d.amount}원
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {selectedNote && (
-        <div className="modal-center">
-          <div className="modal-content" style={{ position: "relative" }}>
-            <button
-              className="close-button-top-right"
-              onClick={() => setSelectedNote("")}
-            >
-              ×
-            </button>
-            <h4>비고</h4>
-            <p>{selectedNote}</p>
-          </div>
-        </div>
-      )}
-
-      {selectedImages.length > 0 && (
-        <div className="modal-center">
-          <div className="modal-content image-modal">
-            <button
-              className="close-button-top-right"
-              onClick={() => setSelectedImages([])}
-            >
-              ×
-            </button>
-            <h4>사진</h4>
-            <div className="thumbnail-grid">
-              {selectedImages.map((url, idx) => (
-                <img
-                  key={url + idx}
-                  src={url}
-                  alt={`img-${idx}`}
-                  className="thumbnail"
-                  onClick={() => window.open(url, "_blank")}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPopup && (
-        <div className="backdrop">
-          <div className="popup-container">
-            <MoveoutForm
-              userId={userId}
-              employeeId={employeeId}
-              editItem={editItem}
-              onDone={handleEditDone}
-              showCancel={true}
-              isMobile={false}
-            />
-
-            <button
-              onClick={async () => {
-                const saved = JSON.stringify(editItem || {});
-                const current = JSON.stringify(window.editingFormData);
-                if (!window.editingFormData || saved === current) {
-                  setEditItem(null);
-                  setShowPopup(false);
-                  return;
-                }
-                const confirmClose = window.confirm(
-                  "변경된 내용이 있습니다. 저장하시겠습니까?"
-                );
-                if (confirmClose) {
-                  document.querySelector(".save-button")?.click();
-                } else {
-                  setEditItem(null);
-                  setShowPopup(false);
+      {/* 비고 모달 */}
+      {noteModalOpen && (
+        <>
+          <div className="note-modal-overlay" onClick={() => setNoteModalOpen(false)} />
+          <div className={`note-modal ${isMobileDevice ? "mobile" : "pc"}`}>
+            <textarea
+              {...koreanInputProps}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="비고 입력"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "NumpadEnter") {
+                  if (e.isComposing) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  saveNote();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setNoteModalOpen(false);
                 }
               }}
-              style={{
-                position: "absolute",
-                top: "10px",
-                right: "15px",
-                background: "transparent",
-                border: "none",
-                fontSize: "24px",
-                color: "#333",
-                cursor: "pointer",
-              }}
-            >
-              <FiX />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {currentReceiptItem && (
-        <div className="modal-center">
-          <div
-            className="modal-content"
-            style={{ textAlign: "center", position: "relative" }}
-          >
-            <button
-              className="close-button-top-right"
-              onClick={() => setCurrentReceiptItem(null)}
-            >
-              ×
-            </button>
-            <h4>영수증 미리보기</h4>
-            <div style={{ marginBottom: "16px", fontSize: "14px", color: "#555" }}>
-              파일명:{" "}
-              <strong>
-                {formatReceiptFileName(currentReceiptItem)}.jpg / .pdf
-              </strong>
-            </div>
-
-            <ReceiptTemplate item={currentReceiptItem} refProp={receiptRef} />
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "12px",
-                marginTop: "16px",
-              }}
-            >
-              <button className="blue-button" onClick={() => downloadImage("jpg")}>
-                JPG 저장
-              </button>
-              <button className="blue-button" onClick={() => downloadImage("pdf")}>
-                PDF 저장
-              </button>
+            />
+            <div className="note-modal-buttons">
+              <button className="save" onClick={saveNote}>저장</button>
+              <button className="cancel" onClick={() => setNoteModalOpen(false)}>닫기</button>
             </div>
           </div>
-        </div>
+        </>
       )}
-
-      {currentReceiptItem && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            zIndex: -9999,
-            opacity: 0,
-            pointerEvents: "none",
-          }}
-        >
-          <ReceiptTemplate item={currentReceiptItem} refProp={receiptRef} />
-        </div>
-      )}
-
-      {toastVisible && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "60px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: "#333",
-            color: "#fff",
-            padding: "12px 20px",
-            borderRadius: "20px",
-            fontSize: "14px",
-            zIndex: 9999,
-            opacity: 0.9,
-          }}
-        >
-          영수증이 다운로드 되었습니다
-        </div>
-      )}
-    </div>
+    </>
   );
 }

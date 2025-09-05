@@ -1,22 +1,22 @@
+// src/pages/MoveoutList.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection, onSnapshot, query, orderBy,
   addDoc, updateDoc, doc, Timestamp, deleteDoc,
 } from "firebase/firestore";
-import {
-  getStorage, ref, uploadBytes, getDownloadURL,
-} from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as htmlToImage from "html-to-image";
-import { jsPDF } from "jspdf"; // ✅ PDF 저장용
+import { jsPDF } from "jspdf";
 import DataTable from "../components/DataTable";
 import PageTitle from "../components/PageTitle";
 import GenericEditModal from "../components/GenericEditModal";
 import ReceiptTemplate from "../components/ReceiptTemplate";
+import MoveoutForm from "../MoveoutForm"; // ✅ 등록 모달로 사용
 
 const storage = getStorage();
 
-/* ========= 유틸 ========= */
 const toNum = (v) =>
   v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0);
 
@@ -47,26 +47,24 @@ const fmtAmount = (val) => {
   return n ? n.toLocaleString() : (val === 0 ? "0" : "");
 };
 
-// 전화번호 하이픈
 const formatPhoneKR = (raw) => {
   const d = String(raw || "").replace(/\D/g, "");
   if (!d) return "";
   if (d.startsWith("02")) {
     if (d.length <= 2) return "02";
     if (d.length <= 5) return `02-${d.slice(2)}`;
-    if (d.length <= 9)  return `02-${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
+    if (d.length <= 9) return `02-${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
     return `02-${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
   }
   if (d.startsWith("1") && d.length <= 8) {
-    return d.length > 4 ? `${d.slice(0,4)}-${d.slice(4)}` : d;
+    return d.length > 4 ? `${d.slice(0, 4)}-${d.slice(4)}` : d;
   }
   if (d.length <= 3) return d;
-  if (d.length <= 7) return `${d.slice(0,3)}-${d.slice(3)}`;
-  if (d.length <= 10) return `${d.slice(0,3)}-${d.slice(3, d.length - 4)}-${d.slice(-4)}`;
-  return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7,11)}`;
+  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  if (d.length <= 10) return `${d.slice(0, 3)}-${d.slice(3, d.length - 4)}-${d.slice(-4)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 11)}`;
 };
 
-// 호수 '호' 자동 부착(중복 방지)
 const formatUnitNumber = (raw) => {
   let s = String(raw || "").trim();
   if (!s) return "";
@@ -75,19 +73,15 @@ const formatUnitNumber = (raw) => {
   return s ? `${s}호` : "";
 };
 
-/* ========= 아이콘 버튼 ========= */
 const IconBtn = ({ active = true, type, title, onClick }) => {
   const color = active
-    ? (type === "note" ? "#F59E0B"
-      : type === "extras" ? "#0EA5E9"
-      : type === "receipt" ? "#14B8A6"
-      : "#7A5FFF")
+    ? type === "note" ? "#F59E0B"
+    : type === "extras" ? "#0EA5E9"
+    : type === "receipt" ? "#14B8A6"
+    : "#7A5FFF"
     : "#bbb";
   const char =
-    type === "note" ? "📝"
-    : type === "extras" ? "🧾"
-    : type === "receipt" ? "📑"
-    : "🖼️";
+    type === "note" ? "📝" : type === "extras" ? "🧾" : type === "receipt" ? "📑" : "🖼️";
   return (
     <button
       type="button"
@@ -114,9 +108,9 @@ const IconBtn = ({ active = true, type, title, onClick }) => {
 
 const StatusCell = ({ value }) => {
   const v = String(value || "").trim();
-  let color = "#9CA3AF"; // 입금대기(회색)
-  if (v === "정산대기") color = "#EF4444";   // 빨강
-  if (v === "정산완료") color = "#10B981";   // 초록
+  let color = "#9CA3AF";
+  if (v === "정산대기") color = "#EF4444";
+  if (v === "정산완료") color = "#10B981";
   const dot = (
     <span
       aria-hidden
@@ -134,27 +128,30 @@ const StatusCell = ({ value }) => {
   return <span>{dot}{v || "-"}</span>;
 };
 
-export default function MoveoutList({ employeeId, userId }) {
+export default function MoveoutList({ employeeId, userId, isMobile }) {
+  const navigate = useNavigate();
+
   const [rows, setRows] = useState([]);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);      // 수정 모달
   const [editing, setEditing] = useState(null);
 
   const [pendingFiles, setPendingFiles] = useState([]);
   const [pendingPreviews, setPendingPreviews] = useState([]);
 
   const [miniOpen, setMiniOpen] = useState(false);
-  const [miniType, setMiniType] = useState(null); // 'photos' | 'note' | 'extras'
+  const [miniType, setMiniType] = useState(null);
   const [miniRow, setMiniRow] = useState(null);
   const [miniPhotoIdx, setMiniPhotoIdx] = useState(0);
 
-  // 진행현황 필터
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // ===== 영수증 미리보기 상태 (업로드 없이 즉시 표시) =====
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptRow, setReceiptRow] = useState(null);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState("");
-  const receiptRef = useRef(null); // ReceiptTemplate 캡처용
+  const receiptRef = useRef(null);
+
+  // ✅ 등록 모달(폼) 오픈 상태
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "moveouts"), orderBy("moveDate", "desc"));
@@ -166,7 +163,7 @@ export default function MoveoutList({ employeeId, userId }) {
   useEffect(() => {
     const urls = pendingFiles.map((f) => URL.createObjectURL(f));
     setPendingPreviews(urls);
-    return () => { urls.forEach((u) => URL.revokeObjectURL(u)); };
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [pendingFiles]);
 
   const emptyItem = useMemo(() => ({
@@ -184,11 +181,9 @@ export default function MoveoutList({ employeeId, userId }) {
     unitNumber: formatUnitNumber,
   }), []);
 
-  /* ====== 상태 필터 적용 데이터/합계 ====== */
-  const rowsForFilter = useMemo(() => {
-    if (statusFilter === "ALL") return rows;
-    return rows.filter((r) => String(r.status || "") === statusFilter);
-  }, [rows, statusFilter]);
+  const rowsForFilter = useMemo(() => (
+    statusFilter === "ALL" ? rows : rows.filter((r) => String(r.status || "") === statusFilter)
+  ), [rows, statusFilter]);
 
   const sumForFilter = useMemo(() => {
     if (statusFilter !== "입금대기") return 0;
@@ -197,33 +192,21 @@ export default function MoveoutList({ employeeId, userId }) {
       .reduce((acc, r) => acc + toNum(r.totalAmount), 0);
   }, [rows, statusFilter]);
 
-  // ===== 오늘 날짜 최상단 + 내부 정렬 보장용 __sortCombo =====
   const displayRows = useMemo(() => {
     const today = new Date();
-    const todayStr =
-      `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
-
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
     const mapped = rowsForFilter.map((r) => {
-      // robust has* 계산
       const photoCount = Array.isArray(r.photos) ? r.photos.filter((u) => !!String(u || "").trim()).length : 0;
       const hasPhotos = photoCount > 0;
-
       const noteStr = String(r.note || "").trim();
       const hasNote = noteStr.length > 0;
-
       const extrasArr = Array.isArray(r.extras) ? r.extras : [];
-      const hasExtrasFromArr = extrasArr.some(
-        (e) => String(e?.desc || "").trim().length > 0 && toNum(e?.amount) > 0
-      );
-      const hasExtrasFromPair =
-        String(r.extraItems || "").trim().length > 0 && toNum(r.extraAmount) > 0;
+      const hasExtrasFromArr = extrasArr.some((e) => String(e?.desc || "").trim().length > 0 && toNum(e?.amount) > 0);
+      const hasExtrasFromPair = String(r.extraItems || "").trim().length > 0 && toNum(r.extraAmount) > 0;
       const hasExtras = hasExtrasFromArr || hasExtrasFromPair;
 
-      const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(r.moveDate || ""))
-        ? String(r.moveDate)
-        : "0000-00-00";
+      const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(r.moveDate || "")) ? String(r.moveDate) : "0000-00-00";
       const ymdNum = parseInt(ymd.replace(/-/g, ""), 10) || 0;
-
       const rank = ymd === todayStr ? 0 : 1;
       const inv = String(99999999 - ymdNum).padStart(8, "0");
       const sortCombo = `${rank}-${inv}`;
@@ -238,20 +221,16 @@ export default function MoveoutList({ employeeId, userId }) {
         tvFee: fmtAmount(r.tvFee),
         cleaningFee: fmtAmount(r.cleaningFee),
         totalAmount: fmtAmount(r.totalAmount),
-
         __hasPhotos: hasPhotos,
         __hasNote: hasNote,
         __hasExtras: hasExtras,
-
         __sortCombo: sortCombo,
       };
     });
-
     mapped.sort((a, b) => a.__sortCombo.localeCompare(b.__sortCombo));
     return mapped;
   }, [rowsForFilter]);
 
-  /* ====== 컬럼 정의 ====== */
   const columns = [
     { label: "이사날짜", key: "moveDate" },
     { label: "빌라명", key: "villaName" },
@@ -266,15 +245,13 @@ export default function MoveoutList({ employeeId, userId }) {
     { label: "TV수신료", key: "tvFee" },
     { label: "청소", key: "cleaningFee" },
     { label: "총액", key: "totalAmount" },
-
     { label: "진행현황", key: "status", render: (row) => <StatusCell value={row.status} /> },
-
     {
       label: "추가내역",
       key: "extrasIcon",
       render: (row) => {
         const has = !!row.__hasExtras;
-        if (!has) return null;               // ❗ 내용 없으면 아이콘 표시 안함
+        if (!has) return null;
         return (
           <IconBtn
             active={true}
@@ -289,13 +266,12 @@ export default function MoveoutList({ employeeId, userId }) {
         );
       },
     },
-
     {
       label: "사진",
       key: "photosIcon",
       render: (row) => {
         const has = !!row.__hasPhotos;
-        if (!has) return null;               // ❗ 내용 없으면 아이콘 표시 안함
+        if (!has) return null;
         return (
           <IconBtn
             active={true}
@@ -311,13 +287,12 @@ export default function MoveoutList({ employeeId, userId }) {
         );
       },
     },
-
     {
       label: "비고",
       key: "noteIcon",
       render: (row) => {
         const has = !!row.__hasNote;
-        if (!has) return null;               // ❗ 내용 없으면 아이콘 표시 안함
+        if (!has) return null;
         return (
           <IconBtn
             active={true}
@@ -332,13 +307,12 @@ export default function MoveoutList({ employeeId, userId }) {
         );
       },
     },
-
     {
       label: "영수증",
       key: "receiptIcon",
       render: (row) => (
         <IconBtn
-          active={true} // 영수증은 항상 표시/활성
+          active={true}
           type="receipt"
           title="영수증 미리보기"
           onClick={() => openReceiptPreview(row)}
@@ -347,7 +321,15 @@ export default function MoveoutList({ employeeId, userId }) {
     },
   ];
 
-  const handleAdd = () => { setEditing(null); setIsOpen(true); setPendingFiles([]); };
+  // ✅ 등록 버튼 → 같은 페이지 위에 폼 모달 띄우기 (PC), 모바일은 전용 폼 라우팅
+  const handleAdd = () => {
+    if (isMobile) {
+      navigate("/mobile/form");
+      return;
+    }
+    setRegisterOpen(true);
+  };
+
   const handleEdit = (row) => { setEditing(row); setIsOpen(true); setPendingFiles([]); };
 
   const onFormUpdate = (next) => {
@@ -358,7 +340,6 @@ export default function MoveoutList({ employeeId, userId }) {
     return next;
   };
 
-  // 파일 선택: 최신이 앞에 오도록 prepend
   const onFilesSelected = (_field, files) => {
     const arr = Array.from(files || []);
     setPendingFiles((prev) => [...arr, ...prev]);
@@ -367,14 +348,13 @@ export default function MoveoutList({ employeeId, userId }) {
     setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // 저장/수정
   const handleSave = async (v) => {
     if (!v.moveDate || !v.villaName || !v.unitNumber) {
       alert("이사날짜, 빌라명, 호수는 필수입니다.");
       return;
     }
     const isEdit = !!editing?.id;
-    setIsOpen(false); // 즉시 닫기
+    setIsOpen(false);
 
     try {
       const water = calcWaterFee(v);
@@ -397,11 +377,9 @@ export default function MoveoutList({ employeeId, userId }) {
         electricity: toNum(v.electricity),
         tvFee: toNum(v.tvFee),
         cleaningFee: toNum(v.cleaningFee),
-
         extras: Array.isArray(v.extras) ? v.extras : [],
         extraItems: String(v.extraItems || "").trim(),
         extraAmount: extrasSum,
-
         totalAmount: total,
         status: v.status || "정산대기",
         note: String(v.note || "").trim(),
@@ -453,6 +431,72 @@ export default function MoveoutList({ employeeId, userId }) {
     await deleteDoc(doc(db, "moveouts", row.id));
   };
 
+  const openReceiptPreview = async (row) => {
+    setReceiptRow(row);
+    setReceiptOpen(true);
+  };
+
+  // 영수증 JPG/PDF 저장
+  const downloadReceipt = async (format /* 'jpg' | 'pdf' */) => {
+    if (!receiptRef.current || !receiptRow) return;
+
+    try {
+      const dataUrl = await htmlToImage.toJpeg(receiptRef.current, {
+        backgroundColor: "#ffffff",
+        quality: 0.95,
+        pixelRatio: 2,
+      });
+
+      const base = `${String(receiptRow.moveDate || "").replace(/-/g, "")}${String(
+        receiptRow.villaName || ""
+      )}${String(receiptRow.unitNumber || "")}`.replace(/[\\/:*?"<>|]/g, "");
+
+      if (format === "jpg") {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${base}.jpg`;
+        a.click();
+      } else {
+        const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+        const imgProps = pdf.getImageProperties(dataUrl);
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const usableWidth = pageWidth - margin * 2;
+        const imgWidth = usableWidth;
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+        const scale = imgHeight > pageHeight - margin * 2 ? (pageHeight - margin * 2) / imgHeight : 1;
+
+        pdf.addImage(dataUrl, "JPEG", margin, margin, imgWidth * scale, imgHeight * scale);
+        pdf.save(`${base}.pdf`);
+      }
+    } catch (e) {
+      console.error("영수증 저장 실패:", e);
+      alert("영수증 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      if (!receiptOpen || !receiptRow) return;
+      await new Promise((r) => setTimeout(r, 0));
+      if (!receiptRef.current) return;
+      try {
+        const dataUrl = await htmlToImage.toJpeg(receiptRef.current, {
+          backgroundColor: "#ffffff",
+          quality: 0.95,
+          pixelRatio: 2,
+        });
+        setReceiptPreviewUrl(dataUrl);
+      } catch (err) {
+        console.error("영수증 미리보기 생성 실패:", err);
+        setReceiptPreviewUrl("");
+      }
+    };
+    run();
+  }, [receiptOpen, receiptRow]);
+
   const closeMini = () => { setMiniOpen(false); setMiniType(null); setMiniRow(null); };
   const nextMiniPhoto = (dir) => {
     if (!miniRow?.photos?.length) return;
@@ -460,7 +504,12 @@ export default function MoveoutList({ employeeId, userId }) {
     setMiniPhotoIdx((p) => (p + dir + n) % n);
   };
 
-  /* 좌측 컨트롤 */
+  const closeReceiptPreview = async () => {
+    setReceiptPreviewUrl("");
+    setReceiptRow(null);
+    setReceiptOpen(false);
+  };
+
   const leftControls = (
     <>
       <select
@@ -501,109 +550,6 @@ export default function MoveoutList({ employeeId, userId }) {
     </>
   );
 
-  /* ====== 영수증 미리보기 ====== */
-  const makeFilenameBase = (row) => {
-    const yyyymmdd = String(row.moveDate || "").replace(/-/g, "");
-    const name = String(row.villaName || "");
-    const unit = String(row.unitNumber || "");
-    const base = `${yyyymmdd}${name}${unit}`;
-    return base.replace(/[\\/:*?"<>|]/g, "");
-  };
-
-  const mapRowToReceiptItem = (row) => {
-    const extras = Array.isArray(row.extras) ? row.extras : [];
-    return {
-      moveOutDate: row.moveDate || "",
-      name: row.villaName || "",
-      roomNumber: row.unitNumber || "",
-      arrears: toNum(row.arrears),
-      currentFee: toNum(row.currentMonth),
-      waterCost: toNum(row.waterFee),
-      electricity: toNum(row.electricity),
-      tvFee: toNum(row.tvFee),
-      cleaning: toNum(row.cleaningFee),
-      defects: extras.map((e) => ({ desc: e.desc, amount: toNum(e.amount) })),
-      total: sumTotal(row),
-    };
-  };
-
-  const openReceiptPreview = async (row) => {
-    setReceiptRow(row);
-    setReceiptOpen(true);
-  };
-
-  // 미리보기: 오프스크린 ReceiptTemplate만 캡처
-  useEffect(() => {
-    const run = async () => {
-      if (!receiptOpen || !receiptRow) return;
-      await new Promise((r) => setTimeout(r, 0)); // 렌더 직후
-      if (!receiptRef.current) return;
-
-      try {
-        const dataUrl = await htmlToImage.toJpeg(receiptRef.current, {
-          backgroundColor: "#ffffff",
-          quality: 0.95,
-          pixelRatio: 2,
-        });
-        setReceiptPreviewUrl(dataUrl);
-      } catch (err) {
-        console.error("영수증 미리보기 생성 실패:", err);
-        setReceiptPreviewUrl("");
-      }
-    };
-    run();
-  }, [receiptOpen, receiptRow]);
-
-  const closeReceiptPreview = async () => {
-    setReceiptPreviewUrl("");
-    setReceiptRow(null);
-    setReceiptOpen(false);
-  };
-
-  // ✅ JPG / PDF 저장 (모달 전체가 아닌 ReceiptTemplate만)
-  const downloadReceipt = async (format /* 'jpg' | 'pdf' */) => {
-    if (!receiptRef.current || !receiptRow) return;
-    const base = makeFilenameBase(receiptRow);
-    try {
-      if (format === "jpg") {
-        const dataUrl = await htmlToImage.toJpeg(receiptRef.current, {
-          backgroundColor: "#ffffff",
-          quality: 0.95,
-          pixelRatio: 2,
-        });
-        const a = document.createElement("a");
-        a.href = dataUrl;
-        a.download = `${base}.jpg`;
-        a.click();
-      } else {
-        const dataUrl = await htmlToImage.toJpeg(receiptRef.current, {
-          backgroundColor: "#ffffff",
-          quality: 0.95,
-          pixelRatio: 2,
-        });
-        const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-        const imgProps = pdf.getImageProperties(dataUrl);
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const margin = 10;
-        const usableWidth = pageWidth - margin * 2;
-        const imgWidth = usableWidth;
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        if (imgHeight > pageHeight - margin * 2) {
-          const scale = (pageHeight - margin * 2) / imgHeight;
-          pdf.addImage(dataUrl, "JPEG", margin, margin, imgWidth * scale, imgHeight * scale);
-        } else {
-          pdf.addImage(dataUrl, "JPEG", margin, margin, imgWidth, imgHeight);
-        }
-        pdf.save(`${base}.pdf`);
-      }
-    } catch (e) {
-      console.error("영수증 저장 실패:", e);
-      alert("영수증 저장 중 오류가 발생했습니다.");
-    }
-  };
-
   return (
     <div className="page-wrapper">
       <PageTitle>이사정산 조회</PageTitle>
@@ -617,11 +563,12 @@ export default function MoveoutList({ employeeId, userId }) {
         searchableKeys={["moveDate","villaName","unitNumber","status","note"]}
         itemsPerPage={15}
         enableExcel={false}
-        sortKey="__sortCombo"  // ✅ 오늘 먼저 + 날짜 내림차순 고정
+        sortKey="__sortCombo"
         sortOrder="asc"
         leftControls={leftControls}
       />
 
+      {/* 수정 모달(등록은 MoveoutForm 모달) */}
       <GenericEditModal
         isOpen={isOpen}
         onClose={() => { setIsOpen(false); setPendingFiles([]); }}
@@ -693,7 +640,18 @@ export default function MoveoutList({ employeeId, userId }) {
         variant="moveout"
       />
 
-      {/* 아이콘 클릭 미니 뷰어 */}
+      {/* 🔷 등록용 MoveoutForm 모달 (뒤에 리스트 보이는 상태) */}
+      {registerOpen && (
+        <MoveoutForm
+          asModal
+          isMobile={false}
+          employeeId={employeeId}
+          userId={userId}
+          onDone={() => setRegisterOpen(false)}
+        />
+      )}
+
+      {/* 미니 뷰어 & 영수증 미리보기는 기존 그대로 */}
       {miniOpen && miniRow && (
         <div
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.25)", display:"flex",
@@ -707,17 +665,13 @@ export default function MoveoutList({ employeeId, userId }) {
           >
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
               <strong>
-                {miniType === "photos" ? "사진 보기"
-                  : miniType === "note" ? "비고"
-                  : "추가내역"}
+                {miniType === "photos" ? "사진 보기" : miniType === "note" ? "비고" : "추가내역"}
               </strong>
               <button className="close-btn" onClick={closeMini}>닫기</button>
             </div>
 
             {miniType === "note" && (
-              <div style={{ whiteSpace:"pre-wrap", lineHeight:1.6 }}>
-                {miniRow.note}
-              </div>
+              <div style={{ whiteSpace:"pre-wrap", lineHeight:1.6 }}>{miniRow.note}</div>
             )}
 
             {miniType === "extras" && (
@@ -758,16 +712,13 @@ export default function MoveoutList({ employeeId, userId }) {
                       {miniPhotoIdx + 1} / {miniRow.photos.length}
                     </div>
                   </>
-                ) : (
-                  <div>사진 없음</div>
-                )}
+                ) : <div>사진 없음</div>}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ===== 영수증 미리보기 모달 ===== */}
       {receiptOpen && receiptRow && (
         <div
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.25)", display:"flex",
@@ -776,14 +727,8 @@ export default function MoveoutList({ employeeId, userId }) {
         >
           <div
             style={{
-              width: 720,
-              maxWidth: "90vw",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background:"#fff",
-              borderRadius:10,
-              padding:16,
-              boxShadow:"0 10px 30px rgba(0,0,0,0.3)"
+              width: 720, maxWidth: "90vw", maxHeight: "90vh", overflowY: "auto",
+              background:"#fff", borderRadius:10, padding:16, boxShadow:"0 10px 30px rgba(0,0,0,0.3)"
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -792,17 +737,10 @@ export default function MoveoutList({ employeeId, userId }) {
               <button className="close-btn" onClick={closeReceiptPreview}>닫기</button>
             </div>
 
-            {/* 미리보기 이미지 (JPEG data URL 즉시 표시) */}
             <div style={{ textAlign:"center", marginBottom:12 }}>
-              {receiptPreviewUrl ? (
-                <img
-                  src={receiptPreviewUrl}
-                  alt="영수증 미리보기"
-                  style={{ width:"100%", maxWidth:480, border:"1px solid #eee", borderRadius:8 }}
-                />
-              ) : (
-                <div style={{ padding:20, color:"#888" }}>미리보기를 준비 중...</div>
-              )}
+              {receiptPreviewUrl
+                ? <img src={receiptPreviewUrl} alt="영수증 미리보기" style={{ width:"100%", maxWidth:480, border:"1px solid #eee", borderRadius:8 }} />
+                : <div style={{ padding:20, color:"#888" }}>미리보기를 준비 중...</div>}
             </div>
 
             <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
@@ -810,11 +748,22 @@ export default function MoveoutList({ employeeId, userId }) {
               <button className="save-btn" onClick={() => downloadReceipt("pdf")}>PDF 저장</button>
             </div>
 
-            {/* 화면에는 보이지 않지만 캡처용으로 DOM에 유지 */}
             <div style={{ position:"absolute", left:-99999, top:-99999 }}>
               <ReceiptTemplate
                 refProp={receiptRef}
-                item={mapRowToReceiptItem(receiptRow)}
+                item={{
+                  moveOutDate: receiptRow.moveDate || "",
+                  name: receiptRow.villaName || "",
+                  roomNumber: receiptRow.unitNumber || "",
+                  arrears: toNum(receiptRow.arrears),
+                  currentFee: toNum(receiptRow.currentMonth),
+                  waterCost: toNum(receiptRow.waterFee),
+                  electricity: toNum(receiptRow.electricity),
+                  tvFee: toNum(receiptRow.tvFee),
+                  cleaning: toNum(receiptRow.cleaningFee),
+                  defects: (Array.isArray(receiptRow.extras) ? receiptRow.extras : []).map((e) => ({ desc: e.desc, amount: toNum(e.amount) })),
+                  total: sumTotal(receiptRow),
+                }}
               />
             </div>
           </div>

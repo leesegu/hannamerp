@@ -26,7 +26,7 @@ import PublicElectricPage from "./pages/PublicElectricPage";
 import CleaningPage from "./pages/CleaningPage";
 import CctvPage from "./pages/CctvPage";
 import VendorRegisterPage from "./pages/VendorRegisterPage";
-import EmployeePage from "./pages/EmployeePage"; // ✅ 사원정보 페이지 임포트
+import EmployeePage from "./pages/EmployeePage";
 
 import "./App.css";
 
@@ -39,29 +39,38 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin }) {
       {/* 로그인 */}
       <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
 
-      {/* 메인 */}
+      {/* 메인 (PC/모바일 분기) */}
       <Route
         path="/main"
         element={
           !isLoggedIn ? (
             <Navigate to="/login" />
           ) : isMobile ? (
-            <MobileMainPage
-              employeeId={employeeId}
-              userId={userId}
-              userName={userName}
-            />
+            <MobileMainPage employeeId={employeeId} userId={userId} userName={userName} />
           ) : (
-            <TrezoSidebar
+            <TrezoSidebar employeeId={employeeId} userId={userId} userName={userName} />
+          )
+        }
+      />
+
+      {/* ✅ PC용 등록 페이지 (단독 라우트). ?popup=1이면 중앙 모달로 표시 */}
+      <Route
+        path="/form"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" />
+          ) : (
+            <MoveoutForm
               employeeId={employeeId}
               userId={userId}
-              userName={userName}
+              isMobile={false}
+              onDone={() => navigate(-1)}
             />
           )
         }
       />
 
-      {/* 모바일 */}
+      {/* 모바일용 기존 라우트 유지 */}
       <Route
         path="/mobile/form"
         element={
@@ -100,7 +109,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin }) {
       <Route path="/cleaning" element={!isLoggedIn ? <Navigate to="/login" /> : <CleaningPage />} />
       <Route path="/cctv" element={!isLoggedIn ? <Navigate to="/login" /> : <CctvPage />} />
 
-      {/* 주메뉴: 거래처관리 메인 */}
+      {/* 주메뉴: 거래처관리 메인(예시) */}
       <Route
         path="/vendors"
         element={
@@ -118,13 +127,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin }) {
         element={!isLoggedIn ? <Navigate to="/login" /> : <VendorRegisterPage />}
       />
 
-      {/* (권장) 사원 등록도 보호 */}
-      <Route
-        path="/register"
-        element={!isLoggedIn ? <Navigate to="/login" /> : <UserRegisterPage />}
-      />
-
-      {/* ✅ 사원관리 → 사원정보 페이지 */}
+      {/* 사원관리 */}
       <Route
         path="/employee"
         element={!isLoggedIn ? <Navigate to="/login" /> : <EmployeePage />}
@@ -146,7 +149,6 @@ function App() {
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // ✅ 로그인 후 상태 저장 함수
   const handleLogin = ({ id, employeeNo, name }) => {
     setUserId(id);
     setEmployeeId(employeeNo);
@@ -154,7 +156,6 @@ function App() {
     localStorage.setItem("autoLogin", JSON.stringify({ id, employeeNo, name }));
   };
 
-  // ✅ 초기 로그인 정보 불러오기
   useEffect(() => {
     const stored = localStorage.getItem("autoLogin");
     if (stored) {
@@ -167,9 +168,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);

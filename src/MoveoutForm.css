@@ -1,220 +1,149 @@
-/* MoveoutForm.css - PC 전용 */back-icon-button
+/* src/MoveoutForm.css — PC 전용 (정리본) */
+/* 간격/레이아웃을 손쉽게 바꾸려면 아래 변수만 조정하세요 */
+:root {
+  --grid-gap-x: 16px;   /* 입력칸 가로 간격 */
+  --grid-gap-y: 20px;   /* 입력칸 세로 간격 */
+  --label-gap: 6px;     /* 라벨-인풋 사이 간격 */
+  --group-margin: 0px;  /* 각 input-group 하단 여백(추가 여백이 필요하면 조정) */
 
+  --input-pad: 10px;    /* 인풋 내부 패딩 */
+  --input-font: 14px;   /* 인풋 폰트 크기 */
+
+  --border: 1px solid #ddd;
+  --radius: 8px;
+  --muted: #f5f5f5;
+}
+
+.grid + .grid { margin-top: 16px; }
+
+
+/* 공통 리셋(필요 최소한) */
 html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  background: #fff;
 }
 
-.form-header {
-  font-size: 20px;
-  text-align: center;
-  font-weight: bold;
-  margin-top: 0;
-  padding-top: 8px;
-  margin-bottom: 12px;
-}
-
+/* 전체 컨테이너(전체 페이지 모드에서 사용) */
 .form-container {
   width: 100%;
   height: auto;
   max-height: 85vh;
   overflow-y: auto;
   background: #fff;
-  box-shadow: none;
   padding: 0;
-  margin-bottom: 0;
   position: relative;
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 30px;
-  background-color: rgba(0, 0, 0, 0.2);
-  z-index: 9999;
-  overflow-y: auto;
-}
-
-.popup-container {
-  background-color: white;
-  border-radius: 10px;
-  padding: 30px;
-  width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
+/* 내부 레이아웃 */
 .form-inner {
   overflow: visible;
   padding: 0;
   margin-bottom: 0;
 }
 
+/* 그리드: PC 3열 */
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  column-gap: var(--grid-gap-x);
+  row-gap: var(--grid-gap-y);
 }
 
+/* 반응형: 태블릿 2열, 모바일 1열 */
+@media (max-width: 1024px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+/* 입력 그룹 */
 .input-group {
   display: flex;
   flex-direction: column;
   width: 100%;
+  margin-bottom: var(--group-margin);
 }
-
 .input-group label {
-  margin-bottom: 0.25rem;
-  font-weight: bold;
+  margin-bottom: var(--label-gap);
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
 }
 
+/* 입력 요소 공통 */
 .input-group input,
 .input-group select,
 .input-group button {
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.input-group input[readonly] {
-  background-color: #f5f5f5;
-}
-
-.note-modal-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.3);
-  z-index: 9998;
-}
-
-.note-modal.pc {
-  position: fixed;
-  top: 20vh;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 400px;
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-}
-
-.note-modal.pc textarea {
-  min-height: 150px;
-  font-size: 14px;
-  resize: none;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.note-modal-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-  gap: 8px;
-}
-
-.note-modal-buttons button {
-  flex: 1;
-  padding: 10px;
+  padding: var(--input-pad);
+  font-size: var(--input-font);
+  border: var(--border);
   border-radius: 6px;
-  font-size: 14px;
-  border: none;
-  color: white;
+  background: #fff;
+  outline: none;
+  transition: box-shadow .15s, border-color .15s, background .15s;
+}
+.input-group input:focus,
+.input-group select:focus {
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+.input-group input[readonly] {
+  background-color: var(--muted);
+}
+
+/* 연락처 한 줄 강조가 필요하면 사용 */
+.contact-field input {
+  letter-spacing: 0.2px;
+}
+
+/* 커스텀 데이트피커 인풋 */
+.custom-datepicker {
+  width: 100%;
   cursor: pointer;
+  background: #fff;
 }
 
-.note-modal-buttons .save {
-  background-color: #28a745;
-}
-.note-modal-buttons .cancel {
-  background-color: #dc3545;
-}
-
-
-.save-button {
-  margin-top: 1.5rem;
-  padding: 12px 28px;
-  font-size: 16px;
-  background-color: orange;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  float: right;
-}
-
-/* ✅ PC 전용 닫기(X) 버튼 스타일 - 우측 상단 고정 */
-/* 우측 상단 X 버튼 (PC 전용) */
-.close-icon-button {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 9999;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: #ff4d4f;
-  font-size: 28px;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.08);
-  cursor: pointer;
+/* 하단 버튼 행(전체 페이지 모드에서 사용) */
+.actions-row {
   display: flex;
+  gap: 8px;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-.close-icon-button:hover {
-  background: #ffeded;
-  color: #d30000;
+  margin-top: 12px;
 }
 
-
-
+/* 추가내역 리스트 */
 .extra-list-container {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-
 .extra-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 0;
+  padding: 6px 0;
   font-size: 14px;
   border-bottom: 1px solid #eee;
 }
-
 .extra-desc {
   flex: 2;
   word-break: break-word;
 }
-
 .extra-amount {
   flex: 1;
   text-align: right;
   margin-right: 1rem;
   white-space: nowrap;
 }
-
 .extra-actions {
   display: flex;
   gap: 6px;
 }
-
 .extra-actions button {
   background-color: #ff8c00;
   border: none;
@@ -223,12 +152,8 @@ html, body {
   font-size: 12px;
   border-radius: 4px;
   cursor: pointer;
+  transition: filter .15s;
 }
-
-.form-title {
-  text-align: center;
-  margin-bottom: 20px;
-  font-size: 20px;
-  font-weight: bold;
-  color: #333;
+.extra-actions button:hover {
+  filter: brightness(0.95);
 }

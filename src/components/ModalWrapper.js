@@ -3,13 +3,17 @@ import React from "react";
 import ReactDOM from "react-dom";
 import "./ModalStyles.css";
 
+/**
+ * 범용 모달 컴포넌트
+ * - 기본 닫기 버튼 ❌ (없앰)
+ * - footer prop을 넘기면 하단에 표시
+ */
 export default function ModalWrapper({
   isOpen,
   onClose,
   children,
   title,
-  footer,
-  showCloseButton = true,
+  footer,               // ✅ 필요할 때만 전달
   width = "700px",
   maxWidth = "90vw",
   className = "",
@@ -18,10 +22,7 @@ export default function ModalWrapper({
 
   const modalContent = (
     <div className="modal-overlay">
-      <div
-        className={`modal-box ${className}`}
-        style={{ width, maxWidth }}
-      >
+      <div className={`modal-box ${className}`} style={{ width, maxWidth }}>
         {/* 상단 제목 */}
         {title && (
           <div className="modal-header">
@@ -29,19 +30,11 @@ export default function ModalWrapper({
           </div>
         )}
 
-        {/* 중간 내용 */}
-        <div className="modal-content">
-          {children}
-        </div>
+        {/* 본문 */}
+        <div className="modal-content">{children}</div>
 
-        {/* 하단 버튼 */}
-        <div className="modal-footer">
-          {footer ? (
-            footer
-          ) : showCloseButton ? (
-            <button className="close-btn" onClick={onClose}>닫기</button>
-          ) : null}
-        </div>
+        {/* 하단 푸터 (있을 때만 렌더링) */}
+        {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </div>
   );
