@@ -18,8 +18,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 
-import "./MoveoutForm.css";
-import "./MoveoutForm.mobile.css";
+import "./MoveoutForm.css";              // ✅ PC 전용만 로드 (모바일 CSS 임포트 제거)
 import FormLayout from "./components/FormLayout";
 import { formatPhoneNumber } from "./utils/formatting";
 
@@ -110,13 +109,12 @@ export default function MoveoutForm({
   const [editIndex, setEditIndex] = useState(null);
 
   /* ===== 사진(미리보기/업로드용 파일) ===== */
-  // photos: 미리보기용 URL 배열 (기존 원격 URL + 새로 선택한 blob URL)
   const [photos, setPhotos] = useState([]);
-  const [photoFiles, setPhotoFiles] = useState([]); // 신규 업로드용 File 배열(기존 원격 URL은 포함 X)
+  const [photoFiles, setPhotoFiles] = useState([]); // 신규 업로드 File 배열
   const [photoIdx, setPhotoIdx] = useState(0);
   const photoInputRef = useRef(null);
   const blobUrlsRef = useRef([]);
-  const didInitPhotosRef = useRef(false); // 🔸 편집 모드 최초 1회 기존 사진 주입 플래그
+  const didInitPhotosRef = useRef(false);
 
   /* 🔹 편집 모드일 때 기존 데이터 → UI 상태로 매핑 */
   useEffect(() => {
@@ -132,20 +130,20 @@ export default function MoveoutForm({
       waterCurr: s(initial.currentReading ?? ""),
       waterPrev: s(initial.previousReading ?? ""),
       waterUnit: fmtComma(initial.unitPrice),
-      // waterCost는 아래 effect에서 자동 계산
       electricity: fmtComma(initial.electricity),
       tvFee: fmtComma(initial.tvFee),
       cleaning: fmtComma(initial.cleaningFee),
       note: s(initial.note),
       status: s(initial.status) || "정산대기",
-      // total은 아래 합계 effect에서 자동 계산
     }));
-    setExtras(Array.isArray(initial.extras) ? initial.extras.map((e) => ({
-      desc: s(e.desc), amount: Number(e.amount) || 0
-    })) : []);
+    setExtras(
+      Array.isArray(initial.extras)
+        ? initial.extras.map((e) => ({ desc: s(e.desc), amount: Number(e.amount) || 0 }))
+        : []
+    );
   }, [mode, initial]);
 
-  /* 🔹 편집 모드 최초 1회: 기존 사진 표시 (원격 URL 표시) */
+  /* 🔹 편집 모드 최초 1회: 기존 사진 표시 */
   useEffect(() => {
     if (mode !== "edit") return;
     if (didInitPhotosRef.current) return;
@@ -165,7 +163,6 @@ export default function MoveoutForm({
       blobUrlsRef.current.push(u);
       return u;
     });
-    // 최신이 위로: 새로 추가한 것들을 앞에 배치
     setPhotos((prev) => [...urls.reverse(), ...prev]);
     setPhotoFiles((prev) => [...arr.reverse(), ...prev]);
     setPhotoIdx(0);
@@ -177,7 +174,6 @@ export default function MoveoutForm({
     if (isBlobUrl(targetUrl)) {
       try { URL.revokeObjectURL(targetUrl); } catch {}
       blobUrlsRef.current = blobUrlsRef.current.filter((u) => u !== targetUrl);
-      // 신규 추가 파일도 같은 인덱스로 제거
       const blobIdx = photos.slice(0, photoIdx + 1).filter(isBlobUrl).length - 1;
       if (blobIdx >= 0) {
         setPhotoFiles((prev) => prev.filter((_, i) => i !== blobIdx));
@@ -384,7 +380,6 @@ export default function MoveoutForm({
   /* ===== 저장 ===== */
   const [saving, setSaving] = useState(false);
 
-  // 💡 리스트 스키마에 맞춰 변환
   const buildPayloadForList = () => {
     const moveDate = s(form.moveOutDate);               // yyyy-MM-dd
     const villaName = s(form.name);
@@ -459,10 +454,8 @@ export default function MoveoutForm({
       const payload = buildPayloadForList();
 
       if (mode === "edit" && docId) {
-        // 🔷 문서 업데이트
         await updateDoc(doc(db, "moveouts", docId), payload);
 
-        // 사진 업로드 후 기존 photos에 이어붙이기
         const newUrls = await uploadAllPhotos(docId);
         if (newUrls.length) {
           await updateDoc(doc(db, "moveouts", docId), {
@@ -473,7 +466,6 @@ export default function MoveoutForm({
 
         alert("수정되었습니다.");
       } else {
-        // 🔷 신규 추가
         const col = collection(db, "moveouts");
         const docRef = await addDoc(col, {
           ...payload,
@@ -493,8 +485,8 @@ export default function MoveoutForm({
         alert("저장되었습니다.");
       }
 
-      if (onDone) onDone();    // 모달 닫기
-      else navigate(-1);       // 페이지면 뒤로가기
+      if (onDone) onDone();
+      else navigate(-1);
     } catch (err) {
       console.error("저장 실패:", err);
       alert("저장 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
@@ -525,6 +517,41 @@ export default function MoveoutForm({
       gap: 8,
       lineHeight: 1,
     };
+  };
+
+  /* 사진 뷰어 보조 스타일 */
+  const navBtnStyle = (side) => ({
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(-50%)",
+    [side]: 8,
+    width: 32,
+    height: 32,
+    borderRadius: "50%",
+    border: "1px solid #ddd",
+    background: "rgba(255,255,255,0.95)",
+    cursor: "pointer",
+  });
+  const delBtnStyle = {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    border: "1px solid #fca5a5",
+    background: "#fee2e2",
+    color: "#b91c1c",
+    padding: "4px 8px",
+    borderRadius: 8,
+    cursor: "pointer",
+  };
+  const indexBadgeStyle = {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    padding: "2px 8px",
+    borderRadius: 12,
+    fontSize: 12,
   };
 
   /* ===== 폼 본문 ===== */
@@ -722,8 +749,8 @@ export default function MoveoutForm({
         </div>
       </div>
 
-      {/* 입력 + 진행현황 */}
-      <div className="grid extras-grid">
+      {/* ✅ 추가내역/추가금액/정산진행현황: 3열 고정 섹션 */}
+      <div className="grid extras-grid extras-grid--3col">
         <div className="input-group">
           <label>추가내역</label>
           <input
@@ -763,7 +790,7 @@ export default function MoveoutForm({
         </div>
       </div>
 
-      {/* ✅ 리스트(사진/비고 위) */}
+      {/* 리스트(사진/비고 위) */}
       <div className="extra-list-container" style={{ marginTop: 8 }}>
         {extras.map((item, index) => (
           <div
@@ -1051,38 +1078,3 @@ export default function MoveoutForm({
     </div>
   );
 }
-
-/* 사진 뷰어 보조 스타일 */
-const navBtnStyle = (side) => ({
-  position: "absolute",
-  top: "50%",
-  transform: "translateY(-50%)",
-  [side]: 8,
-  width: 32,
-  height: 32,
-  borderRadius: "50%",
-  border: "1px solid #ddd",
-  background: "rgba(255,255,255,0.95)",
-  cursor: "pointer",
-});
-const delBtnStyle = {
-  position: "absolute",
-  top: 8,
-  right: 8,
-  border: "1px solid #fca5a5",
-  background: "#fee2e2",
-  color: "#b91c1c",
-  padding: "4px 8px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-const indexBadgeStyle = {
-  position: "absolute",
-  right: 10,
-  bottom: 10,
-  background: "rgba(0,0,0,0.55)",
-  color: "#fff",
-  padding: "2px 8px",
-  borderRadius: 12,
-  fontSize: 12,
-};

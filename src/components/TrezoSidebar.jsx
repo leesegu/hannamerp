@@ -63,7 +63,7 @@ const SidebarSubmenu = ({ items = [], onClick, activeMenu }) => (
   </ul>
 );
 
-const TrezoSidebar = ({ employeeId, userId, userName }) => {
+const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   const navigate = useNavigate();
   const [activeContent, setActiveContent] = useState(null);
   const [openMenu, setOpenMenu] = useState("");
@@ -75,8 +75,10 @@ const TrezoSidebar = ({ employeeId, userId, userName }) => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("autoLogin");
-    navigate("/login");
+    // ✅ 상위(App) 상태와 localStorage까지 비우도록 호출
+    onLogout?.();
+    // 화면 전환 보장
+    navigate("/login", { replace: true });
   };
 
   const goHome = () => {
