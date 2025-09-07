@@ -46,6 +46,8 @@ export default function MoveoutFormMobile() {
 
   /* ===== 상태 ===== */
   const [moveDate, setMoveDate] = useState(null);
+  const [moveDateOpen, setMoveDateOpen] = useState(false); // ▼ 펼침 제어
+
   const [villaName, setVillaName] = useState("");
   const [unitNumber, setUnitNumber] = useState("");
   const [phone, setPhone] = useState("");
@@ -62,7 +64,7 @@ export default function MoveoutFormMobile() {
   const [previousReading, setPreviousReading] = useState("");
   const [waterUnit, setWaterUnit] = useState("");
 
-  // ✅ 정산진행현황 (커스텀 드롭다운)
+  // 진행현황(커스텀 드롭다운)
   const [status, setStatus] = useState("정산대기");
   const [statusOpen, setStatusOpen] = useState(false);
   const statusBtnRef = useRef(null);
@@ -88,9 +90,6 @@ export default function MoveoutFormMobile() {
   // 사진
   const [photos, setPhotos] = useState([]); // 최신이 앞
   const [photoIdx, setPhotoIdx] = useState(0);
-
-  // 달력 제어
-  const [openDate, setOpenDate] = useState(false);
 
   // 저장 중
   const [saving, setSaving] = useState(false);
@@ -166,11 +165,11 @@ export default function MoveoutFormMobile() {
     [arrears, currentMonth, electricity, waterFeeAuto, tvFee, cleaningFee, extrasSum]
   );
 
-  /* ===== 연락처 Enter → 달력 열기 ===== */
+  /* ===== 연락처 Enter → 달력 펼치기 ===== */
   const onPhoneKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      setOpenDate(true);
+      setMoveDateOpen(true);
     }
   };
 
@@ -268,7 +267,7 @@ export default function MoveoutFormMobile() {
       unitNumber: unitNumber.trim(),
 
       payerPhone: phone.trim(),
-      phone: phone.trim(), // 호환용
+      phone: phone.trim(),
 
       arrears: toNum(arrears),
       currentMonth: toNum(currentMonth),
@@ -286,7 +285,7 @@ export default function MoveoutFormMobile() {
       note,
       photos,
       totalAmount,
-      status, // ✅ 진행현황 저장
+      status,
 
       ...(id ? {} : { createdAt: serverTimestamp() }),
       updatedAt: serverTimestamp(),
@@ -320,7 +319,6 @@ export default function MoveoutFormMobile() {
         {/* 절대 중앙 타이틀 */}
         <div className="mf-title">{id ? "이사정산 수정" : "이사정산 등록"}</div>
 
-        {/* ✅ 저장 버튼 사이즈 살짝 키움 */}
         <button className="mf-save mf-save--lg" onClick={onSave} disabled={saving}>
           {saving ? "저장중…" : "저장"}
         </button>
@@ -328,7 +326,7 @@ export default function MoveoutFormMobile() {
 
       {/* 본문 */}
       <div className="mf-body">
-        {/* 연락처 / 날짜 */}
+        {/* 연락처 */}
         <div className="mf-field">
           <label>연락처</label>
           <input
@@ -340,25 +338,63 @@ export default function MoveoutFormMobile() {
           />
         </div>
 
+        {/* 이사날짜 (펼침형 인라인 달력) */}
         <div className="mf-field">
           <label>이사날짜</label>
-          <DatePicker
-            selected={moveDate}
-            onChange={(d) => { setMoveDate(d); setOpenDate(false); }}
-            locale={ko}
-            dateFormat="yyyy-MM-dd"
-            placeholderText="날짜 선택"
-            open={openDate}
-            onClickOutside={() => setOpenDate(false)}
-            customInput={
-              <input
-                className="mf-input"
-                onClick={() => setOpenDate(true)}
-                readOnly
-                value={moveDate ? format(moveDate, "yyyy-MM-dd") : ""}
+
+          {/* 인풋처럼 보이는 컨트롤 (중복 문구 제거: 한 줄만 표시) */}
+          <button
+            type="button"
+            className={`mf-date-control ${moveDate ? "has-value" : "is-placeholder"}`}
+            onClick={() => setMoveDateOpen((v) => !v)}
+            aria-expanded={moveDateOpen}
+            aria-controls="move-date-calendar"
+          >
+            <div className="date-main">
+              {moveDate ? format(moveDate, "yyyy-MM-dd") : "날짜 선택"}
+            </div>
+            <span className="chev" aria-hidden>▾</span>
+          </button>
+
+          {/* 펼쳐지는 인라인 달력 */}
+          {moveDateOpen && (
+            <div id="move-date-calendar" className="mf-calendar" role="dialog" aria-label="달력">
+              <DatePicker
+                selected={moveDate}
+                onChange={(d) => { setMoveDate(d); setMoveDateOpen(false); }}
+                inline
+                locale={ko}
+                monthsShown={1}
+                renderCustomHeader={({
+                  date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled
+                }) => (
+                  <div className="cal-header">
+                    <button
+                      type="button"
+                      onClick={decreaseMonth}
+                      disabled={prevMonthButtonDisabled}
+                      className="nav-btn"
+                      aria-label="이전 달"
+                    >‹</button>
+                    <div className="cal-title">
+                      {format(date, "yyyy년 MM월")}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={increaseMonth}
+                      disabled={nextMonthButtonDisabled}
+                      className="nav-btn"
+                      aria-label="다음 달"
+                    >›</button>
+                  </div>
+                )}
+                dayClassName={(d) => {
+                  const isToday = format(d, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                  return isToday ? "is-today" : undefined;
+                }}
               />
-            }
-          />
+            </div>
+          )}
         </div>
 
         {/* 1: 빌라명 · 호수 */}
@@ -412,7 +448,7 @@ export default function MoveoutFormMobile() {
           </div>
         </div>
 
-        {/* 3: 당월지침 · 전월지침 (Enter 순서: 당월지침 → 전기요금) */}
+        {/* 3: 당월지침 · 전월지침 */}
         <div className="mf-grid2">
           <div className="mf-field">
             <label>당월지침</label>
@@ -432,12 +468,11 @@ export default function MoveoutFormMobile() {
               value={previousReading}
               onChange={(e)=>setPreviousReading(onlyDigits(e.target.value))}
               inputMode="numeric"
-              /* 전월지침에서 Enter 이동은 지정하지 않음 */
             />
           </div>
         </div>
 
-        {/* 4: 수도요금(자동) · 수도단가 (Enter 순서에 포함되지 않음) */}
+        {/* 4: 수도요금(자동) · 수도단가 */}
         <div className="mf-grid2">
           <div className="mf-field">
             <label>수도요금</label>
@@ -455,7 +490,6 @@ export default function MoveoutFormMobile() {
               value={waterUnit}
               onChange={(e)=>setWaterUnit(addCommas(e.target.value))}
               inputMode="numeric"
-              /* Enter 이동 지정하지 않음 */
             />
           </div>
         </div>
@@ -500,7 +534,7 @@ export default function MoveoutFormMobile() {
             />
           </div>
 
-          {/* ✅ 커스텀 진행현황 드롭다운 (mo 코드 스타일 차용) */}
+          {/* 진행현황 드롭다운 */}
           <div className="mf-field">
             <label>정산진행현황</label>
             <div
@@ -549,7 +583,7 @@ export default function MoveoutFormMobile() {
           </div>
         </div>
 
-        {/* 추가내역 (엔터로 추가/수정) */}
+        {/* 추가내역 */}
         <div className="mf-section">
           <div className="mf-grid2">
             <div className="mf-field">
@@ -611,7 +645,7 @@ export default function MoveoutFormMobile() {
           </button>
         </div>
 
-        {/* 사진 뷰어: 사진 있을 때만 */}
+        {/* 사진 뷰어 */}
         {photos.length > 0 && (
           <div className="mf-photo-viewer">
             <div className="viewer">
@@ -648,7 +682,6 @@ export default function MoveoutFormMobile() {
           <div className="modal" onClick={(e)=>e.stopPropagation()}>
             <div className="modal-header">
               <b>비고</b>
-              {/* 닫기 버튼 없음 */}
             </div>
             <div className="mf-field">
               <textarea

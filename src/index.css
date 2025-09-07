@@ -18,7 +18,9 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   overflow-y: hidden;
@@ -33,4 +35,37 @@ html, body, #root {
   flex: 1;
   padding: 30px;
   overflow-y: auto;
+}
+
+/* ✅ 모바일(iOS/안드로이드) 확대 방지 */
+@media (max-width: 768px) {
+  /* iOS Safari 텍스트 자동 확대 방지 */
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* 더블탭 확대 방지 */
+  body {
+    touch-action: manipulation;
+  }
+
+  /* ===== 입력 포커스 확대 방지 ===== */
+  /* 실제 폰트는 16px로 맞추고, 원래 크기처럼 보이게 클래스 기반 축소 */
+  input,
+  select,
+  textarea,
+  button,
+  .react-datepicker__input-container input {
+    font-size: 16px; /* 확대 방지 기준 충족 */
+    line-height: 1.4;
+  }
+
+  /* 필요할 때만 적용할 축소 유틸 (14px처럼 보이게) */
+  .ios-visual-14 {
+    transform: scale(0.875); /* 16px → 14px 비주얼 */
+    transform-origin: left center;
+    height: 38px;
+    padding: 0 12px;
+    display: inline-block;
+  }
 }

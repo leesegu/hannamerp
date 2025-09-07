@@ -165,3 +165,157 @@
 .status-item .check { font-size: 12px; color: #2563eb; }
 .status-item:hover { background: #f8fafc; }
 .status-item.selected { background: #eff6ff; }
+
+/* ====== 날짜 컨트롤(입력창 모양) ====== */
+.mf-date-control {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.mf-date-control:hover { border-color: #cbd5e1; }
+.mf-date-control:active { border-color: #94a3b8; }
+.mf-date-control .date-main {
+  font-size: 16px;         /* 날짜/플레이스홀더 한 줄만 크게 */
+  line-height: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.mf-date-control.is-placeholder .date-main {
+  color: #9ca3af;          /* 회색 플레이스홀더 */
+  font-weight: 700;
+}
+.mf-date-control .chev {
+  justify-self: end;
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* ====== 인라인 달력 컨테이너 ====== */
+.mf-calendar {
+  margin-top: 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.12), 0 2px 8px rgba(2,6,23,0.06);
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 8px;                 /* 균등 여백 */
+}
+
+/* ====== react-datepicker 커스텀 (가로 균등 정렬) ====== */
+.mf-calendar .react-datepicker {
+  width: 100%;                  /* 컨테이너 꽉 채움 */
+  border: 0;
+  border-radius: 14px;
+  font-family: inherit;
+}
+
+.mf-calendar .react-datepicker__month-container { width: 100%; }
+
+.mf-calendar .react-datepicker__header {
+  background: linear-gradient(180deg, #ffffff, #fafafa);
+  border-bottom: 1px solid #eef2f6;
+  padding: 8px 8px 0;           /* 좌우 동일 */
+}
+
+.mf-calendar .cal-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  padding: 6px 4px 8px;
+}
+
+.mf-calendar .cal-title {
+  text-align: center;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: .2px;
+}
+
+.mf-calendar .nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.mf-calendar .nav-btn:hover { background: #f8fafc; }
+.mf-calendar .nav-btn:disabled { opacity: .45; }
+
+.mf-calendar .react-datepicker__day-names {
+  margin: 4px 0 0;
+  padding: 0 4px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* 7등분 */
+  gap: 4px;
+}
+.mf-calendar .react-datepicker__day-name {
+  text-align: center;
+  color: #94a3b8;
+  font-weight: 700;
+  line-height: 2rem;
+}
+
+.mf-calendar .react-datepicker__month {
+  margin: 6px 0 8px;            /* 좌우 여백 제거 */
+  padding: 0 4px;
+}
+.mf-calendar .react-datepicker__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* 7등분 */
+  gap: 4px;                               /* 좌우 동일 간격 */
+}
+
+.mf-calendar .react-datepicker__day {
+  width: 100%;                  /* 셀 너비 균등 */
+  margin: 0;                    /* 기본 마진 제거 */
+  line-height: 2.2rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all .15s ease;
+  color: #0f172a;
+  text-align: center;
+}
+.mf-calendar .react-datepicker__day:hover {
+  background: #f1f5f9;
+  border-color: #e5e7eb;
+}
+.mf-calendar .react-datepicker__day--selected,
+.mf-calendar .react-datepicker__day--keyboard-selected {
+  background: linear-gradient(180deg, #6366f1, #4f46e5);
+  color: #fff !important;
+  border-color: transparent;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08);
+}
+.mf-calendar .react-datepicker__day--today,
+.mf-calendar .is-today {
+  position: relative;
+  font-weight: 800;
+}
+.mf-calendar .react-datepicker__day--today::after,
+.mf-calendar .is-today::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px; height: 6px;
+  background: #22c55e;
+  border-radius: 999px;
+}
+
+.mf-calendar .react-datepicker__day--outside-month {
+  color: #cbd5e1;
+}
+
+/* 터치 대상 확대 */
+@media (hover: none) and (pointer: coarse) {
+  .mf-calendar .react-datepicker__day-name { line-height: 2.2rem; }
+  .mf-calendar .react-datepicker__day { line-height: 2.4rem; }
+}

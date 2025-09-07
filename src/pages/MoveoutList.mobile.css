@@ -9,21 +9,21 @@
 :root {
   --bg: #f7f8fb;
   --card: #ffffff;
-  --muted: #6b7280;        /* 중간톤 회색 */
+  --muted: #6b7280;
   --muted-2: #94a3b8;
-  --text: #111827;         /* 본문 텍스트 */
-  --text-2: #1f2937;       /* 진한 텍스트 */
-  --subtext: #475569;      /* 보조 텍스트 */
-  --border: #e6e9f2;       /* 경계선 */
+  --text: #111827;
+  --text-2: #1f2937;
+  --subtext: #475569;
+  --border: #e6e9f2;
   --border-2: #e2e8f0;
-  --soft: #f1f5f9;         /* 소프트 배경 */
+  --soft: #f1f5f9;
   --soft-2: #f9fafb;
-  --primary: #7a5af8;      /* 보라 (중간 채도) */
+  --primary: #7a5af8;
   --primary-500: #7a5af8;
   --primary-600: #6c4cf3;
   --primary-100: #f2efff;
   --primary-ring: rgba(122, 90, 248, .16);
-  --accent: #fb923c;       /* 포인트 주황 */
+  --accent: #fb923c;
   --accent-soft: #fff7ed;
   --green: #10b981;
   --red: #ef4444;
@@ -146,7 +146,7 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   flex: 1; min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 88px;   /* 하단 여백 조금 확장 */
+  padding-bottom: 88px;
 }
 
 /* 카드 */
@@ -277,19 +277,6 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
 .act-row.top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-items: stretch; }
 .act-row.bottom { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 
-.i-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 40px; border-radius: var(--radius-sm);
-  border: 1px solid var(--border); background: var(--soft-2);
-  color: var(--text); font-weight: 800; font-size: 13px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow .15s, transform .12s, background .12s;
-}
-.i-btn:hover { background: var(--soft); box-shadow: var(--shadow-md); }
-.i-btn:active { transform: translateY(1px); }
-.i-btn .i { font-size: 16px; }
-.i-btn.disabled { opacity: .45; pointer-events: none; cursor: default; }
-
 /* 기본 Pill 버튼 */
 .pill-btn {
   border-radius: var(--radius-sm); padding: 11px 14px;
@@ -305,6 +292,40 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   color: var(--text); font-weight: 800; box-shadow: var(--shadow-sm);
 }
 .pill-btn.danger { background: #e15252; border-color: #e15252; color: #fff; }
+
+/* ✅ Disabled 상태에서도 색상 유지 (하얗게 변하지 않도록) */
+.pill-btn:disabled {
+  opacity: .5;
+  cursor: default;
+  filter: none;
+  transform: none;
+  background: var(--text-2);
+  border-color: var(--text-2);
+  color: #fff;
+}
+.pill-btn.light:disabled {
+  opacity: .5;
+  cursor: default;
+  filter: none;
+  transform: none;
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* 개별 아이콘 버튼 */
+.i-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--soft-2);
+  color: var(--text); font-weight: 800; font-size: 13px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .15s, transform .12s, background .12s;
+}
+.i-btn:hover { background: var(--soft); box-shadow: var(--shadow-md); }
+.i-btn:active { transform: translateY(1px); }
+.i-btn .i { font-size: 16px; }
+.i-btn.disabled { opacity: .45; pointer-events: none; cursor: default; }
 
 /* 모달 */
 .overlay {
@@ -323,15 +344,8 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   max-height: 85vh; overflow: auto;
   border: 1px solid var(--border);
 }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.close {
-  background: var(--soft);
-  border: 1px solid var(--border);
-  padding: 8px 12px; border-radius: var(--radius-sm);
-  color: var(--text);
-}
 
-/* 모달 사진 */
+/* 모달 사진/네비 */
 .photos { position: relative; }
 .photo {
   width: 100%; height: auto; max-height: 60vh;
@@ -353,5 +367,5 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   padding: 2px 8px; border-radius: 12px; font-size: 12px;
 }
 
-/* 영수증 모달 버튼 정렬 */
+/* 영수증 모달 버튼 정렬 + 비고/사진 닫기 버튼 공용 */
 .actions.center { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 12px; }

@@ -296,14 +296,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   const ensureReceiptDataUrl = async () =>
     htmlToImage.toJpeg(receiptRef.current, { backgroundColor:"#fff", quality:0.95, pixelRatio:2 });
 
-  const saveReceipt = async () => {
-    try {
-      const d = await ensureReceiptDataUrl();
-      const a = document.createElement("a");
-      a.href = d; a.download = `${buildBase(receiptRow)}.jpg`; a.click();
-    } catch(e){ alert("영수증 저장 중 오류가 발생했습니다."); }
-  };
-
+  /* ✅ 사진첩 저장 우선 로직: 공유 가능하면 공유 시트로(대부분 사진첩 저장 제공), 아니면 안내 후 다운로드/새 탭 */
   const dataURLToBlob = (d) => {
     const [h,b]=d.split(","); const m=h.match(/:(.*?);/)[1];
     const bin=atob(b); const u8=new Uint8Array(bin.length);
@@ -312,17 +305,47 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   };
 
   const shareReceipt = async () => {
+    const d = await ensureReceiptDataUrl();
+    const file = new File([dataURLToBlob(d)], `${buildBase(receiptRow)}.jpg`, { type:"image/jpeg" });
+    if (navigator.canShare && navigator.canShare({ files:[file] })) {
+      await navigator.share({ title:"이사정산 영수증", files:[file] });
+    } else if (navigator.share) {
+      // 파일 공유가 안되는 브라우저: 텍스트 공유로 안내
+      await navigator.share({ title:"이사정산 영수증", text:"이미지 파일 공유가 제한됩니다. 저장 버튼으로 파일 저장 후 사진에 추가해주세요." });
+    } else {
+      // 완전 불가: 새 탭 열어 롱프레스 저장 유도
+      const w = window.open(d, "_blank");
+      if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
+    }
+  };
+
+  const saveReceipt = async () => {
     try {
       const d = await ensureReceiptDataUrl();
       const file = new File([dataURLToBlob(d)], `${buildBase(receiptRow)}.jpg`, { type:"image/jpeg" });
+
+      // 1) 가능한 경우: 공유 시트로 보내서 사진첩 저장 선택 유도 (가장 자연스러운 사진첩 저장 경로)
       if (navigator.canShare && navigator.canShare({ files:[file] })) {
         await navigator.share({ title:"이사정산 영수증", files:[file] });
-      } else if (navigator.share) {
-        await navigator.share({ title:"이사정산 영수증", text:"이 기기는 파일 공유가 제한됩니다. 저장 후 앱에서 전송해주세요." });
-      } else {
-        alert("이 브라우저는 공유를 지원하지 않습니다. 저장 후 문자/카톡으로 전송해주세요.");
+        return;
       }
-    } catch { alert("전송 중 오류가 발생했습니다."); }
+
+      // 2) 공유가 불가한 경우: 파일 다운로드 vs 사진첩 수동 저장 선택
+      const goDownload = window.confirm(
+        "이 기기는 사진첩으로 바로 저장을 지원하지 않을 수 있어요.\n\n" +
+        "확인: 파일로 저장 (다운로드)\n취소: 새 탭으로 열기 후 '이미지 길게 누르기 → 사진에 저장'"
+      );
+      if (goDownload) {
+        const a = document.createElement("a");
+        a.href = d; a.download = `${buildBase(receiptRow)}.jpg`; a.click();
+      } else {
+        const w = window.open(d, "_blank");
+        if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
+      }
+    } catch(e){
+      console.error(e);
+      alert("영수증 저장 중 오류가 발생했습니다.");
+    }
   };
 
   return (
@@ -451,16 +474,14 @@ export default function MoveoutListMobile({ employeeId, userId }) {
         <button className="pill-btn" onClick={goNext} disabled={page >= totalPages} aria-label="다음 페이지">다음 ›</button>
       </div>
 
-      {/* 비고/사진 모달 */}
+      {/* 비고/사진 모달 — 제목 제거, 내용만 표시 + 하단 닫기 버튼 추가 */}
       {centerOpen && centerRow && (
         <div className="overlay center" onClick={()=>setCenterOpen(false)}>
           <div className="modal" onClick={(e)=>e.stopPropagation()}>
-            <div className="modal-header">
-              <b>{centerType === "photos" ? "사진" : "비고"}</b>
-              <button className="close" onClick={()=>setCenterOpen(false)}>닫기</button>
-            </div>
-
-            {centerType === "note" && <div className="note">{centerRow.note}</div>}
+            {/* 제목 제거: 콘텐츠만 */}
+            {centerType === "note" && (
+              <div className="note" style={{ whiteSpace:"pre-wrap", lineHeight:1.6 }}>{centerRow.note}</div>
+            )}
 
             {centerType === "photos" && (
               <div className="photos">
@@ -474,6 +495,18 @@ export default function MoveoutListMobile({ employeeId, userId }) {
                 ) : <div>사진 없음</div>}
               </div>
             )}
+
+            {/* 하단 닫기 버튼 (영수증 모달과 동일한 스타일) */}
+            <div className="actions center" style={{ display:"flex", justifyContent:"center", marginTop:16 }}>
+              <button
+                className="pill-btn danger"
+                onClick={()=>setCenterOpen(false)}
+                style={{ fontSize:14, padding:"10px 14px", borderRadius:10 }}
+                aria-label="닫기"
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
       )}
