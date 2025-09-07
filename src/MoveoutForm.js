@@ -18,7 +18,8 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 
-import "./MoveoutForm.css";              // ✅ PC 전용만 로드 (모바일 CSS 임포트 제거)
+/* ✅ PC 전용 스타일만 로드 (모바일 CSS 임포트 제거) */
+import "./MoveoutForm.css";
 import FormLayout from "./components/FormLayout";
 import { formatPhoneNumber } from "./utils/formatting";
 
@@ -245,7 +246,7 @@ export default function MoveoutForm({
     waterUnit: waterUnitRef,
     electricity: electricityRef,
     tvFee: tvFeeRef,
-    cleaningRef: cleaningRef,
+    cleaning: cleaningRef, // ✅ 키 정정
     extraDesc: extraDescRef,
     extraAmount: extraAmountRef,
   };
@@ -332,7 +333,7 @@ export default function MoveoutForm({
     const prev = parseNumber(form.waterPrev);
     const curr = parseNumber(form.waterCurr);
     const unit = parseNumber(form.waterUnit);
-    const usage = Math.max(0, curr - prev);
+       const usage = Math.max(0, curr - prev);
     const cost = usage * unit;
     setForm((s2) => ({ ...s2, waterCost: cost ? cost.toLocaleString() : "" }));
   }, [form.waterPrev, form.waterCurr, form.waterUnit]);
@@ -557,7 +558,7 @@ export default function MoveoutForm({
   /* ===== 폼 본문 ===== */
   const renderFormContent = () => (
     <FormLayout>
-      <div className="grid">
+      <div className="pc-moveout__grid grid">
         {/* 연락처 자리맞춤 */}
         <div className="input-group" />
         <div className="input-group" />
@@ -750,7 +751,7 @@ export default function MoveoutForm({
       </div>
 
       {/* ✅ 추가내역/추가금액/정산진행현황: 3열 고정 섹션 */}
-      <div className="grid extras-grid extras-grid--3col">
+      <div className="pc-moveout__grid extras-grid extras-grid--3col">
         <div className="input-group">
           <label>추가내역</label>
           <input
@@ -817,7 +818,7 @@ export default function MoveoutForm({
       </div>
 
       {/* 사진/비고/총액 */}
-      <div className="grid" style={{ marginTop: 12 }}>
+      <div className="pc-moveout__grid grid" style={{ marginTop: 12 }}>
         {/* 사진 */}
         <div className="input-group">
           <label>사진</label>
@@ -934,44 +935,47 @@ export default function MoveoutForm({
             display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none",
           }}
         >
-          <div
-            style={{
-              width: 720, maxWidth: "90vw", maxHeight: "90vh",
-              background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
-              boxShadow: "0 18px 48px rgba(0,0,0,0.25)", overflow: "hidden",
-              pointerEvents: "auto", display: "flex", flexDirection: "column",
-            }}
-          >
+          {/* ✅ PC 전용 스코프 래퍼: 모바일이면 적용 안 함 */}
+          <div className={`${!isMobile ? "pc-moveout" : ""}`} style={{ pointerEvents: "auto", width: "100%" }}>
             <div
               style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 14px", borderBottom: "1px solid #eef2f7", background: "#fafafa",
+                width: 720, maxWidth: "90vw", maxHeight: "90vh",
+                background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
+                boxShadow: "0 18px 48px rgba(0,0,0,0.25)", overflow: "hidden",
+                display: "flex", flexDirection: "column", margin: "0 auto",
               }}
             >
-              <strong style={{ fontSize: 15 }}>
-                {mode === "edit" ? "이사정산 수정" : "이사정산 등록"}
-              </strong>
-              <div />
-            </div>
-
-            <div style={{ padding: 14, overflow: "auto", flex: 1 }}>
-              {renderFormContent()}
-            </div>
-
-            <div
-              className="actions-row"
-              style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7", background: "#fff", position: "sticky", bottom: 0 }}
-            >
-              <button className="save-btn" onClick={handleSave} disabled={saving}>
-                {saving ? (mode === "edit" ? "수정 중..." : "저장 중...") : (mode === "edit" ? "수정" : "저장")}
-              </button>
-              <button
-                className="close-btn"
-                onClick={() => (onDone ? onDone() : navigate(-1))}
-                disabled={saving}
+              <div
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 14px", borderBottom: "1px solid #eef2f7", background: "#fafafa",
+                }}
               >
-                닫기
-              </button>
+                <strong style={{ fontSize: 15 }}>
+                  {mode === "edit" ? "이사정산 수정" : "이사정산 등록"}
+                </strong>
+                <div />
+              </div>
+
+              <div style={{ padding: 14, overflow: "auto", flex: 1 }}>
+                {renderFormContent()}
+              </div>
+
+              <div
+                className="actions-row"
+                style={{ padding: "10px 14px", borderTop: "1px solid #eef2f7", background: "#fff", position: "sticky", bottom: 0 }}
+              >
+                <button className="save-btn" onClick={handleSave} disabled={saving}>
+                  {saving ? (mode === "edit" ? "수정 중..." : "저장 중...") : (mode === "edit" ? "수정" : "저장")}
+                </button>
+                <button
+                  className="close-btn"
+                  onClick={() => (onDone ? onDone() : navigate(-1))}
+                  disabled={saving}
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -984,6 +988,7 @@ export default function MoveoutForm({
               style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 10002 }}
             />
             <div
+              className={`${!isMobile ? "pc-moveout" : ""}`}
               style={{
                 position: "fixed", top: "18vh", left: "50%", transform: "translateX(-50%)",
                 width: 420, maxWidth: "92vw", background: "#fff", borderRadius: 12, padding: 16,
@@ -1019,7 +1024,7 @@ export default function MoveoutForm({
 
   /* ===== 전체 페이지 모드 ===== */
   return (
-    <div className={`form-container ${isMobile ? "mobile" : ""}`}>
+    <div className={`${!isMobile ? "pc-moveout" : ""} form-container ${isMobile ? "mobile" : ""}`}>
       {renderFormContent()}
 
       <div className="actions-row">
@@ -1046,6 +1051,7 @@ export default function MoveoutForm({
             style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 10002 }}
           />
           <div
+            className={`${!isMobile ? "pc-moveout" : ""}`}
             style={{
               position: "fixed", top: "18vh", left: "50%", transform: "translateX(-50%)",
               width: 420, maxWidth: "92vw", background: "#fff", borderRadius: 12, padding: 16,

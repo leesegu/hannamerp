@@ -11,6 +11,90 @@ import PageTitle from "../components/PageTitle";
 import ReceiptTemplate from "../components/ReceiptTemplate";
 import "./MoveoutList.mobile.css";
 
+/* =========================
+   안드로이드 저장/공유/SMS 유틸
+   - 저장(갤러리): ExternalStorage/Pictures/HannamReceipts
+   - 전송(MMS 첨부): Cache 디렉토리에 저장(권한 無) → MmsComposer 호출
+========================= */
+const isHybrid = () => {
+  try {
+    const w = typeof window !== "undefined" ? window : {};
+    if (w.Capacitor?.isNativePlatform) return w.Capacitor.isNativePlatform();
+    return !!(w.Capacitor || w.cordova);
+  } catch { return false; }
+};
+
+// dataURL → base64 본문
+const dataURLToBase64 = (dataUrl) => {
+  if (!dataUrl) return "";
+  const parts = String(dataUrl).split(",");
+  return parts.length > 1 ? parts[1] : parts[0];
+};
+
+// Capacitor 모듈 로딩 (Filesystem만)
+async function loadCapacitorMods() {
+  const core = await import("@capacitor/core");
+  const fs = await import("@capacitor/filesystem");
+  return {
+    Capacitor: core.Capacitor,
+    registerPlugin: core.registerPlugin,
+    Filesystem: fs.Filesystem,
+    Directory: fs.Directory,
+  };
+}
+
+/** 갤러리 저장(저장 버튼 전용): ExternalStorage/Pictures/HannamReceipts/..jpg */
+async function saveToGalleryWithFilesystem(b64, fileName) {
+  const { Capacitor, Filesystem, Directory } = await loadCapacitorMods();
+  try { await Filesystem.requestPermissions(); } catch {}
+  const path = `Pictures/HannamReceipts/${fileName}`;
+  await Filesystem.writeFile({
+    path, data: b64, directory: Directory.ExternalStorage, recursive: true,
+  });
+  const { uri } = await Filesystem.getUri({ path, directory: Directory.ExternalStorage });
+  const fileUriNative = uri; // file:///... (갤러리 노출)
+  const fileUriView = Capacitor.convertFileSrc ? Capacitor.convertFileSrc(uri) : uri;
+  return { fileUriNative, fileUriView };
+}
+
+/** 전송 전용(권한 無): Cache/receipts/..jpg → FileProvider로 첨부 */
+async function saveForMms(b64, fileName) {
+  const { Filesystem, Directory } = await loadCapacitorMods();
+  const path = `receipts/${fileName}`;
+  await Filesystem.writeFile({
+    path, data: b64, directory: Directory.Cache, recursive: true,
+  });
+  const { uri } = await Filesystem.getUri({ path, directory: Directory.Cache });
+  return uri; // file:///... 캐시 경로
+}
+
+/** 저장 버튼에서 호출 */
+async function saveReceiptToGalleryHybrid(dataUrl, baseName = "receipt") {
+  const b64 = dataURLToBase64(dataUrl);
+  if (!b64) throw new Error("Invalid dataUrl");
+  const safeBase = String(baseName).replace(/[\\/:*?"<>|]/g, "") || "receipt";
+  const fileName = `${safeBase}.jpg`;
+  return await saveToGalleryWithFilesystem(b64, fileName);
+}
+
+/** 전송 버튼에서 호출 (캐시 저장) */
+async function saveReceiptForMmsHybrid(dataUrl, baseName = "receipt") {
+  const b64 = dataURLToBase64(dataUrl);
+  if (!b64) throw new Error("Invalid dataUrl");
+  const safeBase = String(baseName).replace(/[\\/:*?"<>|]/g, "") || "receipt";
+  const fileName = `${safeBase}.jpg`;
+  const fileUriNative = await saveForMms(b64, fileName);
+  return { fileUriNative, fileName };
+}
+
+/** MMS 컴포저(네이티브 플러그인) 호출 */
+async function openMmsComposer({ phone, fileUriNative, mimeType = "image/jpeg" }) {
+  const { registerPlugin } = await loadCapacitorMods();
+  const MmsComposer = registerPlugin("MmsComposer");
+  // ⚠️ 본문 텍스트는 절대 전달하지 않음(자동 문구 방지)
+  return MmsComposer.compose({ phone, fileUri: fileUriNative, mimeType });
+}
+
 /* ===== 유틸 ===== */
 const toNum = (v) => v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0);
 const fmtAmount = (val) => { const n = toNum(val); return n ? n.toLocaleString() : (val === 0 ? "0" : ""); };
@@ -18,7 +102,7 @@ const sumExtrasFromArray = (extras) => (extras || []).reduce((a, it) => a + (Num
 const getExtraTotal = (x) => { const sx = Array.isArray(x.extras) ? sumExtrasFromArray(x.extras) : 0; return sx || toNum(x.extraAmount); };
 const sumTotal = (x) => toNum(x.arrears)+toNum(x.currentMonth)+toNum(x.waterFee)+toNum(x.electricity)+toNum(x.tvFee)+toNum(x.cleaningFee)+getExtraTotal(x);
 
-/* ===== 진행현황 셀렉트 (포털 메뉴) ===== */
+/* ===== 진행현황 셀렉트 ===== */
 const STATUS = ["정산대기","입금대기","정산완료"];
 const statusColor = (v) => v==="입금대기" ? "#ef4444" : v==="정산완료" ? "#10b981" : "#9ca3af";
 
@@ -100,7 +184,7 @@ function StatusSelect({ value, onChange }) {
   );
 }
 
-/* ===== 조회(필터) 셀렉트 (포털 메뉴) ===== */
+/* ===== 조회(필터) 셀렉트 ===== */
 const FILTERS = ["ALL","정산대기","입금대기","정산완료"];
 const filterLabel = (v) => v === "ALL" ? "전체" : v;
 
@@ -170,6 +254,17 @@ function FilterSelect({ value, onChange }) {
   );
 }
 
+/* ===== 문자 수신번호 후보 ===== */
+function pickSmsNumber(row) {
+  const cand = [
+    row?.phone,
+    row?.tenantPhone,
+    row?.contactPhone,
+    row?.managerPhone,
+  ].find(v => v && String(v).trim().length >= 8);
+  return cand ? String(cand).replace(/[^\d+]/g, "") : "";
+}
+
 export default function MoveoutListMobile({ employeeId, userId }) {
   const navigate = useNavigate();
 
@@ -178,25 +273,20 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   const [keyword, setKeyword] = useState("");
   const [openId, setOpenId] = useState(null);
 
-  /* ✅ 센터 모달(비고/사진) 상태 */
   const [centerOpen, setCenterOpen] = useState(false);
   const [centerType, setCenterType] = useState(null);
   const [centerRow, setCenterRow] = useState(null);
   const [photoIdx, setPhotoIdx] = useState(0);
 
-  /* ✅ 영수증 모달 상태 */
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptRow, setReceiptRow] = useState(null);
   const receiptRef = useRef(null);
 
-  /* ✅ 페이지네이션 상태 */
   const PAGE_SIZE = 8;
   const [page, setPage] = useState(1);
 
-  /* ✅ 리스트 스크롤 컨테이너 ref */
   const listRef = useRef(null);
 
-  /* 데이터 구독 */
   useEffect(() => {
     const q = query(collection(db, "moveouts"), orderBy("moveDate", "desc"));
     return onSnapshot(q, (snap) => {
@@ -204,7 +294,6 @@ export default function MoveoutListMobile({ employeeId, userId }) {
     });
   }, []);
 
-  /* 필터링/정렬 */
   const filtered = useMemo(() => {
     let list = rows;
     if (statusFilter !== "ALL") list = list.filter(r => String(r.status || "") === statusFilter);
@@ -243,18 +332,14 @@ export default function MoveoutListMobile({ employeeId, userId }) {
     return mapped;
   }, [filtered]);
 
-  /* 필터/검색 변경 시 페이지 초기화 */
   useEffect(() => {
     setPage(1);
     setOpenId(null);
     listRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [statusFilter, keyword]);
 
-  /* 페이지 계산 */
   const totalPages = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   const pagedRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
@@ -270,7 +355,6 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   const goPrev = () => { if (page > 1) { setPage(p => p - 1); scrollTopSmooth(); } };
   const goNext = () => { if (page < totalPages) { setPage(p => p + 1); scrollTopSmooth(); } };
 
-  /* 액션 */
   const handleAdd = () => navigate("/mobile/form");
   const handleEdit = (row) => navigate(`/mobile/form?id=${row.id}`);
   const handleDeleteRow = async (row) => {
@@ -293,10 +377,15 @@ export default function MoveoutListMobile({ employeeId, userId }) {
     `${String(r.moveDate||"").replace(/-/g,"")}${String(r.villaName||"")}${String(r.unitNumber||"")}`
       .replace(/[\\/:*?"<>|]/g,"");
 
-  const ensureReceiptDataUrl = async () =>
-    htmlToImage.toJpeg(receiptRef.current, { backgroundColor:"#fff", quality:0.95, pixelRatio:2 });
+  /** ReceiptTemplate 캡쳐: 렌더 한 프레임 대기 후 캡쳐 */
+  const ensureReceiptDataUrl = async () => {
+    const node = receiptRef.current;
+    if (!node) throw new Error("Receipt not ready");
+    // 한 프레임 대기(레이아웃 안정화)
+    await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));
+    return htmlToImage.toJpeg(node, { backgroundColor:"#fff", quality:0.95, pixelRatio:2 });
+  };
 
-  /* ✅ 사진첩 저장 우선 로직: 공유 가능하면 공유 시트로(대부분 사진첩 저장 제공), 아니면 안내 후 다운로드/새 탭 */
   const dataURLToBlob = (d) => {
     const [h,b]=d.split(","); const m=h.match(/:(.*?);/)[1];
     const bin=atob(b); const u8=new Uint8Array(bin.length);
@@ -304,47 +393,69 @@ export default function MoveoutListMobile({ employeeId, userId }) {
     return new Blob([u8],{type:m});
   };
 
-  const shareReceipt = async () => {
-    const d = await ensureReceiptDataUrl();
-    const file = new File([dataURLToBlob(d)], `${buildBase(receiptRow)}.jpg`, { type:"image/jpeg" });
-    if (navigator.canShare && navigator.canShare({ files:[file] })) {
-      await navigator.share({ title:"이사정산 영수증", files:[file] });
-    } else if (navigator.share) {
-      // 파일 공유가 안되는 브라우저: 텍스트 공유로 안내
-      await navigator.share({ title:"이사정산 영수증", text:"이미지 파일 공유가 제한됩니다. 저장 버튼으로 파일 저장 후 사진에 추가해주세요." });
-    } else {
-      // 완전 불가: 새 탭 열어 롱프레스 저장 유도
-      const w = window.open(d, "_blank");
-      if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
-    }
-  };
-
+  /* ===== 저장: 갤러리 저장 ===== */
   const saveReceipt = async () => {
     try {
-      const d = await ensureReceiptDataUrl();
-      const file = new File([dataURLToBlob(d)], `${buildBase(receiptRow)}.jpg`, { type:"image/jpeg" });
+      const baseName = buildBase(receiptRow);
+      const dataUrl = await ensureReceiptDataUrl();
 
-      // 1) 가능한 경우: 공유 시트로 보내서 사진첩 저장 선택 유도 (가장 자연스러운 사진첩 저장 경로)
-      if (navigator.canShare && navigator.canShare({ files:[file] })) {
-        await navigator.share({ title:"이사정산 영수증", files:[file] });
+      if (isHybrid()) {
+        await saveReceiptToGalleryHybrid(dataUrl, baseName);
+        alert("갤러리(HannamReceipts)에 저장되었습니다.");
         return;
       }
 
-      // 2) 공유가 불가한 경우: 파일 다운로드 vs 사진첩 수동 저장 선택
-      const goDownload = window.confirm(
-        "이 기기는 사진첩으로 바로 저장을 지원하지 않을 수 있어요.\n\n" +
-        "확인: 파일로 저장 (다운로드)\n취소: 새 탭으로 열기 후 '이미지 길게 누르기 → 사진에 저장'"
-      );
-      if (goDownload) {
-        const a = document.createElement("a");
-        a.href = d; a.download = `${buildBase(receiptRow)}.jpg`; a.click();
-      } else {
-        const w = window.open(d, "_blank");
-        if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
-      }
+      const a = document.createElement("a");
+      a.href = dataUrl; a.download = `${baseName}.jpg`; a.click();
     } catch(e){
       console.error(e);
       alert("영수증 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  /* ===== 전송: 갤러리 저장 + 캐시에 전송본 저장 + 문자앱 열기(번호 자동/본문 없음/이미지 첨부) ===== */
+  const shareReceipt = async () => {
+    try {
+      const to = pickSmsNumber(receiptRow);
+      if (!to) {
+        alert("수신 번호를 찾을 수 없습니다. 연락처를 먼저 등록해주세요.");
+        return;
+      }
+
+      const baseName = buildBase(receiptRow);
+      const dataUrl = await ensureReceiptDataUrl();
+
+      if (isHybrid()) {
+        // 1) 갤러리에 저장 (사용자가 갤러리에서도 확인 가능)
+        await saveReceiptToGalleryHybrid(dataUrl, baseName);
+
+        // 2) 전송용 파일(캐시)에 저장
+        const { fileUriNative } = await saveReceiptForMmsHybrid(dataUrl, baseName);
+
+        // 3) 네이티브 MMS 컴포저 호출 (본문 텍스트는 전달하지 않음 → 자동 문구 방지)
+        try {
+          await openMmsComposer({ phone: to, fileUriNative, mimeType: "image/jpeg" });
+        } catch (err) {
+          console.error("MmsComposer failed:", err);
+          // 플러그인 실패 시에도 본문 없이 번호만 자동 입력
+          window.location.href = `sms:${to}`;
+        }
+        return;
+      }
+
+      // (웹 폴백) 파일 공유 시도 - 본문 텍스트 제공 안 함
+      const file = new File([dataURLToBlob(dataUrl)], `${baseName}.jpg`, { type:"image/jpeg" });
+      if (navigator.canShare && navigator.canShare({ files:[file] })) {
+        await navigator.share({ files:[file], title: "" }); // text 미전달
+      } else if (navigator.share) {
+        await navigator.share({ title: "" }); // text 미전달
+      } else {
+        const w = window.open(dataUrl, "_blank");
+        if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("영수증 전송 중 오류가 발생했습니다.");
     }
   };
 
@@ -359,7 +470,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
         </button>
       </div>
 
-      {/* 필터 (커스텀 드롭다운 + 검색) */}
+      {/* 필터 */}
       <div className="mo-filters">
         <FilterSelect value={statusFilter} onChange={setStatusFilter} />
         <input
@@ -374,30 +485,27 @@ export default function MoveoutListMobile({ employeeId, userId }) {
       <div className="card-list" ref={listRef}>
         {pagedRows.map((row) => {
           const opened = openId === row.id;
-          const hasNote = row.__hasNote;
-          const hasPhotos = row.__hasPhotos;
+          const hasNote = String(row.note || "").trim().length > 0;
+          const hasPhotos = Array.isArray(row.photos) && row.photos.filter(Boolean).length > 0;
 
           return (
             <div className={`card ${opened ? "opened" : ""}`} key={row.id}>
               <div className="card-head" onClick={()=>toggleOpen(row.id)}>
-                {/* 1행: 날짜 / 진행현황 */}
                 <div className="head-line">
                   <div className="head-left"><span className="emoji">📅</span><span className="date">{row.moveDate || "-"}</span></div>
                   <div className="head-right" onClick={(e)=>e.stopPropagation()}>
                     <StatusSelect value={row.status || "정산대기"} onChange={(s)=>updateStatus(row,s)} />
                   </div>
                 </div>
-                {/* 2행: 3분할 */}
                 <div className="head-3col">
                   <div className="h-left ellipsis" title={row.villaName || ""}>🏢 {row.villaName || "-"}</div>
                   <div className="h-center unit-chip unit-narrow" title={row.unitNumber || ""}>{row.unitNumber || "-"}</div>
-                  <div className="h-right total">💰 {row.__totalDisplay}원</div>
+                  <div className="h-right total">💰 {fmtAmount(row.totalAmount)}원</div>
                 </div>
               </div>
 
               {opened && (
                 <div className="card-body">
-                  {/* 금액 */}
                   <div className="amounts-stack">
                     <div className="a-item"><div className="a-label ellipsis">미납관리비</div><div className="a-value ellipsis">{fmtAmount(row.arrears)}원</div></div>
                     <div className="a-item"><div className="a-label ellipsis">당월관리비</div><div className="a-value ellipsis">{fmtAmount(row.currentMonth)}원</div></div>
@@ -407,34 +515,37 @@ export default function MoveoutListMobile({ employeeId, userId }) {
                     <div className="a-item"><div className="a-label ellipsis">청소비용</div><div className="a-value ellipsis">{fmtAmount(row.cleaningFee)}원</div></div>
                   </div>
 
-                  {/* 추가내역 */}
-                  {row.__hasExtras && (
-                    <div className="extras-inline">
-                      <div className="extras-title">🧾 추가내역</div>
-                      <div className="extras-grid">
-                        {Array.isArray(row.extras) && row.extras.length > 0 ? (
-                          row.extras.map((e,i)=>(
-                            <div key={i} className="x-item">
-                              <div className="x-label ellipsis" title={e.desc}>{e.desc}</div>
-                              <div className="x-value ellipsis">{fmtAmount(e.amount)}원</div>
+                  {(() => {
+                    const extrasArr = Array.isArray(row.extras) ? row.extras : null;
+                    const hasPair = String(row.extraItems || "").trim().length > 0 && toNum(row.extraAmount) > 0;
+                    if (!(extrasArr?.length || hasPair)) return null;
+                    return (
+                      <div className="extras-inline">
+                        <div className="extras-title">🧾 추가내역</div>
+                        <div className="extras-grid">
+                          {extrasArr?.length ? (
+                            extrasArr.map((e,i)=>(
+                              <div key={i} className="x-item">
+                                <div className="x-label ellipsis" title={e.desc}>{e.desc}</div>
+                                <div className="x-value ellipsis">{fmtAmount(e.amount)}원</div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="x-item">
+                              <div className="x-label ellipsis" title={row.extraItems || ""}>{String(row.extraItems || "").trim() || "-"}</div>
+                              <div className="x-value ellipsis">{fmtAmount(row.extraAmount)}원</div>
                             </div>
-                          ))
-                        ) : (
-                          <div className="x-item">
-                            <div className="x-label ellipsis" title={row.extraItems || ""}>{String(row.extraItems || "").trim() || "-"}</div>
-                            <div className="x-value ellipsis">{fmtAmount(row.extraAmount)}원</div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
-                  {/* 액션 2줄 고정 */}
                   <div className="actions-fixed">
                     <div className="act-row top">
                       <button
                         className={`i-btn ${hasNote ? "" : "disabled"}`}
-                        onClick={() => hasNote && openCenter(row, "note")}
+                        onClick={() => hasNote && (setCenterRow(row), setCenterType("note"), setPhotoIdx(0), setCenterOpen(true))}
                         disabled={!hasNote}
                         title={hasNote ? "비고 보기" : "비고 없음"}
                       >
@@ -442,7 +553,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
                       </button>
                       <button
                         className={`i-btn ${hasPhotos ? "" : "disabled"}`}
-                        onClick={() => hasPhotos && openCenter(row, "photos")}
+                        onClick={() => hasPhotos && (setCenterRow(row), setCenterType("photos"), setPhotoIdx(0), setCenterOpen(true))}
                         disabled={!hasPhotos}
                         title={hasPhotos ? "사진 보기" : "사진 없음"}
                       >
@@ -465,7 +576,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
         })}
       </div>
 
-      {/* 하단 페이지 컨트롤 */}
+      {/* 페이지네이션 */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "10px 12px" }}>
         <button className="pill-btn light" onClick={goPrev} disabled={page <= 1} aria-label="이전 페이지">‹ 이전</button>
         <div style={{ fontWeight: 900, fontSize: 13, color: "#334155", minWidth: 80, textAlign: "center" }}>
@@ -474,15 +585,13 @@ export default function MoveoutListMobile({ employeeId, userId }) {
         <button className="pill-btn" onClick={goNext} disabled={page >= totalPages} aria-label="다음 페이지">다음 ›</button>
       </div>
 
-      {/* 비고/사진 모달 — 제목 제거, 내용만 표시 + 하단 닫기 버튼 추가 */}
+      {/* 비고/사진 모달 */}
       {centerOpen && centerRow && (
         <div className="overlay center" onClick={()=>setCenterOpen(false)}>
           <div className="modal" onClick={(e)=>e.stopPropagation()}>
-            {/* 제목 제거: 콘텐츠만 */}
             {centerType === "note" && (
               <div className="note" style={{ whiteSpace:"pre-wrap", lineHeight:1.6 }}>{centerRow.note}</div>
             )}
-
             {centerType === "photos" && (
               <div className="photos">
                 {Array.isArray(centerRow.photos) && centerRow.photos.filter(Boolean).length > 0 ? (
@@ -495,106 +604,50 @@ export default function MoveoutListMobile({ employeeId, userId }) {
                 ) : <div>사진 없음</div>}
               </div>
             )}
-
-            {/* 하단 닫기 버튼 (영수증 모달과 동일한 스타일) */}
             <div className="actions center" style={{ display:"flex", justifyContent:"center", marginTop:16 }}>
-              <button
-                className="pill-btn danger"
-                onClick={()=>setCenterOpen(false)}
-                style={{ fontSize:14, padding:"10px 14px", borderRadius:10 }}
-                aria-label="닫기"
-              >
-                닫기
-              </button>
+              <button className="pill-btn danger" onClick={()=>setCenterOpen(false)} style={{ fontSize:14, padding:"10px 14px", borderRadius:10 }} aria-label="닫기">닫기</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 영수증: 저장/전송 (제목 제거, 2개 버튼만 크게) */}
+      {/* 영수증 모달 */}
       {receiptModalOpen && receiptRow && (
         <div className="overlay center" onClick={closeReceiptModal}>
           <div className="modal" onClick={(e)=>e.stopPropagation()}>
-            <div
-              className="actions center"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 14,
-                padding: "24px 20px",
-              }}
-            >
-              <button
-                className="pill-btn"
-                onClick={saveReceipt}
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  padding: "16px 18px",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                }}
-                aria-label="영수증 저장"
-              >
+            <div className="actions center" style={{ display:"flex", flexDirection:"column", gap:14, padding:"24px 20px" }}>
+              <button className="pill-btn" onClick={saveReceipt} style={{ fontSize:16, fontWeight:700, padding:"16px 18px", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", gap:10 }} aria-label="영수증 저장">
                 <span role="img" aria-hidden="true">💾</span>
                 <span>영수증저장</span>
               </button>
-
-              <button
-                className="pill-btn light"
-                onClick={shareReceipt}
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  padding: "16px 18px",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                }}
-                aria-label="영수증 전송"
-              >
+              <button className="pill-btn light" onClick={shareReceipt} style={{ fontSize:16, fontWeight:700, padding:"16px 18px", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", gap:10 }} aria-label="영수증 전송">
                 <span role="img" aria-hidden="true">📤</span>
                 <span>영수증전송</span>
               </button>
-
-              <button
-                className="pill-btn danger"
-                onClick={closeReceiptModal}
-                style={{
-                  fontSize: 14,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  marginTop: 2,
-                }}
-                aria-label="닫기"
-              >
-                닫기
-              </button>
+              <button className="pill-btn danger" onClick={closeReceiptModal} style={{ fontSize:14, padding:"10px 14px", borderRadius:10, marginTop:2 }} aria-label="닫기">닫기</button>
             </div>
 
-            {/* 오프스크린 캡처 타깃 */}
+            {/* 오프스크린 캡처 타깃: ReceiptTemplate을 래핑한 div에 ref를 직접 걸어 캡쳐 안정화 */}
             <div style={{ position:"absolute", left:-99999, top:-99999 }}>
-              <ReceiptTemplate
-                refProp={receiptRef}
-                item={{
-                  moveOutDate: receiptRow.moveDate || "",
-                  name: receiptRow.villaName || "",
-                  roomNumber: receiptRow.unitNumber || "",
-                  arrears: toNum(receiptRow.arrears),
-                  currentFee: toNum(receiptRow.currentMonth),
-                  waterCost: toNum(receiptRow.waterFee),
-                  electricity: toNum(receiptRow.electricity),
-                  tvFee: toNum(receiptRow.tvFee),
-                  cleaning: toNum(receiptRow.cleaningFee),
-                  defects: (Array.isArray(receiptRow.extras) ? receiptRow.extras : []).map((e) => ({ desc: e.desc, amount: toNum(e.amount) })),
-                  total: sumTotal(receiptRow),
-                }}
-              />
+              <div id="receipt-capture" ref={receiptRef}>
+                <ReceiptTemplate
+                  item={{
+                    moveOutDate: receiptRow.moveDate || "",
+                    name: receiptRow.villaName || "",
+                    roomNumber: receiptRow.unitNumber || "",
+                    arrears: toNum(receiptRow.arrears),
+                    currentFee: toNum(receiptRow.currentMonth),
+                    waterCost: toNum(receiptRow.waterFee),
+                    electricity: toNum(receiptRow.electricity),
+                    tvFee: toNum(receiptRow.tvFee),
+                    cleaning: toNum(receiptRow.cleaningFee),
+                    defects: (Array.isArray(receiptRow.extras) ? receiptRow.extras : []).map((e) => ({ desc: e.desc, amount: toNum(e.amount) })),
+                    total: toNum(receiptRow.arrears)+toNum(receiptRow.currentMonth)+toNum(receiptRow.waterFee)+toNum(receiptRow.electricity)+toNum(receiptRow.tvFee)+toNum(receiptRow.cleaningFee)+(
+                      Array.isArray(receiptRow.extras) ? sumExtrasFromArray(receiptRow.extras) : toNum(receiptRow.extraAmount)
+                    ),
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>

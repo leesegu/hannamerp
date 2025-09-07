@@ -31,6 +31,9 @@ import CctvPage from "./pages/CctvPage";
 import VendorRegisterPage from "./pages/VendorRegisterPage";
 import EmployeePage from "./pages/EmployeePage";
 
+/* ✅ 신규: 영수증 발행 리스트 페이지 */
+import ReceiptIssuePage from "./pages/ReceiptIssuePage";
+
 import "./App.css";
 
 function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }) {
@@ -128,6 +131,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
             <Navigate to="/login" replace />
           ) : (
             <MoveoutList employeeId={employeeId} userId={userId} />
+          )
+        }
+      />
+
+      {/* ✅ 신규: 영수증 발행 리스트 (PC) */}
+      <Route
+        path="/receipts"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ReceiptIssuePage />
           )
         }
       />

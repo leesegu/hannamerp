@@ -18,8 +18,12 @@ export default function DataTable({
   enableExcel = false,
   excelFields = [],
 
-  // 새로 추가: 좌측 커스텀 컨트롤(필터 등) 렌더 슬롯
+  // 좌측 커스텀 컨트롤(필터 등) 렌더 슬롯
   leftControls = null,
+
+  // ✅ 신규: 등록 버튼 라벨/아이콘 커스터마이즈(페이지별 일관성 유지용)
+  addButtonLabel = "등록",
+  addButtonIcon = "➕",
 
   // ⚠️ 아래는 엑셀 업로드에 필요 (해당 페이지에서 사용 안 하면 생략 가능)
   collectionName,
@@ -38,23 +42,15 @@ export default function DataTable({
   const fileInputRef = useRef(null);
   const allowUploadRef = useRef(false);
 
-  // ====== ✅ 기본값 자동 추론 (여기만 추가됨) ======
+  // ====== ✅ 기본값 자동 추론 ======
   const resolveIdKeyFromColumns = (cols) => {
     if (!Array.isArray(cols)) return undefined;
-    // 1) isId 명시
     const byIsId = cols.find((c) => c?.isId);
     if (byIsId?.key) return byIsId.key;
-    // 2) key에 code 포함
-    const byKey = cols.find((c) =>
-      String(c?.key ?? "").toLowerCase().includes("code")
-    );
+    const byKey = cols.find((c) => String(c?.key ?? "").toLowerCase().includes("code"));
     if (byKey?.key) return byKey.key;
-    // 3) 라벨에 "코드" 포함
-    const byLabel = cols.find((c) =>
-      String(c?.label ?? "").toLowerCase().includes("코드")
-    );
+    const byLabel = cols.find((c) => String(c?.label ?? "").toLowerCase().includes("코드"));
     if (byLabel?.key) return byLabel.key;
-    // 4) 최후의 기본값
     return "code";
   };
 
@@ -99,7 +95,7 @@ export default function DataTable({
 
   const normalizeForSearch = (v) => {
     const out = [];
-    if (v === null || v === undefined) return out;
+    if (v == null) return out;
     const base =
       typeof v === "string" || typeof v === "number" || typeof v === "boolean"
         ? String(v)
@@ -173,9 +169,9 @@ export default function DataTable({
     else { setSortKey(key); setSortOrder("asc"); }
   };
 
-  // ---------- (엑셀 관련 유틸: 필요 시 사용) ----------
+  // ---------- (엑셀 관련 유틸) ----------
   const normalizeAmount = (v) => {
-    if (v === null || v === undefined) return "";
+    if (v == null) return "";
     const raw = String(v).trim();
     if (raw === "" || raw === "-") return "";
     const cleaned = raw.replace(/[^\d.-]/g, "");
@@ -345,7 +341,6 @@ export default function DataTable({
 
   const openUploadDialog = () => {
     if (!enableExcel) return;
-    // ✅ 페이지에서 안 넘겨줘도 기본값으로 동작
     if (!resolvedCollectionName || !resolvedIdKey) {
       alert("엑셀 업로드가 비활성화되었습니다.\n(기본값 추론 실패: 컬렉션/ID 키를 확인하세요)");
       return;
@@ -432,7 +427,7 @@ export default function DataTable({
 
   return (
     <div className="data-table-wrapper">
-      {/* 상단 컨트롤 바: 좌측(커스텀) / 우측(등록+검색) */}
+      {/* 상단 컨트롤 바 */}
       <div
         className="table-controls"
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
@@ -444,7 +439,7 @@ export default function DataTable({
         <div className="control-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {onAdd && (
             <button className="register-button" onClick={onAdd}>
-              ➕ 등록
+              {addButtonIcon} {addButtonLabel}
             </button>
           )}
           <input

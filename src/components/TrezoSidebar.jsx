@@ -16,6 +16,7 @@ import CctvPage from "../pages/CctvPage";
 import VendorRegisterPage from "../pages/VendorRegisterPage";
 import VendorsMainPage from "../pages/VendorsMainPage.js";
 import EmployeePage from "../pages/EmployeePage";
+import ReceiptIssuePage from "../pages/ReceiptIssuePage"; // ✅ 추가
 
 import "remixicon/fonts/remixicon.css";
 
@@ -75,9 +76,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   };
 
   const handleLogout = () => {
-    // ✅ 상위(App) 상태와 localStorage까지 비우도록 호출
     onLogout?.();
-    // 화면 전환 보장
     navigate("/login", { replace: true });
   };
 
@@ -198,7 +197,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               label="영수증발행"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(null, "영수증발행");
+                handleNavigate(<ReceiptIssuePage />, "영수증발행"); // ✅ 콘텐츠 렌더 연결
               }}
               active={activeMenu === "영수증발행"}
             />

@@ -1,31 +1,22 @@
 /* src/MoveoutForm.css — PC 전용 (정리본) */
-/* 간격/레이아웃을 손쉽게 바꾸려면 아래 변수만 조정하세요 */
-:root {
+/* ✅ 전부 .pc-moveout 네임스페이스로 스코프 → 모바일 간섭 방지 */
+
+.pc-moveout {
   --grid-gap-x: 16px;   /* 입력칸 가로 간격 */
   --grid-gap-y: 20px;   /* 입력칸 세로 간격 */
   --label-gap: 6px;     /* 라벨-인풋 사이 간격 */
   --group-margin: 0px;  /* 각 input-group 하단 여백 */
-
   --input-pad: 10px;    /* 인풋 내부 패딩 */
   --input-font: 14px;   /* 인풋 폰트 크기 */
-
   --border: 1px solid #ddd;
   --radius: 8px;
   --muted: #f5f5f5;
 }
 
-.grid + .grid { margin-top: 16px; }
+.pc-moveout .grid + .grid { margin-top: 16px; }
 
-/* 공통 리셋(필요 최소한) */
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  background: #fff;
-}
-
-/* 전체 컨테이너(전체 페이지 모드에서 사용) */
-.form-container {
+/* 전체 컨테이너 */
+.pc-moveout.form-container {
   width: 100%;
   height: auto;
   max-height: 85vh;
@@ -35,37 +26,30 @@ html, body {
   position: relative;
 }
 
-/* 내부 레이아웃 */
-.form-inner {
-  overflow: visible;
-  padding: 0;
-  margin-bottom: 0;
-}
-
 /* 그리드: PC 기본 3열 */
-.grid {
+.pc-moveout .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   column-gap: var(--grid-gap-x);
   row-gap: var(--grid-gap-y);
 }
 
-/* 반응형: 태블릿 2열, 모바일 1열 */
+/* 반응형 */
 @media (max-width: 1024px) {
-  .grid { grid-template-columns: repeat(2, 1fr); }
+  .pc-moveout .grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  .grid { grid-template-columns: 1fr; }
+  .pc-moveout .grid { grid-template-columns: 1fr; }
 }
 
 /* 입력 그룹 */
-.input-group {
+.pc-moveout .input-group {
   display: flex;
   flex-direction: column;
   width: 100%;
   margin-bottom: var(--group-margin);
 }
-.input-group label {
+.pc-moveout .input-group label {
   margin-bottom: var(--label-gap);
   font-weight: 600;
   color: #333;
@@ -73,9 +57,10 @@ html, body {
 }
 
 /* 입력 요소 공통 */
-.input-group input,
-.input-group select,
-.input-group button {
+.pc-moveout .input-group input,
+.pc-moveout .input-group select,
+.pc-moveout .input-group button,
+.pc-moveout textarea {
   padding: var(--input-pad);
   font-size: var(--input-font);
   border: var(--border);
@@ -84,29 +69,28 @@ html, body {
   outline: none;
   transition: box-shadow .15s, border-color .15s, background .15s;
 }
-.input-group input:focus,
-.input-group select:focus {
+.pc-moveout .input-group input:focus,
+.pc-moveout .input-group select:focus,
+.pc-moveout textarea:focus {
   border-color: #c7d2fe;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
 }
-.input-group input[readonly] {
+.pc-moveout .input-group input[readonly] {
   background-color: var(--muted);
 }
 
-/* 연락처 한 줄 강조가 필요하면 사용 */
-.contact-field input {
-  letter-spacing: 0.2px;
-}
+/* 연락처 강조 */
+.pc-moveout .contact-field input { letter-spacing: 0.2px; }
 
 /* 커스텀 데이트피커 인풋 */
-.custom-datepicker {
+.pc-moveout .custom-datepicker {
   width: 100%;
   cursor: pointer;
   background: #fff;
 }
 
-/* 하단 버튼 행(전체 페이지 모드/모달 바닥 공통) */
-.actions-row {
+/* 하단 버튼 행 */
+.pc-moveout .actions-row {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
@@ -115,13 +99,13 @@ html, body {
 }
 
 /* 추가내역 리스트 */
-.extra-list-container {
+.pc-moveout .extra-list-container {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.extra-row {
+.pc-moveout .extra-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -129,21 +113,21 @@ html, body {
   font-size: 14px;
   border-bottom: 1px solid #eee;
 }
-.extra-desc {
+.pc-moveout .extra-desc {
   flex: 2;
   word-break: break-word;
 }
-.extra-amount {
+.pc-moveout .extra-amount {
   flex: 1;
   text-align: right;
   margin-right: 1rem;
   white-space: nowrap;
 }
-.extra-actions {
+.pc-moveout .extra-actions {
   display: flex;
   gap: 6px;
 }
-.extra-actions button {
+.pc-moveout .extra-actions button {
   background-color: #ff8c00;
   border: none;
   color: white;
@@ -153,15 +137,11 @@ html, body {
   cursor: pointer;
   transition: filter .15s;
 }
-.extra-actions button:hover {
-  filter: brightness(0.95);
-}
+.pc-moveout .extra-actions button:hover { filter: brightness(0.95); }
 
-/* ============================= */
-/* 저장 / 닫기 버튼 디자인 추가  */
-/* ============================= */
-.save-btn,
-.close-btn {
+/* 저장 / 닫기 버튼 */
+.pc-moveout .save-btn,
+.pc-moveout .close-btn {
   font-size: 14px;
   padding: 10px 20px;
   border-radius: 6px;
@@ -178,72 +158,59 @@ html, body {
 }
 
 /* 저장(주버튼) */
-.save-btn {
+.pc-moveout .save-btn {
   background-color: #7A5FFF;
   color: white;
   border: 2px solid transparent;
 }
-.save-btn:hover {
+.pc-moveout .save-btn:hover {
   background-color: #9B7DFF;
   border: 2px solid #BFAEFF;
   box-shadow: 0 0 0 3px rgba(122, 95, 255, 0.3);
 }
-.save-btn:disabled {
+.pc-moveout .save-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
 
 /* 닫기(보조버튼) */
-.close-btn {
-  background-color: #ccc;
-  color: black;
+.pc-moveout .close-btn {
+  background-color: #ececec;
+  color: #111;
   border: 2px solid transparent;
 }
-.close-btn:hover {
-  background-color: #e0e0e0;
-  border: 2px solid #aaa;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+.pc-moveout .close-btn:hover {
+  background-color: #f4f4f4;
+  border: 2px solid #cfcfcf;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
 }
-.close-btn:disabled {
+.pc-moveout .close-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
 
 /* 키보드 접근성 */
-.save-btn:focus-visible,
-.close-btn:focus-visible {
+.pc-moveout .save-btn:focus-visible,
+.pc-moveout .close-btn:focus-visible {
   outline: 3px solid rgba(147, 197, 253, 0.8);
   outline-offset: 2px;
 }
 
-/* 작은 아이콘을 넣을 때 */
-.save-btn .icon,
-.close-btn .icon { font-size: 18px; line-height: 0; }
-
-/* 모바일에서 살짝 키우기 */
-@media (max-width: 640px) {
-  .save-btn, .close-btn {
-    padding: 12px 22px;
-  }
-}
-
-/* ============================= */
-/* ✅ 추가내역/추가금액/진행현황 3열 고정 */
-/* ============================= */
-.extras-grid.extras-grid--3col {
+/* 추가내역/추가금액/진행현황 3열 고정 */
+.pc-moveout .extras-grid.extras-grid--3col {
   grid-template-columns: repeat(3, 1fr);
-  align-items: end;                 /* 라벨 높이 차이 보정 */
+  align-items: end;
   column-gap: var(--grid-gap-x);
   row-gap: var(--grid-gap-y);
 }
 
-/* 태블릿/모바일에서도 강제로 3열 유지하고 싶다면 아래 주석 해제
+/* (옵션) 반응형에서 강제 3열 유지하려면 아래 주석 해제
 @media (max-width: 1024px) {
-  .extras-grid.extras-grid--3col { grid-template-columns: repeat(3, 1fr); }
+  .pc-moveout .extras-grid.extras-grid--3col { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 768px) {
-  .extras-grid.extras-grid--3col { grid-template-columns: 1fr; }
+  .pc-moveout .extras-grid.extras-grid--3col { grid-template-columns: 1fr; }
 }
 */
