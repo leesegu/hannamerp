@@ -15,13 +15,16 @@ import {
 
 import DataTable from "../components/DataTable";
 import PageTitle from "../components/PageTitle";
-import ReceiptPreviewModal from "../components/ReceiptPreviewModal"; // ✅ 미리보기 분리
+import ReceiptPreviewModal from "../components/ReceiptPreviewModal";
 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import "remixicon/fonts/remixicon.css";
+
+// ✅ 새로 분리된 CSS
+import "./ReceiptIssuePage.css";
 
 /* ===== 유틸 ===== */
 const s = (v) => String(v ?? "").trim();
@@ -30,25 +33,215 @@ const fmtComma = (n) => (parseNumber(n) ? parseNumber(n).toLocaleString() : "");
 const today = () => format(new Date(), "yyyy-MM-dd");
 const toDate = (str) => (str ? new Date(str) : null);
 
-/* 달력 커스텀 인풋: 어디를 눌러도 열림 */
+/* 날짜 인풋: .date-field 셸(테두리/라운드/포커스) + compact 옵션 */
 const DPInput = forwardRef(function DPInput(
-  { value, onClick, placeholder = "날짜", className = "ri-calendar-line dp-input" },
+  { value, onClick, placeholder = "날짜", clearable = false, compact = false },
   ref
 ) {
   return (
-    <div className="date-input" onClick={onClick}>
-      <i className="ri-calendar-line" />
+    <div
+      className={`date-field${compact ? " compact" : ""}`}
+      data-clear={clearable ? "true" : "false"}
+      onClick={onClick}
+    >
       <input
         ref={ref}
-        className={className}
+        className="date-inner"
         value={value || ""}
         onClick={onClick}
         readOnly
         placeholder={placeholder}
       />
+      <i className="ri-calendar-line date-icon" />
     </div>
   );
 });
+
+/* 선택 즉시 닫힘 보장 (발행일자/입금날짜용) */
+function AutoCloseDate({ selected, onChange, isClearable = false, placeholder = "날짜", compact = false }) {
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef(null);
+
+  const closeNow = () => {
+    setTimeout(() => {
+      setOpen(false);
+      inputRef.current?.blur();
+    }, 0);
+  };
+
+  const handleSelect = (date) => {
+    onChange(date);
+    closeNow();
+  };
+
+  return (
+    <DatePicker
+      selected={selected}
+      onChange={handleSelect}
+      onSelect={handleSelect}
+      open={open}
+      onInputClick={() => setOpen(true)}
+      onClickOutside={closeNow}
+      onCalendarClose={() => setOpen(false)}
+      preventOpenOnFocus
+      shouldCloseOnSelect
+      dateFormat="yyyy-MM-dd"
+      locale={ko}
+      isClearable={isClearable}
+      popperPlacement="bottom-start"
+      customInput={<DPInput ref={inputRef} placeholder={placeholder} clearable={isClearable} compact={compact} />}
+    />
+  );
+}
+
+/* 영수증이름 콤보: 검색 없음, 선택 시 자동 닫힘 */
+function ReceiptNameCombo({ value, onChange }) {
+  const options = useMemo(() => ["영수증", "이사정산 영수증", "한남주택관리 영수증"], []);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!boxRef.current) return;
+      if (!boxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const onSelect = (val) => {
+    onChange(val);
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
+  return (
+    <div className="namecombo" ref={boxRef}>
+      <input
+        ref={inputRef}
+        className="input"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+      />
+      <i
+        className="ri-arrow-down-s-line combo-caret"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setOpen((v) => !v);
+        }}
+      />
+      {open && (
+        <div className="combo-list">
+          <div className="combo-items">
+            {options.map((opt) => (
+              <div
+                key={opt}
+                className="combo-item small"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(opt);
+                }}
+              >
+                <div className="ci-name">{opt}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 코드번호 콤보: 검색 유지, 선택 시 자동 닫힘(항목 높이 축소) + 선택 콜백 */
+function CodeCombo({ value, onChange, onSelectOption, options }) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const boxRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const list = useMemo(() => {
+    const f = s(filter);
+    return options.filter((v) => (f ? v.code.includes(f) || v.name.includes(f) : true)).slice(0, 300);
+  }, [filter, options]);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!boxRef.current) return;
+      if (!boxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const onSelect = (code) => {
+    onChange(code);
+    setOpen(false);
+    setFilter("");
+    inputRef.current?.blur();
+    onSelectOption?.(code);
+  };
+
+  return (
+    <div className="codecombo" ref={boxRef}>
+      <input
+        ref={inputRef}
+        className="input"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setFilter(e.target.value);
+          setOpen(true);
+        }}
+      />
+      <i
+        className="ri-arrow-down-s-line combo-caret"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setOpen((v) => !v);
+        }}
+      />
+      {open && (
+        <div className="combo-list">
+          <div className="combo-search">
+            <i className="ri-search-line" />
+            <input
+              className="combo-search-input"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </div>
+          <div className="combo-items">
+            {list.length === 0 ? (
+              <div className="combo-empty">검색 결과가 없습니다</div>
+            ) : (
+              list.map((v) => (
+                <div
+                  key={v.id}
+                  className="combo-item small"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSelect(v.code);
+                  }}
+                >
+                  <div className="ci-code">{v.code}</div>
+                  <div className="ci-name">{v.name}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ReceiptIssuePage() {
   const [rows, setRows] = useState([]);
@@ -67,11 +260,18 @@ export default function ReceiptIssuePage() {
   const [form, setForm] = useState(blankForm());
   const [items, setItems] = useState([blankItem()]);
 
-  const issueRef = useRef(null);
-  const depositRef = useRef(null);
+  // 품목 입력 포커스 제어용 refs
   const itemDateRefs = useRef([]);
+  const itemDescRefs = useRef([]);
+  const itemQtyRefs = useRef([]);
+  const itemPriceRefs = useRef([]);
 
-  // 커서 근처 툴팁(내용+금액)
+  // 상단 입력 포커스 제어용 refs
+  const unitRef = useRef(null);
+  const recipientRef = useRef(null);
+  const billingRef = useRef(null);
+
+  // 커서툴팁(내용+금액)
   const [tip, setTip] = useState({ show: false, x: 0, y: 0, content: "" });
   const showTip = (content, e) => setTip({ show: true, x: e.clientX + 12, y: e.clientY + 12, content });
   const moveTip = (e) => setTip((t) => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
@@ -80,13 +280,12 @@ export default function ReceiptIssuePage() {
   function blankForm() {
     return {
       issueDate: today(),
-      receiptName: "한남주택관리 영수증", // ✅ 기본 영수증 이름
+      receiptName: "한남주택관리 영수증",
       code: "",
       address: "",
       villaName: "",
       unitNumber: "",
       recipient: "",
-      depositorName: "",      // 유지(요청에는 제거 언급 X, 저장은 계속)
       billingMethod: "",
       depositDate: "",
       note: "",
@@ -121,7 +320,6 @@ export default function ReceiptIssuePage() {
           note: s(data.note || ""),
           code: s(data.code || ""),
           recipient: s(data.recipient || ""),
-          depositorName: s(data.depositorName || ""),
           items: its,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
@@ -133,7 +331,7 @@ export default function ReceiptIssuePage() {
     return () => unsub();
   }, []);
 
-  /* villas(코드별빌라) 구독 */
+  /* villas 구독 */
   useEffect(() => {
     const qx = query(collection(db, "villas"), orderBy("code", "asc"));
     const unsub = onSnapshot(qx, (snap) => {
@@ -146,12 +344,10 @@ export default function ReceiptIssuePage() {
     return () => unsub();
   }, []);
 
-  /* 툴팁(내용+금액) */
+  /* 툴팁 텍스트 */
   const buildTooltip = (row) => {
     const arr = Array.isArray(row.items) ? row.items : [];
-    if (!arr.length) {
-      return row.amount ? `총액 : ${Number(row.amount).toLocaleString()}원` : "";
-    }
+    if (!arr.length) return row.amount ? `총액 : ${Number(row.amount).toLocaleString()}원` : "";
     const lines = arr.map((it) => {
       const desc = s(it?.description);
       const amt = Number(it?.amount ?? (Number(it?.qty || 0) * parseNumber(it?.unitPrice)));
@@ -160,13 +356,13 @@ export default function ReceiptIssuePage() {
     return lines.join("\n");
   };
 
-  /* 컬럼: 헤더 '영수증'은 텍스트만, 셀 아이콘은 테두리 없이 */
+  /* 목록 컬럼 */
   const columns = useMemo(
     () => [
       { key: "issueDate", label: "발행일자", width: 110 },
       { key: "address", label: "주소", width: 220 },
       { key: "villaName", label: "빌라명", width: 120 },
-      { key: "unitNumber", label: "호수", width: 80 },
+      { key: "unitNumber", label: "나머지주소", width: 80 },
       { key: "amount", label: "금액", width: 110, render: (row) => (row.amount ? row.amount.toLocaleString() : "") },
       {
         key: "description",
@@ -192,7 +388,7 @@ export default function ReceiptIssuePage() {
       { key: "note", label: "비고", width: 160 },
       {
         key: "receipt",
-        label: "영수증", // ✅ 텍스트만
+        label: "영수증",
         width: 80,
         render: (row) => (
           <button className="receipt-icon" title="영수증 미리보기" onClick={() => onPreview(row)}>
@@ -205,7 +401,7 @@ export default function ReceiptIssuePage() {
   );
 
   const searchableKeys = [
-    "issueDate","address","villaName","unitNumber","description","billingMethod","depositDate","note","code","recipient","depositorName","receiptName"
+    "issueDate","address","villaName","unitNumber","description","billingMethod","depositDate","note","code","recipient","receiptName"
   ];
 
   /* 액션 */
@@ -222,7 +418,6 @@ export default function ReceiptIssuePage() {
       villaName: row.villaName || "",
       unitNumber: row.unitNumber || "",
       recipient: row.recipient || "",
-      depositorName: row.depositorName || "",
       billingMethod: row.billingMethod || "",
       depositDate: row.depositDate || "",
       note: row.note || "",
@@ -254,17 +449,11 @@ export default function ReceiptIssuePage() {
     setEditOpen(true);
   };
 
-  /* 코드번호 → 주소/빌라명 자동 기입 */
+  /* 코드번호 선택 시 주소/빌라명 자동 기입 */
   useEffect(() => {
     const v = villas.find((x) => x.code === s(form.code));
     if (v) setForm((f) => ({ ...f, address: v.address || "", villaName: v.name || "" }));
   }, [form.code, villas]);
-
-  /* 발행일자 선택 → 기존 행 중 '빈 날짜'만 자동 기입 */
-  useEffect(() => {
-    if (!form.issueDate) return;
-    setItems((list) => list.map((it) => (s(it.date) ? it : { ...it, date: form.issueDate })));
-  }, [form.issueDate]);
 
   /* 품목 입력 */
   const setItemField = (idx, key, value) => {
@@ -299,7 +488,7 @@ export default function ReceiptIssuePage() {
     if (saving) return;
     if (!s(form.issueDate)) return alert("발행일자를 입력하세요.");
     if (!s(form.code)) return alert("코드번호를 선택/입력하세요.");
-    if (!s(form.villaName)) return alert("빌라명을 확인하세요. (코드번호 선택 시 자동 기입)");
+    if (!s(form.villaName)) return alert("빌라명을 확인하세요.");
     if (!s(form.unitNumber)) return alert("호수를 입력하세요.");
     if (totalAmount <= 0) return alert("품목의 합계 금액이 0원입니다.");
 
@@ -313,13 +502,12 @@ export default function ReceiptIssuePage() {
 
     const payload = {
       issueDate: s(form.issueDate),
-      receiptName: s(form.receiptName),   // ✅ 저장
+      receiptName: s(form.receiptName),
       code: s(form.code),
       address: s(form.address),
       villaName: s(form.villaName),
       unitNumber: s(form.unitNumber),
       recipient: s(form.recipient),
-      depositorName: s(form.depositorName),
       billingMethod: s(form.billingMethod),
       depositDate: s(form.depositDate),
       note: s(form.note),
@@ -372,6 +560,7 @@ export default function ReceiptIssuePage() {
         <>
           <div className="modal-backdrop" onClick={() => setEditOpen(false)} />
           <div className="modal">
+            {/* 상단 고정 */}
             <div className="modal-head">
               <div className="title">{editMode === "edit" ? "영수증 수정" : "영수증 발행"}</div>
               <div className="right">
@@ -379,200 +568,187 @@ export default function ReceiptIssuePage() {
               </div>
             </div>
 
-            {/* 상단 기본 정보 */}
-            <div className="grid grid-3">
-              {/* 영수증 이름: 입력/드롭다운 병행 */}
-              <LabeledInput label="영수증 이름">
-                <input
-                  type="text"
-                  list="receiptNameList"
-                  className="input"
-                  value={form.receiptName}
-                  onChange={(e) => setForm((f) => ({ ...f, receiptName: e.target.value }))}
-                  placeholder="영수증 이름 입력 또는 선택"
-                />
-                <datalist id="receiptNameList">
-                  <option value="영수증" />
-                  <option value="이사정산 영수증" />
-                  <option value="한남주택관리 영수증" />
-                </datalist>
-              </LabeledInput>
+            {/* 본문 스크롤 */}
+            <div className="modal-body">
+              <div className="grid grid-3">
+                {/* 1행: 영수증이름, 발행일자, 코드번호 */}
+                <LabeledInput label="영수증 이름">
+                  <ReceiptNameCombo
+                    value={form.receiptName}
+                    onChange={(val) => setForm((f) => ({ ...f, receiptName: val }))}
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="발행일자" onClickLabel={() => issueRef.current?.click()}>
-                <DatePicker
-                  selected={toDate(form.issueDate)}
-                  onChange={(date) => setForm((f) => ({ ...f, issueDate: format(date, "yyyy-MM-dd") }))}
-                  dateFormat="yyyy-MM-dd"
-                  locale={ko}
-                  popperPlacement="bottom-start"
-                  customInput={<DPInput ref={issueRef} />}
-                />
-              </LabeledInput>
+                <LabeledInput label="발행일자">
+                  <AutoCloseDate
+                    selected={toDate(form.issueDate)}
+                    onChange={(date) =>
+                      setForm((f) => ({ ...f, issueDate: date ? format(date, "yyyy-MM-dd") : "" }))
+                    }
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="코드번호">
-                <input
-                  type="text"
-                  list="villaCodes"
-                  className="input"
-                  value={form.code}
-                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                  placeholder="코드번호 입력 또는 선택"
-                />
-                <datalist id="villaCodes">
-                  {villas.map((v) => (
-                    <option key={v.id} value={v.code} label={`${v.code} - ${v.name}`} />
-                  ))}
-                </datalist>
-              </LabeledInput>
+                <LabeledInput label="코드번호">
+                  <CodeCombo
+                    value={form.code}
+                    onChange={(val) => setForm((f) => ({ ...f, code: val }))}
+                    onSelectOption={() => unitRef.current?.focus()}   // 코드 선택 → 호수
+                    options={villas}
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="호수">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.unitNumber}
-                  onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
-                  placeholder="예: 302호"
-                />
-              </LabeledInput>
+                {/* 2행: 주소, 빌라명, 호수 */}
+                <LabeledInput label="주소">
+                  <input
+                    type="text"
+                    className="input"
+                    value={form.address}
+                    onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="주소">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  placeholder="코드 선택 시 자동 기입"
-                />
-              </LabeledInput>
+                <LabeledInput label="빌라명">
+                  <input
+                    type="text"
+                    className="input"
+                    value={form.villaName}
+                    onChange={(e) => setForm((f) => ({ ...f, villaName: e.target.value }))}
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="빌라명">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.villaName}
-                  onChange={(e) => setForm((f) => ({ ...f, villaName: e.target.value }))}
-                  placeholder="코드 선택 시 자동 기입"
-                />
-              </LabeledInput>
+                <LabeledInput label="나머지주소">
+                  <input
+                    ref={unitRef}
+                    type="text"
+                    className="input"
+                    value={form.unitNumber}
+                    onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") recipientRef.current?.focus(); }}  // 호수 Enter → 공급받는자
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="공급받는자">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.recipient}
-                  onChange={(e) => setForm((f) => ({ ...f, recipient: e.target.value }))}
-                  placeholder="예: 건물주"
-                />
-              </LabeledInput>
+                {/* 3행: 공급받는자, 청구방법, 입금날짜 */}
+                <LabeledInput label="공급받는자">
+                  <input
+                    ref={recipientRef}
+                    type="text"
+                    className="input"
+                    value={form.recipient}
+                    onChange={(e) => setForm((f) => ({ ...f, recipient: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") billingRef.current?.focus(); }}  // 공급받는자 Enter → 청구방법
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="입금자명">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.depositorName}
-                  onChange={(e) => setForm((f) => ({ ...f, depositorName: e.target.value }))}
-                  placeholder="예: 온수대통 건물주"
-                />
-              </LabeledInput>
+                <LabeledInput label="청구방법">
+                  <input
+                    ref={billingRef}
+                    type="text"
+                    className="input"
+                    value={form.billingMethod}
+                    onChange={(e) => setForm((f) => ({ ...f, billingMethod: e.target.value }))}
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="청구방법">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.billingMethod}
-                  onChange={(e) => setForm((f) => ({ ...f, billingMethod: e.target.value }))}
-                  placeholder="예: 계좌이체 / 현금 / MMS요청 등"
-                />
-              </LabeledInput>
+                <LabeledInput label="입금날짜">
+                  <AutoCloseDate
+                    selected={toDate(form.depositDate)}
+                    onChange={(date) =>
+                      setForm((f) => ({ ...f, depositDate: date ? format(date, "yyyy-MM-dd") : "" }))
+                    }
+                    isClearable
+                  />
+                </LabeledInput>
 
-              <LabeledInput label="입금날짜" onClickLabel={() => depositRef.current?.click()}>
-                <DatePicker
-                  selected={toDate(form.depositDate)}
-                  onChange={(date) => setForm((f) => ({ ...f, depositDate: date ? format(date, "yyyy-MM-dd") : "" }))}
-                  dateFormat="yyyy-MM-dd"
-                  locale={ko}
-                  isClearable
-                  placeholderText="선택(선택 시 클릭)"
-                  popperPlacement="bottom-start"
-                  customInput={<DPInput ref={depositRef} />}
-                />
-              </LabeledInput>
-
-              <LabeledInput label="비고">
-                <input
-                  type="text"
-                  className="input"
-                  value={form.note}
-                  onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-                  placeholder="비고 메모"
-                />
-              </LabeledInput>
-            </div>
-
-            {/* 품목 테이블 */}
-            <div className="card section">
-              <div className="table-head">
-                <div>날짜</div><div>품목(내용)</div><div>수량</div><div>단가</div><div>금액</div><div></div>
-              </div>
-
-              {items.map((it, idx) => (
-                <div className="table-row" key={idx}>
-                  <div onClick={() => itemDateRefs.current[idx]?.click()}>
-                    <DatePicker
-                      selected={toDate(it.date)}
-                      onChange={(date) => setItemField(idx, "date", date ? format(date, "yyyy-MM-dd") : "")}
-                      dateFormat="yyyy-MM-dd"
-                      locale={ko}
-                      isClearable
-                      placeholderText="날짜"
-                      popperPlacement="bottom-start"
-                      customInput={<DPInput ref={(el) => (itemDateRefs.current[idx] = el)} />}
-                    />
-                  </div>
-                  <div>
+                {/* 4행: 비고 (전체 폭) */}
+                <div className="col-span-3">
+                  <LabeledInput label="비고">
                     <input
                       type="text"
                       className="input"
-                      value={it.description}
-                      onChange={(e) => setItemField(idx, "description", e.target.value)}
-                      placeholder="예: 품입, 아이트럼 교체"
+                      value={form.note}
+                      onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                     />
-                  </div>
-                  <div>
-                    <input
-                      type="number"
-                      className="input"
-                      min="0"
-                      value={it.qty}
-                      onChange={(e) => setItemField(idx, "qty", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      className="input"
-                      inputMode="numeric"
-                      value={it.unitPrice}
-                      onChange={(e) => setItemField(idx, "unitPrice", e.target.value)}
-                      placeholder="예: 20,000"
-                    />
-                  </div>
-                  <div className="amount">{(Number(it.amount) || 0).toLocaleString()} 원</div>
-                  <div className="row-actions">
-                    <button className="icon-btn danger" title="행 삭제" onClick={() => removeItem(idx)}>
-                      <i className="ri-close-line" />
-                    </button>
-                  </div>
+                  </LabeledInput>
                 </div>
-              ))}
+              </div>
 
-              <div className="table-foot">
-                <button className="btn-outline" onClick={addItem} type="button">+ 항목 추가</button>
-                <div className="sum">합계 <b>{totalAmount.toLocaleString()}</b> 원</div>
+              {/* 품목 테이블 */}
+              <div className="card section">
+                <div className="table-head center small">
+                  <div>날짜</div><div>품목(내용)</div><div>수량</div><div>단가</div><div>금액</div><div></div>
+                </div>
+
+                {items.map((it, idx) => (
+                  <div className="table-row center" key={idx}>
+                    <div className="col-date">
+                      <DatePicker
+                        selected={toDate(it.date)}
+                        onChange={(date) => {
+                          setItemField(idx, "date", date ? format(date, "yyyy-MM-dd") : "");
+                          setTimeout(() => itemDescRefs.current[idx]?.focus(), 0); // 날짜 선택 → 품목
+                        }}
+                        dateFormat="yyyy-MM-dd"
+                        locale={ko}
+                        isClearable
+                        shouldCloseOnSelect
+                        popperPlacement="bottom-start"
+                        customInput={
+                          <DPInput
+                            ref={(el) => (itemDateRefs.current[idx] = el)}
+                            clearable
+                            compact           // 더 작은 날짜 선택창
+                          />
+                        }
+                      />
+                    </div>
+                    <div>
+                      <input
+                        ref={(el) => (itemDescRefs.current[idx] = el)}
+                        type="text"
+                        className="input"
+                        value={it.description}
+                        onChange={(e) => setItemField(idx, "description", e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") itemQtyRefs.current[idx]?.focus(); }} // 품목 Enter → 수량
+                      />
+                    </div>
+                    <div>
+                      <input
+                        ref={(el) => (itemQtyRefs.current[idx] = el)}
+                        type="number"
+                        className="input"
+                        min="0"
+                        value={it.qty}
+                        onChange={(e) => setItemField(idx, "qty", e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") itemPriceRefs.current[idx]?.focus(); }} // 수량 Enter → 단가
+                      />
+                    </div>
+                    <div>
+                      <input
+                        ref={(el) => (itemPriceRefs.current[idx] = el)}
+                        type="text"
+                        className="input"
+                        inputMode="numeric"
+                        value={it.unitPrice}
+                        onChange={(e) => setItemField(idx, "unitPrice", e.target.value)}
+                      />
+                    </div>
+                    <div className="amount">{(Number(it.amount) || 0).toLocaleString()} 원</div>
+                    <div className="row-actions">
+                      <button className="icon-btn danger" title="행 삭제" onClick={() => removeItem(idx)}>
+                        <i className="ri-close-line" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="table-foot">
+                  <button className="btn-outline" onClick={addItem} type="button">+ 항목 추가</button>
+                  <div className="sum">합계 <b>{totalAmount.toLocaleString()}</b> 원</div>
+                </div>
               </div>
             </div>
 
-            {/* 액션: 수정/발행 레이블 분기 */}
+            {/* 하단 고정 */}
             <div className="modal-actions">
               <button className="btn-primary" onClick={saveForm} disabled={saving}>
                 {saving ? "저장 중..." : (editMode === "edit" ? "수정" : "발행")}
@@ -592,77 +768,7 @@ export default function ReceiptIssuePage() {
         </div>
       )}
 
-      {/* 페이지 전용 스타일 */}
-      <style>{`
-        .receipt-page { padding: 14px; }
-        .grid { display: grid; gap: 12px; }
-        .grid-3 { grid-template-columns: repeat(3, 1fr); }
-        @media (max-width: 1024px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 640px)  { .grid-3 { grid-template-columns: 1fr; } }
-
-        .input, .date-input input {
-          width: 100%; border: 1px solid #e5e7eb; border-radius: 10px;
-          padding: 10px 12px; font-size: 14px; outline: none;
-          transition: box-shadow .15s, border-color .15s, background .15s; background:#fff;
-        }
-        .input:focus, .date-input:focus-within { border-color: #c7d2fe; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
-        .date-input { display:flex; align-items:center; gap:8px; border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; cursor:pointer; }
-        .date-input i { color:#7A5FFF; font-size:16px; }
-        .dp-input { border:none; padding:0; height:20px; }
-
-        /* 영수증 아이콘(테두리 제거) */
-        .receipt-icon { background: transparent; border: none; padding: 0; cursor: pointer; line-height: 1; }
-        .receipt-icon .emoji { font-size: 18px; }
-
-        /* 테이블/모달/버튼 공통 */
-        .card { background:#fff; border:1px solid #eef2f7; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.06); padding:14px; }
-        .section { margin-top: 10px; }
-        .table-head, .table-row { display:grid; grid-template-columns: 150px 1fr 110px 160px 160px 52px; align-items:center; }
-        .table-head { background:#fafafa; padding:10px 12px; font-weight:700; border-bottom:1px solid #e5e7eb; border-radius:10px 10px 0 0; }
-        .table-row { padding:8px 12px; border-bottom:1px solid #f1f5f9; gap:10px; }
-        .table-row .amount { text-align:right; padding-right:6px; font-weight:600; color:#111827; }
-        .row-actions { display:flex; justify-content:flex-end; }
-        .table-foot { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#fff; border-top:1px solid #e5e7eb; border-radius:0 0 10px 10px; }
-        .btn-outline { background:#fff; border:1px dashed #c7d2fe; color:#5b5bd6; padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
-        .btn-outline:hover { background:#f5f7ff; }
-        .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:1000; }
-        .modal { position:fixed; top:6vh; left:50%; transform:translateX(-50%); width:1000px; max-width:96vw; max-height:88vh; overflow:auto; z-index:1001; background:#fff; border:1px solid #eef2f7; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.06); padding:14px; }
-        .modal-head { display:flex; align-items:center; justify-content:space-between; padding:4px 4px 12px 4px; margin-bottom:8px; border-bottom:1px solid #eef2f7; }
-        .modal-head .title { font-weight:800; font-size:18px; }
-        .badge-total { background:#f5f3ff; color:#5b5bd6; border:1px solid #d9d6ff; padding:6px 10px; border-radius:999px; font-weight:700; }
-        .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
-        .btn-primary { background:#7A5FFF; color:#fff; border:2px solid transparent; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; }
-        .btn-primary:hover { background:#8F7CFF; border-color:#BFAEFF; box-shadow:0 0 0 3px rgba(122,95,255,.25); }
-        .btn-primary:disabled { opacity:.6; cursor:not-allowed; }
-        .btn-neutral { background:#eef2f7; color:#111; border:2px solid transparent; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; }
-
-        /* 내용 말줄임 & 커서툴팁 */
-        .desc-ellipsis {
-          display: inline-block;
-          max-width: 260px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          vertical-align: middle;
-          cursor: help;
-        }
-        .hover-tooltip {
-          position: fixed;
-          z-index: 1500;
-          max-width: 460px;
-          white-space: pre-wrap;
-          background: #111827;
-          color: #fff;
-          padding: 10px 12px;
-          border-radius: 10px;
-          box-shadow: 0 12px 28px rgba(0,0,0,0.25);
-          pointer-events: none;
-          font-size: 13px;
-          line-height: 1.55;
-        }
-      `}</style>
-
-      {/* 미리보기 모달 — 별도 파일 */}
+      {/* 미리보기 모달 */}
       <ReceiptPreviewModal
         open={previewOpen}
         row={{ ...previewRow, receiptName: previewRow?.receiptName || form.receiptName }}
@@ -678,10 +784,6 @@ function LabeledInput({ label, children, onClickLabel }) {
     <label className="labeled" onClick={onClickLabel}>
       <span className="lab">{label}</span>
       {children}
-      <style>{`
-        .labeled { display:flex; flex-direction:column; gap:6px; cursor: default; }
-        .labeled .lab { font-size: 13px; font-weight: 700; color:#111827; }
-      `}</style>
     </label>
   );
 }
