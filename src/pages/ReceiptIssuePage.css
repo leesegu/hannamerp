@@ -15,6 +15,11 @@
 /* 페이지 패딩 */
 .receipt-page { padding: 14px; }
 
+/* 추가: 이 페이지에서 DataTable만 다른 페이지와 같은 위치로 붙이기 */
+.receipt-page > .data-table-wrapper {
+  margin: -14px -14px 0;  /* top: -14px, left/right: -14px, bottom: 0 */
+}
+
 /* Grid */
 .grid { display: grid; gap: 12px; }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }

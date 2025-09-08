@@ -21,6 +21,72 @@ const formatKDateLong = (str) => {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${wd}`;
 };
 
+/* JPG에 흰 여백 추가 유틸 (px 단위 여백) */
+async function addWhiteMarginToDataUrl(dataUrl, marginPx = 48) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width + marginPx * 2;
+      canvas.height = img.height + marginPx * 2;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, marginPx, marginPx);
+      resolve(canvas.toDataURL("image/jpeg", 0.96));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/* iframe 프린트 유틸: paper HTML만 넣어 여백과 함께 인쇄 */
+function printHtmlWithMargins(html, { pageMarginMm = 12 } = {}) {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  const style = `
+    @page { size: A4 portrait; margin: ${pageMarginMm}mm; }
+    html, body { margin:0; padding:0; }
+    .paper {
+      width: 210mm;
+      min-height: 297mm;
+      box-shadow: none !important;
+      border: none !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  `;
+  doc.open();
+  doc.write(`
+    <html>
+      <head>
+        <meta charset="utf-8"/>
+        <title>영수증</title>
+        <style>${style}</style>
+      </head>
+      <body>${html}</body>
+    </html>
+  `);
+  doc.close();
+
+  iframe.onload = () => {
+    // 일부 브라우저에서 onload 이후 렌더 안정화 대기
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => document.body.removeChild(iframe), 200);
+    }, 50);
+  };
+}
+
 export default function ReceiptPreviewModal({ open, row, onClose }) {
   const paperRef = useRef(null);
   if (!open || !row) return null;
@@ -43,21 +109,27 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
     return `${ymd}${v}${u}`.replace(/[\\/:*?"<>|]/g, "");
   };
 
+  /* ✅ JPG 저장: 여백 추가 후 다운로드 */
   const saveJPG = async () => {
-    const dataUrl = await htmlToImage.toJpeg(paperRef.current, {
+    const node = paperRef.current;
+    const dataUrl = await htmlToImage.toJpeg(node, {
       backgroundColor: "#fff",
       quality: 0.96,
       pixelRatio: 2,
     });
+    // 흰 여백 추가 (px)
+    const withMargin = await addWhiteMarginToDataUrl(dataUrl, 64);
     const a = document.createElement("a");
-    a.href = dataUrl;
+    a.href = withMargin;
     a.download = `${baseName()}.jpg`;
     a.click();
   };
 
+  /* ✅ PDF 저장: A4에 여백 두고 배치 */
   const savePDF = async () => {
     const mod = await import("jspdf").catch(() => null);
     if (!mod?.default) {
+      // 모듈 없으면 PNG로 대체 (여백 포함 JPG가 더 낫지만 PNG 유지)
       const png = await htmlToImage.toPng(paperRef.current, {
         backgroundColor: "#fff",
         pixelRatio: 2,
@@ -74,23 +146,46 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
       backgroundColor: "#fff",
       pixelRatio: 2,
     });
+
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
     const img = new Image();
     img.src = dataUrl;
     await img.decode();
-    const ratio = img.height / img.width;
-    const pdfW = pageWidth - 20;
-    const pdfH = pdfW * ratio;
-    pdf.addImage(dataUrl, "PNG", 10, 10, pdfW, pdfH, undefined, "FAST");
+
+    // 여백(mm) 설정
+    const margin = 12; // 좌우상하 12mm
+    const maxW = pageWidth - margin * 2;
+    const maxH = pageHeight - margin * 2;
+
+    // 비율 유지하여 이미지 크기 계산
+    const ratio = img.width / img.height;
+    let drawW = maxW;
+    let drawH = drawW / ratio;
+    if (drawH > maxH) {
+      drawH = maxH;
+      drawW = drawH * ratio;
+    }
+
+    const x = (pageWidth - drawW) / 2;
+    const y = (pageHeight - drawH) / 2;
+
+    pdf.addImage(dataUrl, "PNG", x, y, drawW, drawH, undefined, "FAST");
     pdf.save(`${baseName()}.pdf`);
   };
 
-  const handlePrint = () => window.print();
+  /* ✅ 인쇄: paper만 별도 iframe에 넣고 여백 둘러 인쇄 */
+  const handlePrint = () => {
+    if (!paperRef.current) return;
+    // 현재 paper DOM만 복제하여 iframe에 전달
+    const html = paperRef.current.outerHTML;
+    printHtmlWithMargins(html, { pageMarginMm: 12 });
+  };
 
-  /* 하단 공백 방지용 최소 행 */
-  const MIN_ROWS = 18;
-  const rowCount = Math.max(items.length, MIN_ROWS);
+  /* 품목표는 16칸 고정 표시 */
+  const DISPLAY_ROWS = 16;
 
   return (
     <>
@@ -117,7 +212,7 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
           {/* 세로 스크롤만 허용 */}
           <div className="content-scroll">
             <div className="paper" ref={paperRef}>
-              {/* 상단 헤더 — 주황 그라데이션 + 크게 */}
+              {/* 주황 헤더 (이전 답변의 스타일 유지) */}
               <div className="brand">
                 <div className="brand-title">{s(row.receiptName) || "한남주택관리 영수증"}</div>
               </div>
@@ -149,13 +244,12 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
                 </div>
               </div>
 
-              {/* 품목 테이블 */}
+              {/* 품목 테이블 (16칸) */}
               <div className="table">
-                {/* ✅ 헤더-리스트 사이 구분선: 상단 테이블 구분선 스타일과 동일 */}
                 <div className="thead thead--separator-like-top">
                   <div>날짜</div><div>품목(내용)</div><div>수량</div><div>단가</div><div>금액</div>
                 </div>
-                {Array.from({ length: rowCount }).map((_, i) => {
+                {Array.from({ length: DISPLAY_ROWS }).map((_, i) => {
                   const it = items[i];
                   const date = it?.date || "";
                   const desc = it?.description || "";
@@ -195,54 +289,23 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
       </div>
 
       <style>{`
-        /* 인쇄: A4, 여백 10mm */
-        @media print {
-          @page { size: A4 portrait; margin: 10mm; }
-          .modal-backdrop, .modal-shell, .modal-head { display: none !important; }
-          .paper {
-            width: 210mm !important; min-height: 297mm !important;
-            box-shadow: none !important; border: none !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .box, .table, .summary,
-          .r:not(:last-child), .thead > div, .trow .cell, .srow:not(:last-child),
-          .th, .sth, .trow .cell, .thead, .summary, .srow {
-            border-color:#000 !important;
-          }
-          .thead--separator-like-top { border-bottom: 1.2px solid #000 !important; }
-        }
+        /* (미리보기 전용 스타일 — 이전 답변과 동일/유지) */
 
-        /* 배경 */
         .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000; }
-
-        /* 중앙 정렬 셸 */
         .modal-shell {
           position: fixed; inset: 0; z-index: 1001;
           display: flex; align-items: center; justify-content: center;
-          padding: 24px; overflow: hidden;
+          padding: 28px;
+          overflow: hidden;
         }
-
-        .modal {
-          width: 980px; max-width: min(96vw, 980px);
-          background: transparent; display: flex; flex-direction: column;
-        }
-
-        .modal-head {
-          display:flex; justify-content:space-between; align-items:center;
-          margin-bottom:16px; color:#111;
-        }
+        .modal { width: 980px; max-width: min(96vw, 980px); background: transparent; display: flex; flex-direction: column; }
+        .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; color:#111; }
         .modal-head .title { font-weight:800; font-size:17px; }
         .right { display:flex; gap:10px; }
-        .btn {
-          background:#eef2f7; border:none; border-radius:10px;
-          padding:9px 14px; font-weight:700; cursor:pointer; font-size:12.5px;
-          display:inline-flex; align-items:center;
-        }
+        .btn { background:#eef2f7; border:none; border-radius:10px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:12.5px; display:inline-flex; align-items:center; }
         .btn.print { background:#111827; color:#fff; }
         .btn.ghost { background:#f6f7fb; }
 
-        /* 세로 스크롤만 */
         .content-scroll {
           max-height: calc(100vh - 160px);
           overflow-y: auto;
@@ -252,118 +315,49 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
           overscroll-behavior: contain;
         }
 
-        /* 종이 */
         .paper {
-          --stroke:#121316;             /* 기본 라인색 */
-          width: 210mm;
-          min-height: 297mm;
-          max-width: 100%;
-          background:#fff;
-          border:1.4px solid var(--stroke);
-          border-radius:14px;
-          box-shadow: 0 12px 34px rgba(16,24,40,.12);
-          color:#111827;
-          margin: 0 auto;
-          padding: 22px 18px 24px;
-          box-sizing: border-box;
-          overflow: hidden;
+          --stroke:#121316;
+          width: 210mm; min-height: 297mm; max-width: 100%;
+          background:#fff; border:1.4px solid var(--stroke); border-radius:14px; box-shadow: 0 12px 34px rgba(16,24,40,.12);
+          color:#111827; margin: 0 auto; padding: 32px 26px 36px; box-sizing: border-box; overflow: hidden;
           font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Malgun Gothic";
-          font-size: 13.25px;
-          line-height: 1.42;
-          white-space: nowrap;
-
-          display: flex;
-          flex-direction: column;
+          font-size: 13.25px; line-height: 1.42; white-space: nowrap;
+          display: flex; flex-direction: column;
         }
 
-        /* 상단 헤더 — 주황 그라데이션 */
-        .brand {
-          display:flex; align-items:center; justify-content:flex-start;
-          background: linear-gradient(90deg, #FF7A00, #FFB84D);
-          color:#fff; padding: 20px 20px;
-          border-radius:12px; margin-bottom:16px;
-          letter-spacing:.2px;
-        }
-        .brand-title { font-size:20px; font-weight:900; line-height:1.2; }
+        .brand { display:flex; align-items:center; justify-content:flex-start; background: linear-gradient(90deg, #FF7A00, #FFB84D); color:#fff; padding: 28px 26px; border-radius:12px; margin-bottom:18px; letter-spacing:.2px; }
+        .brand-title { font-size:24px; font-weight:900; line-height:1.22; }
 
-        /* 상단 4그리드 */
-        .top-grid {
-          display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:16px;
-        }
+        .top-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:18px; }
         .box { border:1.4px solid var(--stroke); border-radius:10px; overflow:hidden; width:100%; }
         .r { display:grid; grid-template-columns:130px 1fr; }
         .r:not(:last-child) { border-bottom:1.2px solid var(--stroke); }
-
-        .th {
-          background:#f8fafc; padding:11px 10px;
-          font-weight:800; border-right:1.2px solid var(--stroke); font-size:12.25px;
-          overflow:hidden; text-overflow:ellipsis;
-        }
-        .td {
-          padding:11px 12px;
-          font-size:13.25px; overflow:hidden; text-overflow:ellipsis;
-        }
+        .th { background:#f8fafc; padding:13px 12px; font-weight:800; border-right:1.2px solid var(--stroke); font-size:12.75px; overflow:hidden; text-overflow:ellipsis; }
+        .td { padding:13px 14px; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; }
         .td.strong { font-weight:900; }
 
-        /* 품목 테이블 */
-        .table {
-          border:1.4px solid var(--stroke);
-          border-radius:10px; overflow:hidden; width:100%;
-        }
-
-        /* ✅ 헤더-리스트 사이 구분선: 상단 테이블 구분선과 동일 */
-        .thead--separator-like-top {
-          border-bottom: 1.2px solid var(--stroke);
-        }
-
-        /* 열 폭: 날짜(95px) | 품목(1fr) | 수량(60px) | 단가(105px) | 금액(115px) */
+        .table { border:1.6px solid var(--stroke); border-radius:10px; overflow:hidden; width:100%; }
+        .thead--separator-like-top { border-bottom: 1.4px solid var(--stroke); }
         .thead, .trow { display:grid; grid-template-columns: 95px 1fr 60px 105px 115px; }
         .thead { background:#f1f5f9; font-weight:900; }
-        .thead > div {
-          padding:11px 12px;
-          text-align:center; border-right:1.2px solid var(--stroke);
-          font-size:12.5px;
-        }
+        .thead > div { padding:12px 13px; text-align:center; border-right:1.4px solid var(--stroke); font-size:12.75px; }
         .thead > div:last-child { border-right:none; }
-
-        .trow .cell {
-          padding:11px 12px;
-          border-top:1.1px solid #d4d7de; border-right:1.1px solid #e0e3ea;
-        }
+        .trow .cell { padding:12px 13px; border-top:1.3px solid var(--stroke); border-right:1.3px solid var(--stroke); }
         .trow .cell:last-child { border-right:none; }
-
-        /* ✅ 날짜는 중앙 정렬 */
         .trow .cell:nth-child(1) { text-align: center; }
-
-        /* ✅ 품목(내용) 본문은 좌측 정렬 */
         .trow .cell.desc { text-align: left; }
-
-        /* ✅ 수량 본문은 중앙 정렬 */
         .trow .cell.qty { text-align: center; }
-
         .num { text-align:right; font-variant-numeric: tabular-nums; }
-        .text-ell { overflow:hidden; text-overflow:ellipsis; }
+        .between-gap { height: 14px; }
 
-        /* 품목표와 하단 요약 사이 간격 */
-        .between-gap { height: 12px; }
-
-        /* 하단 요약 */
-        .summary {
-          border:1.4px solid var(--stroke); border-radius:10px; overflow:hidden; width:100%;
-        }
-        .srow { display:grid; grid-template-columns: 140px 1fr; }
-        .srow:not(:last-child) { border-bottom:1.2px solid var(--stroke); }
-        .sth {
-          padding:12px 12px;
-          background:#f8fafc; font-weight:900; border-right:1.2px solid var(--stroke);
-          font-size:13.25px; overflow:hidden; text-overflow:ellipsis;
-        }
+        .summary { border:1.6px solid var(--stroke); border-radius:10px; overflow:hidden; width:100%; }
+        .srow { display:grid; grid-template-columns: 150px 1fr; }
+        .srow:not(:last-child) { border-bottom:1.4px solid var(--stroke); }
+        .sth { padding:14px 14px; background:#f8fafc; font-weight:900; border-right:1.4px solid var(--stroke); font-size:15px; overflow:hidden; text-overflow:ellipsis; }
         .sth.center { text-align:center; }
-        .std {
-          padding:12px 12px; font-size:14.25px; overflow:hidden; text-overflow:ellipsis;
-        }
-        .std.big { font-size:18.5px; font-weight:900; }
-        .std.big2 { font-size:16.5px; font-weight:700; }
+        .std { padding:14px 14px; font-size:15px; overflow:hidden; text-overflow:ellipsis; }
+        .std.big { font-size:20px; font-weight:900; }
+        .std.big2 { font-size:18px; font-weight:700; }
         .std.red { color:#d10; }
       `}</style>
     </>

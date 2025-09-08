@@ -33,6 +33,9 @@ const fmtComma = (n) => (parseNumber(n) ? parseNumber(n).toLocaleString() : "");
 const today = () => format(new Date(), "yyyy-MM-dd");
 const toDate = (str) => (str ? new Date(str) : null);
 
+// ✅ 최대 품목 행 수(16개 이상 불가 → 최대 15개)
+const MAX_ITEMS = 15;
+
 /* 날짜 인풋: .date-field 셸(테두리/라운드/포커스) + compact 옵션 */
 const DPInput = forwardRef(function DPInput(
   { value, onClick, placeholder = "날짜", clearable = false, compact = false },
@@ -455,6 +458,15 @@ export default function ReceiptIssuePage() {
     if (v) setForm((f) => ({ ...f, address: v.address || "", villaName: v.name || "" }));
   }, [form.code, villas]);
 
+  /* ====== 입력 이동 유틸: 다음 행의 품목으로 포커스 or 폴백 ====== */
+  const focusNextRowDescOr = (idx, fallback) => {
+    if (items.length > idx + 1 && itemDescRefs.current[idx + 1]) {
+      itemDescRefs.current[idx + 1].focus();
+    } else {
+      fallback?.();
+    }
+  };
+
   /* 품목 입력 */
   const setItemField = (idx, key, value) => {
     setItems((list) => {
@@ -471,7 +483,16 @@ export default function ReceiptIssuePage() {
       return next;
     });
   };
-  const addItem = () => setItems((l) => [...l, blankItem()]);
+  const addItem = () => {
+    // ✅ 16개 이상 생성 방지 → 최대 15개
+    setItems((l) => {
+      if (l.length >= MAX_ITEMS) {
+        alert(`품목은 최대 ${MAX_ITEMS}개까지 추가할 수 있습니다.`);
+        return l;
+      }
+      return [...l, blankItem()];
+    });
+  };
   const removeItem = (idx) => setItems((l) => (l.length > 1 ? l.filter((_, i) => i !== idx) : l));
 
   const totalAmount = useMemo(() => items.reduce((s2, it) => s2 + (Number(it.amount) || 0), 0), [items]);
@@ -489,7 +510,8 @@ export default function ReceiptIssuePage() {
     if (!s(form.issueDate)) return alert("발행일자를 입력하세요.");
     if (!s(form.code)) return alert("코드번호를 선택/입력하세요.");
     if (!s(form.villaName)) return alert("빌라명을 확인하세요.");
-    if (!s(form.unitNumber)) return alert("호수를 입력하세요.");
+    // ✅ 요청: 나머지주소 미입력이어도 저장 가능 → unitNumber 강제 검증 제거
+    // if (!s(form.unitNumber)) return alert("호수를 입력하세요.");
     if (totalAmount <= 0) return alert("품목의 합계 금액이 0원입니다.");
 
     const itemsPayload = items.map((it) => ({
@@ -538,242 +560,267 @@ export default function ReceiptIssuePage() {
 
   /* ===== 렌더 ===== */
   return (
-    <div className="receipt-page">
-      <PageTitle title="영수증 발행 내역" subtitle="발행/수정/미리보기 및 저장" />
+    <div className="page-wrapper">
+      {/* ✅ 페이지 좌측 상단 제목 (통일 스타일) */}
+      <PageTitle>영수증발행</PageTitle>
 
-      <DataTable
-        columns={columns}
-        data={rows}
-        searchableKeys={searchableKeys}
-        itemsPerPage={10}
-        sortKey="issueDate"
-        sortOrder="desc"
-        onAdd={onAdd}
-        addButtonLabel="발행"
-        addButtonIcon="🧾"
-        onEdit={onEdit}
-        onDelete={onDelete}
-      />
+      <div className="receipt-page">
+        <DataTable
+          columns={columns}
+          data={rows}
+          searchableKeys={searchableKeys}
+          itemsPerPage={10}
+          sortKey="issueDate"
+          sortOrder="desc"
+          onAdd={onAdd}
+          addButtonLabel="발행"
+          addButtonIcon="🧾"
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
 
-      {/* 등록/수정 모달 */}
-      {editOpen && (
-        <>
-          <div className="modal-backdrop" onClick={() => setEditOpen(false)} />
-          <div className="modal">
-            {/* 상단 고정 */}
-            <div className="modal-head">
-              <div className="title">{editMode === "edit" ? "영수증 수정" : "영수증 발행"}</div>
-              <div className="right">
-                <span className="badge-total">합계 {totalAmount.toLocaleString()} 원</span>
+        {/* 등록/수정 모달 */}
+        {editOpen && (
+          <>
+            <div className="modal-backdrop" onClick={() => setEditOpen(false)} />
+            <div className="modal">
+              {/* 상단 고정 */}
+              <div className="modal-head">
+                <div className="title">{editMode === "edit" ? "영수증 수정" : "영수증 발행"}</div>
+                <div className="right">
+                  <span className="badge-total">합계 {totalAmount.toLocaleString()} 원</span>
+                </div>
               </div>
-            </div>
 
-            {/* 본문 스크롤 */}
-            <div className="modal-body">
-              <div className="grid grid-3">
-                {/* 1행: 영수증이름, 발행일자, 코드번호 */}
-                <LabeledInput label="영수증 이름">
-                  <ReceiptNameCombo
-                    value={form.receiptName}
-                    onChange={(val) => setForm((f) => ({ ...f, receiptName: val }))}
-                  />
-                </LabeledInput>
+              {/* 본문 스크롤 */}
+              <div className="modal-body">
+                <div className="grid grid-3">
+                  {/* 1행: 영수증이름, 발행일자, 코드번호 */}
+                  <LabeledInput label="영수증 이름">
+                    <ReceiptNameCombo
+                      value={form.receiptName}
+                      onChange={(val) => setForm((f) => ({ ...f, receiptName: val }))}
+                    />
+                  </LabeledInput>
 
-                <LabeledInput label="발행일자">
-                  <AutoCloseDate
-                    selected={toDate(form.issueDate)}
-                    onChange={(date) =>
-                      setForm((f) => ({ ...f, issueDate: date ? format(date, "yyyy-MM-dd") : "" }))
-                    }
-                  />
-                </LabeledInput>
+                  <LabeledInput label="발행일자">
+                    <AutoCloseDate
+                      selected={toDate(form.issueDate)}
+                      onChange={(date) =>
+                        setForm((f) => ({ ...f, issueDate: date ? format(date, "yyyy-MM-dd") : "" }))
+                      }
+                    />
+                  </LabeledInput>
 
-                <LabeledInput label="코드번호">
-                  <CodeCombo
-                    value={form.code}
-                    onChange={(val) => setForm((f) => ({ ...f, code: val }))}
-                    onSelectOption={() => unitRef.current?.focus()}   // 코드 선택 → 호수
-                    options={villas}
-                  />
-                </LabeledInput>
+                  <LabeledInput label="코드번호">
+                    <CodeCombo
+                      value={form.code}
+                      onChange={(val) => setForm((f) => ({ ...f, code: val }))}
+                      onSelectOption={() => unitRef.current?.focus()}   // 코드 선택 → 호수
+                      options={villas}
+                    />
+                  </LabeledInput>
 
-                {/* 2행: 주소, 빌라명, 호수 */}
-                <LabeledInput label="주소">
-                  <input
-                    type="text"
-                    className="input"
-                    value={form.address}
-                    onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  />
-                </LabeledInput>
-
-                <LabeledInput label="빌라명">
-                  <input
-                    type="text"
-                    className="input"
-                    value={form.villaName}
-                    onChange={(e) => setForm((f) => ({ ...f, villaName: e.target.value }))}
-                  />
-                </LabeledInput>
-
-                <LabeledInput label="나머지주소">
-                  <input
-                    ref={unitRef}
-                    type="text"
-                    className="input"
-                    value={form.unitNumber}
-                    onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === "Enter") recipientRef.current?.focus(); }}  // 호수 Enter → 공급받는자
-                  />
-                </LabeledInput>
-
-                {/* 3행: 공급받는자, 청구방법, 입금날짜 */}
-                <LabeledInput label="공급받는자">
-                  <input
-                    ref={recipientRef}
-                    type="text"
-                    className="input"
-                    value={form.recipient}
-                    onChange={(e) => setForm((f) => ({ ...f, recipient: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === "Enter") billingRef.current?.focus(); }}  // 공급받는자 Enter → 청구방법
-                  />
-                </LabeledInput>
-
-                <LabeledInput label="청구방법">
-                  <input
-                    ref={billingRef}
-                    type="text"
-                    className="input"
-                    value={form.billingMethod}
-                    onChange={(e) => setForm((f) => ({ ...f, billingMethod: e.target.value }))}
-                  />
-                </LabeledInput>
-
-                <LabeledInput label="입금날짜">
-                  <AutoCloseDate
-                    selected={toDate(form.depositDate)}
-                    onChange={(date) =>
-                      setForm((f) => ({ ...f, depositDate: date ? format(date, "yyyy-MM-dd") : "" }))
-                    }
-                    isClearable
-                  />
-                </LabeledInput>
-
-                {/* 4행: 비고 (전체 폭) */}
-                <div className="col-span-3">
-                  <LabeledInput label="비고">
+                  {/* 2행: 주소, 빌라명, 호수 */}
+                  <LabeledInput label="주소">
                     <input
                       type="text"
                       className="input"
-                      value={form.note}
-                      onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                      value={form.address}
+                      onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                     />
                   </LabeledInput>
-                </div>
-              </div>
 
-              {/* 품목 테이블 */}
-              <div className="card section">
-                <div className="table-head center small">
-                  <div>날짜</div><div>품목(내용)</div><div>수량</div><div>단가</div><div>금액</div><div></div>
-                </div>
+                  <LabeledInput label="빌라명">
+                    <input
+                      type="text"
+                      className="input"
+                      value={form.villaName}
+                      onChange={(e) => setForm((f) => ({ ...f, villaName: e.target.value }))}
+                    />
+                  </LabeledInput>
 
-                {items.map((it, idx) => (
-                  <div className="table-row center" key={idx}>
-                    <div className="col-date">
-                      <DatePicker
-                        selected={toDate(it.date)}
-                        onChange={(date) => {
-                          setItemField(idx, "date", date ? format(date, "yyyy-MM-dd") : "");
-                          setTimeout(() => itemDescRefs.current[idx]?.focus(), 0); // 날짜 선택 → 품목
-                        }}
-                        dateFormat="yyyy-MM-dd"
-                        locale={ko}
-                        isClearable
-                        shouldCloseOnSelect
-                        popperPlacement="bottom-start"
-                        customInput={
-                          <DPInput
-                            ref={(el) => (itemDateRefs.current[idx] = el)}
-                            clearable
-                            compact           // 더 작은 날짜 선택창
-                          />
-                        }
-                      />
-                    </div>
-                    <div>
+                  <LabeledInput label="나머지주소">
+                    <input
+                      ref={unitRef}
+                      type="text"
+                      className="input"
+                      value={form.unitNumber}
+                      onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") recipientRef.current?.focus(); }}  // 호수 Enter → 공급받는자
+                    />
+                  </LabeledInput>
+
+                  {/* 3행: 공급받는자, 청구방법, 입금날짜 */}
+                  <LabeledInput label="공급받는자">
+                    <input
+                      ref={recipientRef}
+                      type="text"
+                      className="input"
+                      value={form.recipient}
+                      onChange={(e) => setForm((f) => ({ ...f, recipient: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") billingRef.current?.focus(); }}  // 공급받는자 Enter → 청구방법
+                    />
+                  </LabeledInput>
+
+                  <LabeledInput label="청구방법">
+                    <input
+                      ref={billingRef}
+                      type="text"
+                      className="input"
+                      value={form.billingMethod}
+                      onChange={(e) => setForm((f) => ({ ...f, billingMethod: e.target.value }))}
+                    />
+                  </LabeledInput>
+
+                  <LabeledInput label="입금날짜">
+                    <AutoCloseDate
+                      selected={toDate(form.depositDate)}
+                      onChange={(date) =>
+                        setForm((f) => ({ ...f, depositDate: date ? format(date, "yyyy-MM-dd") : "" }))
+                      }
+                      isClearable
+                    />
+                  </LabeledInput>
+
+                  {/* 4행: 비고 (전체 폭) */}
+                  <div className="col-span-3">
+                    <LabeledInput label="비고">
                       <input
-                        ref={(el) => (itemDescRefs.current[idx] = el)}
                         type="text"
                         className="input"
-                        value={it.description}
-                        onChange={(e) => setItemField(idx, "description", e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") itemQtyRefs.current[idx]?.focus(); }} // 품목 Enter → 수량
+                        value={form.note}
+                        onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                       />
-                    </div>
-                    <div>
-                      <input
-                        ref={(el) => (itemQtyRefs.current[idx] = el)}
-                        type="number"
-                        className="input"
-                        min="0"
-                        value={it.qty}
-                        onChange={(e) => setItemField(idx, "qty", e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") itemPriceRefs.current[idx]?.focus(); }} // 수량 Enter → 단가
-                      />
-                    </div>
-                    <div>
-                      <input
-                        ref={(el) => (itemPriceRefs.current[idx] = el)}
-                        type="text"
-                        className="input"
-                        inputMode="numeric"
-                        value={it.unitPrice}
-                        onChange={(e) => setItemField(idx, "unitPrice", e.target.value)}
-                      />
-                    </div>
-                    <div className="amount">{(Number(it.amount) || 0).toLocaleString()} 원</div>
-                    <div className="row-actions">
-                      <button className="icon-btn danger" title="행 삭제" onClick={() => removeItem(idx)}>
-                        <i className="ri-close-line" />
-                      </button>
-                    </div>
+                    </LabeledInput>
                   </div>
-                ))}
+                </div>
 
-                <div className="table-foot">
-                  <button className="btn-outline" onClick={addItem} type="button">+ 항목 추가</button>
-                  <div className="sum">합계 <b>{totalAmount.toLocaleString()}</b> 원</div>
+                {/* 품목 테이블 */}
+                <div className="card section">
+                  <div className="table-head center small">
+                    <div>날짜</div><div>품목(내용)</div><div>수량</div><div>단가</div><div>금액</div><div></div>
+                  </div>
+
+                  {items.map((it, idx) => (
+                    <div className="table-row center" key={idx}>
+                      <div className="col-date">
+                        <DatePicker
+                          selected={toDate(it.date)}
+                          onChange={(date) => {
+                            setItemField(idx, "date", date ? format(date, "yyyy-MM-dd") : "");
+                            setTimeout(() => itemDescRefs.current[idx]?.focus(), 0); // 날짜 선택 → 품목
+                          }}
+                          dateFormat="yyyy-MM-dd"
+                          locale={ko}
+                          isClearable
+                          shouldCloseOnSelect
+                          popperPlacement="bottom-start"
+                          customInput={
+                            <DPInput
+                              ref={(el) => (itemDateRefs.current[idx] = el)}
+                              clearable
+                              compact           // 더 작은 날짜 선택창
+                            />
+                          }
+                        />
+                      </div>
+                      <div>
+                        <input
+                          ref={(el) => (itemDescRefs.current[idx] = el)}
+                          type="text"
+                          className="input"
+                          value={it.description}
+                          onChange={(e) => setItemField(idx, "description", e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              // ✅ 요청: 품목에서 Enter → 다음 행의 품목
+                              focusNextRowDescOr(idx, () => {
+                                // 폴백: 다음 행이 없으면 기존 동작(수량으로 이동) 유지
+                                itemQtyRefs.current[idx]?.focus();
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <input
+                          ref={(el) => (itemQtyRefs.current[idx] = el)}
+                          type="number"
+                          className="input"
+                          min="0"
+                          value={it.qty}
+                          onChange={(e) => setItemField(idx, "qty", e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              // ✅ 요청: 수량에서 Enter → 다음 행의 품목
+                              focusNextRowDescOr(idx, () => {
+                                // 폴백: 다음 행이 없으면 기존 동작(단가로 이동) 유지
+                                itemPriceRefs.current[idx]?.focus();
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <input
+                          ref={(el) => (itemPriceRefs.current[idx] = el)}
+                          type="text"
+                          className="input"
+                          inputMode="numeric"
+                          value={it.unitPrice}
+                          onChange={(e) => setItemField(idx, "unitPrice", e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              // ✅ 요청: 단가에서 Enter → 다음 행의 품목
+                              focusNextRowDescOr(idx);
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="amount">{(Number(it.amount) || 0).toLocaleString()} 원</div>
+                      <div className="row-actions">
+                        <button className="icon-btn danger" title="행 삭제" onClick={() => removeItem(idx)}>
+                          <i className="ri-close-line" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="table-foot">
+                    <button className="btn-outline" onClick={addItem} type="button">+ 항목 추가</button>
+                    <div className="sum">합계 <b>{totalAmount.toLocaleString()}</b> 원</div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* 하단 고정 */}
-            <div className="modal-actions">
-              <button className="btn-primary" onClick={saveForm} disabled={saving}>
-                {saving ? "저장 중..." : (editMode === "edit" ? "수정" : "발행")}
-              </button>
-              <button className="btn-neutral" onClick={() => setEditOpen(false)} disabled={saving}>
-                닫기
-              </button>
+              {/* 하단 고정 */}
+              <div className="modal-actions">
+                <button className="btn-primary" onClick={saveForm} disabled={saving}>
+                  {saving ? "저장 중..." : (editMode === "edit" ? "수정" : "발행")}
+                </button>
+                <button className="btn-neutral" onClick={() => setEditOpen(false)} disabled={saving}>
+                  닫기
+                </button>
+              </div>
             </div>
+          </>
+        )}
+
+        {/* 커서 근처 툴팁 */}
+        {tip.show && (
+          <div className="hover-tooltip" style={{ top: tip.y, left: tip.x }}>
+            {tip.content}
           </div>
-        </>
-      )}
+        )}
 
-      {/* 커서 근처 툴팁 */}
-      {tip.show && (
-        <div className="hover-tooltip" style={{ top: tip.y, left: tip.x }}>
-          {tip.content}
-        </div>
-      )}
-
-      {/* 미리보기 모달 */}
-      <ReceiptPreviewModal
-        open={previewOpen}
-        row={{ ...previewRow, receiptName: previewRow?.receiptName || form.receiptName }}
-        onClose={() => { setPreviewOpen(false); setPreviewRow(null); }}
-      />
+        {/* 미리보기 모달 */}
+        <ReceiptPreviewModal
+          open={previewOpen}
+          row={{ ...previewRow, receiptName: previewRow?.receiptName || form.receiptName }}
+          onClose={() => { setPreviewOpen(false); setPreviewRow(null); }}
+        />
+      </div>
     </div>
   );
 }
