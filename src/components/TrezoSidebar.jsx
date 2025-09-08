@@ -16,9 +16,18 @@ import CctvPage from "../pages/CctvPage";
 import VendorRegisterPage from "../pages/VendorRegisterPage";
 import VendorsMainPage from "../pages/VendorsMainPage.js";
 import EmployeePage from "../pages/EmployeePage";
-import ReceiptIssuePage from "../pages/ReceiptIssuePage"; // ✅ 추가
+import ReceiptIssuePage from "../pages/ReceiptIssuePage";
+import MoveInCleaningPage from "../pages/MoveInCleaningPage"; // ✅ 입주청소 페이지 연결
 
 import "remixicon/fonts/remixicon.css";
+
+/* 임시 플레이스홀더 (실제 페이지 연결 전까지 사용) */
+const ComingSoon = ({ title }) => (
+  <div className="p-6">
+    <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
+    <p className="text-gray-500 mt-2">준비 중입니다. (UI/데이터 스펙 확정 후 연결 예정)</p>
+  </div>
+);
 
 const SidebarItem = ({ icon, label, onClick, active, hasChildren, isOpen }) => (
   <button
@@ -117,7 +126,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         {/* 메뉴 */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <nav className="space-y-2">
-            {/* 빌라정보 */}
+            {/* 1) 빌라정보 */}
             <div>
               <SidebarItem
                 icon="ri-building-4-line"
@@ -160,13 +169,13 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                       건물청소: <CleaningPage />,
                       CCTV: <CctvPage />,
                     };
-                    handleNavigate(pages[item], item);
+                    handleNavigate(pages[item] ?? <ComingSoon title={item} />, item);
                   }}
                 />
               )}
             </div>
 
-            {/* 이사정산: 조회 페이지 표시 */}
+            {/* 2) 이사정산 */}
             <SidebarItem
               icon="ri-truck-line"
               label="이사정산"
@@ -180,7 +189,86 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "이사정산"}
             />
 
-            {/* 거래처관리 (주메뉴) */}
+            {/* 3) 부가서비스 관리 */}
+            <div>
+              <SidebarItem
+                icon="ri-tools-line"
+                label="부가서비스 관리"
+                onClick={() => {
+                  const newState = openMenu === "addon" ? "" : "addon";
+                  setOpenMenu(newState);
+                  setActiveMenu("부가서비스 관리");
+                }}
+                active={activeMenu === "부가서비스 관리"}
+                hasChildren
+                isOpen={openMenu === "addon"}
+              />
+              {openMenu === "addon" && (
+                <SidebarSubmenu
+                  items={["입주청소", "도배", "설정"]}
+                  activeMenu={activeMenu}
+                  onClick={(item) => {
+                    setActiveMenu(item);
+                    const pages = {
+                      입주청소: <MoveInCleaningPage />,                 // ✅ 실제 페이지 연결
+                      도배: <ComingSoon title="부가서비스 · 도배" />,
+                      설정: <ComingSoon title="부가서비스 · 설정" />,
+                    };
+                    handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* 4) 관리비회계 */}
+            <div>
+              <SidebarItem
+                icon="ri-coins-line"
+                label="관리비회계"
+                onClick={() => {
+                  const newState = openMenu === "accounting" ? "" : "accounting";
+                  setOpenMenu(newState);
+                  setActiveMenu("관리비회계");
+                }}
+                active={activeMenu === "관리비회계"}
+                hasChildren
+                isOpen={openMenu === "accounting"}
+              />
+              {openMenu === "accounting" && (
+                <SidebarSubmenu
+                  items={[
+                    "수입정리",
+                    "지출정리",
+                    "일마감",
+                    "월마감",
+                    "수입뷰어",
+                    "지출뷰어",
+                    "수입DB",
+                    "지출DB",
+                    "연간시트",
+                    "설정",
+                  ]}
+                  activeMenu={activeMenu}
+                  onClick={(item) => {
+                    setActiveMenu(item);
+                    handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* 5) 영수증발행 */}
+            <SidebarItem
+              icon="ri-receipt-line"
+              label="영수증발행"
+              onClick={() => {
+                setOpenMenu("");
+                handleNavigate(<ReceiptIssuePage />, "영수증발행");
+              }}
+              active={activeMenu === "영수증발행"}
+            />
+
+            {/* 6) 거래처관리 */}
             <SidebarItem
               icon="ri-booklet-line"
               label="거래처관리"
@@ -191,18 +279,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "거래처관리"}
             />
 
-            {/* 영수증발행 */}
-            <SidebarItem
-              icon="ri-receipt-line"
-              label="영수증발행"
-              onClick={() => {
-                setOpenMenu("");
-                handleNavigate(<ReceiptIssuePage />, "영수증발행"); // ✅ 콘텐츠 렌더 연결
-              }}
-              active={activeMenu === "영수증발행"}
-            />
-
-            {/* 사원관리 */}
+            {/* 7) 사원관리 */}
             <SidebarItem
               icon="ri-user-line"
               label="사원관리"
@@ -213,7 +290,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "사원관리"}
             />
 
-            {/* 기초등록 */}
+            {/* 8) 기초등록 */}
             <div>
               <SidebarItem
                 icon="ri-settings-3-line"
