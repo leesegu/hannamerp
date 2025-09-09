@@ -1,4 +1,4 @@
-// src/components/TrezoSidebar.js
+// src/components/TrezoSidebar.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MoveoutList from "../pages/MoveoutList";
@@ -18,6 +18,7 @@ import VendorsMainPage from "../pages/VendorsMainPage.js";
 import EmployeePage from "../pages/EmployeePage";
 import ReceiptIssuePage from "../pages/ReceiptIssuePage";
 import MoveInCleaningPage from "../pages/MoveInCleaningPage"; // ✅ 입주청소 페이지 연결
+import Dashboard from "../pages/Dashboard"; // ✅ 대시보드 추가
 
 import "remixicon/fonts/remixicon.css";
 
@@ -58,11 +59,7 @@ const SidebarSubmenu = ({ items = [], onClick, activeMenu }) => (
       <li
         key={item}
         className={`flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer transition-colors
-          ${
-            activeMenu === item
-              ? "bg-purple-100 text-purple-600"
-              : "hover:bg-purple-50 hover:text-purple-600"
-          }
+          ${activeMenu === item ? "bg-purple-100 text-purple-600" : "hover:bg-purple-50 hover:text-purple-600"}
         `}
         onClick={() => onClick?.(item)}
       >
@@ -90,7 +87,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   };
 
   const goHome = () => {
-    setActiveContent(null);
+    setActiveContent(null);     // ✅ 대시보드로 돌아가게 됨
     setActiveMenu("");
     setOpenMenu("");
     navigate("/main");
@@ -102,7 +99,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
       <aside className="w-60 h-full bg-white border-r border-gray-200 flex flex-col">
         {/* 로고 */}
         <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-          <div onClick={goHome} className="flex items-center gap-2 cursor-pointer">
+          <div onClick={goHome} className="flex items-center gap-2 cursor-pointer" title="대시보드로 이동">
             <i className="ri-home-4-line text-xl text-gray-700"></i>
             <span className="font-bold text-lg text-gray-800">한남주택관리</span>
           </div>
@@ -126,6 +123,19 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         {/* 메뉴 */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <nav className="space-y-2">
+            {/* (옵션) 대시보드 바로가기 메뉴를 추가하고 싶다면 주석 해제
+            <SidebarItem
+              icon="ri-dashboard-2-line"
+              label="대시보드"
+              onClick={() => {
+                setOpenMenu("");
+                setActiveContent(null); // 기본 화면으로
+                setActiveMenu("대시보드");
+              }}
+              active={activeMenu === "대시보드"}
+            />
+            */}
+
             {/* 1) 빌라정보 */}
             <div>
               <SidebarItem
@@ -205,14 +215,13 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "addon" && (
                 <SidebarSubmenu
-                  items={["입주청소", "도배", "설정"]}
+                  items={["입주청소", "도배"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
                     const pages = {
-                      입주청소: <MoveInCleaningPage />,                 // ✅ 실제 페이지 연결
+                      입주청소: <MoveInCleaningPage />,
                       도배: <ComingSoon title="부가서비스 · 도배" />,
-                      설정: <ComingSoon title="부가서비스 · 설정" />,
                     };
                     handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
                   }}
@@ -246,7 +255,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                     "수입DB",
                     "지출DB",
                     "연간시트",
-                    "설정",
                   ]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
@@ -306,13 +314,13 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "settings" && (
                 <SidebarSubmenu
-                  items={["사원코드생성", "거래처등록"]}
+                  items={["사원코드생성", "설정"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
                     if (item === "사원코드생성") {
                       handleNavigate(<UserRegisterPage />, item);
-                    } else if (item === "거래처등록") {
+                    } else if (item === "설정") {
                       handleNavigate(<VendorRegisterPage />, item);
                     }
                   }}
@@ -323,8 +331,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         </div>
       </aside>
 
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 p-6 bg-gray-50 overflow-auto">{activeContent}</main>
+      {/* 메인 콘텐츠: 기본은 대시보드 */}
+      <main className="flex-1 p-6 bg-gray-50 overflow-auto">
+        {activeContent || <Dashboard userId={userId} userName={userName} />}
+      </main>
     </div>
   );
 };

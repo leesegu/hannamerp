@@ -14,19 +14,25 @@
   border-bottom: 2px solid #ddd3c5; /* 따뜻한 베이지 테두리 */
 }
 
+/* ▼ 헤더를 보라색으로 변경 */
 .data-table thead {
-  background-color: #fff4e5;
+  background-color: #7e57c2; /* 보라색 */
 }
 
 .data-table th {
   padding: 8px 10px;
   font-weight: 600;
   font-size: 14px;
-  border-bottom: 0.5px solid #e4dcd1;
-  background-color: inherit;
-  color: #5a4b3e;
+  border-bottom: 0.5px solid #6f4dbc; /* 보라색 계열 테두리 */
+  background-color: inherit; /* thead 배경 상속 */
+  color: #ffffff; /* 헤더 글자 흰색 */
   white-space: nowrap;
   text-align: center;
+}
+
+/* 헤더 안의 정렬 화살표도 흰색으로 */
+.data-table thead .sort-arrow {
+  color: #ffffff;
 }
 
 .data-table td {
@@ -198,7 +204,7 @@ th {
 
 .sort-arrow {
   margin-left: 4px;
-  color: #7e57c2;
+  color: #7e57c2; /* 기본 색 (헤더 밖에서 사용할 때) */
   font-size: 11px;
 }
 

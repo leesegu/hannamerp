@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection, onSnapshot, query, orderBy,
-  deleteDoc, doc,
+  deleteDoc, doc, getDocs, where,   // ✅ 추가: getDocs, where
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import * as htmlToImage from "html-to-image";
@@ -303,10 +303,47 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     openForm({ mode: "edit", item: row });
   };
 
+  // ✅ 삭제: 연동 여부 확인 후 선택 삭제
   const handleDeleteRow = async (row) => {
     if (!row?.id) return;
-    if (!window.confirm("해당 이사정산 내역을 삭제할까요?")) return;
-    await deleteDoc(doc(db, "moveouts", row.id));
+
+    try {
+      // moveInCleanings에서 이 moveout과 연동된 문서가 있는지 확인
+      const clQ = query(
+        collection(db, "moveInCleanings"),
+        where("sourceMoveoutId", "==", row.id)
+      );
+      const clSnap = await getDocs(clQ);
+
+      if (!clSnap.empty) {
+        // 연동됨: 둘 다 삭제 or 이사정산만 삭제 선택
+        const both = window.confirm(
+          "이 항목은 입주청소와 연동되어 있습니다.\n" +
+          "두 데이터(이사정산 + 입주청소)를 모두 삭제하시겠습니까?\n\n" +
+          "[확인] 둘 다 삭제 / [취소] 다음 단계로"
+        );
+        if (both) {
+          // 입주청소 연동 문서 모두 삭제
+          await Promise.all(
+            clSnap.docs.map((d) => deleteDoc(doc(db, "moveInCleanings", d.id)))
+          );
+          // 이사정산 삭제
+          await deleteDoc(doc(db, "moveouts", row.id));
+          return;
+        }
+        const onlyMoveout = window.confirm("이사정산 데이터만 삭제하시겠습니까?");
+        if (!onlyMoveout) return;
+        await deleteDoc(doc(db, "moveouts", row.id));
+        return;
+      }
+
+      // 연동 안됨: 기존 확인 후 삭제
+      if (!window.confirm("해당 이사정산 내역을 삭제할까요?")) return;
+      await deleteDoc(doc(db, "moveouts", row.id));
+    } catch (e) {
+      console.error("삭제 중 오류:", e);
+      alert("삭제 중 오류가 발생했습니다. 콘솔을 확인하세요.");
+    }
   };
 
   const openReceiptPreview = async (row) => {

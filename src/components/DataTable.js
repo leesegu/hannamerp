@@ -21,11 +21,14 @@ export default function DataTable({
   // 좌측 커스텀 컨트롤(필터 등) 렌더 슬롯
   leftControls = null,
 
-  // ✅ 신규: 등록 버튼 라벨/아이콘 커스터마이즈(페이지별 일관성 유지용)
+  // ✅ 신규: 우측 커스텀 컨트롤 슬롯 (예: '차액' 버튼)
+  rightControls = null,
+
+  // 등록 버튼 라벨/아이콘
   addButtonLabel = "등록",
   addButtonIcon = "➕",
 
-  // ⚠️ 아래는 엑셀 업로드에 필요 (해당 페이지에서 사용 안 하면 생략 가능)
+  // ⚠️ 엑셀 업로드 관련(사용하지 않으면 생략 가능)
   collectionName,
   idKey,
   idAliases = [],
@@ -42,7 +45,7 @@ export default function DataTable({
   const fileInputRef = useRef(null);
   const allowUploadRef = useRef(false);
 
-  // ====== ✅ 기본값 자동 추론 ======
+  // ====== 기본값 자동 추론 ======
   const resolveIdKeyFromColumns = (cols) => {
     if (!Array.isArray(cols)) return undefined;
     const byIsId = cols.find((c) => c?.isId);
@@ -437,6 +440,9 @@ export default function DataTable({
         </div>
 
         <div className="control-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* ✅ 우측 커스텀 컨트롤: 예) 차액 버튼 */}
+          {rightControls}
+
           {onAdd && (
             <button className="register-button" onClick={onAdd}>
               {addButtonIcon} {addButtonLabel}
