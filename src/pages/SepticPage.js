@@ -1,5 +1,6 @@
 // src/pages/SepticPage.js
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom"; // ✅ 추가
 import { db } from "../firebase";
 import {
   collection,
@@ -18,37 +19,38 @@ export default function SepticPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🔍 정화조(septic) 필드가 채워진 문서만 조회
+  // ✅ 대시보드 → ?villa=<id> 수신
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const focusVilla =
+    params.get("villa") ||
+    params.get("id") ||
+    params.get("row");
+
   useEffect(() => {
     const q = query(collection(db, "villas"), where("septic", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          ...data,
-        };
-      });
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
       setVillas(list);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // 💰 금액 정규화
   const normalizeAmount = (v) => {
     const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : undefined;
   };
 
-  // ✏ 수정
   const handleEdit = (villa) => {
     setSelectedVilla(villa);
     setIsModalOpen(true);
   };
 
-  // 💾 저장
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
 
@@ -63,7 +65,6 @@ export default function SepticPage() {
     setSelectedVilla(null);
   };
 
-  // 📋 테이블 컬럼
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -83,7 +84,6 @@ export default function SepticPage() {
     { label: "비고", key: "septicNote" },
   ];
 
-  // 📑 엑셀 필드
   const excelFields = [
     "code", "name", "district", "address",
     "septic", "septicGrate", "septicDate",
@@ -103,6 +103,9 @@ export default function SepticPage() {
         itemsPerPage={15}
         enableExcel={true}
         excelFields={excelFields}
+        /** ✅ 포커스 적용 */
+        focusId={focusVilla}
+        rowIdKey="id"
       />
 
       <GenericEditModal
@@ -119,7 +122,7 @@ export default function SepticPage() {
           "septicAmount",
           "septicNote",
         ]}
-        readOnlyKeys={["septic"]} // ✅ 읽기 전용 표시
+        readOnlyKeys={["septic"]}
         labels={{
           septic: "정화조",
           septicGrate: "창살제거",

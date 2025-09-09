@@ -1,5 +1,6 @@
 // src/pages/FireSafetyPage.js
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom"; // ✅ 추가
 import { db } from "../firebase";
 import { collection, query, where, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import DataTable from "../components/DataTable";
@@ -10,6 +11,14 @@ export default function FireSafetyPage() {
   const [villas, setVillas] = useState([]);
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // ✅ 대시보드 → ?villa=<id> 수신
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const focusVilla =
+    params.get("villa") ||
+    params.get("id") ||
+    params.get("row");
 
   useEffect(() => {
     const q = query(collection(db, "villas"), where("fireSafety", "!=", ""));
@@ -106,6 +115,9 @@ export default function FireSafetyPage() {
           "code", "name", "district", "address",
           "fireSafety", "fireSafetyManager", "fireSafetyTrainingDate", "fireSafetyNote"
         ]}
+        /** ✅ 포커스 적용 */
+        focusId={focusVilla}
+        rowIdKey="id"
       />
 
       <GenericEditModal

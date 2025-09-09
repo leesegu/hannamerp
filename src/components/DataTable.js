@@ -1,5 +1,5 @@
 // src/components/DataTable.js
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { db } from "../firebase";
 import { doc, setDoc } from "firebase/firestore";
@@ -21,19 +21,23 @@ export default function DataTable({
   // 좌측 커스텀 컨트롤(필터 등) 렌더 슬롯
   leftControls = null,
 
-  // ✅ 신규: 우측 커스텀 컨트롤 슬롯 (예: '차액' 버튼)
+  // ✅ 우측 커스텀 컨트롤 슬롯
   rightControls = null,
 
   // 등록 버튼 라벨/아이콘
   addButtonLabel = "등록",
   addButtonIcon = "➕",
 
-  // ⚠️ 엑셀 업로드 관련(사용하지 않으면 생략 가능)
+  // ⚠️ 엑셀 업로드 관련
   collectionName,
   idKey,
   idAliases = [],
   idResolver,
   onUploadComplete,
+
+  // ✅ 신규: 포커스 행/ID키
+  focusId,                 // ex) "311"
+  rowIdKey = "id",         // ex) "id" (행의 고유키 필드명)
 }) {
   const defaultSortKey = columns?.[0]?.key ?? "code";
   const [searchText, setSearchText] = useState("");
@@ -44,6 +48,10 @@ export default function DataTable({
   const EXCEL_PASSWORD = "20453948";
   const fileInputRef = useRef(null);
   const allowUploadRef = useRef(false);
+
+  // ✅ 스크롤/하이라이트용 ref들
+  const tableContainerRef = useRef(null); // 스크롤 컨테이너(필요 시 사용)
+  const rowRefs = useRef({});             // { [rowId]: <tr> }
 
   // ====== 기본값 자동 추론 ======
   const resolveIdKeyFromColumns = (cols) => {
@@ -172,7 +180,7 @@ export default function DataTable({
     else { setSortKey(key); setSortOrder("asc"); }
   };
 
-  // ---------- (엑셀 관련 유틸) ----------
+  // ---------- 엑셀 유틸 ----------
   const normalizeAmount = (v) => {
     if (v == null) return "";
     const raw = String(v).trim();
@@ -428,6 +436,38 @@ export default function DataTable({
     inputEl.value = "";
   };
 
+  // =========================
+  // ✅ 포커스(스크롤/하이라이트) 로직
+  // 1) focusId가 있는 행이 어느 페이지에 있는지 계산 후, 그 페이지로 자동 이동
+  useEffect(() => {
+    if (!focusId) return;
+    const idx = filteredData.findIndex((r) => String(r?.[rowIdKey]) === String(focusId));
+    if (idx === -1) return;
+    const targetPage = Math.floor(idx / itemsPerPage) + 1;
+    if (targetPage !== currentPage) setCurrentPage(targetPage);
+    // currentPage가 바뀌면 아래 2) 효과가 후속으로 실행됨
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, filteredData, itemsPerPage]);
+
+  // 2) 현재 페이지에 포커스 행이 있으면 중앙으로 스크롤 + 하이라이트
+  useEffect(() => {
+    if (!focusId) return;
+    // currentData에 대상 행이 있는지 확인
+    const has = currentData.some((r) => String(r?.[rowIdKey]) === String(focusId));
+    if (!has) return;
+    // 렌더가 반영되도록 약간 지연 후 스크롤/하이라이트
+    const t = setTimeout(() => {
+      const el = rowRefs.current[focusId];
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("row-flash");
+        setTimeout(() => el.classList.remove("row-flash"), 1500);
+      }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [focusId, currentData, rowIdKey]);
+  // =========================
+
   return (
     <div className="data-table-wrapper">
       {/* 상단 컨트롤 바 */}
@@ -440,7 +480,7 @@ export default function DataTable({
         </div>
 
         <div className="control-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* ✅ 우측 커스텀 컨트롤: 예) 차액 버튼 */}
+          {/* 우측 커스텀 컨트롤 */}
           {rightControls}
 
           {onAdd && (
@@ -462,7 +502,7 @@ export default function DataTable({
       </div>
 
       {/* 테이블 */}
-      <div className="scroll-table">
+      <div className="scroll-table" ref={tableContainerRef}>
         <table className="data-table">
           <thead>
             <tr>
@@ -483,47 +523,55 @@ export default function DataTable({
             </tr>
           </thead>
           <tbody>
-            {currentData.map((row, i) => (
-              <tr key={row.id || i}>
-                <td>{startIndex + i + 1}</td>
-                {columns.map((col) => {
-                  const val = getByPath(row, col.key);
-                  const content =
-                    typeof col.render === "function"
-                      ? col.render(row)
-                      : (col.format ? col.format(val, row) : (val ?? "-"));
-                  return (
-                    <td key={col.key || col.label} style={{ whiteSpace: "nowrap", verticalAlign: "middle" }}>
-                      {content}
+            {currentData.map((row, i) => {
+              const rid = row?.[rowIdKey] ?? row?.id ?? `${startIndex + i}`;
+              return (
+                <tr
+                  key={rid}
+                  ref={(el) => { if (el) rowRefs.current[rid] = el; }}
+                  data-rowid={rid}
+                  className="hover:bg-gray-50 transition-colors"
+                >
+                  <td>{startIndex + i + 1}</td>
+                  {columns.map((col) => {
+                    const val = getByPath(row, col.key);
+                    const content =
+                      typeof col.render === "function"
+                        ? col.render(row)
+                        : (col.format ? col.format(val, row) : (val ?? "-"));
+                    return (
+                      <td key={col.key || col.label} style={{ whiteSpace: "nowrap", verticalAlign: "middle" }}>
+                        {content}
+                      </td>
+                    );
+                  })}
+                  {(onEdit || onDelete) && (
+                    <td>
+                      <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                        {onEdit && (
+                          <button
+                            className="icon-button"
+                            onClick={(e) => { e.stopPropagation(); onEdit(row); }}
+                            title="수정"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button
+                            className="icon-button"
+                            onClick={(e) => { e.stopPropagation(); onDelete(row); }}
+                            title="삭제"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
                     </td>
-                  );
-                })}
-                {(onEdit || onDelete) && (
-                  <td>
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                      {onEdit && (
-                        <button
-                          className="icon-button"
-                          onClick={(e) => { e.stopPropagation(); onEdit(row); }}
-                          title="수정"
-                        >
-                          ✏️
-                        </button>
-                      )}
-                      {onDelete && (
-                        <button
-                          className="icon-button"
-                          onClick={(e) => { e.stopPropagation(); onDelete(row); }}
-                          title="삭제"
-                        >
-                          🗑️
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
+                  )}
+                </tr>
+              );
+            })}
             {currentData.length === 0 && (
               <tr>
                 <td
@@ -537,6 +585,14 @@ export default function DataTable({
           </tbody>
         </table>
       </div>
+
+      {/* 하이라이트 효과 스타일 */}
+      <style>{`
+        .row-flash {
+          background-color: #fff3cd !important; /* 은은한 노란색 */
+          transition: background-color 300ms ease;
+        }
+      `}</style>
 
       {/* 하단: 엑셀 + 페이지네이션 */}
       <div className="table-footer">

@@ -1,6 +1,6 @@
 // src/components/TrezoSidebar.jsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import MoveoutList from "../pages/MoveoutList";
 import UserRegisterPage from "../UserRegisterPage";
 import VillaCodePage from "../pages/VillaCodePage";
@@ -17,16 +17,18 @@ import VendorRegisterPage from "../pages/VendorRegisterPage";
 import VendorsMainPage from "../pages/VendorsMainPage.js";
 import EmployeePage from "../pages/EmployeePage";
 import ReceiptIssuePage from "../pages/ReceiptIssuePage";
-import MoveInCleaningPage from "../pages/MoveInCleaningPage"; // ✅ 입주청소 페이지 연결
-import Dashboard from "../pages/Dashboard"; // ✅ 대시보드 추가
+import MoveInCleaningPage from "../pages/MoveInCleaningPage";
+import Dashboard from "../pages/Dashboard";
+
+/* ✅ 관리비회계 · 수입정리 페이지 import */
+import IncomeImportPage from "../pages/IncomeImportPage";
 
 import "remixicon/fonts/remixicon.css";
 
-/* 임시 플레이스홀더 (실제 페이지 연결 전까지 사용) */
 const ComingSoon = ({ title }) => (
   <div className="p-6">
     <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
-    <p className="text-gray-500 mt-2">준비 중입니다. (UI/데이터 스펙 확정 후 연결 예정)</p>
+    <p className="text-gray-500 mt-2">준비 중입니다.</p>
   </div>
 );
 
@@ -34,9 +36,7 @@ const SidebarItem = ({ icon, label, onClick, active, hasChildren, isOpen }) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center justify-between text-sm px-3 py-2 rounded-md transition-colors ${
-      active
-        ? "bg-gray-100 text-purple-600"
-        : "text-gray-700 hover:bg-gray-100 hover:text-purple-600"
+      active ? "bg-gray-100 text-purple-600" : "text-gray-700 hover:bg-gray-100 hover:text-purple-600"
     }`}
   >
     <div className="flex items-center gap-2">
@@ -72,6 +72,8 @@ const SidebarSubmenu = ({ items = [], onClick, activeMenu }) => (
 
 const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [activeContent, setActiveContent] = useState(null);
   const [openMenu, setOpenMenu] = useState("");
   const [activeMenu, setActiveMenu] = useState("");
@@ -87,11 +89,39 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   };
 
   const goHome = () => {
-    setActiveContent(null);     // ✅ 대시보드로 돌아가게 됨
+    setActiveContent(null); // 대시보드
     setActiveMenu("");
     setOpenMenu("");
-    navigate("/main");
+    navigate("/main", { replace: true });
   };
+
+  /** ✅ URL 쿼리 변화에 반응해서 내부 화면을 전환 */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const go = params.get("go");      // 예: "빌라정보"
+    const sub = params.get("sub");    // 예: "통신사"
+    // const villa = params.get("villa"); // 필요 시 페이지 내부에서 useLocation으로 사용
+
+    if (go === "빌라정보" && sub) {
+      setOpenMenu("villa");
+      setActiveMenu(sub);
+
+      const pages = {
+        코드별빌라: <VillaCodePage />,
+        통신사: <TelcoPage />,          // TelcoPage 안에서 useLocation으로 ?villa= 읽기 가능
+        승강기: <ElevatorPage />,
+        정화조: <SepticPage />,
+        소방안전: <FireSafetyPage />,
+        전기안전: <ElectricSafetyPage />,
+        상수도: <WaterPage />,
+        공용전기: <PublicElectricPage />,
+        건물청소: <CleaningPage />,
+        CCTV: <CctvPage />,
+      };
+
+      setActiveContent(pages[sub] ?? <ComingSoon title={`빌라정보 · ${sub}`} />);
+    }
+  }, [location.search]);
 
   return (
     <div className="flex w-full h-screen">
@@ -111,11 +141,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
             <div className="font-medium text-gray-800">{userName}</div>
             <div className="text-sm text-gray-400">로그인 중</div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-red-500 hover:text-red-600"
-            title="로그아웃"
-          >
+          <button onClick={handleLogout} className="text-red-500 hover:text-red-600" title="로그아웃">
             <i className="ri-logout-box-r-line text-xl"></i>
           </button>
         </div>
@@ -123,20 +149,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         {/* 메뉴 */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <nav className="space-y-2">
-            {/* (옵션) 대시보드 바로가기 메뉴를 추가하고 싶다면 주석 해제
-            <SidebarItem
-              icon="ri-dashboard-2-line"
-              label="대시보드"
-              onClick={() => {
-                setOpenMenu("");
-                setActiveContent(null); // 기본 화면으로
-                setActiveMenu("대시보드");
-              }}
-              active={activeMenu === "대시보드"}
-            />
-            */}
-
-            {/* 1) 빌라정보 */}
+            {/* 빌라정보 */}
             <div>
               <SidebarItem
                 icon="ri-building-4-line"
@@ -185,21 +198,18 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               )}
             </div>
 
-            {/* 2) 이사정산 */}
+            {/* 이사정산 */}
             <SidebarItem
               icon="ri-truck-line"
               label="이사정산"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(
-                  <MoveoutList employeeId={employeeId} userId={userId} isMobile={false} />,
-                  "이사정산"
-                );
+                handleNavigate(<MoveoutList employeeId={employeeId} userId={userId} isMobile={false} />, "이사정산");
               }}
               active={activeMenu === "이사정산"}
             />
 
-            {/* 3) 부가서비스 관리 */}
+            {/* 부가서비스 관리 */}
             <div>
               <SidebarItem
                 icon="ri-tools-line"
@@ -229,7 +239,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               )}
             </div>
 
-            {/* 4) 관리비회계 */}
+            {/* ✅ 관리비회계 */}
             <div>
               <SidebarItem
                 icon="ri-coins-line"
@@ -245,27 +255,26 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "accounting" && (
                 <SidebarSubmenu
-                  items={[
-                    "수입정리",
-                    "지출정리",
-                    "일마감",
-                    "월마감",
-                    "수입뷰어",
-                    "지출뷰어",
-                    "수입DB",
-                    "지출DB",
-                    "연간시트",
-                  ]}
+                  items={["수입정리", "지출정리", "일마감", "월마감", "수입뷰어", "지출뷰어", "수입DB", "지출DB", "연간시트"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
+                    if (item === "수입정리") {
+                      // 사이드바 내부 탭 방식으로 렌더링
+                      handleNavigate(<IncomeImportPage />, item);
+
+                      // URL 라우팅도 동시에 이동시키고 싶으면 아래 라인을 함께 사용하세요.
+                      // navigate("/accounting/income", { replace: true });
+                      return;
+                    }
+                    // 그 외는 아직 준비 중
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
                   }}
                 />
               )}
             </div>
 
-            {/* 5) 영수증발행 */}
+            {/* 영수증발행 */}
             <SidebarItem
               icon="ri-receipt-line"
               label="영수증발행"
@@ -276,7 +285,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "영수증발행"}
             />
 
-            {/* 6) 거래처관리 */}
+            {/* 거래처관리 */}
             <SidebarItem
               icon="ri-booklet-line"
               label="거래처관리"
@@ -287,7 +296,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "거래처관리"}
             />
 
-            {/* 7) 사원관리 */}
+            {/* 사원관리 */}
             <SidebarItem
               icon="ri-user-line"
               label="사원관리"
@@ -298,7 +307,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "사원관리"}
             />
 
-            {/* 8) 기초등록 */}
+            {/* 기초등록 */}
             <div>
               <SidebarItem
                 icon="ri-settings-3-line"

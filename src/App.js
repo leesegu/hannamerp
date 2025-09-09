@@ -33,6 +33,9 @@ import EmployeePage from "./pages/EmployeePage";
 /* ✅ 영수증 발행 리스트 페이지 */
 import ReceiptIssuePage from "./pages/ReceiptIssuePage";
 
+/* ✅ 관리비회계 · 수입정리 페이지 (새로 추가) */
+import IncomeImportPage from "./pages/IncomeImportPage";
+
 import "./App.css";
 
 function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }) {
@@ -140,6 +143,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
             <Navigate to="/login" replace />
           ) : (
             <ReceiptIssuePage />
+          )
+        }
+      />
+
+      {/* ✅ 관리비회계 · 수입정리 (라우트 추가) */}
+      <Route
+        path="/accounting/income"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <IncomeImportPage />
           )
         }
       />

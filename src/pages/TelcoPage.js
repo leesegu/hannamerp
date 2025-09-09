@@ -1,5 +1,6 @@
 // src/pages/TelcoPage.js
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection,
@@ -17,6 +18,11 @@ export default function TelcoPage() {
   const [villas, setVillas] = useState([]);
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // ✅ 대시보드에서 전달된 쿼리 (?villa=123)
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const focusVilla = params.get("villa"); // 자동 스크롤/하이라이트 대상
 
   // 🔎 통신사 필드가 있는 문서만 가져오기
   useEffect(() => {
@@ -43,7 +49,6 @@ export default function TelcoPage() {
       });
       setVillas(list);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -60,35 +65,26 @@ export default function TelcoPage() {
     return `${yy}-${mm}-${dd}`;
   };
 
-  // 표시용/저장용 공통 포맷터 (빈 값 -> "")
   function formatDateYYMMDD(value) {
     if (!value && value !== 0) return "";
-    // Firestore Timestamp
     if (typeof value === "object" && value?.seconds) {
       const d = new Date(value.seconds * 1000);
       return toYYMMDD(d);
     }
-    // JS Date
     if (value instanceof Date) return toYYMMDD(value);
-    // 숫자(ms)
     if (typeof value === "number") {
       const d = new Date(value);
       return isNaN(d.getTime()) ? "" : toYYMMDD(d);
     }
-    // 문자열
     if (typeof value === "string") {
       const s = value.trim();
       if (!s) return "";
       if (/^\d{8}$/.test(s)) {
-        const yy = s.slice(2, 4);
-        const mm = s.slice(4, 6);
-        const dd = s.slice(6, 8);
+        const yy = s.slice(2, 4), mm = s.slice(4, 6), dd = s.slice(6, 8);
         return `${yy}-${mm}-${dd}`;
       }
       if (/^\d{6}$/.test(s)) {
-        const yy = s.slice(0, 2);
-        const mm = s.slice(2, 4);
-        const dd = s.slice(4, 6);
+        const yy = s.slice(0, 2), mm = s.slice(2, 4), dd = s.slice(4, 6);
         return `${yy}-${mm}-${dd}`;
       }
       const parts = s.replace(/[./]/g, "-").split("-");
@@ -103,7 +99,6 @@ export default function TelcoPage() {
     return String(value ?? "");
   }
 
-  // 숫자/금액 정규화 (빈 값이면 undefined 반환하여 저장 시 필드 제거 가능)
   const normalizeAmountForSave = (v) => {
     if (v === null || v === undefined) return undefined;
     const cleaned = String(v).replace(/[^\d.-]/g, "");
@@ -121,32 +116,21 @@ export default function TelcoPage() {
 
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
+    if (data.telcoContract) data.telcoContract = formatDateYYMMDD(data.telcoContract);
 
-    // ✅ 날짜 통일
-    if (data.telcoContract) {
-      data.telcoContract = formatDateYYMMDD(data.telcoContract);
-    }
-
-    // ✅ 금액/숫자 통일 (숫자 형태로 저장)
     const amt = normalizeAmountForSave(data.telcoAmount);
     const sup = normalizeAmountForSave(data.telcoSupport);
     const lines = normalizeIntForSave(data.telcoLineCount);
 
-    if (amt === undefined) delete data.telcoAmount;
-    else data.telcoAmount = amt;
-
-    if (sup === undefined) delete data.telcoSupport;
-    else data.telcoSupport = sup;
-
-    if (lines === undefined) delete data.telcoLineCount;
-    else data.telcoLineCount = lines;
+    if (amt === undefined) delete data.telcoAmount; else data.telcoAmount = amt;
+    if (sup === undefined) delete data.telcoSupport; else data.telcoSupport = sup;
+    if (lines === undefined) delete data.telcoLineCount; else data.telcoLineCount = lines;
 
     await updateDoc(doc(db, "villas", id), data);
     setIsModalOpen(false);
     setSelectedVilla(null);
   };
 
-  // 📋 테이블 컬럼 정의
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -165,11 +149,7 @@ export default function TelcoPage() {
     { label: "명세서번호", key: "telcoBillNo" },
     { label: "회선수", key: "telcoLineCount" },
     { label: "수신방법", key: "telcoReceiveMethod" },
-    {
-      label: "약정만료",
-      key: "telcoContract",
-      format: (value) => formatDateYYMMDD(value), // ✅ 표시도 YY-MM-DD
-    },
+    { label: "약정만료", key: "telcoContract", format: (v) => formatDateYYMMDD(v) },
     {
       label: "지원금",
       key: "telcoSupport",
@@ -181,7 +161,6 @@ export default function TelcoPage() {
     { label: "비고", key: "telcoNote" },
   ];
 
-  // 📑 엑셀 import/export 필드 (순서대로 저장/내보내기)
   const excelFields = [
     "code",
     "name",
@@ -206,13 +185,14 @@ export default function TelcoPage() {
         columns={columns}
         data={villas}
         onEdit={handleEdit}
-        // 🔽 검색/정렬/페이지 옵션
         sortKey="code"
         sortOrder="asc"
         itemsPerPage={15}
-        // 🔽 엑셀 다운로드/업로드 활성화
         enableExcel={true}
         excelFields={excelFields}
+        /** ✅ 추가: 포커스 대상 전달 + id 키 지정 */
+        focusId={focusVilla}
+        rowIdKey="id"
       />
 
       <GenericEditModal
@@ -223,7 +203,6 @@ export default function TelcoPage() {
           setSelectedVilla(null);
         }}
         onSave={handleSave}
-        // ✅ 수정 가능한 필드만 나열 (통신사는 읽기전용 헤더로 표시)
         fields={[
           "telcoAmount",
           "telcoName",
@@ -234,7 +213,6 @@ export default function TelcoPage() {
           "telcoSupport",
           "telcoNote",
         ]}
-        // ✅ 상단/읽기전용으로 함께 표시할 키
         readOnlyKeys={["telco"]}
         labels={{
           telco: "통신사",
