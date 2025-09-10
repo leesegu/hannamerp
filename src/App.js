@@ -33,8 +33,14 @@ import EmployeePage from "./pages/EmployeePage";
 /* ✅ 영수증 발행 리스트 페이지 */
 import ReceiptIssuePage from "./pages/ReceiptIssuePage";
 
-/* ✅ 관리비회계 · 수입정리 페이지 (새로 추가) */
+/* ✅ 관리비회계 · 수입정리 페이지 */
 import IncomeImportPage from "./pages/IncomeImportPage";
+
+/* ✅ 전기요금 추출(문자 추출) 페이지 */
+import MessageExtractor from "./pages/MessageExtractor";
+
+/* ✅ 캘린더 페이지 */
+import CalendarPage from "./pages/CalendarPage";
 
 import "./App.css";
 
@@ -63,7 +69,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
         }
       />
 
-      {/* 메인 */}
+      {/* 메인 (PC: 사이드바, 모바일: 리스트로 리다이렉트) */}
       <Route
         path="/main"
         element={
@@ -138,25 +144,25 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       {/* 영수증 발행 리스트 */}
       <Route
         path="/receipts"
-        element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
-          ) : (
-            <ReceiptIssuePage />
-          )
-        }
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <ReceiptIssuePage />}
       />
 
-      {/* ✅ 관리비회계 · 수입정리 (라우트 추가) */}
+      {/* ✅ 관리비회계 · 수입정리 */}
       <Route
         path="/accounting/income"
-        element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
-          ) : (
-            <IncomeImportPage />
-          )
-        }
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <IncomeImportPage />}
+      />
+
+      {/* ✅ 전기요금 추출(문자) 페이지 라우트 */}
+      <Route
+        path="/extract"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <MessageExtractor />}
+      />
+
+      {/* ✅ 캘린더 라우트 */}
+      <Route
+        path="/calendar"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <CalendarPage />}
       />
 
       {/* 기타 메뉴 */}

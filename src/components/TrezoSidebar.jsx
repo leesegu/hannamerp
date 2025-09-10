@@ -20,8 +20,14 @@ import ReceiptIssuePage from "../pages/ReceiptIssuePage";
 import MoveInCleaningPage from "../pages/MoveInCleaningPage";
 import Dashboard from "../pages/Dashboard";
 
-/* ✅ 관리비회계 · 수입정리 페이지 import */
+/* ✅ 관리비회계 · 수입정리 페이지 */
 import IncomeImportPage from "../pages/IncomeImportPage";
+
+/* ✅ 전기요금 추출(문자) 페이지 */
+import MessageExtractor from "../pages/MessageExtractor";
+
+/* ✅ 캘린더 페이지 */
+import CalendarPage from "../pages/CalendarPage";
 
 import "remixicon/fonts/remixicon.css";
 
@@ -98,9 +104,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   /** ✅ URL 쿼리 변화에 반응해서 내부 화면을 전환 */
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const go = params.get("go");      // 예: "빌라정보"
-    const sub = params.get("sub");    // 예: "통신사"
-    // const villa = params.get("villa"); // 필요 시 페이지 내부에서 useLocation으로 사용
+    const go = params.get("go");
+    const sub = params.get("sub");
 
     if (go === "빌라정보" && sub) {
       setOpenMenu("villa");
@@ -108,7 +113,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
 
       const pages = {
         코드별빌라: <VillaCodePage />,
-        통신사: <TelcoPage />,          // TelcoPage 안에서 useLocation으로 ?villa= 읽기 가능
+        통신사: <TelcoPage />,
         승강기: <ElevatorPage />,
         정화조: <SepticPage />,
         소방안전: <FireSafetyPage />,
@@ -209,31 +214,47 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "이사정산"}
             />
 
-            {/* 부가서비스 관리 */}
+            {/* ✅ 캘린더 (이사정산 아래) */}
+            <SidebarItem
+              icon="ri-calendar-line"
+              label="캘린더"
+              onClick={() => {
+                setOpenMenu("");
+                handleNavigate(<CalendarPage />, "캘린더");
+                // 필요 시 URL도 이동하려면: navigate("/calendar", { replace: true });
+              }}
+              active={activeMenu === "캘린더"}
+            />
+
+            {/* 부가서비스 (이전: 부가서비스 관리) */}
             <div>
               <SidebarItem
                 icon="ri-tools-line"
-                label="부가서비스 관리"
+                label="부가서비스"
                 onClick={() => {
                   const newState = openMenu === "addon" ? "" : "addon";
                   setOpenMenu(newState);
-                  setActiveMenu("부가서비스 관리");
+                  setActiveMenu("부가서비스");
                 }}
-                active={activeMenu === "부가서비스 관리"}
+                active={activeMenu === "부가서비스"}
                 hasChildren
                 isOpen={openMenu === "addon"}
               />
               {openMenu === "addon" && (
                 <SidebarSubmenu
-                  items={["입주청소", "도배"]}
+                  items={["입주청소", "도배", "전기요금 추출"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
                     const pages = {
                       입주청소: <MoveInCleaningPage />,
                       도배: <ComingSoon title="부가서비스 · 도배" />,
+                      /* ✅ 전기요금 추출 → MessageExtractor 연결 */
+                      "전기요금 추출": <MessageExtractor />,
                     };
                     handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
+                    // URL을 /extract 로도 이동하고 싶다면:
+                    // if (item === "전기요금 추출") navigate("/extract", { replace: true });
                   }}
                 />
               )}
@@ -260,14 +281,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                   onClick={(item) => {
                     setActiveMenu(item);
                     if (item === "수입정리") {
-                      // 사이드바 내부 탭 방식으로 렌더링
                       handleNavigate(<IncomeImportPage />, item);
-
-                      // URL 라우팅도 동시에 이동시키고 싶으면 아래 라인을 함께 사용하세요.
                       // navigate("/accounting/income", { replace: true });
                       return;
                     }
-                    // 그 외는 아직 준비 중
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
                   }}
                 />
