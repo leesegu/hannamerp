@@ -1,22 +1,22 @@
 // src/pages/CalendarPage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import "./CalendarPage.css";
 
 /**
- * 요청 반영
- * - 팝오버: 클릭한 요소의 실제 rect 기준 + 뷰포트 클램프(우/하단에서도 절대 가리지 않음)
- * - 더보기 목록: 드래그로 날짜 이동/동일 날짜 재정렬, 전역 events 반영으로 순서 실시간 갱신
- * - 동일 날짜 재정렬 UX: 대상 위에 '빈 공간' 플레이스홀더가 나타나며 자연스럽게 밀리는 느낌
- * - 이전/다음 달 셀에도 해당 날짜 이벤트가 있으면 항상 표시
+ * 변경 요약
+ * - 팝오버: 하단 셀에서도 가려지지 않도록 강제 상단 배치 + 동적 상향 부스트 로직 강화
+ * - 더보기: 표시는 유지, 클릭해도 아무 동작 없음 + 커서 변화 없음
+ * - 레이아웃 여백 축소: 헤더/요일/그리드/셀 내부 여백 최소화
  */
 
 const STATUS_COLORS = [
-  { key: "darkgray", label: "짙은 회색", hex: "#374151" },
-  { key: "deepblue", label: "진한 파랑색", hex: "#1e3a8a" },
-  { key: "sky",      label: "하늘색",     hex: "#38bdf8" }, // 기본
-  { key: "red",      label: "빨간색",     hex: "#ef4444" },
-  { key: "purple",   label: "보라색",     hex: "#8b5cf6" },
-  { key: "amber",    label: "노란색",     hex: "#f59e0b" },
-  { key: "green",    label: "녹색",       hex: "#22c55e" },
+  { key: "darkgray", label: "짙은 회색" },
+  { key: "deepblue", label: "진한 파랑색" },
+  { key: "sky",      label: "하늘색" }, // 기본
+  { key: "red",      label: "빨간색" },
+  { key: "purple",   label: "보라색" },
+  { key: "amber",    label: "노란색" },
+  { key: "green",    label: "녹색" },
 ];
 
 export default function CalendarPage() {
@@ -42,14 +42,10 @@ export default function CalendarPage() {
   // 항목 수정 팝오버
   const [popover, setPopover] = useState({ open: false, id: null, x: 0, y: 0, w: 300, h: 252 });
 
-  // ‘N건 더보기’ 팝업(⚠️ items 스냅샷 대신 날짜만 보관 → 렌더 시 실시간 필터)
-  const [moreList, setMoreList] = useState({ open: false, x: 0, y: 0, w: 260, ymd: null, anchorRect: null });
-
   // 하이라이트
   const [highlightId, setHighlightId] = useState(null);
 
   // 드래그 상태(플레이스홀더용)
-  // dragId: 끌리는 항목 id, overId: 같은 날짜에서 '앞에 끼울' 타겟 id, overYMD: {y,m,d}
   const [dragState, setDragState] = useState({ dragId: null, overId: null, overYMD: null });
 
   // 날짜 셀 오버플로우 측정
@@ -151,7 +147,6 @@ export default function CalendarPage() {
   const onDragStart = (e, ev) => {
     e.dataTransfer.setData("text/plain", JSON.stringify({ id: ev.id, y: ev.y, m: ev.m, d: ev.d }));
     setDragState({ dragId: ev.id, overId: null, overYMD: { y: ev.y, m: ev.m, d: ev.d } });
-    // 작은 투명 드래그 이미지
     const ghost = document.createElement("div");
     ghost.style.width = "1px"; ghost.style.height = "1px"; ghost.style.opacity = "0";
     document.body.appendChild(ghost);
@@ -160,7 +155,6 @@ export default function CalendarPage() {
   };
   const clearDragState = () => setDragState({ dragId: null, overId: null, overYMD: null });
 
-  // 셀로 드롭 → 다른 날짜 이동(끝으로) / 같은 날짜면 맨 끝
   const onDropToDate = (e, targetCell) => {
     e.preventDefault();
     const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
@@ -180,7 +174,6 @@ export default function CalendarPage() {
     clearDragState();
   };
 
-  // 타겟 pill 위로 드롭 → 같은 날짜면 '앞'으로 재정렬 (다른 날짜면 타겟 날짜로 옮기며 앞에 삽입)
   const onDropBeforeTarget = (e, targetEvent) => {
     e.preventDefault();
     const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
@@ -189,7 +182,6 @@ export default function CalendarPage() {
     clearDragState();
   };
 
-  // 드래그가 타겟 pill 위에 올라왔을 때(같은 날짜면 플레이스홀더 표시)
   const onDragOverTarget = (e, targetEvent) => {
     e.preventDefault();
     const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
@@ -237,23 +229,44 @@ export default function CalendarPage() {
     setTimeout(() => setHighlightId(null), 2500);
   };
 
-  /** ====================== 팝오버 위치 계산(강화) ====================== */
+  /** ====================== 팝오버 위치 계산(더 강하게 상향) ====================== */
+  // 조건:
+  // - 아래 공간(belowSpace)이 popH보다 작거나
+  // - 클릭 지점(rect.bottom)이 화면 높이의 70% 이상(하단 30% 구간)
+  // => 무조건 '위쪽' 배치. 위쪽 공간이 부족하면 동적 부스트(EXTRA + 부족분)를 더해 최대한 끌어올림.
   const placePopoverNearRect = (rect, popW, popH) => {
-    const M = 12;
-
+    const M = 10; // 기본 여백(더 좁게)
+    const BASE_EXTRA = 24; // 기본 상향 오프셋(증가)
+    const bottomZoneCutoff = window.innerHeight * 0.70; // 하단 30% 구간
     const leftSpace   = rect.left - M;
     const rightSpace  = window.innerWidth  - rect.right - M;
     const aboveSpace  = rect.top  - M;
     const belowSpace  = window.innerHeight - rect.bottom - M;
 
-    // 가로/세로 모두 더 넓은 쪽 우선
+    // 가로 배치: 넓은 쪽
     const placeRight = rightSpace >= leftSpace;
-    const placeBelow = belowSpace >= aboveSpace;
+    let x = placeRight ? (rect.right + M) : (rect.left - popW - M);
 
-    let x = placeRight ? rect.right + M : rect.left - popW - M;
-    let y = placeBelow ? rect.top       : rect.bottom - popH;
+    // 세로 배치 판단
+    let forceAbove = false;
+    if (belowSpace < popH + M) forceAbove = true;
+    if (rect.bottom >= bottomZoneCutoff) forceAbove = true;
 
-    // 최종 클램프(뷰포트 밖 불가)
+    let y;
+    if (forceAbove) {
+      // 위로 올리되, 위쪽 공간이 부족하면 부족분만큼 추가로 더 끌어올림(동적 부스트)
+      const shortage = Math.max(0, (popH + M) - aboveSpace); // 위쪽 공간 부족분
+      const EXTRA = BASE_EXTRA + shortage;                    // 상황에 따른 추가 상향
+      y = rect.top - popH - M - EXTRA;
+    } else if (aboveSpace < popH + M) {
+      // 위쪽도 좁으면 아래로
+      y = rect.bottom + M;
+    } else {
+      // 둘 다 가능하면 넓은 쪽
+      y = belowSpace >= aboveSpace ? (rect.bottom + M) : (rect.top - popH - M);
+    }
+
+    // 최종 클램프(뷰포트 밖 방지)
     x = Math.max(M, Math.min(x, window.innerWidth  - popW - M));
     y = Math.max(M, Math.min(y, window.innerHeight - popH - M));
 
@@ -266,29 +279,9 @@ export default function CalendarPage() {
     const pos = placePopoverNearRect(rect, popW, popH);
     setPopover({ open: true, id: ev.id, w: popW, h: popH, ...pos });
   };
-  const openPopoverAtRect = (ev, rect) => {
-    const popW = 300, popH = 252;
-    const pos = placePopoverNearRect(rect, popW, popH);
-    setPopover({ open: true, id: ev.id, w: popW, h: popH, ...pos });
-  };
   const closePopover = () => setPopover({ open: false, id: null, x: 0, y: 0, w: 300, h: 252 });
 
-  /** ====================== 더보기 팝업 ====================== */
-  const openMoreForCell = (cellEvents, anchorEl) => {
-    const any = cellEvents[0];
-    if (!any) return;
-    const rect = anchorEl.getBoundingClientRect();
-    const w = 260;
-    const maxH = 360;
-    const preferredH = Math.min(maxH, 8 + cellEvents.length * 34);
-    let y = rect.top - preferredH - 8;
-    if (y < 8) y = Math.min(window.innerHeight - preferredH - 8, rect.bottom + 8);
-    const x = Math.min(window.innerWidth - w - 8, Math.max(8, rect.left));
-    setMoreList({ open: true, x, y, w, ymd: { y: any.y, m: any.m, d: any.d }, anchorRect: rect });
-  };
-  const closeMore = () => setMoreList({ open: false, x: 0, y: 0, w: 260, ymd: null, anchorRect: null });
-
-  /** ====================== 리사이즈 ====================== */
+  /** ====================== 리사이즈: 위치 재계산 ====================== */
   useEffect(() => {
     const onResize = () => {
       Object.keys(contentRefs.current).forEach((k) => updateOverflowForKey(k));
@@ -309,25 +302,19 @@ export default function CalendarPage() {
 
   /** ====================== 렌더 ====================== */
   return (
-    <div className="calendar-page flex flex-col w-full h-full overflow-hidden bg-white">
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar{ display:none; }
-        .no-scrollbar{ scrollbar-width:none; -ms-overflow-style:none; }
-        .drop-spacer{ height:22px; border-radius:6px; outline:1px dashed rgba(99,102,241,.45); background:rgba(99,102,241,.08); transition:all .12s ease; }
-      `}</style>
-
+    <div className="calendar-page">
       {/* 헤더 */}
-      <div className="shrink-0 flex items-center justify-between px-1 pt-2 pb-[2px] border-b border-gray-200 bg-white z-[1]">
-        <div className="flex items-center gap-1.5">
-          <button className="h-9 px-3 rounded-md text-[13px] ring-1 ring-gray-300 hover:bg-gray-100" onClick={goPrev}>◀</button>
-          <select className="h-9 rounded-md px-3 text-[13px] ring-1 ring-gray-300" value={year} onChange={(e) => setYear(parseInt(e.target.value, 10))}>
+      <div className="calendar-header">
+        <div className="calendar-nav">
+          <button className="btn-plain" onClick={goPrev}>◀</button>
+          <select className="inp-sel" value={year} onChange={(e) => setYear(parseInt(e.target.value, 10))}>
             {yearOptions().map((y) => <option key={y} value={y}>{y}년</option>)}
           </select>
-          <select className="h-9 rounded-md px-3 text-[13px] ring-1 ring-gray-300" value={month} onChange={(e) => setMonth(parseInt(e.target.value, 10))}>
+          <select className="inp-sel" value={month} onChange={(e) => setMonth(parseInt(e.target.value, 10))}>
             {Array.from({ length: 12 }, (_, i) => i).map((m) => <option key={m} value={m}>{m + 1}월</option>)}
           </select>
-          <button className="h-9 px-3 rounded-md text-[13px] ring-1 ring-gray-300 hover:bg-gray-100" onClick={goNext}>▶</button>
-          <button className="h-9 px-3 rounded-md text-[13px] bg-violet-600 text-white hover:bg-violet-700" onClick={goToday}>오늘</button>
+          <button className="btn-plain" onClick={goNext}>▶</button>
+          <button className="btn-primary" onClick={goToday}>오늘</button>
         </div>
 
         <input
@@ -336,155 +323,91 @@ export default function CalendarPage() {
           onKeyDown={onSearchKeyDown}
           placeholder="검색어 입력"
           aria-label="검색"
-          className="h-9 rounded-md px-3 text-[13px] ring-1 ring-gray-300 outline-none focus:ring-violet-400"
-          style={{ width: 320 }}
+          className="inp-search"
         />
       </div>
 
       {/* 달력 본문 */}
-      <div className="flex-1 min-h-0 flex bg-white">
-        <div className="flex-1 min-h-0">
-          <div className="px-0 py-0 h-full flex flex-col">
-            {/* 요일 헤더 */}
-            <div className="shrink-0 grid grid-cols-7 text-center text-[12px] font-medium bg-gray-50 border border-gray-200 border-b-0">
-              {["일","월","화","수","목","금","토"].map((d) => <div key={d} className="py-1">{d}</div>)}
-            </div>
-
-            {/* 날짜 그리드 */}
-            <div className="flex-1 min-h-0">
-              <div className="grid grid-cols-7 gap-px p-0 bg-white border border-gray-200 h-full" style={{ gridTemplateRows: "repeat(6, 1fr)" }}>
-                {daysGrid.map((cell, idx) => {
-                  const isCurrentMonth = cell.m === month;
-                  const key = makeKey(cell);
-                  // 해당 날짜 이벤트(정렬 포함)
-                  const cellEvents = sortByOrder(events.filter((e) => e.y === cell.y && e.m === cell.m && e.d === cell.d));
-
-                  const isToday =
-                    cell.y === today.getFullYear() &&
-                    cell.m === today.getMonth() &&
-                    cell.d === today.getDate();
-                  const ov = overflowMap[key] || { top: false, bottom: false, hiddenBelow: 0 };
-
-                  const isDragSameDay =
-                    dragState.dragId &&
-                    dragState.overYMD &&
-                    dragState.overYMD.y === cell.y &&
-                    dragState.overYMD.m === cell.m &&
-                    dragState.overYMD.d === cell.d;
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => openModalForNew(cell.y, cell.m, cell.d)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => onDropToDate(e, cell)}
-                      className={`relative rounded border border-gray-200 bg-white overflow-hidden ${isToday ? "ring-2 ring-violet-400" : ""}`}
-                    >
-                      {/* 상단 날짜바 */}
-                      <div className="h-5 px-1 flex items-center justify-between bg-white/80">
-                        <div className={`text-[11px] select-none ${isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}>{cell.d}</div>
-                      </div>
-
-                      {/* 이벤트 영역 */}
-                      <div
-                        ref={setContentRef(key)}
-                        className="absolute left-0 right-0 bottom-0 no-scrollbar"
-                        style={{ top: 18, padding: "2px", overflow: "auto" }}
-                        onScroll={(e) => updateOverflowForKey(key, e.currentTarget)}
-                        onDoubleClick={(e) => { e.stopPropagation(); }}
-                      >
-                        <div className="space-y-1 text-[11px]">
-                          {cellEvents.map((e) => (
-                            <React.Fragment key={e.id}>
-                              {/* 플레이스홀더: 같은 날에서 타겟 위에 빈 공간 */}
-                              {isDragSameDay && dragState.overId === e.id && <div className="drop-spacer" />}
-                              <EventPill
-                                event={e}
-                                highlight={highlightId === e.id || (query && isMatch(e, query))}
-                                onOpenPopover={(domEvent) => openPopover(e, domEvent)}
-                                onDoubleClick={() => openModalForEdit(e)}
-                                onDragStart={(evt) => onDragStart(evt, e)}
-                                onDragOver={(evt) => onDragOverTarget(evt, e)}
-                                onDropBefore={(evt) => onDropBeforeTarget(evt, e)}
-                              />
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 하단 'N건 더보기' */}
-                      {ov.hiddenBelow > 0 && (
-                        <div className="absolute left-0 right-0 bottom-0 p-1 bg-gradient-to-t from-white/90 to-transparent">
-                          <button
-                            className="w-full rounded-md text-[10px] px-2 py-[3px] ring-1 ring-gray-300 text-gray-700 bg-white hover:bg-gray-50"
-                            onClick={(evt) => {
-                              evt.stopPropagation();
-                              openMoreForCell(cellEvents, evt.currentTarget);
-                            }}
-                          >
-                            가려진 항목 {ov.hiddenBelow}건 더보기
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+      <div className="calendar-body">
+        <div className="weekday-row">
+          {["일","월","화","수","목","금","토"].map((d) => <div key={d} className="weekday-cell">{d}</div>)}
         </div>
 
-        <div className="w-0" />
-      </div>
+        <div className="calendar-grid">
+          {daysGrid.map((cell, idx) => {
+            const isCurrentMonth = cell.m === month;
+            const key = makeKey(cell);
+            const cellEvents = sortByOrder(events.filter((e) => e.y === cell.y && e.m === cell.m && e.d === cell.d));
 
-      {/* ‘N건 더보기’ 팝업 (헤더/닫기 제거, 색상 유지, 드래그 재정렬 + 실시간 반영) */}
-      {moreList.open && moreList.ymd && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={closeMore} />
-          <div
-            className="fixed z-50 rounded-md border bg-white shadow-lg overflow-auto"
-            style={{ left: moreList.x, top: moreList.y, width: moreList.w, maxHeight: 360 }}
-          >
-            <div className="p-2 space-y-1">
-              {sortByOrder(events.filter((e) =>
-                e.y === moreList.ymd.y && e.m === moreList.ymd.m && e.d === moreList.ymd.d
-              )).map((e) => {
-                const color = STATUS_COLORS.find((c) => c.key === e.statusKey)?.hex || "#38bdf8";
-                const isDragSameDay =
-                  dragState.dragId &&
-                  dragState.overYMD &&
-                  dragState.overYMD.y === moreList.ymd.y &&
-                  dragState.overYMD.m === moreList.ymd.m &&
-                  dragState.overYMD.d === moreList.ymd.d;
+            const isToday =
+              cell.y === today.getFullYear() &&
+              cell.m === today.getMonth() &&
+              cell.d === today.getDate();
 
-                return (
-                  <React.Fragment key={e.id}>
-                    {/* 플레이스홀더(팝업 목록용) */}
-                    {isDragSameDay && dragState.overId === e.id && <div className="drop-spacer" />}
+            const ov = overflowMap[key] || { top: false, bottom: false, hiddenBelow: 0 };
+
+            const isDragSameDay =
+              dragState.dragId &&
+              dragState.overYMD &&
+              dragState.overYMD.y === cell.y &&
+              dragState.overYMD.m === cell.m &&
+              dragState.overYMD.d === cell.d;
+
+            return (
+              <div
+                key={idx}
+                onClick={() => openModalForNew(cell.y, cell.m, cell.d)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => onDropToDate(e, cell)}
+                className={`day-cell ${isToday ? "day-cell--today" : ""}`}
+              >
+                {/* 상단 날짜바 */}
+                <div className="daybar">
+                  <div className={`daybar-date ${isCurrentMonth ? "daybar-date--curr" : "daybar-date--dim"}`}>{cell.d}</div>
+                </div>
+
+                {/* 이벤트 영역 */}
+                <div
+                  ref={setContentRef(key)}
+                  className="event-area no-scrollbar"
+                  onScroll={(e) => updateOverflowForKey(key, e.currentTarget)}
+                  onDoubleClick={(e) => { e.stopPropagation(); }}
+                >
+                  <div className="event-stack">
+                    {cellEvents.map((e) => (
+                      <React.Fragment key={e.id}>
+                        {isDragSameDay && dragState.overId === e.id && <div className="drop-spacer" />}
+                        <EventPill
+                          event={e}
+                          highlight={highlightId === e.id || (query && isMatch(e, query))}
+                          onOpenPopover={(domEvent) => openPopover(e, domEvent)}
+                          onDoubleClick={() => openModalForEdit(e)}
+                          onDragStart={(evt) => onDragStart(evt, e)}
+                          onDragOver={(evt) => onDragOverTarget(evt, e)}
+                          onDropBefore={(evt) => onDropBeforeTarget(evt, e)}
+                        />
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 하단 'N건 더보기' (표시만, 클릭 동작 없음 + 커서 변화 없음) */}
+                {ov.hiddenBelow > 0 && (
+                  <div className="more-gradient">
                     <button
-                      draggable
-                      onDragStart={(evt) => onDragStart(evt, e)}
-                      onDragOver={(evt) => onDragOverTarget(evt, e)}
-                      onDrop={(evt) => onDropBeforeTarget(evt, e)}
-                      className="w-full text-left rounded px-2 py-1 text-[12px] flex items-center justify-between gap-2"
-                      style={{ backgroundColor: color, color: "#fff" }}
-                      title={`${e.villa} ${e.amount}`}
-                      onClick={(evt) => {
-                        // ✅ 더보기 내 '해당 항목 버튼'의 실제 rect 기준으로 팝오버 위치
-                        openPopoverAtRect(e, evt.currentTarget.getBoundingClientRect());
-                        closeMore();
-                      }}
+                      className="more-button"
+                      title="가려진 항목 수 표시 (열리지 않음)"
+                      onClick={(evt) => { evt.stopPropagation(); /* no-op */ }}
                     >
-                      <span className="truncate">{e.villa}</span>
-                      <span className="shrink-0">{e.amount}</span>
+                      가려진 항목 {ov.hiddenBelow}건 더보기
                     </button>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* 항목 수정 팝오버 */}
       {popover.open && (() => {
@@ -492,23 +415,23 @@ export default function CalendarPage() {
         if (!selected) return null;
         return (
           <>
-            <div className="fixed inset-0 z-40" onClick={closePopover} />
-            <div className="fixed z-50 rounded-md border bg-white shadow-lg" style={{ left: popover.x, top: popover.y, width: popover.w }}>
-              <div className="flex items-center justify-between border-b px-2 py-2">
-                <div className="text-[13px] font-semibold">항목 수정</div>
-                <div className="flex items-center gap-1">
+            <div className="screen-dim" onClick={closePopover} />
+            <div className="popover" style={{ left: popover.x, top: popover.y }}>
+              <div className="popover-head">
+                <div className="popover-title">항목 수정</div>
+                <div className="popover-actions">
                   <button
-                    className="rounded px-2 py-0.5 text-[12px] ring-1 ring-red-300 text-red-600 hover:bg-red-50"
+                    className="btn-danger"
                     onClick={() => { deleteEvent(selected.id); closePopover(); }}
                     title="삭제"
                   >
                     삭제
                   </button>
-                  <button className="text-gray-600 hover:text-gray-800 px-1 text-[20px]" onClick={closePopover} title="닫기">✕</button>
+                  <button className="btn-x" onClick={closePopover} title="닫기">✕</button>
                 </div>
               </div>
 
-              <div className="p-3 space-y-2">
+              <div className="popover-body">
                 <Field label="빌라명/호수" value={selected.villa} onChange={(v) => patchEvent(selected.id, { villa: v })} />
                 <Field
                   label="금액"
@@ -526,18 +449,18 @@ export default function CalendarPage() {
       {/* 등록/수정 모달 */}
       {modalOpen && (
         <Modal onClose={() => setModalOpen(false)} title={`${modalDate.y}.${modalDate.m + 1}.${modalDate.d}`} width={editId ? 560 : 420} showClose={!!editId}>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="form-grid">
             <Field label="빌라명/호수" value={form.villa} onChange={(v) => setForm((s) => ({ ...s, villa: v }))} onEnter={() => amountRef.current?.focus()} inputRef={villaRef} />
             <Field label="금액" value={form.amount}
-              onChange={(v) => setForm((s) => ({ ...s, amount: v.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") }))}
+              onChange={(v) => setForm((s) => ({ ...s, amount: v.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") })) }
               onEnter={() => descRef.current?.focus()} inputRef={amountRef}
             />
             <StatusPicker value={form.statusKey} onChange={(key) => setForm((s) => ({ ...s, statusKey: key }))} />
             <TextArea label="설명" value={form.desc} onChange={(v) => setForm((s) => ({ ...s, desc: v }))} inputRef={descRef} />
           </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <button onClick={saveEvent} className="rounded px-3 py-1 text-[12px] bg-violet-600 text-white hover:bg-violet-700">저장</button>
-            <button onClick={() => setModalOpen(false)} className="rounded px-3 py-1 text-[12px] ring-1 ring-gray-300 hover:bg-gray-50">닫기</button>
+          <div className="modal-actions">
+            <button onClick={saveEvent} className="btn-primary">저장</button>
+            <button onClick={() => setModalOpen(false)} className="btn-plain">닫기</button>
           </div>
         </Modal>
       )}
@@ -556,7 +479,7 @@ export default function CalendarPage() {
 /* -------------------- 하위/공통 컴포넌트 -------------------- */
 
 function EventPill({ event, highlight, onOpenPopover, onDoubleClick, onDragStart, onDragOver, onDropBefore }) {
-  const color = STATUS_COLORS.find((c) => c.key === event.statusKey)?.hex || "#38bdf8";
+  const colorClass = `pill--${event.statusKey || "sky"}`;
   return (
     <div
       data-evpill="1"
@@ -566,13 +489,12 @@ function EventPill({ event, highlight, onOpenPopover, onDoubleClick, onDragStart
       onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(); }}
       onDragOver={(e) => onDragOver(e, event)}
       onDrop={(e) => onDropBefore(e, event)}
-      className={`w-full rounded-md border cursor-pointer ${highlight ? "ring-2 ring-white/70" : ""}`}
-      style={{ backgroundColor: color, borderColor: color, padding: "2px 6px", color: "#fff" }}
+      className={`event-pill ${colorClass} ${highlight ? "event-pill--hl" : ""}`}
       title={`${event.villa}    ${event.amount}`}
     >
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <span className="truncate">{event.villa}</span>
-        <span className="shrink-0">{event.amount}</span>
+      <div className="pill-row">
+        <span className="pill-villa">{event.villa}</span>
+        <span className="pill-amt">{event.amount}</span>
       </div>
     </div>
   );
@@ -580,15 +502,15 @@ function EventPill({ event, highlight, onOpenPopover, onDoubleClick, onDragStart
 
 function Modal({ children, onClose, title, width = 560, showClose = true }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="rounded-lg bg-white shadow-lg max-h-[80vh] overflow-auto" style={{ width }}>
-        <div className="flex items-center justify-between border-b px-3 py-2 sticky top-0 bg-white">
-          <div className="text-[13px] font-semibold">{title}</div>
+    <div className="modal-wrap">
+      <div className="modal-panel" style={{ width }}>
+        <div className="modal-head">
+          <div className="modal-title">{title}</div>
           {showClose && (
-            <button className="text-gray-600 hover:text-gray-800 text-[16px]" onClick={onClose}>✕</button>
+            <button className="btn-x" onClick={onClose}>✕</button>
           )}
         </div>
-        <div className="p-3">{children}</div>
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );
@@ -596,28 +518,28 @@ function Modal({ children, onClose, title, width = 560, showClose = true }) {
 
 function Field({ label, value, onChange, onEnter, inputRef }) {
   return (
-    <div>
-      <div className="mb-1 text-[12px] font-semibold text-gray-800">{label}</div>
+    <div className="field">
+      <div className="field-label">{label}</div>
       <input
         ref={inputRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
-        className="w-full rounded border px-2 py-1 text-[12px] ring-1 ring-gray-200 outline-none focus:ring-violet-400"
+        className="field-input"
       />
     </div>
   );
 }
 function TextArea({ label, value, onChange, inputRef }) {
   return (
-    <div className="col-span-2">
-      <div className="mb-1 text-[12px] font-semibold text-gray-800">{label}</div>
+    <div className="field field--full">
+      <div className="field-label">{label}</div>
       <textarea
         ref={inputRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
-        className="w-full rounded border px-2 py-1 text-[12px] ring-1 ring-gray-200 outline-none focus:ring-violet-400"
+        className="field-textarea"
       />
     </div>
   );
@@ -627,18 +549,18 @@ function StatusPicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const current = STATUS_COLORS.find((c) => c.key === value) || STATUS_COLORS[2];
   return (
-    <div>
-      <div className="mb-1 text-[12px] font-semibold text-gray-800">진행현황</div>
-      <div className="relative">
-        <button type="button" className="flex items-center gap-2 rounded border px-2 py-1 text-[12px] ring-1 ring-gray-200" onClick={() => setOpen((v) => !v)} title="진행현황 색상">
-          <ColorDot hex={current.hex} size={20} />
+    <div className="field">
+      <div className="field-label">진행현황</div>
+      <div className="status-picker">
+        <button type="button" className="status-btn" onClick={() => setOpen((v) => !v)} title="진행현황 색상">
+          <ColorDot keyName={current.key} size={20} />
         </button>
         {open && (
-          <div className="absolute z-10 mt-1 rounded border bg-white p-2 shadow">
-            <div className="grid grid-cols-7 gap-2">
+          <div className="status-pop">
+            <div className="status-grid">
               {STATUS_COLORS.map((c) => (
-                <button key={c.key} className="flex items-center justify-center" onClick={() => { onChange(c.key); setOpen(false); }} title={c.label}>
-                  <ColorDot hex={c.hex} size={16} />
+                <button key={c.key} className="status-cell" onClick={() => { onChange(c.key); setOpen(false); }} title={c.label}>
+                  <ColorDot keyName={c.key} size={16} />
                 </button>
               ))}
             </div>
@@ -648,8 +570,8 @@ function StatusPicker({ value, onChange }) {
     </div>
   );
 }
-function ColorDot({ hex, size = 14 }) {
-  return <span className="inline-block rounded-full border-2" style={{ width: size, height: size, backgroundColor: hex, borderColor: hex }} />;
+function ColorDot({ keyName, size = 14 }) {
+  return <span className={`color-dot color-${keyName}`} style={{ width: size, height: size }} />;
 }
 
 /* ----------------------- 유틸 ----------------------- */
