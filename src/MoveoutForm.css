@@ -2,12 +2,12 @@
 /* ✅ 전부 .pc-moveout 네임스페이스로 스코프 → 모바일 간섭 방지 */
 
 .pc-moveout {
-  --grid-gap-x: 16px;   /* 입력칸 가로 간격 */
-  --grid-gap-y: 20px;   /* 입력칸 세로 간격 */
-  --label-gap: 6px;     /* 라벨-인풋 사이 간격 */
-  --group-margin: 0px;  /* 각 input-group 하단 여백 */
-  --input-pad: 10px;    /* 인풋 내부 패딩 */
-  --input-font: 14px;   /* 인풋 폰트 크기 */
+  --grid-gap-x: 16px;
+  --grid-gap-y: 20px;
+  --label-gap: 6px;
+  --group-margin: 0px;
+  --input-pad: 10px;
+  --input-font: 14px;
   --border: 1px solid #ddd;
   --radius: 8px;
   --muted: #f5f5f5;
@@ -113,20 +113,9 @@
   font-size: 14px;
   border-bottom: 1px solid #eee;
 }
-.pc-moveout .extra-desc {
-  flex: 2;
-  word-break: break-word;
-}
-.pc-moveout .extra-amount {
-  flex: 1;
-  text-align: right;
-  margin-right: 1rem;
-  white-space: nowrap;
-}
-.pc-moveout .extra-actions {
-  display: flex;
-  gap: 6px;
-}
+.pc-moveout .extra-desc { flex: 2; word-break: break-word; }
+.pc-moveout .extra-amount { flex: 1; text-align: right; margin-right: 1rem; white-space: nowrap; }
+.pc-moveout .extra-actions { display: flex; gap: 6px; }
 .pc-moveout .extra-actions button {
   background-color: #ff8c00;
   border: none;
@@ -206,11 +195,33 @@
   row-gap: var(--grid-gap-y);
 }
 
-/* (옵션) 반응형에서 강제 3열 유지하려면 아래 주석 해제
-@media (max-width: 1024px) {
-  .pc-moveout .extras-grid.extras-grid--3col { grid-template-columns: repeat(3, 1fr); }
+/* 위쪽 입력 그리드와 '추가내역/추가금액/정산진행현황' 섹션 사이 간격 */
+.pc-moveout .grid + .extras-grid {
+  margin-top: 24px;   /* 숫자 키우면 더 멀어짐 (예: 32px) */
 }
-@media (max-width: 768px) {
-  .pc-moveout .extras-grid.extras-grid--3col { grid-template-columns: 1fr; }
+
+/* ✅ 체크박스(상단 두 칸) */
+.pc-moveout .checkbox-inline .chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 43px;
+  padding: 0 10px;
+  border: var(--border);
+  border-radius: 6px;
+  background: #fff;
 }
-*/
+.pc-moveout .checkbox-inline .chk input[type="checkbox"] {
+  width: 16px; height: 16px;
+}
+.pc-moveout .checkbox-inline .chk span {
+  font-weight: 600; font-size: 13px; color: #374151;
+}
+
+/* 체크박스 줄 전체를 아래로 내림 */
+.pc-moveout .checkbox-inline {
+  margin-top: calc(14px + var(--label-gap) + 7px); /* ↑ 숫자 키우면 더 내려감 (예: +6px, +10px) */
+}
+
+/* 체크박스 라벨에 기본 margin-bottom 제거(미세 높이 틀어짐 방지) */
+.pc-moveout .checkbox-inline .chk { margin-bottom: 0; }

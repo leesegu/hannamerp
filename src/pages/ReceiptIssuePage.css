@@ -1,24 +1,19 @@
 /* ===== 공통 변수 (한 곳에서만 폭 관리) ===== */
 :root {
   --item-min: 160px;   /* 품목(내용) 최소 가로폭 */
-  --modal-w: 800px;   /* 발행/등록 모달 가로폭 */
-
-  /* 🔧 여기 숫자를 줄이면 날짜선택창 '자체' 폭이 실제로 줄어듭니다. */
-  --date-col-w: 130px;  /* 예: 160 → 140 → 120px 등 단계적으로 테스트 */
-
-  --input-h: 40px;     /* 인풋 높이 */
-  --edge-gutter: 12px; /* 행 좌/우 패딩 */
-  --col-gap: 10px;     /* 칼럼 간격 */
-  --actions-w: 2px;    /* X 아이콘 영역 폭 (절대배치 사용 시) */
+  --modal-w: 800px;    /* 발행/등록 모달 가로폭 */
+  --date-col-w: 130px; /* 날짜 칼럼 폭 */
+  --input-h: 40px;
+  --edge-gutter: 12px;
+  --col-gap: 10px;
+  --actions-w: 2px;
 }
 
 /* 페이지 패딩 */
 .receipt-page { padding: 14px; }
 
-/* 추가: 이 페이지에서 DataTable만 다른 페이지와 같은 위치로 붙이기 */
-.receipt-page > .data-table-wrapper {
-  margin: -14px -14px 0;  /* top: -14px, left/right: -14px, bottom: 0 */
-}
+/* DataTable를 페이지 좌측/상단과 붙이기 */
+.receipt-page > .data-table-wrapper { margin: -14px -14px 0; }
 
 /* Grid */
 .grid { display: grid; gap: 12px; }
@@ -52,15 +47,14 @@
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 0 20px 0 0;           /* 달력 아이콘 오른쪽 자리 */
+  padding: 0 20px 0 0;
   box-sizing: border-box;
-  min-width: 0;                  /* 내부가 칼럼보다 커지지 않게 */
+  min-width: 0;
   z-index: 1;
   pointer-events: auto;
   transition: box-shadow .15s, border-color .15s, background .15s;
 }
-/* X 아이콘도 함께 보일 때는 여유를 더 확보 (X + 달력 아이콘 두 개) */
-.date-field[data-clear="true"] { padding-right: 46px; } /* ⬅️ 중요 */
+.date-field[data-clear="true"] { padding-right: 46px; }
 .date-field.compact { height: var(--input-h); padding: 0 18px 0 0; font-size: 14px; }
 .date-field:focus-within { border-color: #c7d2fe; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
 
@@ -68,8 +62,9 @@
   flex: 1;
   border: 0; outline: 0; background: transparent;
   font-size: inherit; padding: 0;
-  text-align: left; text-indent: 0;
-  height: 100%; font-variant-numeric: tabular-nums;
+  text-align: left;
+  height: 100%;
+  font-variant-numeric: tabular-nums;
   min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -78,47 +73,22 @@
   font-size: 14px; color: #7A5FFF; pointer-events: none;
 }
 
-/* react-datepicker 래퍼: 닫기(X) 아이콘의 기준 좌표가 되도록 relative 부여 */
+/* react-datepicker */
 .react-datepicker__input-container { position: relative; }
 .col-date .react-datepicker-wrapper,
-.col-date .react-datepicker__input-container {
-  width: 100% !important;
-  min-width: 0 !important;
-  display: block;
-}
-
-/* ✅ X(지우기) 아이콘 보이기/클릭 가능하도록 위치·레이어 보정 */
+.col-date .react-datepicker__input-container { width: 100% !important; min-width: 0 !important; display: block; }
 .react-datepicker__close-icon {
-  position: absolute !important;
-  right: 22px !important;         /* 달력 아이콘(우측 4px) 왼쪽에 배치 */
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  z-index: 3 !important;          /* 달력 아이콘보다 위 */
-  pointer-events: auto !important;
-  width: 18px !important; height: 18px !important;
-  line-height: 18px !important;
+  position: absolute !important; right: 22px !important; top: 50% !important; transform: translateY(-50%) !important;
+  z-index: 3 !important; pointer-events: auto !important; width: 18px !important; height: 18px !important; line-height: 18px !important;
 }
 .react-datepicker__close-icon::after {
-  content: "×";
-  display: block;
-  width: 18px; height: 18px;
-  text-align: center;
-  font-size: 12px; font-weight: 700;
-  background: #ef4444; color: #fff;
-  border-radius: 50%;
+  content: "×"; display: block; width: 18px; height: 18px; text-align: center;
+  font-size: 12px; font-weight: 700; background: #ef4444; color: #fff; border-radius: 50%;
 }
+.react-datepicker { border: 1px solid #e5e7eb !important; border-radius: 10px !important; box-shadow: 0 10px 24px rgba(16,24,40,0.08); }
+.react-datepicker__header { background: #fafafa !important; border-bottom: 1px solid #e5e7eb !important; border-top-left-radius: 10px !important; border-top-right-radius: 10px !important; }
 
-/* react-datepicker 팝업 */
-.react-datepicker {
-  border: 1px solid #e5e7eb !important; border-radius: 10px !important;
-  box-shadow: 0 10px 24px rgba(16,24,40,0.08);
-}
-.react-datepicker__header {
-  background: #fafafa !important; border-bottom: 1px solid #e5e7eb !important;
-  border-top-left-radius: 10px !important; border-top-right-radius: 10px !important;
-}
-
-/* 콤보 공통 */
+/* 콤보 */
 .namecombo, .codecombo { position: relative; }
 .combo-caret { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; color: #7A5FFF; cursor: pointer; }
 .combo-list { position: absolute; z-index: 20; left: 0; right: 0; margin-top: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 30px rgba(16,24,40,0.12); overflow: hidden; }
@@ -137,7 +107,6 @@
 .receipt-icon { background: transparent; border: none; padding: 0; cursor: pointer; line-height: 1; }
 .receipt-icon .emoji { font-size: 18px; }
 
-/* 모달(발행/등록) 폭: 변수로만 제어 */
 .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:1000; }
 .modal {
   position: fixed; top: 6vh; left: 50%; transform: translateX(-50%);
@@ -167,37 +136,36 @@
 .receipt-page .card.section .table-head,
 .receipt-page .card.section .table-row {
   display: grid;
-  grid-template-columns: var(--date-col-w) minmax(var(--item-min), 1fr) 60px 120px 140px 0px !important; /* 마지막 0px: X 절대배치 */
+  grid-template-columns: var(--date-col-w) minmax(var(--item-min), 1fr) 60px 120px 140px 0px !important;
   align-items: center;
   column-gap: var(--col-gap);
 }
 
-/* ✅ 날짜 칼럼: 실제로 줄어들고, 겹침·가림 없게 */
+/* 날짜 칼럼 */
 .receipt-page .card.section .table-head > div:first-child,
 .receipt-page .card.section .table-row > div:first-child,
 .receipt-page .card.section .table-row .col-date {
   width: var(--date-col-w);
   min-width: 0 !important;
-  overflow: visible;              /* 테두리/아이콘 가림 방지 */
+  overflow: visible;
   position: relative;
   z-index: 2;
 }
 
-/* 행/헤더 좌우 패딩 */
+/* 정렬 */
 .table-head { background:#fafafa; padding:10px var(--edge-gutter); font-weight:700; border-bottom:1px solid #e5e7eb; border-radius:10px 10px 0 0; }
 .table-head.small { font-size: 13px; }
 .table-row { padding:8px var(--edge-gutter); border-bottom:1px solid #f1f5f9; position: relative; }
 
-/* 정렬 */
 .center > div, .table-row.center > div { text-align: center; }
 .table-row.center input.input { text-align: center; }
 .receipt-page .card.section .table-row .col-date { justify-self: start; }
 
-/* 금액: 줄바꿈 방지 + 우측 정렬 */
+/* 금액 */
 .receipt-page .card.section .table-row .amount { white-space: nowrap; text-align: right !important; }
 .table-row .amount { font-weight:700; }
 
-/* X 아이콘(절대배치) */
+/* X 아이콘 */
 .row-actions {
   position: absolute; top: 50%; right: var(--edge-gutter); transform: translateY(-50%);
   display: flex; justify-content: center; align-items: center;
@@ -217,9 +185,65 @@
 .btn-outline { background:#fff; border:1px dashed #c7d2fe; color:#5b5bd6; padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
 .btn-outline:hover { background:#f5f7ff; }
 
-/* ===== 최종 오버라이드: 모달 가로폭 ===== */
+/* 모달 폭 오버라이드 */
 .receipt-page > .modal,
 .receipt-page .modal { width: var(--modal-w) !important; max-width: none !important; }
 
-/* ===== 달력 팝업이 항상 위로 보이도록 (겹침 방지) ===== */
+/* 달력 팝업 항상 위 */
 .react-datepicker-popper { z-index: 3000 !important; }
+
+
+/* =========================
+   🖨️ 인쇄/PDF/JPG 동일 룩: A4 내부 균일 여백 + 비율 유지(contain)
+   ========================= */
+@media print {
+  /* 균일 여백(mm) — 필요 시 한 곳만 조정 */
+  :root { --pad: 8mm; }
+
+  @page { size: A4 portrait; margin: 0; }
+
+  html, body {
+    width: 210mm; height: 297mm;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #fff !important;
+  }
+
+  /* 인쇄 시 기본 UI 숨기고 .paper만 노출 */
+  body * { visibility: hidden !important; }
+  .paper, .paper * { visibility: visible !important; }
+
+  /* A4 종이 박스 */
+  .paper {
+    position: fixed; inset: 0;
+    width: 210mm !important; height: 297mm !important;
+    margin: 0 !important; padding: var(--pad) !important; /* ← 패딩으로 균일 여백 확보 */
+    border: none !important; border-radius: 0 !important;
+    box-shadow: none !important; background: #fff !important;
+    overflow: hidden !important;
+  }
+
+  /* ⚠️ 기존의 .paper > * 강제 절대/크기 지정은 제거합니다 (레이아웃 왜곡 방지) */
+
+  /* 이미지/캔버스/SVG가 들어올 경우에도 contain으로 맞춤 (옵션) */
+  .paper img,
+  .paper canvas,
+  .paper svg,
+  .paper figure,
+  .paper .receipt-template,
+  .paper .template-root {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+    page-break-inside: avoid !important;
+    background: #fff !important;
+  }
+
+  /* 표/라인 유지 */
+  .paper table, .paper th, .paper td {
+    border-color: inherit !important;
+    border-style: inherit !important;
+  }
+}

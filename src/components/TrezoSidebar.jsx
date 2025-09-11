@@ -29,6 +29,9 @@ import MessageExtractor from "../pages/MessageExtractor";
 /* ✅ 캘린더 페이지 */
 import CalendarPage from "../pages/CalendarPage";
 
+/* ✅ 부가서비스 · 도배 페이지 */
+import PaperingPage from "../pages/PaperingPage";
+
 import "remixicon/fonts/remixicon.css";
 
 const ComingSoon = ({ title }) => (
@@ -221,12 +224,11 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               onClick={() => {
                 setOpenMenu("");
                 handleNavigate(<CalendarPage />, "캘린더");
-                // 필요 시 URL도 이동하려면: navigate("/calendar", { replace: true });
               }}
               active={activeMenu === "캘린더"}
             />
 
-            {/* 부가서비스 (이전: 부가서비스 관리) */}
+            {/* 부가서비스 */}
             <div>
               <SidebarItem
                 icon="ri-tools-line"
@@ -248,12 +250,13 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                     setActiveMenu(item);
                     const pages = {
                       입주청소: <MoveInCleaningPage />,
-                      도배: <ComingSoon title="부가서비스 · 도배" />,
-                      /* ✅ 전기요금 추출 → MessageExtractor 연결 */
+                      도배: <PaperingPage />, // ✅ 도배 페이지 연결
                       "전기요금 추출": <MessageExtractor />,
                     };
                     handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
-                    // URL을 /extract 로도 이동하고 싶다면:
+
+                    // URL 이동도 함께 하고 싶으면 주석 해제:
+                    // if (item === "도배") navigate("/papering", { replace: true });
                     // if (item === "전기요금 추출") navigate("/extract", { replace: true });
                   }}
                 />
@@ -282,7 +285,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                     setActiveMenu(item);
                     if (item === "수입정리") {
                       handleNavigate(<IncomeImportPage />, item);
-                      // navigate("/accounting/income", { replace: true });
                       return;
                     }
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection, onSnapshot, query, orderBy,
-  deleteDoc, doc, getDocs, where,   // ✅ 추가: getDocs, where
+  deleteDoc, doc, getDocs, where,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import * as htmlToImage from "html-to-image";
@@ -76,15 +76,17 @@ const IconBtn = ({ active = true, type, title, onClick }) => {
   );
 };
 
-/* ✅ 진행현황 색상 규칙
+/* ✅ 진행현황 색상 규칙 (조회페이지 전용)
    - 정산대기: 회색
-   - 입금대기: 빨강
-   - 정산완료: 초록(기존과 동일) */
+   - 입금대기: 빨간색
+   - 정산완료: 녹색
+*/
 const StatusCell = ({ value }) => {
   const v = String(value || "").trim();
-  let color = "#9CA3AF";               // 정산대기: 회색(기본)
-  if (v === "입금대기") color = "#EF4444";   // 빨강
-  if (v === "정산완료") color = "#10B981";   // 초록
+  let color = "#9CA3AF";               // 정산대기(회색)
+  if (v === "입금대기") color = "#EF4444"; // 빨간색
+  if (v === "정산완료") color = "#10B981"; // 녹색
+  if (v === "정산대기") color = "#9CA3AF"; // 회색(명시)
   const dot = (
     <span
       aria-hidden
@@ -100,6 +102,30 @@ const StatusCell = ({ value }) => {
     />
   );
   return <span>{dot}{v || "-"}</span>;
+};
+
+/* ✅ 아주 은은한 플래그 점(툴팁 제공) */
+const FlagDots = ({ first, exclude }) => {
+  const wrap = { display: "inline-flex", gap: 4, marginLeft: 6, verticalAlign: "middle" };
+  const dot = (bg, title) => (
+    <span
+      title={title}
+      style={{
+        display: "inline-block",
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: bg,
+        opacity: 0.9,
+      }}
+    />
+  );
+  return (
+    <span style={wrap}>
+      {first && dot("#8b5cf6", "1차정산")}
+      {exclude && dot("#f59e0b", "보증금제외")}
+    </span>
+  );
 };
 
 /* ---------- 메인 컴포넌트 ---------- */
@@ -147,10 +173,10 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     if (statusFilter !== "입금대기") return 0;
     return rows
       .filter((r) => String(r.status || "") === "입금대기")
-      .reduce((acc, r) => acc + toNum(r.totalAmount), 0);
+      .reduce((acc, r) => acc + toNum(sumTotal(r)), 0);
   }, [rows, statusFilter]);
 
-  // ✅ 정렬: 오늘(moveDate가 오늘) 최상단 → 그 외는 날짜 최신순(내림차순)
+  // ✅ 정렬: 오늘 우선, 그 외 최신순
   const displayRows = useMemo(() => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
@@ -181,7 +207,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         electricity: fmtAmount(r.electricity),
         tvFee: fmtAmount(r.tvFee),
         cleaningFee: fmtAmount(r.cleaningFee),
-        totalAmount: fmtAmount(r.totalAmount),
+        totalAmount: fmtAmount(sumTotal(r)),
         __hasPhotos: hasPhotos,
         __hasNote: hasNote,
         __hasExtras: hasExtras,
@@ -196,7 +222,16 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
   // 테이블 컬럼
   const columns = [
     { label: "이사날짜", key: "moveDate" },
-    { label: "빌라명", key: "villaName" },
+    {
+      label: "빌라명",
+      key: "villaName",
+      render: (row) => (
+        <span style={{ display:"inline-flex", alignItems:"center" }}>
+          {row.villaName}
+          <FlagDots first={!!row.firstSettlement} exclude={!!row.excludeDeposit} />
+        </span>
+      ),
+    },
     { label: "호수", key: "unitNumber" },
     { label: "미납", key: "arrears" },
     { label: "당월", key: "currentMonth" },
@@ -303,7 +338,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     openForm({ mode: "edit", item: row });
   };
 
-  // ✅ 삭제: 연동 여부 확인 후 선택 삭제
+  // ✅ 삭제: 연동 여부 확인 후 선택 삭제 (캘린더와 동일 규칙)
   const handleDeleteRow = async (row) => {
     if (!row?.id) return;
 
@@ -492,7 +527,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
           isMobile={false}
           employeeId={employeeId}
           userId={userId}
-          mode={formMode}                    // "create" | "edit"
+          mode={formMode}
           initial={formMode === "edit" ? currentItem : null}
           docId={formMode === "edit" ? currentItem?.id : null}
           existingPhotos={formMode === "edit" ? (currentItem?.photos || []) : []}
@@ -573,7 +608,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         </div>
       )}
 
-      {/* 🔎 원본 이미지 확대 뷰 (스크롤 가능, 원본 크기) */}
+      {/* 🔎 원본 이미지 확대 뷰 */}
       {fullImageOpen && (
         <div
           onClick={() => setFullImageOpen(false)}

@@ -1,4 +1,4 @@
-// src/pages/MoveInCleaningPage.js
+// src/pages/PaperingPage.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "../firebase";
 import {
@@ -69,16 +69,32 @@ const dateToNum = (v) => {
   return parseInt(`${y}${m}${dd}`, 10);
 };
 
-/* ===== 진행현황 색상/배지 ===== */
+/* ===== '도배' 판별 & 합계 ===== */
+const isPaperingDesc = (desc) => {
+  const t = s(desc).replace(/\s+/g, ""); // 공백 제거 후 판별
+  return t.includes("도배");
+};
+const sumPaperingAmount = (extras) => {
+  if (!Array.isArray(extras)) return 0;
+  return extras.reduce((acc, it) => {
+    if (isPaperingDesc(it?.desc)) {
+      const amt = parseNumber(it?.amount);
+      return acc + (amt || 0);
+    }
+    return acc;
+  }, 0);
+};
+
+/* ===== 진행현황 색상/배지 (도배 전용) ===== */
 const statusMeta = (status) => {
   switch (status) {
     case "미접수":
       return { dot: "#EF4444" };
     case "접수완료":
       return { dot: "#F59E0B" };
-    case "청소완료":
+    case "도배완료":
       return { dot: "#10B981" };
-    case "청소보류":
+    case "도배보류":
       return { dot: "#9CA3AF" };
     default:
       return { dot: "#9CA3AF" };
@@ -205,18 +221,18 @@ function EditForm({ initial, onCancel, onSaved }) {
 
     try {
       if (form.id) {
-        await updateDoc(doc(db, "moveInCleanings", form.id), payload);
+        await updateDoc(doc(db, "paperings", form.id), payload);
 
-        // 연동 항목이면 moveouts에도 공통 필드 반영
+        // ✅ 연동 항목이면 moveouts에도 "도배 전용 필드" 반영
         if (linked) {
           await updateDoc(doc(db, "moveouts", form.sourceMoveoutId), {
-            status: payload.status,
-            note: payload.note,
+            paperStatus: payload.status,
+            paperNote: payload.note,
             updatedAt: serverTimestamp(),
           });
         }
       } else {
-        await addDoc(collection(db, "moveInCleanings"), {
+        await addDoc(collection(db, "paperings"), {
           ...payload,
           createdAt: serverTimestamp(),
           sourceMoveoutId: "", // 독립 등록
@@ -237,7 +253,7 @@ function EditForm({ initial, onCancel, onSaved }) {
   };
 
   const dateInputClass =
-  "h-10 px-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 w-[332px]";
+    "h-10 px-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 w-[332px]";
 
   const ro = { readOnly: true, style: { background: "#f9fafb", pointerEvents: "none" } };
   const roDp = { disabled: true };
@@ -364,7 +380,7 @@ function EditForm({ initial, onCancel, onSaved }) {
         </div>
       </div>
 
-      {/* 5) 진행현황 · 비고 */}
+      {/* 5) 진행현황 · 비고 (도배 전용 옵션) */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm text-gray-600 mb-1">진행현황</label>
@@ -375,8 +391,8 @@ function EditForm({ initial, onCancel, onSaved }) {
           >
             <option value="미접수">🔴 미접수</option>
             <option value="접수완료">🟡 접수완료</option>
-            <option value="청소완료">🟢 청소완료</option>
-            <option value="청소보류">⚪ 청소보류</option>
+            <option value="도배완료">🟢 도배완료</option>
+            <option value="도배보류">⚪ 도배보류</option>
           </select>
         </div>
         <div>
@@ -411,7 +427,7 @@ function EditForm({ initial, onCancel, onSaved }) {
 }
 
 /* ===== 메인 페이지 ===== */
-export default function MoveInCleaningPage() {
+export default function PaperingPage() {
   const [rows, setRows] = useState([]);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -424,9 +440,9 @@ export default function MoveInCleaningPage() {
   const [sumYear, setSumYear] = useState("");
   const [sumMonth, setSumMonth] = useState("");
 
-  /* 🔁 A. moveInCleanings 목록 구독 */
+  /* 🔁 A. paperings 목록 구독 */
   useEffect(() => {
-    const qy = query(collection(db, "moveInCleanings"), orderBy("createdAt", "desc"));
+    const qy = query(collection(db, "paperings"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
       qy,
       (snap) => {
@@ -474,14 +490,17 @@ export default function MoveInCleaningPage() {
         setRows(list);
       },
       (err) => {
-        console.error("[moveInCleanings listen error]", err);
+        console.error("[paperings listen error]", err);
         alert("목록 조회 중 오류가 발생했습니다.\n콘솔을 확인하세요.");
       }
     );
     return () => unsub();
   }, []);
 
-  /* 🔁 B. 이사정산 → 입주청소 자동 동기화 */
+  /* 🔁 B. 이사정산 → 도배 자동 동기화
+        - moveouts.extras 에 desc에 '도배'가 포함된 항목들의 금액을 '모두 합산'
+        - 합계가 0이면 paperings/mo_<id> 삭제
+  */
   useEffect(() => {
     const moQ = collection(db, "moveouts");
     const unsub = onSnapshot(
@@ -490,32 +509,31 @@ export default function MoveInCleaningPage() {
         for (const d of snap.docs) {
           try {
             const x = d.data() || {};
-            const settleDate = fmtDate(x.moveDate);
-            const villaName = s(x.villaName);
-            const unitNumber = s(x.unitNumber);
-            const moStatus = s(x.status);
-            const cleaningFee = parseNumber(x.cleaningFee);
-            const depositIn = moStatus === "정산완료" ? cleaningFee : 0;
+            const extras = Array.isArray(x.extras) ? x.extras : [];
+            const amountSum = sumPaperingAmount(extras);
 
-            const ref = doc(db, "moveInCleanings", `mo_${d.id}`);
+            const ref = doc(db, "paperings", `mo_${d.id}`);
             const prev = await getDoc(ref);
             const exists = prev.exists();
-            const prevStatus = s(prev.data()?.status);
 
-            const payload = {
-              sourceMoveoutId: d.id,   // ✅ 연동 키
-              settleDate,
-              villaName,
-              unitNumber,
-              depositIn,
-              status: prevStatus || "미접수",
-              updatedAt: serverTimestamp(),
-            };
-            if (!exists) payload.createdAt = serverTimestamp();
-
-            await setDoc(ref, payload, { merge: true });
+            if (amountSum > 0) {
+              const payload = {
+                sourceMoveoutId: d.id,                 // ✅ 연동 키
+                settleDate: fmtDate(x.moveDate),
+                villaName: s(x.villaName),
+                unitNumber: s(x.unitNumber),
+                depositIn: amountSum,                  // ✅ '도배' 포함 extras 합계
+                status: s(prev.data()?.status) || s(x.paperStatus) || "미접수",
+                note: s(prev.data()?.note) || s(x.paperNote) || "",
+                updatedAt: serverTimestamp(),
+              };
+              if (!exists) payload.createdAt = serverTimestamp();
+              await setDoc(ref, payload, { merge: true });
+            } else {
+              if (exists) await deleteDoc(ref);
+            }
           } catch (e) {
-            console.error("moveouts → moveInCleanings 동기화 오류:", e);
+            console.error("moveouts → paperings 동기화 오류:", e);
           }
         }
       },
@@ -600,11 +618,11 @@ export default function MoveInCleaningPage() {
     const raw = rows.find((r) => r.id === row.id) || row;
     if (!raw?.id) return;
     if (raw.sourceMoveoutId) {
-      alert("이 항목은 이사정산과 연동되었습니다. 이사정산 페이지에서 삭제해 주세요.");
+      alert("이 항목은 이사정산과 연동되었습니다. 이사정산 페이지에서 도배 내역을 제거해 주세요.");
       return;
     }
     if (!window.confirm("해당 내역을 삭제할까요?")) return;
-    await deleteDoc(doc(db, "moveInCleanings", raw.id));
+    await deleteDoc(doc(db, "paperings", raw.id));
   };
 
   const handleSaved = () => {
@@ -634,8 +652,8 @@ export default function MoveInCleaningPage() {
         <option value="ALL">전체</option>
         <option value="미접수">미접수</option>
         <option value="접수완료">접수완료</option>
-        <option value="청소완료">청소완료</option>
-        <option value="청소보류">청소보류</option>
+        <option value="도배완료">도배완료</option>
+        <option value="도배보류">도배보류</option>
       </select>
     </>
   );
@@ -681,7 +699,7 @@ export default function MoveInCleaningPage() {
 
   return (
     <div className="page-wrapper">
-      <PageTitle>입주청소</PageTitle>
+      <PageTitle>도배</PageTitle>
 
       <DataTable
         columns={columns}
@@ -701,11 +719,11 @@ export default function MoveInCleaningPage() {
       {/* 등록/수정 모달 */}
       <SimpleModal
         open={formOpen}
-        title={formMode === "edit" ? "입주청소 수정" : "입주청소 등록"}
+        title={formMode === "edit" ? "도배 수정" : "도배 등록"}
         onClose={() => {
           setFormOpen(false);
           setEditingRow(null);
-          setFormMode("create");
+          setFormMode="create";
         }}
       >
         <EditForm

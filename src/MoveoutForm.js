@@ -65,6 +65,33 @@ const fmtComma = (n) => {
 /* blob URL 여부 */
 const isBlobUrl = (u) => typeof u === "string" && u.startsWith("blob:");
 
+/* ===== 비고 태그 정규화 유틸 (⭐ 추가) =====
+   - 두 태그(1차정산, 보증금제외)를 모두 제거
+   - 공백 정리
+   - 필요 시 단일 태그만 다시 추가
+*/
+const TAG_FIRST = "1차정산";
+const TAG_EXCL  = "보증금제외";
+
+const stripNoteTags = (text) => {
+  const base = s(text);
+  if (!base) return "";
+  // 태그 양옆 여백까지 정리
+  const removed = base
+    .replace(new RegExp(`\\s*(${TAG_FIRST}|${TAG_EXCL})\\s*`, "g"), " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return removed;
+};
+
+const addTagOnce = (text, tag) => {
+  const base = s(text);
+  if (!tag) return base;
+  // 이미 같은 태그가 있더라도 strip 이후라 중복될 일은 없지만, 안전하게 한 번 더 방지
+  if (new RegExp(`(^|\\s)${tag}(\\s|$)`).test(base)) return base;
+  return base ? `${base} ${tag}`.trim() : tag;
+};
+
 export default function MoveoutForm({
   isMobile = false,
   showCancel = true,
@@ -85,7 +112,7 @@ export default function MoveoutForm({
 
   /* ===== 폼 상태 (UI용 키) ===== */
   const [form, setForm] = useState({
-    moveOutDate: "",  // UI용 → 저장 시 moveDate 로 매핑
+    moveOutDate: "",
     name: "",
     roomNumber: "",
     contact: "",
@@ -103,6 +130,9 @@ export default function MoveoutForm({
     note: "",
     total: "",
     status: "정산대기",
+    /* ✅ 추가: 체크박스 */
+    firstSettlement: false,
+    excludeDeposit: false,
   });
 
   /* ===== 추가내역 리스트 ===== */
@@ -136,6 +166,9 @@ export default function MoveoutForm({
       cleaning: fmtComma(initial.cleaningFee),
       note: s(initial.note),
       status: s(initial.status) || "정산대기",
+      /* ✅ 체크박스 초기값 */
+      firstSettlement: !!initial.firstSettlement,
+      excludeDeposit: !!initial.excludeDeposit,
     }));
     setExtras(
       Array.isArray(initial.extras)
@@ -246,7 +279,7 @@ export default function MoveoutForm({
     waterUnit: waterUnitRef,
     electricity: electricityRef,
     tvFee: tvFeeRef,
-    cleaning: cleaningRef, // ✅ 키 정정
+    cleaning: cleaningRef,
     extraDesc: extraDescRef,
     extraAmount: extraAmountRef,
   };
@@ -333,7 +366,7 @@ export default function MoveoutForm({
     const prev = parseNumber(form.waterPrev);
     const curr = parseNumber(form.waterCurr);
     const unit = parseNumber(form.waterUnit);
-       const usage = Math.max(0, curr - prev);
+    const usage = Math.max(0, curr - prev);
     const cost = usage * unit;
     setForm((s2) => ({ ...s2, waterCost: cost ? cost.toLocaleString() : "" }));
   }, [form.waterPrev, form.waterCurr, form.waterUnit]);
@@ -405,6 +438,17 @@ export default function MoveoutForm({
 
     const totalAmount = arrears + currentMonth + waterFee + electricity + tvFee + cleaningFee + extraAmount;
 
+    /* ⭐ 비고 태그 처리 로직 (요청사항 반영)
+       1) 기존 비고에서 두 태그 전부 제거
+       2) 체크 상태에 따라 단 하나의 태그만 다시 추가
+       3) 아무 것도 체크 안되면 태그 없이 저장
+    */
+    const baseNote = stripNoteTags(form.note);
+    const selectedTag =
+      form.firstSettlement ? TAG_FIRST :
+      form.excludeDeposit ? TAG_EXCL : "";
+    const note = selectedTag ? addTagOnce(baseNote, selectedTag) : baseNote;
+
     return {
       moveDate,
       villaName,
@@ -424,7 +468,10 @@ export default function MoveoutForm({
       extraAmount,
       totalAmount,
       status: s(form.status) || "정산대기",
-      note: s(form.note),
+      note,                                   // ✅ 태그 정규화 반영된 비고
+      /* ✅ 체크박스 값 저장 */
+      firstSettlement: !!form.firstSettlement,
+      excludeDeposit: !!form.excludeDeposit,
       updatedAt: serverTimestamp(),
     };
   };
@@ -555,13 +602,55 @@ export default function MoveoutForm({
     fontSize: 12,
   };
 
+  /* ===== ✅ 체크박스(배타 + 토글) 핸들러 ===== */
+  const toggleFirstSettlement = () => {
+    setForm((st) => {
+      const willCheck = !st.firstSettlement;
+      return {
+        ...st,
+        firstSettlement: willCheck,
+        excludeDeposit: willCheck ? false : st.excludeDeposit, // 배타
+      };
+    });
+  };
+  const toggleExcludeDeposit = () => {
+    setForm((st) => {
+      const willCheck = !st.excludeDeposit;
+      return {
+        ...st,
+        excludeDeposit: willCheck,
+        firstSettlement: willCheck ? false : st.firstSettlement, // 배타
+      };
+    });
+  };
+
   /* ===== 폼 본문 ===== */
   const renderFormContent = () => (
     <FormLayout>
       <div className="pc-moveout__grid grid">
-        {/* 연락처 자리맞춤 */}
-        <div className="input-group" />
-        <div className="input-group" />
+        {/* ✅ 배타 + 토글 체크박스 */}
+        <div className="input-group checkbox-inline">
+          <label className="chk">
+            <input
+              type="checkbox"
+              checked={form.firstSettlement}
+              onChange={toggleFirstSettlement}
+            />
+            <span>1차정산</span>
+          </label>
+        </div>
+        <div className="input-group checkbox-inline">
+          <label className="chk">
+            <input
+              type="checkbox"
+              checked={form.excludeDeposit}
+              onChange={toggleExcludeDeposit}
+            />
+            <span>보증금제외</span>
+          </label>
+        </div>
+
+        {/* 연락처 */}
         <div className="input-group contact-underline contact-field">
           <label>연락처</label>
           <input

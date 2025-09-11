@@ -1,6 +1,22 @@
-// src/components/ReceiptPreviewModal.jsx
 import React, { useRef } from "react";
 import * as htmlToImage from "html-to-image";
+import { jsPDF } from "jspdf";
+
+/* ────────────────────────────────────────────────────────────────────
+   공통 설정: A4 규격 + 균일 여백 + 출력 해상도
+   ──────────────────────────────────────────────────────────────────── */
+const A4_MM = { w: 210, h: 297 };
+const DPI = 300;                 // JPG/PDF용 권장 해상도
+const PAD_MM = 6;               // 상하좌우 동일 여백(mm)
+const JPEG_QUALITY = 0.95;
+
+/* ★ 좌우만 늘리는 스트레치 계수 (1.00=변화 없음, 1.20=가로 20% 확대) */
+const H_STRETCH = 1.20;
+
+const mmToPx = (mm) => Math.round((mm * DPI) / 25.4);
+const PAGE_PX = { w: mmToPx(A4_MM.w), h: mmToPx(A4_MM.h) };
+const PAD_PX = mmToPx(PAD_MM);
+const INNER_PX = { w: PAGE_PX.w - PAD_PX * 2, h: PAGE_PX.h - PAD_PX * 2 };
 
 /* 회사 고정 정보 */
 const COMPANY = {
@@ -21,45 +37,75 @@ const formatKDateLong = (str) => {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${wd}`;
 };
 
-/* 긴 변 기준 비율 유지 + 여백(사방 개별 설정) + 확대 금지(축소만) */
-async function fitToLongEdgeWithMargins(
-  dataUrl,
-  {
-    longEdgePortrait = 1900,
-    longEdgeLandscape = 2200,
-    margins = { top: 28, right: 6, bottom: 28, left: 6 }, // 좌우 최소, 상하는 약간
-    mime = "image/jpeg",
-    quality = 0.96,
-  } = {}
-) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const portrait = img.height >= img.width;
-      const targetLong = portrait ? longEdgePortrait : longEdgeLandscape;
-      const scale = Math.min(1, targetLong / (portrait ? img.height : img.width)); // 축소만
-      const targetW = Math.round(img.width * scale);
-      const targetH = Math.round(img.height * scale);
-
-      const { top, right, bottom, left } = margins;
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW + left + right;
-      canvas.height = targetH + top + bottom;
-
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, left, top, targetW, targetH);
-
-      resolve(canvas.toDataURL(mime, quality));
-    };
-    img.src = dataUrl;
+/* ────────────────────────────────────────────────────────────────────
+   1) DOM 캡처 → PNG
+   2) A4 캔버스에 합성 (세로 고정 + 가로만 스트레치)
+   ──────────────────────────────────────────────────────────────────── */
+async function captureReceiptAsPngDataUrl(node) {
+  return htmlToImage.toPng(node, {
+    backgroundColor: "#fff",
+    pixelRatio: 2,
   });
 }
 
-/* 이미지 인쇄: (미리보기 전체를 캡처한) 이미지를 A4 1장에 무조건 맞춰 출력(잘림 방지) */
-function printImageInIframe(dataUrl, { pageMarginMm = 12 } = {}) {
+/* ★ 세로를 INNER에 '정확히' 맞추고, 가로만 H_STRETCH 만큼 비율 깨서 늘림 */
+async function composeA4PageDataUrl(
+  rawDataUrl,
+  {
+    mime = "image/jpeg",            // "image/jpeg" | "image/png"
+    quality = JPEG_QUALITY,
+    alignX = "center",              // "left" | "center" | "right" (가로 정렬)
+  } = {}
+) {
+  // 원본 이미지 로드
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = rawDataUrl;
+  });
+
+  // A4 캔버스 생성
+  const canvas = document.createElement("canvas");
+  canvas.width = PAGE_PX.w;
+  canvas.height = PAGE_PX.h;
+  const ctx = canvas.getContext("2d");
+
+  // 배경 흰색
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, PAGE_PX.w, PAGE_PX.h);
+
+  // ① 세로를 INNER 높이에 '정확히' 맞춤 (세로 고정)
+  const baseScale = INNER_PX.h / img.height;
+  const drawH = Math.round(img.height * baseScale);
+
+  // ② 가로만 스트레치 (비율 깨서 좌우만 늘림)
+  const drawW = Math.round(img.width * baseScale * H_STRETCH);
+
+  // ③ 가로 정렬
+  let x;
+  if (alignX === "left") x = PAD_PX;
+  else if (alignX === "right") x = PAD_PX + (INNER_PX.w - drawW);
+  else x = PAD_PX + Math.round((INNER_PX.w - drawW) / 2);
+
+  const y = PAD_PX; // 세로는 딱 맞추므로 위쪽부터 채움
+
+  // ④ INNER 영역을 clip → 스트레치로 넘친 좌우는 가려짐(잘려 보임 X, 영역 밖 masking)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PAD_PX, PAD_PX, INNER_PX.w, INNER_PX.h);
+  ctx.clip();
+
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, x, y, drawW, drawH);
+  ctx.restore();
+
+  return canvas.toDataURL(mime, quality);
+}
+
+/* 인쇄 (최종 페이지 이미지를 iframe에 넣고 @page 여백 0으로 출력) */
+function printFinalPageImage(dataUrl) {
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
   iframe.style.right = "0";
@@ -71,25 +117,10 @@ function printImageInIframe(dataUrl, { pageMarginMm = 12 } = {}) {
 
   const doc = iframe.contentWindow.document;
   const style = `
-    @page { size: A4 portrait; margin: ${pageMarginMm}mm; }
-    html, body { margin:0; padding:0; height: 100%; }
-    .page {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;   /* 세로 가운데 */
-      justify-content: center; /* 가로 가운데 */
-    }
-    img.printable {
-      max-width: 100%;
-      max-height: 100%;
-      width: auto;
-      height: auto;
-      display: block;
-      page-break-inside: avoid;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
+    @page { size: A4 portrait; margin: 0; }
+    html, body { margin:0; padding:0; height:100%; }
+    .page { width:100%; height:100%; }
+    img.final { width:100%; height:100%; display:block; object-fit:fill; }
   `;
   doc.open();
   doc.write(`
@@ -101,7 +132,7 @@ function printImageInIframe(dataUrl, { pageMarginMm = 12 } = {}) {
       </head>
       <body>
         <div class="page">
-          <img class="printable" src="${dataUrl}" alt="receipt"/>
+          <img class="final" src="${dataUrl}" alt="receipt-final"/>
         </div>
       </body>
     </html>
@@ -139,94 +170,44 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
     return `${ymd}${v}${u}`.replace(/[\\/:*?"<>|]/g, "");
   };
 
-  /* 인쇄: 미리보기 전체 캡처 → A4 1장에 맞춰 출력 */
+  /* ─────────────── 액션: 인쇄 / JPG / PDF ─────────────── */
   const handlePrint = async () => {
     if (!paperRef.current) return;
-    const raw = await htmlToImage.toPng(paperRef.current, { backgroundColor: "#fff", pixelRatio: 2 });
-    // 인쇄용: 좌우 최소, 상하 적당 — 실제 맞춤은 iframe CSS가 수행(페이지 박스에 max-fit)
-    const printable = await fitToLongEdgeWithMargins(raw, {
-      longEdgePortrait: 1900,
-      longEdgeLandscape: 2200,
-      margins: { top: 28, right: 6, bottom: 28, left: 6 },
-      mime: "image/png",
-    });
-    printImageInIframe(printable, { pageMarginMm: 12 });
+    const raw = await captureReceiptAsPngDataUrl(paperRef.current);
+    const finalPage = await composeA4PageDataUrl(raw, { mime: "image/png", alignX: "center" });
+    printFinalPageImage(finalPage);
   };
 
-  /* JPG: 세로 길이 축소 + 좌우 여백 최소 */
   const saveJPG = async () => {
-    const raw = await htmlToImage.toJpeg(paperRef.current, { backgroundColor: "#fff", quality: 0.96, pixelRatio: 2 });
-    const processed = await fitToLongEdgeWithMargins(raw, {
-      longEdgePortrait: 1900,
-      longEdgeLandscape: 2200,
-      margins: { top: 28, right: 6, bottom: 28, left: 6 },
+    if (!paperRef.current) return;
+    const raw = await captureReceiptAsPngDataUrl(paperRef.current);
+    const finalPage = await composeA4PageDataUrl(raw, {
       mime: "image/jpeg",
-      quality: 0.96,
+      quality: JPEG_QUALITY,
+      alignX: "center",
     });
+
     const a = document.createElement("a");
-    a.href = processed;
+    a.href = finalPage;
     a.download = `${baseName()}.jpg`;
     a.click();
   };
 
-  /* PDF: JPG와 동일 스케일/비율 → 좌우 여백 더 줄임(2mm), 상하 10mm 유지 */
   const savePDF = async () => {
-    const mod = await import("jspdf").catch(() => null);
-    if (!mod?.default) {
-      const png = await htmlToImage.toPng(paperRef.current, { backgroundColor: "#fff", pixelRatio: 2 });
-      const processed = await fitToLongEdgeWithMargins(png, {
-        longEdgePortrait: 1900,
-        longEdgeLandscape: 2200,
-        margins: { top: 28, right: 6, bottom: 28, left: 6 },
-        mime: "image/png",
-      });
-      const a = document.createElement("a");
-      a.href = processed;
-      a.download = `${baseName()}.png`;
-      a.click();
-      alert("PDF 모듈(jspdf)이 없어 PNG로 저장했습니다. (npm i jspdf 설치 시 PDF 가능)");
-      return;
-    }
-    const jsPDF = mod.default;
-
-    const png = await htmlToImage.toPng(paperRef.current, { backgroundColor: "#fff", pixelRatio: 2 });
-    const processedJpg = await fitToLongEdgeWithMargins(png, {
-      longEdgePortrait: 1900,
-      longEdgeLandscape: 2200,
-      margins: { top: 28, right: 6, bottom: 28, left: 6 },
+    if (!paperRef.current) return;
+    const raw = await captureReceiptAsPngDataUrl(paperRef.current);
+    const finalPage = await composeA4PageDataUrl(raw, {
       mime: "image/jpeg",
-      quality: 0.96,
+      quality: JPEG_QUALITY,
+      alignX: "center",
     });
 
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-
-    const img = new Image();
-    img.src = processedJpg;
-    await img.decode();
-
-    // 좌우 2mm, 상하 10mm
-    const marginLR = 2;
-    const marginTB = 10;
-    const maxW = pageW - marginLR * 2;
-    const maxH = pageH - marginTB * 2;
-
-    const ratio = img.width / img.height;
-    let drawW = maxW;
-    let drawH = drawW / ratio;
-    if (drawH > maxH) {
-      drawH = maxH;
-      drawW = drawH * ratio;
-    }
-    const x = (pageW - drawW) / 2;
-    const y = (pageH - drawH) / 2;
-
-    pdf.addImage(processedJpg, "JPEG", x, y, drawW, drawH, undefined, "FAST");
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    pdf.addImage(finalPage, "JPEG", 0, 0, A4_MM.w, A4_MM.h, undefined, "FAST");
     pdf.save(`${baseName()}.pdf`);
   };
 
-  /* 품목표는 16칸 고정 표시 (변경 없음) */
+  /* 품목표 16칸 고정 표시 */
   const DISPLAY_ROWS = 16;
 
   return (
@@ -238,13 +219,7 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
           <div className="modal-head">
             <div className="title">영수증 미리보기</div>
             <div className="right">
-              {/* 버튼 순서: 인쇄 · JPG · PDF · 닫기 */}
-              <button className="btn print" onClick={handlePrint}>
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style={{marginRight:6}}>
-                  <path fill="currentColor" d="M6 7V3h12v4h-2V5H8v2H6zm12 6h2v6h-4v2H8v-2H4v-6h2v4h12v-4zM20 9H4a2 2 0 0 0-2 2v4h4v-2h12v2h4v-4a2 2 0 0 0-2-2z"/>
-                </svg>
-                인쇄
-              </button>
+              <button className="btn print" onClick={handlePrint}>인쇄</button>
               <button className="btn jpg" onClick={saveJPG}>JPG 저장</button>
               <button className="btn pdf" onClick={savePDF}>PDF 저장</button>
               <button className="btn close" onClick={onClose}>닫기</button>
@@ -254,7 +229,7 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
           {/* 세로 스크롤만 허용 */}
           <div className="content-scroll">
             <div className="paper" ref={paperRef}>
-              {/* 주황 헤더 — 세로 살짝 축소 */}
+              {/* 주황 헤더 */}
               <div className="brand">
                 <div className="brand-title">{s(row.receiptName) || "한남주택관리 영수증"}</div>
               </div>
@@ -330,75 +305,36 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
         </div>
       </div>
 
+      {/* 모달/미리보기 전용 스타일 (화면용) */}
       <style>{`
-        /* 배경 */
         .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000; }
-
-        /* 중앙 정렬 셸 */
-        .modal-shell {
-          position: fixed; inset: 0; z-index: 1001;
-          display: flex; align-items: center; justify-content: center;
-          padding: 16px;
-          overflow: hidden;
-        }
+        .modal-shell { position: fixed; inset: 0; z-index: 1001; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; }
         .modal { width: 980px; max-width: min(96vw, 980px); background: transparent; display: flex; flex-direction: column; }
-
         .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; color:#111; }
         .modal-head .title { font-weight:800; font-size:17px; }
         .right { display:flex; gap:10px; }
-
-        .btn {
-          border:none; border-radius:10px;
-          padding:9px 14px; font-weight:700; cursor:pointer; font-size:12.5px;
-          display:inline-flex; align-items:center;
-          background:#eef2f7; color:#111;
-        }
+        .btn { border:none; border-radius:10px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:12.5px; display:inline-flex; align-items:center; background:#eef2f7; color:#111; }
         .btn.print { background:#111827; color:#fff; }
-        .btn.jpg   { background:#0ea5a4; color:#fff; } /* 청록 */
-        .btn.pdf   { background:#7c3aed; color:#fff; } /* 보라 */
-        .btn.close { background:#e5e7eb; color:#111; } /* 회색 */
+        .btn.jpg   { background:#0ea5a4; color:#fff; }
+        .btn.pdf   { background:#7c3aed; color:#fff; }
+        .btn.close { background:#e5e7eb; color:#111; }
 
-        .content-scroll {
-          max-height: calc(100vh - 72px);
-          overflow-y: auto;
-          overflow-x: hidden;
-          padding-right: 6px;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior: contain;
-        }
+        .content-scroll { max-height: calc(100vh - 72px); overflow-y: auto; overflow-x: hidden; padding-right: 6px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 
-        /* 종이: A4 기본 높이 유지 */
         .paper {
           --stroke:#121316;
-          width: 210mm;
-          min-height: 297mm;  /* 그대로 유지 */
-          max-width: 100%;
-          background:#fff;
-          border:1.4px solid var(--stroke);
-          border-radius:14px;
+          width: 210mm; min-height: 297mm;
+          max-width: 100%; background:#fff;
+          border:1.4px solid var(--stroke); border-radius:14px;
           box-shadow: 0 12px 34px rgba(16,24,40,.12);
-          color:#111827;
-          margin: 0 auto;
-          padding: 32px 26px 36px;
-          box-sizing: border-box;
-          overflow: hidden;
+          color:#111827; margin: 0 auto; padding: 32px 26px 36px;
+          box-sizing: border-box; overflow: hidden;
           font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Malgun Gothic";
-          font-size: 13.25px;
-          line-height: 1.42;
-          white-space: nowrap;
-
-          display: flex;
-          flex-direction: column;
+          font-size: 13.25px; line-height: 1.42; white-space: nowrap;
+          display: flex; flex-direction: column;
         }
 
-        /* 주황 헤더 — 세로 소폭 축소 */
-        .brand {
-          display:flex; align-items:center; justify-content:flex-start;
-          background: linear-gradient(90deg, #FF7A00, #FFB84D);
-          color:#fff; padding: 22px 26px;  /* 28px → 22px */
-          border-radius:12px; margin-bottom:18px;
-          letter-spacing:.2px;
-        }
+        .brand { display:flex; align-items:center; justify-content:flex-start; background: linear-gradient(90deg, #FF7A00, #FFB84D); color:#fff; padding: 22px 26px; border-radius:12px; margin-bottom:18px; letter-spacing:.2px; }
         .brand-title { font-size:24px; font-weight:900; line-height:1.22; }
 
         .top-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:18px; }
@@ -428,9 +364,9 @@ export default function ReceiptPreviewModal({ open, row, onClose }) {
         .summary { border:1.6px solid var(--stroke); border-radius:10px; overflow:hidden; width:100%; }
         .srow { display:grid; grid-template-columns: 150px 1fr; }
         .srow:not(:last-child) { border-bottom:1.4px solid var(--stroke); }
-        .sth { padding:14px 14px; background:#f8fafc; font-weight:900; border-right:1.4px solid var(--stroke); font-size:15px; overflow:hidden; text-overflow:ellipsis; }
+        .sth { padding:14px 14px; background:#f8fafc; font-weight:900; border-right:1.4px solid var(--stroke); font-size:15px; }
         .sth.center { text-align:center; }
-        .std { padding:14px 14px; font-size:15px; overflow:hidden; text-overflow:ellipsis; }
+        .std { padding:14px 14px; font-size:15px; }
         .std.big { font-size:20px; font-weight:900; }
         .std.big2 { font-size:18px; font-weight:700; }
         .std.red { color:#d10; }

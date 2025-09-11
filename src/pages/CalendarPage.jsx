@@ -1,51 +1,78 @@
 // src/pages/CalendarPage.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import "./CalendarPage.css";
+import { db } from "../firebase";
+import {
+  collection, onSnapshot, query, orderBy,
+  updateDoc, doc, writeBatch,
+} from "firebase/firestore";
 
 /**
  * 변경 요약
- * - 팝오버: 하단 셀에서도 가려지지 않도록 강제 상단 배치 + 동적 상향 부스트 로직 강화
- * - 더보기: 표시는 유지, 클릭해도 아무 동작 없음 + 커서 변화 없음
- * - 레이아웃 여백 축소: 헤더/요일/그리드/셀 내부 여백 최소화
+ * - 등록 기능 제거 (날짜 셀 클릭 시 신규 모달 없음)
+ * - Firestore `moveouts`와 실시간 양방향 연동 (수정/날짜 이동/동일 날짜 재정렬)
+ * - 팝오버: 빌라명/호수 2열 + 금액 입력창은 읽기전용
+ * - 삭제 버튼/기능 제거
+ * - 진행현황 드롭다운 펼침 시 팝오버 스크롤 안생김(overflow: visible)
+ * - ✅ 같은 날짜에서 임의 위치로 재정렬 (앞/중간/마지막) + _order 평균값/리넘버링
  */
 
 const STATUS_COLORS = [
-  { key: "darkgray", label: "짙은 회색" },
-  { key: "deepblue", label: "진한 파랑색" },
-  { key: "sky",      label: "하늘색" }, // 기본
-  { key: "red",      label: "빨간색" },
+  { key: "darkgray", label: "짙은 회색" }, // 정산완료
+  { key: "deepblue", label: "진한 파랑색" }, // 입금대기
+  { key: "sky",      label: "하늘색" },     // 정산대기
+  { key: "red",      label: "빨간색" },     // 보증금제외
   { key: "purple",   label: "보라색" },
   { key: "amber",    label: "노란색" },
-  { key: "green",    label: "녹색" },
+  { key: "green",    label: "녹색" },       // 1차정산
 ];
+
+/* ===== 공통 유틸 (총액 계산) ===== */
+const toNum = (v) =>
+  v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0);
+const sumExtrasFromArray = (extras) =>
+  (extras || []).reduce((acc, it) => acc + (Number(it?.amount || 0) || 0), 0);
+const getExtraTotal = (x) => {
+  const sx = Array.isArray(x.extras) ? sumExtrasFromArray(x.extras) : 0;
+  return sx || toNum(x.extraAmount);
+};
+const sumTotal = (x) =>
+  toNum(x.arrears) +
+  toNum(x.currentMonth) +
+  toNum(x.waterFee) +
+  toNum(x.electricity) +
+  toNum(x.tvFee) +
+  toNum(x.cleaningFee) +
+  getExtraTotal(x);
+const fmtAmount = (n) => {
+  const v = toNum(n);
+  return v ? v.toLocaleString() : "0";
+};
+
+/* ===== 정렬 관련 상수 ===== */
+const ORDER_STEP = 1000;
+const ORDER_EPS = 1e-6; // 간격이 너무 좁을 때 판단용
 
 export default function CalendarPage() {
   const today = new Date();
   const [year, setYear]   = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
-  // 이벤트: {id,y,m,d,villa,amount,desc,statusKey,order?}
-  const [events, setEvents] = useState([]);
-  const [query, setQuery]   = useState("");
 
-  // 검색 순회 인덱스
+  // Firestore moveouts → 캘린더 이벤트로 매핑
+  const [events, setEvents] = useState([]);
+  const [queryText, setQueryText] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
 
-  // 등록/수정 모달
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalDate, setModalDate] = useState({ y: year, m: month, d: today.getDate() });
-  const [form, setForm] = useState({ villa: "", amount: "", desc: "", statusKey: "sky" });
-  const [editId, setEditId] = useState(null);
-  const villaRef  = useRef(null);
-  const amountRef = useRef(null);
-  const descRef   = useRef(null);
-
-  // 항목 수정 팝오버
-  const [popover, setPopover] = useState({ open: false, id: null, x: 0, y: 0, w: 300, h: 252 });
+  // 팝오버
+  const containerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const anchorElRef = useRef(null);
+  const [popover, setPopover] = useState({ open: false, id: null, x: 0, y: 0, w: 0, h: 0, positioned: false });
 
   // 하이라이트
   const [highlightId, setHighlightId] = useState(null);
 
-  // 드래그 상태(플레이스홀더용)
+  // 드래그 상태
   const [dragState, setDragState] = useState({ dragId: null, overId: null, overYMD: null });
 
   // 날짜 셀 오버플로우 측정
@@ -76,126 +103,54 @@ export default function CalendarPage() {
     });
   };
 
-  // 그리드
+  // 월 그리드
   const daysGrid = useMemo(() => buildMonthGrid(year, month), [year, month]);
 
-  // 신규 등록
-  const openModalForNew = (y, m, d) => {
-    setModalDate({ y, m, d });
-    setForm({ villa: "", amount: "", desc: "", statusKey: "sky" });
-    setEditId(null);
-    setModalOpen(true);
-    setTimeout(() => villaRef.current?.focus(), 0);
-  };
-
-  // 수정 모달
-  const openModalForEdit = (ev) => {
-    setModalDate({ y: ev.y, m: ev.m, d: ev.d });
-    setForm({
-      villa: ev.villa || "",
-      amount: ev.amount || "",
-      desc: ev.desc || "",
-      statusKey: ev.statusKey || "sky",
-    });
-    setEditId(ev.id);
-    setModalOpen(true);
-    setTimeout(() => villaRef.current?.focus(), 0);
-  };
-
-  // 저장
-  const saveEvent = () => {
-    if (editId) {
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === editId
-            ? {
-                ...e,
-                ...form,
-                villa: (form.villa || "").trim(),
-                amount: (form.amount || "").trim(),
-                desc: (form.desc || "").trim(),
-                y: modalDate.y, m: modalDate.m, d: modalDate.d,
-              }
-            : e
-        )
-      );
-    } else {
-      const id = `${modalDate.y}-${modalDate.m}-${modalDate.d}-${Date.now()}`;
-      const endOrder = nextOrderForDate(events, modalDate.y, modalDate.m, modalDate.d);
-      setEvents((prev) => ([
-        ...prev,
-        {
-          id,
-          y: modalDate.y, m: modalDate.m, d: modalDate.d,
-          villa: (form.villa || "").trim(),
-          amount: (form.amount || "").trim(),
-          desc: (form.desc || "").trim(),
-          statusKey: form.statusKey || "sky",
-          order: endOrder,
-        },
-      ]));
-    }
-    setModalOpen(false);
-  };
-
-  // 달 이동
-  const goPrev = () => { const d = new Date(year, month - 1, 1); setYear(d.getFullYear()); setMonth(d.getMonth()); };
-  const goNext = () => { const d = new Date(year, month + 1, 1); setYear(d.getFullYear()); setMonth(d.getMonth()); };
-  const goToday = () => { const t = new Date(); setYear(t.getFullYear()); setMonth(t.getMonth()); };
-
-  /** ====================== 드래그/드롭 (이동 + 재정렬) ====================== */
-  const onDragStart = (e, ev) => {
-    e.dataTransfer.setData("text/plain", JSON.stringify({ id: ev.id, y: ev.y, m: ev.m, d: ev.d }));
-    setDragState({ dragId: ev.id, overId: null, overYMD: { y: ev.y, m: ev.m, d: ev.d } });
-    const ghost = document.createElement("div");
-    ghost.style.width = "1px"; ghost.style.height = "1px"; ghost.style.opacity = "0";
-    document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, 0, 0);
-    setTimeout(() => document.body.removeChild(ghost), 0);
-  };
-  const clearDragState = () => setDragState({ dragId: null, overId: null, overYMD: null });
-
-  const onDropToDate = (e, targetCell) => {
-    e.preventDefault();
-    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
-    if (!payload?.id) return;
-    setEvents((prev) => {
-      const dragged = prev.find((x) => x.id === payload.id);
-      if (!dragged) return prev;
-      if (dragged.y !== targetCell.y || dragged.m !== targetCell.m || dragged.d !== targetCell.d) {
-        const newOrder = nextOrderForDate(prev, targetCell.y, targetCell.m, targetCell.d);
-        return prev.map((x) =>
-          x.id === dragged.id ? { ...x, y: targetCell.y, m: targetCell.m, d: targetCell.d, order: newOrder } : x
-        );
-      }
-      const last = nextOrderForDate(prev, dragged.y, dragged.m, dragged.d);
-      return prev.map((x) => (x.id === dragged.id ? { ...x, order: last } : x));
-    });
-    clearDragState();
-  };
-
-  const onDropBeforeTarget = (e, targetEvent) => {
-    e.preventDefault();
-    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
-    if (!payload?.id) return;
-    setEvents((prev) => reorderBefore(prev, payload.id, targetEvent));
-    clearDragState();
-  };
-
-  const onDragOverTarget = (e, targetEvent) => {
-    e.preventDefault();
-    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
-    if (!payload?.id || payload.id === targetEvent.id) return;
-    if (payload.y === targetEvent.y && payload.m === targetEvent.m && payload.d === targetEvent.d) {
-      setDragState((s) => ({ dragId: payload.id, overId: targetEvent.id, overYMD: { y: targetEvent.y, m: targetEvent.m, d: targetEvent.d } }));
-    } else {
-      setDragState((s) => ({ ...s, overId: null }));
-    }
-  };
-
-  /** ====================== 검색 이동 ====================== */
+  /* ================= Firestore 구독 ================= */
   useEffect(() => {
-    const q = query.trim();
+    const q = query(collection(db, "moveouts"), orderBy("moveDate", "asc"));
+    return onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const mapped = list.map((r) => {
+        const ymd = String(r.moveDate || "");
+        let y = year, m = month, d = 1;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+          y = parseInt(ymd.slice(0,4), 10);
+          m = parseInt(ymd.slice(5,7), 10) - 1;
+          d = parseInt(ymd.slice(8,10), 10);
+        }
+        const total = sumTotal(r);
+        const colorKey = pickColorKey(r);
+        return {
+          id: r.id,
+          y, m, d,
+          villaName: r.villaName || "",
+          unitNumber: r.unitNumber || "",
+          amount: fmtAmount(total), // 총액 표시
+          statusKey: colorKey,
+          note: r.note || "",
+          raw: r, // 원본 필드 접근용
+          order: typeof r._order === "number" ? r._order : 0, // 정렬용
+        };
+      });
+      setEvents(mapped);
+    });
+  }, []); // eslint-disable-line
+
+  /* ===== 색상 규칙 결정 ===== */
+  function pickColorKey(r) {
+    const s = String(r.status || "");
+    if (s === "정산완료") return "darkgray";
+    if (r.excludeDeposit) return "red";
+    if (r.firstSettlement) return "green";
+    if (s === "정산대기") return "sky";
+    if (s === "입금대기") return "deepblue";
+    return "sky";
+  }
+
+  /* ===== 검색 ===== */
+  useEffect(() => {
+    const q = queryText.trim();
     setSearchIndex(0);
     if (!q) { setHighlightId(null); return; }
     const matches = allMatches(events, q);
@@ -211,15 +166,14 @@ export default function CalendarPage() {
     } else {
       setHighlightId(null);
     }
-  }, [query, events]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [queryText, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearchKeyDown = (e) => {
     if (e.key !== "Enter") return;
-    const q = query.trim();
+    const q = queryText.trim();
     if (!q) return;
     const matches = allMatches(events, q);
     if (matches.length === 0) return;
-
     const nextIdx = (searchIndex + 1) % matches.length;
     const target = matches[nextIdx];
     setSearchIndex(nextIdx);
@@ -229,97 +183,254 @@ export default function CalendarPage() {
     setTimeout(() => setHighlightId(null), 2500);
   };
 
-  /** ====================== 팝오버 위치 계산(더 강하게 상향) ====================== */
-  // 조건:
-  // - 아래 공간(belowSpace)이 popH보다 작거나
-  // - 클릭 지점(rect.bottom)이 화면 높이의 70% 이상(하단 30% 구간)
-  // => 무조건 '위쪽' 배치. 위쪽 공간이 부족하면 동적 부스트(EXTRA + 부족분)를 더해 최대한 끌어올림.
-  const placePopoverNearRect = (rect, popW, popH) => {
-    const M = 10; // 기본 여백(더 좁게)
-    const BASE_EXTRA = 24; // 기본 상향 오프셋(증가)
-    const bottomZoneCutoff = window.innerHeight * 0.70; // 하단 30% 구간
-    const leftSpace   = rect.left - M;
-    const rightSpace  = window.innerWidth  - rect.right - M;
-    const aboveSpace  = rect.top  - M;
-    const belowSpace  = window.innerHeight - rect.bottom - M;
+  /* ===== 팝오버 배치 ===== */
+  const clampToContainer = (x, y, w, h, M = 10) => {
+    const rect = containerRef.current?.getBoundingClientRect() || { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    const minX = rect.left + M;
+    const maxX = rect.right - w - M;
+    const minY = rect.top + M;
+    const maxY = rect.bottom - h - M;
+    return { x: Math.max(minX, Math.min(x, maxX)), y: Math.max(minY, Math.min(y, maxY)) };
+  };
+  const placePopoverNearRect = (anchorRect, popW, popH) => {
+    const M = 10;
+    const BASE_EXTRA = 24;
+    const cont = containerRef.current?.getBoundingClientRect() || { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    const leftSpace   = anchorRect.left - cont.left - M;
+    const rightSpace  = cont.right - anchorRect.right - M;
+    const aboveSpace  = anchorRect.top - cont.top - M;
+    const belowSpace  = cont.bottom - anchorRect.bottom - M;
+    const bottomZoneCutoff = cont.top + (cont.bottom - cont.top) * 0.70;
 
-    // 가로 배치: 넓은 쪽
     const placeRight = rightSpace >= leftSpace;
-    let x = placeRight ? (rect.right + M) : (rect.left - popW - M);
+    let x = placeRight ? (anchorRect.right + M) : (anchorRect.left - popW - M);
 
-    // 세로 배치 판단
     let forceAbove = false;
     if (belowSpace < popH + M) forceAbove = true;
-    if (rect.bottom >= bottomZoneCutoff) forceAbove = true;
+    if (anchorRect.bottom >= bottomZoneCutoff) forceAbove = true;
 
     let y;
     if (forceAbove) {
-      // 위로 올리되, 위쪽 공간이 부족하면 부족분만큼 추가로 더 끌어올림(동적 부스트)
-      const shortage = Math.max(0, (popH + M) - aboveSpace); // 위쪽 공간 부족분
-      const EXTRA = BASE_EXTRA + shortage;                    // 상황에 따른 추가 상향
-      y = rect.top - popH - M - EXTRA;
+      const shortage = Math.max(0, (popH + M) - aboveSpace);
+      const EXTRA = BASE_EXTRA + shortage;
+      y = anchorRect.top - popH - M - EXTRA;
     } else if (aboveSpace < popH + M) {
-      // 위쪽도 좁으면 아래로
-      y = rect.bottom + M;
+      y = anchorRect.bottom + M;
     } else {
-      // 둘 다 가능하면 넓은 쪽
-      y = belowSpace >= aboveSpace ? (rect.bottom + M) : (rect.top - popH - M);
+      y = belowSpace >= aboveSpace ? (anchorRect.bottom + M) : (anchorRect.top - popH - M);
+    }
+    return clampToContainer(x, y, popW, popH, M);
+  };
+  const measureAndPlacePopover = () => {
+    if (!popover.open) return;
+    const el = popoverRef.current;
+    if (!el) return;
+    const popRect = el.getBoundingClientRect();
+    const anchorRect = anchorElRef.current?.getBoundingClientRect() || popRect;
+    const { x, y } = placePopoverNearRect(anchorRect, popRect.width, popRect.height);
+    setPopover((p) => ({ ...p, x, y, w: popRect.width, h: popRect.height, positioned: true }));
+  };
+  const openPopover = (ev, domEvent) => {
+    anchorElRef.current = domEvent.currentTarget;
+    setPopover({ open: true, id: ev.id, x: -9999, y: -9999, w: 0, h: 0, positioned: false });
+  };
+  const closePopover = () => {
+    setPopover({ open: false, id: null, x: 0, y: 0, w: 0, h: 0, positioned: false });
+    anchorElRef.current = null;
+  };
+  useLayoutEffect(() => {
+    if (popover.open && !popover.positioned) {
+      const r = requestAnimationFrame(measureAndPlacePopover);
+      return () => cancelAnimationFrame(r);
+    }
+  }, [popover.open, popover.positioned, popover.id]);
+  useEffect(() => {
+    if (!popover.open) return;
+    const handler = () => measureAndPlacePopover();
+    window.addEventListener("resize", handler);
+    window.addEventListener("scroll", handler, true);
+    return () => {
+      window.removeEventListener("resize", handler);
+      window.removeEventListener("scroll", handler, true);
+    };
+  }, [popover.open]);
+
+  /* ===== 드래그 앤 드롭 ===== */
+  const onDragStart = (e, ev) => {
+    e.dataTransfer.setData("text/plain", JSON.stringify({ id: ev.id, y: ev.y, m: ev.m, d: ev.d }));
+    setDragState({ dragId: ev.id, overId: null, overYMD: { y: ev.y, m: ev.m, d: ev.d } });
+    const ghost = document.createElement("div");
+    ghost.style.width = "1px"; ghost.style.height = "1px"; ghost.style.opacity = "0";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    setTimeout(() => document.body.removeChild(ghost), 0);
+  };
+  const clearDragState = () => setDragState({ dragId: null, overId: null, overYMD: null });
+
+  // 날짜 변경 (셀 바닥으로 드롭)
+  const onDropToDate = async (e, targetCell) => {
+    e.preventDefault();
+    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
+    if (!payload?.id) return;
+
+    const dragged = events.find(x => x.id === payload.id);
+    if (!dragged) return;
+
+    // 날짜가 바뀌면 moveDate 업데이트 (순서값은 그 날짜의 맨 끝으로)
+    if (dragged.y !== targetCell.y || dragged.m !== targetCell.m || dragged.d !== targetCell.d) {
+      const y = targetCell.y;
+      const m = targetCell.m + 1;
+      const d = targetCell.d;
+      const ymd = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+      // 대상 날짜의 끝 order 계산
+      const dayEvts = dayEvents(events, y, targetCell.m, d).sort((a,b)=>a.order-b.order);
+      const last = dayEvts[dayEvts.length-1];
+      const newOrder = last ? last.order + ORDER_STEP : ORDER_STEP;
+
+      try {
+        await updateDoc(doc(db, "moveouts", dragged.id), { moveDate: ymd, _order: newOrder });
+        setEvents(prev => prev.map(e => e.id===dragged.id ? { ...e, y: y, m: targetCell.m, d: d, order: newOrder, raw: { ...e.raw, moveDate: ymd, _order: newOrder } } : e));
+      } catch (err) {
+        console.error("moveDate 변경 실패:", err);
+        alert("날짜 이동 중 오류가 발생했습니다.");
+      }
+    }
+    clearDragState();
+  };
+
+  // 동일 날짜 내, targetEvent "앞"에 떨어뜨리기
+  const onDropBeforeTarget = async (e, targetEvent) => {
+    e.preventDefault();
+    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
+    if (!payload?.id) return;
+
+    const dragged = events.find(x => x.id === payload.id);
+    if (!dragged) return;
+
+    // 동일 날짜가 아니면 무시 (날짜 이동은 셀 바닥 드롭에서 처리)
+    if (!(dragged.y === targetEvent.y && dragged.m === targetEvent.m && dragged.d === targetEvent.d)) {
+      setDragState({ dragId: null, overId: null, overYMD: null });
+      return;
     }
 
-    // 최종 클램프(뷰포트 밖 방지)
-    x = Math.max(M, Math.min(x, window.innerWidth  - popW - M));
-    y = Math.max(M, Math.min(y, window.innerHeight - popH - M));
+    const y = dragged.y, m = dragged.m, d = dragged.d;
+    const day = dayEvents(events, y, m, d).sort((a,b)=>a.order-b.order);
+    const tIdx = day.findIndex(x => x.id === targetEvent.id);
+    if (tIdx < 0) { clearDragState(); return; }
 
-    return { x, y };
-  };
+    const prevEvt = day[tIdx - 1]?.id === dragged.id ? day[tIdx - 2] : day[tIdx - 1];
+    const nextEvt = day[tIdx]?.id === dragged.id ? day[tIdx + 1] : day[tIdx];
 
-  const openPopover = (ev, domEvent) => {
-    const rect = domEvent.currentTarget.getBoundingClientRect();
-    const popW = 300, popH = 252;
-    const pos = placePopoverNearRect(rect, popW, popH);
-    setPopover({ open: true, id: ev.id, w: popW, h: popH, ...pos });
-  };
-  const closePopover = () => setPopover({ open: false, id: null, x: 0, y: 0, w: 300, h: 252 });
-
-  /** ====================== 리사이즈: 위치 재계산 ====================== */
-  useEffect(() => {
-    const onResize = () => {
-      Object.keys(contentRefs.current).forEach((k) => updateOverflowForKey(k));
-      if (popover.open) {
-        const rect = { left: popover.x, top: popover.y, right: popover.x + popover.w, bottom: popover.y + popover.h };
-        const pos = placePopoverNearRect(rect, popover.w, popover.h);
-        setPopover((p) => ({ ...p, ...pos }));
+    let newOrder;
+    if (!prevEvt && nextEvt) newOrder = (nextEvt.order ?? 0) - ORDER_STEP;
+    else if (prevEvt && !nextEvt) newOrder = (prevEvt.order ?? 0) + ORDER_STEP;
+    else if (prevEvt && nextEvt) {
+      const gap = (nextEvt.order - prevEvt.order);
+      if (gap > ORDER_EPS) {
+        newOrder = prevEvt.order + gap / 2;
+      } else {
+        // 간격이 너무 좁음 → 리넘버링 후 다시 계산
+        await renumberDayOrders(y, m, d);
+        const day2 = dayEvents(events, y, m, d).sort((a,b)=>a.order-b.order);
+        const t2 = day2.findIndex(x => x.id === targetEvent.id);
+        const p2 = day2[t2 - 1];
+        const n2 = day2[t2];
+        if (!p2 && n2) newOrder = n2.order - ORDER_STEP;
+        else if (p2 && !n2) newOrder = p2.order + ORDER_STEP;
+        else newOrder = p2.order + (n2.order - p2.order) / 2;
       }
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [popover.open, popover.w, popover.h]);
+    } else {
+      // 대상 날짜가 비정상인 경우 맨 앞으로
+      newOrder = ORDER_STEP;
+    }
 
-  // 오버플로우 계산 갱신
+    try {
+      await updateDoc(doc(db, "moveouts", dragged.id), { _order: newOrder });
+      setEvents(prev => prev.map(ev => ev.id === dragged.id ? { ...ev, order: newOrder, raw: { ...ev.raw, _order: newOrder } } : ev));
+    } catch (err) {
+      console.error("순서 변경 실패:", err);
+      alert("순서 변경 중 오류가 발생했습니다.");
+    }
+
+    setDragState({ dragId: null, overId: null, overYMD: null });
+  };
+
+  // ✅ 동일 날짜 내 항목 위로 드래그할 때 스페이서 표시를 위한 오버 핸들러
+  const onDragOverTarget = (e, targetEvent) => {
+    e.preventDefault();
+    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
+    if (!payload?.id || payload.id === targetEvent.id) return;
+
+    if (
+      payload.y === targetEvent.y &&
+      payload.m === targetEvent.m &&
+      payload.d === targetEvent.d
+    ) {
+      setDragState((s) => ({
+        dragId: payload.id,
+        overId: targetEvent.id,
+        overYMD: { y: targetEvent.y, m: targetEvent.m, d: targetEvent.d },
+      }));
+    } else {
+      setDragState((s) => ({ ...s, overId: null }));
+    }
+  };
+
+  // 동일 날짜 내, 맨 끝으로 이동 (End Dropzone)
+  const onDropToEnd = async (e, cell) => {
+    e.preventDefault();
+    const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
+    if (!payload?.id) return;
+
+    const dragged = events.find(x => x.id === payload.id);
+    if (!dragged) return;
+
+    if (!(dragged.y === cell.y && dragged.m === cell.m && dragged.d === cell.d)) {
+      setDragState({ dragId: null, overId: null, overYMD: null });
+      return;
+    }
+
+    const day = dayEvents(events, cell.y, cell.m, cell.d).sort((a,b)=>a.order-b.order);
+    const last = day[day.length - 1];
+    const newOrder = last ? last.order + ORDER_STEP : ORDER_STEP;
+
+    try {
+      await updateDoc(doc(db, "moveouts", dragged.id), { _order: newOrder });
+      setEvents(prev => prev.map(ev => ev.id === dragged.id ? { ...ev, order: newOrder, raw: { ...ev.raw, _order: newOrder } } : ev));
+    } catch (err) {
+      console.error("끝으로 이동 실패:", err);
+      alert("순서 변경 중 오류가 발생했습니다.");
+    }
+
+    setDragState({ dragId: null, overId: null, overYMD: null });
+  };
+
+  /* ===== 오버플로우 갱신 ===== */
   useEffect(() => {
     daysGrid.forEach((c) => updateOverflowForKey(makeKey(c)));
-  }, [events, daysGrid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [events, daysGrid]); // eslint-disable-line
 
-  /** ====================== 렌더 ====================== */
+  /* ===== 렌더 ===== */
   return (
-    <div className="calendar-page">
+    <div className="calendar-page" ref={containerRef}>
       {/* 헤더 */}
       <div className="calendar-header">
         <div className="calendar-nav">
-          <button className="btn-plain" onClick={goPrev}>◀</button>
+          <button className="btn-plain" onClick={() => { const d = new Date(year, month - 1, 1); setYear(d.getFullYear()); setMonth(d.getMonth()); }}>◀</button>
           <select className="inp-sel" value={year} onChange={(e) => setYear(parseInt(e.target.value, 10))}>
             {yearOptions().map((y) => <option key={y} value={y}>{y}년</option>)}
           </select>
           <select className="inp-sel" value={month} onChange={(e) => setMonth(parseInt(e.target.value, 10))}>
             {Array.from({ length: 12 }, (_, i) => i).map((m) => <option key={m} value={m}>{m + 1}월</option>)}
           </select>
-          <button className="btn-plain" onClick={goNext}>▶</button>
-          <button className="btn-primary" onClick={goToday}>오늘</button>
+          <button className="btn-plain" onClick={() => { const d = new Date(year, month + 1, 1); setYear(d.getFullYear()); setMonth(d.getMonth()); }}>▶</button>
+          <button className="btn-primary" onClick={() => { const t = new Date(); setYear(t.getFullYear()); setMonth(t.getMonth()); }}>오늘</button>
         </div>
 
         <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          value={queryText}
+          onChange={(e) => setQueryText(e.target.value)}
           onKeyDown={onSearchKeyDown}
           placeholder="검색어 입력"
           aria-label="검색"
@@ -356,7 +467,6 @@ export default function CalendarPage() {
             return (
               <div
                 key={idx}
-                onClick={() => openModalForNew(cell.y, cell.m, cell.d)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => onDropToDate(e, cell)}
                 className={`day-cell ${isToday ? "day-cell--today" : ""}`}
@@ -376,28 +486,39 @@ export default function CalendarPage() {
                   <div className="event-stack">
                     {cellEvents.map((e) => (
                       <React.Fragment key={e.id}>
+                        {/* 동일 날짜 + 드래그 중일 때, 현재 항목 앞에 드롭스페이서 */}
                         {isDragSameDay && dragState.overId === e.id && <div className="drop-spacer" />}
                         <EventPill
                           event={e}
-                          highlight={highlightId === e.id || (query && isMatch(e, query))}
+                          highlight={highlightId === e.id || (queryText && isMatch(e, queryText))}
                           onOpenPopover={(domEvent) => openPopover(e, domEvent)}
-                          onDoubleClick={() => openModalForEdit(e)}
+                          onDoubleClick={null}
                           onDragStart={(evt) => onDragStart(evt, e)}
                           onDragOver={(evt) => onDragOverTarget(evt, e)}
                           onDropBefore={(evt) => onDropBeforeTarget(evt, e)}
                         />
                       </React.Fragment>
                     ))}
+
+                    {/* ✅ 동일 날짜 끝 드롭존: 맨 끝으로 이동 */}
+                    {isDragSameDay && (
+                      <div
+                        className="drop-end"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => onDropToEnd(e, cell)}
+                        title="끝으로 이동"
+                      />
+                    )}
                   </div>
                 </div>
 
-                {/* 하단 'N건 더보기' (표시만, 클릭 동작 없음 + 커서 변화 없음) */}
+                {/* 하단 'N건 더보기' (표시만) */}
                 {ov.hiddenBelow > 0 && (
                   <div className="more-gradient">
                     <button
                       className="more-button"
                       title="가려진 항목 수 표시 (열리지 않음)"
-                      onClick={(evt) => { evt.stopPropagation(); /* no-op */ }}
+                      onClick={(evt) => { evt.stopPropagation(); }}
                     >
                       가려진 항목 {ov.hiddenBelow}건 더보기
                     </button>
@@ -409,77 +530,119 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* 항목 수정 팝오버 */}
+      {/* 항목 보기/부분 수정 팝오버 */}
       {popover.open && (() => {
         const selected = events.find((e) => e.id === popover.id);
         if (!selected) return null;
         return (
           <>
             <div className="screen-dim" onClick={closePopover} />
-            <div className="popover" style={{ left: popover.x, top: popover.y }}>
+            <div
+              ref={popoverRef}
+              className="popover"
+              style={{ left: `${popover.x}px`, top: `${popover.y}px` }}
+            >
               <div className="popover-head">
-                <div className="popover-title">항목 수정</div>
+                <div className="popover-title">항목 보기</div>
                 <div className="popover-actions">
-                  <button
-                    className="btn-danger"
-                    onClick={() => { deleteEvent(selected.id); closePopover(); }}
-                    title="삭제"
-                  >
-                    삭제
-                  </button>
                   <button className="btn-x" onClick={closePopover} title="닫기">✕</button>
                 </div>
               </div>
 
               <div className="popover-body">
-                <Field label="빌라명/호수" value={selected.villa} onChange={(v) => patchEvent(selected.id, { villa: v })} />
-                <Field
-                  label="금액"
-                  value={selected.amount}
-                  onChange={(v) => patchEvent(selected.id, { amount: v.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") })}
+                {/* 읽기전용 필드 */}
+                <div className="two-col">
+                  <Field label="빌라명" value={selected.villaName} readOnly />
+                  <Field label="호수" value={selected.unitNumber} readOnly />
+                </div>
+                <Field label="금액" value={selected.amount} readOnly />
+
+                {/* 진행현황 변경 가능 */}
+                <StatusPicker
+                  value={selected.statusKey}
+                  onChange={(key) => patchEvent(selected, applyStatusFromKey(key))}
                 />
-                <StatusPicker value={selected.statusKey || "sky"} onChange={(key) => patchEvent(selected.id, { statusKey: key })} />
-                <TextArea label="설명" value={selected.desc || ""} onChange={(v) => patchEvent(selected.id, { desc: v })} />
+
+                {/* 비고는 수정 가능 */}
+                <TextArea
+                  label="비고"
+                  value={selected.note || ""}
+                  onChange={(v) => patchEvent(selected, { note: v })}
+                />
               </div>
             </div>
           </>
         );
       })()}
-
-      {/* 등록/수정 모달 */}
-      {modalOpen && (
-        <Modal onClose={() => setModalOpen(false)} title={`${modalDate.y}.${modalDate.m + 1}.${modalDate.d}`} width={editId ? 560 : 420} showClose={!!editId}>
-          <div className="form-grid">
-            <Field label="빌라명/호수" value={form.villa} onChange={(v) => setForm((s) => ({ ...s, villa: v }))} onEnter={() => amountRef.current?.focus()} inputRef={villaRef} />
-            <Field label="금액" value={form.amount}
-              onChange={(v) => setForm((s) => ({ ...s, amount: v.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") })) }
-              onEnter={() => descRef.current?.focus()} inputRef={amountRef}
-            />
-            <StatusPicker value={form.statusKey} onChange={(key) => setForm((s) => ({ ...s, statusKey: key }))} />
-            <TextArea label="설명" value={form.desc} onChange={(v) => setForm((s) => ({ ...s, desc: v }))} inputRef={descRef} />
-          </div>
-          <div className="modal-actions">
-            <button onClick={saveEvent} className="btn-primary">저장</button>
-            <button onClick={() => setModalOpen(false)} className="btn-plain">닫기</button>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 
-  /** ============== 로컬 헬퍼 ============== */
-  function patchEvent(id, patch) {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  /* ===== Firestore 패치 ===== */
+  async function patchEvent(selected, patch) {
+    setEvents((prev) => prev.map((e) => (e.id === selected.id ? { ...e, ...patch } : e)));
+
+    const update = {};
+    if (patch.note != null) update.note = patch.note;
+
+    if (patch.statusKey != null) {
+      const s = statusFromKey(patch.statusKey, selected.raw);
+      if (s != null) update.status = s;
+    }
+
+    if (Object.keys(update).length > 0) {
+      try {
+        await updateDoc(doc(db, "moveouts", selected.id), update);
+      } catch (err) {
+        console.error("업데이트 실패:", err);
+        alert("수정 중 오류가 발생했습니다.");
+      }
+    }
   }
-  function deleteEvent(id) {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+
+  function applyStatusFromKey(key) {
+    const s =
+      key === "darkgray" ? "정산완료" :
+      key === "sky"      ? "정산대기" :
+      key === "deepblue" ? "입금대기" :
+      null;
+    return s ? { statusKey: key, status: s } : { statusKey: key };
+  }
+
+  function statusFromKey(key, raw) {
+    if (key === "darkgray") return "정산완료";
+    if (key === "sky") return "정산대기";
+    if (key === "deepblue") return "입금대기";
+    return raw?.status ?? null;
+  }
+
+  /* ===== 동일 날짜 유틸 ===== */
+  function dayEvents(all, y, m, d) {
+    return all.filter(e => e.y===y && e.m===m && e.d===d);
+  }
+
+  async function renumberDayOrders(y, m, d) {
+    const day = dayEvents(events, y, m, d).sort((a,b)=>a.order-b.order);
+    const batch = writeBatch(db);
+    day.forEach((ev, idx) => {
+      const newOrder = (idx + 1) * ORDER_STEP;
+      batch.update(doc(db, "moveouts", ev.id), { _order: newOrder });
+    });
+    await batch.commit();
+    // 로컬 상태도 갱신
+    setEvents(prev => prev.map(ev => {
+      if (ev.y===y && ev.m===m && ev.d===d) {
+        const idx = day.findIndex(dv => dv.id===ev.id);
+        return { ...ev, order: (idx + 1) * ORDER_STEP, raw: { ...ev.raw, _order: (idx + 1) * ORDER_STEP } };
+        }
+      return ev;
+    }));
   }
 }
 
-/* -------------------- 하위/공통 컴포넌트 -------------------- */
-
+/* -------------------- 하위 컴포넌트 -------------------- */
 function EventPill({ event, highlight, onOpenPopover, onDoubleClick, onDragStart, onDragOver, onDropBefore }) {
   const colorClass = `pill--${event.statusKey || "sky"}`;
+  const title = `${(event.villaName || "").trim()} ${(event.unitNumber || "").trim()}    ${event.amount}`;
   return (
     <div
       data-evpill="1"
@@ -490,40 +653,28 @@ function EventPill({ event, highlight, onOpenPopover, onDoubleClick, onDragStart
       onDragOver={(e) => onDragOver(e, event)}
       onDrop={(e) => onDropBefore(e, event)}
       className={`event-pill ${colorClass} ${highlight ? "event-pill--hl" : ""}`}
-      title={`${event.villa}    ${event.amount}`}
+      title={title}
     >
       <div className="pill-row">
-        <span className="pill-villa">{event.villa}</span>
+        <span className="pill-villa">{`${event.villaName || ""} ${event.unitNumber || ""}`.trim()}</span>
         <span className="pill-amt">{event.amount}</span>
       </div>
     </div>
   );
 }
 
-function Modal({ children, onClose, title, width = 560, showClose = true }) {
-  return (
-    <div className="modal-wrap">
-      <div className="modal-panel" style={{ width }}>
-        <div className="modal-head">
-          <div className="modal-title">{title}</div>
-          {showClose && (
-            <button className="btn-x" onClick={onClose}>✕</button>
-          )}
-        </div>
-        <div className="modal-body">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, onEnter, inputRef }) {
+function Field({ label, value, onChange, onEnter, inputRef, readOnly = false }) {
   return (
     <div className="field">
       <div className="field-label">{label}</div>
       <input
         ref={inputRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        readOnly={true}
+        onChange={(e) => {
+          if (readOnly) return;
+          onChange?.(e.target.value);
+        }}
         onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
         className="field-input"
       />
@@ -552,14 +703,24 @@ function StatusPicker({ value, onChange }) {
     <div className="field">
       <div className="field-label">진행현황</div>
       <div className="status-picker">
-        <button type="button" className="status-btn" onClick={() => setOpen((v) => !v)} title="진행현황 색상">
+        <button
+          type="button"
+          className="status-btn"
+          onClick={() => setOpen((v) => !v)}
+          title="진행현황 색상"
+        >
           <ColorDot keyName={current.key} size={20} />
         </button>
         {open && (
           <div className="status-pop">
             <div className="status-grid">
               {STATUS_COLORS.map((c) => (
-                <button key={c.key} className="status-cell" onClick={() => { onChange(c.key); setOpen(false); }} title={c.label}>
+                <button
+                  key={c.key}
+                  className="status-cell"
+                  onClick={() => { onChange(c.key); setOpen(false); }}
+                  title={c.label}
+                >
                   <ColorDot keyName={c.key} size={16} />
                 </button>
               ))}
@@ -593,7 +754,11 @@ function yearOptions() {
   return list;
 }
 function isMatch(e, q) {
-  return [e.villa, e.amount, e.desc].some((s) => (s || "").toLowerCase().includes(q.toLowerCase()));
+  const hay = [
+    e.villaName, e.unitNumber, e.amount, e.note
+  ].map(s => (s || "").toLowerCase());
+  const needle = q.toLowerCase();
+  return hay.some(s => s.includes(needle));
 }
 function allMatches(events, q) {
   const m = events.filter((e) => isMatch(e, q));
@@ -603,66 +768,14 @@ function allMatches(events, q) {
     return da - db;
   });
 }
-
-// 날짜별 다음 order 값
-function nextOrderForDate(list, y, m, d) {
-  const same = list.filter((e) => e.y === y && e.m === m && e.d === d);
-  const max = same.reduce((acc, cur) => Math.max(acc, Number.isFinite(cur.order) ? cur.order : -1), -1);
-  return max + 1;
-}
-
-// order 정렬(없으면 안정 보정)
 function sortByOrder(arr) {
   const withOrder = arr.map((e, idx) => ({
     ...e,
-    _orderTmp: Number.isFinite(e.order) ? e.order : idx,
+    _orderTmp: Number.isFinite(e.order) ? e.order : (idx + 1) * ORDER_STEP,
   }));
   withOrder.sort((a, b) => a._orderTmp - b._orderTmp || a.id.localeCompare(b.id));
   return withOrder;
 }
-
-// 안전 파싱
 function safeParseDrag(text) {
   try { return JSON.parse(text); } catch { return null; }
-}
-
-// 같은 날짜에서 'target 앞'으로 재정렬 (다른 날짜면 target 날짜로 이동하며 앞에 삽입)
-function reorderBefore(prev, draggedId, target) {
-  const dragged = prev.find((x) => x.id === draggedId);
-  if (!dragged) return prev;
-
-  // 타겟 날짜 목록
-  const dayList = sortByOrder(prev.filter((e) => e.y === target.y && e.m === target.m && e.d === target.d));
-  const targetIdx = dayList.findIndex((x) => x.id === target.id);
-
-  // 다른 날짜면 타겟 날짜로 이동하며 '앞'으로 삽입
-  if (dragged.y !== target.y || dragged.m !== target.m || dragged.d !== target.d) {
-    const beforeOrder = targetIdx === 0 ? -1 : (dayList[targetIdx - 1].order ?? targetIdx - 1);
-    const afterOrder  = (dayList[targetIdx].order ?? targetIdx);
-    const newOrder = (beforeOrder + afterOrder) / 2;
-    const moved = prev.map((x) =>
-      x.id === dragged.id ? { ...x, y: target.y, m: target.m, d: target.d, order: newOrder } : x
-    );
-    return normalizeOrders(moved, target.y, target.m, target.d);
-  }
-
-  // 같은 날짜면 target 앞 삽입
-  const beforeOrder = targetIdx === 0 ? -1 : (dayList[targetIdx - 1].order ?? targetIdx - 1);
-  const afterOrder  = (dayList[targetIdx].order ?? targetIdx);
-  const newOrder = (beforeOrder + afterOrder) / 2;
-
-  const updated = prev.map((x) =>
-    x.id === dragged.id ? { ...x, order: newOrder, y: target.y, m: target.m, d: target.d } : x
-  );
-  return normalizeOrders(updated, target.y, target.m, target.d);
-}
-
-// 해당 날짜의 order를 0..n-1 로 재배치
-function normalizeOrders(list, y, m, d) {
-  const indices = list
-    .filter((e) => e.y === y && e.m === m && e.d === d)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map((e, i) => ({ id: e.id, order: i }));
-  const map = new Map(indices.map(({ id, order }) => [id, order]));
-  return list.map((e) => (map.has(e.id) ? { ...e, order: map.get(e.id) } : e));
 }

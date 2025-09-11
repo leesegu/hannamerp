@@ -484,7 +484,6 @@ export default function ReceiptIssuePage() {
     });
   };
   const addItem = () => {
-    // ✅ 16개 이상 생성 방지 → 최대 15개
     setItems((l) => {
       if (l.length >= MAX_ITEMS) {
         alert(`품목은 최대 ${MAX_ITEMS}개까지 추가할 수 있습니다.`);
@@ -510,8 +509,6 @@ export default function ReceiptIssuePage() {
     if (!s(form.issueDate)) return alert("발행일자를 입력하세요.");
     if (!s(form.code)) return alert("코드번호를 선택/입력하세요.");
     if (!s(form.villaName)) return alert("빌라명을 확인하세요.");
-    // ✅ 요청: 나머지주소 미입력이어도 저장 가능 → unitNumber 강제 검증 제거
-    // if (!s(form.unitNumber)) return alert("호수를 입력하세요.");
     if (totalAmount <= 0) return alert("품목의 합계 금액이 0원입니다.");
 
     const itemsPayload = items.map((it) => ({
@@ -561,7 +558,6 @@ export default function ReceiptIssuePage() {
   /* ===== 렌더 ===== */
   return (
     <div className="page-wrapper">
-      {/* ✅ 페이지 좌측 상단 제목 (통일 스타일) */}
       <PageTitle>영수증발행</PageTitle>
 
       <div className="receipt-page">
@@ -584,7 +580,6 @@ export default function ReceiptIssuePage() {
           <>
             <div className="modal-backdrop" onClick={() => setEditOpen(false)} />
             <div className="modal">
-              {/* 상단 고정 */}
               <div className="modal-head">
                 <div className="title">{editMode === "edit" ? "영수증 수정" : "영수증 발행"}</div>
                 <div className="right">
@@ -592,10 +587,8 @@ export default function ReceiptIssuePage() {
                 </div>
               </div>
 
-              {/* 본문 스크롤 */}
               <div className="modal-body">
                 <div className="grid grid-3">
-                  {/* 1행: 영수증이름, 발행일자, 코드번호 */}
                   <LabeledInput label="영수증 이름">
                     <ReceiptNameCombo
                       value={form.receiptName}
@@ -616,12 +609,11 @@ export default function ReceiptIssuePage() {
                     <CodeCombo
                       value={form.code}
                       onChange={(val) => setForm((f) => ({ ...f, code: val }))}
-                      onSelectOption={() => unitRef.current?.focus()}   // 코드 선택 → 호수
+                      onSelectOption={() => unitRef.current?.focus()}
                       options={villas}
                     />
                   </LabeledInput>
 
-                  {/* 2행: 주소, 빌라명, 호수 */}
                   <LabeledInput label="주소">
                     <input
                       type="text"
@@ -647,11 +639,10 @@ export default function ReceiptIssuePage() {
                       className="input"
                       value={form.unitNumber}
                       onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") recipientRef.current?.focus(); }}  // 호수 Enter → 공급받는자
+                      onKeyDown={(e) => { if (e.key === "Enter") recipientRef.current?.focus(); }}
                     />
                   </LabeledInput>
 
-                  {/* 3행: 공급받는자, 청구방법, 입금날짜 */}
                   <LabeledInput label="공급받는자">
                     <input
                       ref={recipientRef}
@@ -659,7 +650,7 @@ export default function ReceiptIssuePage() {
                       className="input"
                       value={form.recipient}
                       onChange={(e) => setForm((f) => ({ ...f, recipient: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") billingRef.current?.focus(); }}  // 공급받는자 Enter → 청구방법
+                      onKeyDown={(e) => { if (e.key === "Enter") billingRef.current?.focus(); }}
                     />
                   </LabeledInput>
 
@@ -683,7 +674,6 @@ export default function ReceiptIssuePage() {
                     />
                   </LabeledInput>
 
-                  {/* 4행: 비고 (전체 폭) */}
                   <div className="col-span-3">
                     <LabeledInput label="비고">
                       <input
@@ -709,7 +699,7 @@ export default function ReceiptIssuePage() {
                           selected={toDate(it.date)}
                           onChange={(date) => {
                             setItemField(idx, "date", date ? format(date, "yyyy-MM-dd") : "");
-                            setTimeout(() => itemDescRefs.current[idx]?.focus(), 0); // 날짜 선택 → 품목
+                            setTimeout(() => itemDescRefs.current[idx]?.focus(), 0);
                           }}
                           dateFormat="yyyy-MM-dd"
                           locale={ko}
@@ -720,7 +710,7 @@ export default function ReceiptIssuePage() {
                             <DPInput
                               ref={(el) => (itemDateRefs.current[idx] = el)}
                               clearable
-                              compact           // 더 작은 날짜 선택창
+                              compact
                             />
                           }
                         />
@@ -734,9 +724,7 @@ export default function ReceiptIssuePage() {
                           onChange={(e) => setItemField(idx, "description", e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
-                              // ✅ 요청: 품목에서 Enter → 다음 행의 품목
                               focusNextRowDescOr(idx, () => {
-                                // 폴백: 다음 행이 없으면 기존 동작(수량으로 이동) 유지
                                 itemQtyRefs.current[idx]?.focus();
                               });
                             }
@@ -753,9 +741,7 @@ export default function ReceiptIssuePage() {
                           onChange={(e) => setItemField(idx, "qty", e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
-                              // ✅ 요청: 수량에서 Enter → 다음 행의 품목
                               focusNextRowDescOr(idx, () => {
-                                // 폴백: 다음 행이 없으면 기존 동작(단가로 이동) 유지
                                 itemPriceRefs.current[idx]?.focus();
                               });
                             }
@@ -772,7 +758,6 @@ export default function ReceiptIssuePage() {
                           onChange={(e) => setItemField(idx, "unitPrice", e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
-                              // ✅ 요청: 단가에서 Enter → 다음 행의 품목
                               focusNextRowDescOr(idx);
                             }
                           }}
@@ -794,7 +779,6 @@ export default function ReceiptIssuePage() {
                 </div>
               </div>
 
-              {/* 하단 고정 */}
               <div className="modal-actions">
                 <button className="btn-primary" onClick={saveForm} disabled={saving}>
                   {saving ? "저장 중..." : (editMode === "edit" ? "수정" : "발행")}

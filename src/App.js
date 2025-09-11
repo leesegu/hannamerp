@@ -42,6 +42,9 @@ import MessageExtractor from "./pages/MessageExtractor";
 /* ✅ 캘린더 페이지 */
 import CalendarPage from "./pages/CalendarPage";
 
+/* ✅ 부가서비스 · 도배 */
+import PaperingPage from "./pages/PaperingPage";
+
 import "./App.css";
 
 function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }) {
@@ -163,6 +166,12 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/calendar"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <CalendarPage />}
+      />
+
+      {/* ✅ 부가서비스 · 도배 라우트 */}
+      <Route
+        path="/papering"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <PaperingPage />}
       />
 
       {/* 기타 메뉴 */}

@@ -234,12 +234,15 @@ export default function GenericEditModal({
           <DatePicker
             selected={selectedDate}
             onChange={(date) => {
-              const str = formatYYYYMMDD(date);
+              // date가 null이면 비우기(삭제)
+              const str = date ? formatYYYYMMDD(date) : "";
               handleChange({ target: { name: field, value: str } }, "date");
             }}
             locale={ko}
-            dateFormat="yyyy-MM-dd"   // 저장 포맷 기준
+            dateFormat="yyyy-MM-dd"   // 저장 포맷 기준 (YYYY-MM-DD)
             disabled={disabled}
+            isClearable                 // ✅ X 버튼으로 날짜 삭제 가능
+            clearButtonTitle="지우기"
             /* 포털 없이 '펼쳐지되' 버튼 위로 보이게 (z-index는 위에서 주입) */
             placement="top-start"
             popperPlacement="top-start"
