@@ -1,9 +1,5 @@
 // ==================================
-// 관리비회계 · 수입정리 페이지
-// 엑셀 업로드 + 조밀 테이블 + 중복안내모달 + 선택삭제(확인)
-// 페이지네이션 기본 30 (선택: 30/50/100/200)
-// 기간(조회시작일자 — 조회끝일자) 필터: 양 끝 날짜 포함 (로컬 기준, KST)
-// 내부 스크롤 제거 + 선명한 최신형 테이블 스타일
+// 관리비회계 · 수입정리 페이지 (중복 상태 제거/요청 기능 포함)
 // ==================================
 import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import * as XLSX from "xlsx";
@@ -18,15 +14,13 @@ const toNumber = (v) => {
   return Number.isFinite(num) ? num : 0;
 };
 
-/** 안전한 날짜/시간 파서 (엑셀 셀, 문자열 혼용 대응) */
+/** 안전한 날짜/시간 파서 */
 const parseKoreanDateTime = (v) => {
   if (v instanceof Date && !isNaN(v)) return v;
   const raw = s(v);
   if (!raw) return null;
   const norm = raw.replace(/[.\-]/g, "/").replace(/\s+/g, " ").trim();
-  const m = norm.match(
-    /^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
+  const m = norm.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!m) return null;
   const [, Y, M, D, hh = "0", mm = "0", ss = "0"] = m;
   const dt = new Date(+Y, +M - 1, +D, +hh, +mm, +ss);
@@ -39,16 +33,16 @@ const fmtTime = (d) => (d instanceof Date && !isNaN(d) ? `${pad2(d.getHours())}:
 const fmtComma = (n) => (toNumber(n) ? toNumber(n).toLocaleString() : "");
 const ymdToDate = (y, m, d) => new Date(y, m - 1, d);
 
-/** ✅ 'YYYY-MM-DD'를 로컬(KST) 날짜로 안전 파싱 (UTC 파싱으로 하루 밀리는 문제 방지) */
+/** 'YYYY-MM-DD' 로컬 파싱 */
 const parseYMDLocal = (ymd) => {
   if (!ymd) return null;
   const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
   const [, y, mo, d] = m.map((t) => +t);
-  return new Date(y, mo - 1, d); // 로컬 자정
+  return new Date(y, mo - 1, d);
 };
 
-/* ===== 엑셀 헤더 탐지 ===== */
+/* ===== 엑셀 파싱 보조 ===== */
 function findHeaderRow(rows) {
   const maxScan = Math.min(rows.length, 50);
   for (let i = 0; i < maxScan; i++) {
@@ -59,8 +53,6 @@ function findHeaderRow(rows) {
   }
   return -1;
 }
-
-/* ===== 유틸: 특정 셀 오른쪽/아래로 값 찾기 ===== */
 function findFollowingValue(rows, r0, c0, maxRadius = 8) {
   for (let c = c0 + 1; c <= c0 + maxRadius; c++) {
     const v = rows[r0]?.[c];
@@ -78,8 +70,6 @@ function findFollowingValue(rows, r0, c0, maxRadius = 8) {
   }
   return "";
 }
-
-/* ===== 상단 메타 파싱 ===== */
 function parseMeta(rows) {
   const meta = {};
   const scan = Math.min(rows.length, 30);
@@ -113,12 +103,9 @@ function parseMeta(rows) {
   meta.balance = toNumber(meta.balanceText);
   return meta;
 }
-
-/* ===== 중복判 키 ===== */
 const makeDupKey = (r) =>
   [r.date, r.time, toNumber(r.inAmt), s(r.record), toNumber(r.balance)].join("|");
 
-/* ===== 행 → 레코드 ===== */
 function rowsToRecords(rows, headerRowIdx, meta) {
   const header = (rows[headerRowIdx] || []).map((h) => s(h));
   const idx = (key) => header.findIndex((h) => h.includes(key));
@@ -158,12 +145,13 @@ function rowsToRecords(rows, headerRowIdx, meta) {
       memo: s(row[col.memo]),
       _seq: s(row[col.seq]),
       type: inAmt > 0 ? "입금" : outAmt > 0 ? "출금" : "",
+      unconfirmed: false,
     });
   }
   return out;
 }
 
-/* ===== 모달 ===== */
+/* ===== 공용 모달 ===== */
 function Modal({ open, title, children, onClose, onConfirm, confirmText = "확인", cancelText = "닫기", mode = "info" }) {
   if (!open) return null;
   return (
@@ -189,24 +177,27 @@ function Modal({ open, title, children, onClose, onConfirm, confirmText = "확�
   );
 }
 
-/* ===== 메인 컴포넌트 ===== */
+/* ===== 메인 ===== */
 export default function IncomeImportPage() {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
 
-  // 중복 안내 모달
   const [dupInfo, setDupInfo] = useState(null);
   const [dupOpen, setDupOpen] = useState(false);
 
-  // 삭제 확인 모달
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmOpenPayload, setConfirmOpenPayload] = useState(null);
 
-  // 검색/필터
   const [query, setQuery] = useState("");
   const [onlyIncome, setOnlyIncome] = useState(true);
+  const [editMode, setEditMode] = useState(false);
 
-  /* ====== 기간(조회시작일자/조회끝일자) ====== */
+  // ✅ 미확인 모달/상태
+  const [unconfOpen, setUnconfOpen] = useState(false);
+  const [unconfQuery, setUnconfQuery] = useState("");
+  const [unconfDraft, setUnconfDraft] = useState({}); // { id: { memo, unconfirmed } }
+
+  /* 기간 */
   const today = useMemo(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
@@ -214,12 +205,10 @@ export default function IncomeImportPage() {
   const [yFrom, setYFrom] = useState(today.y);
   const [mFrom, setMFrom] = useState(today.m);
   const [dFrom, setDFrom] = useState(today.d);
-
   const [yTo, setYTo] = useState(today.y);
   const [mTo, setMTo] = useState(today.m);
   const [dTo, setDTo] = useState(today.d);
 
-  // 앞날짜 > 뒷날짜 금지(즉시 보정)
   const clampRange = useCallback((nyF, nmF, ndF, nyT, nmT, ndT) => {
     const start = ymdToDate(nyF, nmF, ndF);
     const end = ymdToDate(nyT, nmT, ndT);
@@ -227,24 +216,17 @@ export default function IncomeImportPage() {
     return [nyF, nmF, ndF, nyT, nmT, ndT];
   }, []);
 
-  // 선택 삭제
+  /* 페이지네이션 */
+  const pageSizeOptions = [24, 50, 100, 200, 300];
+  const [pageSize, setPageSize] = useState(24);
+  const [page, setPage] = useState(1);
+
+  /* ✅ 선택(체크) — 단일 선언 */
   const [selected, setSelected] = useState(new Set());
 
-  // 페이지네이션
-  const [page, setPage] = useState(1);
-  const pageSizeOptions = [30, 50, 100, 200];
-  const [pageSize, setPageSize] = useState(30);
-
-  // 일수 옵션
-  const daysInMonth = (y, m) => new Date(y, m, 0).getDate();
-  const daysFrom = useMemo(() => daysInMonth(yFrom, mFrom), [yFrom, mFrom]);
-  const daysTo = useMemo(() => daysInMonth(yTo, mTo), [yTo, mTo]);
-  useEffect(() => { if (dFrom > daysFrom) setDFrom(daysFrom); }, [daysFrom, dFrom]);
-  useEffect(() => { if (dTo > daysTo) setDTo(daysTo); }, [daysTo, dTo]);
-
+  /* 파일 업로드 */
   const fileInputRef = useRef(null);
   const onPickFiles = useCallback(() => fileInputRef.current?.click(), []);
-
   const handleFiles = useCallback(
     async (files) => {
       setError("");
@@ -291,14 +273,11 @@ export default function IncomeImportPage() {
         setDupOpen(false);
       }
 
-      // 최신 우선 정렬
       merged.sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
-
       const nextRows = [...rows, ...merged].sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
       setRows(nextRows);
       setPage(1);
 
-      // 업로드된 마지막(최신) 날짜를 기간 기본값으로
       const last = nextRows.find((r) => r.date);
       if (last?.date) {
         const [yy, mm, dd] = last.date.split("-").map((t) => +t);
@@ -310,18 +289,16 @@ export default function IncomeImportPage() {
     [rows, clampRange]
   );
 
-  /* ===== 필터(기간 포함, 로컬 파싱) ===== */
+  /* 필터 */
   const filtered = useMemo(() => {
     const q = s(query);
     const qLower = q.toLowerCase();
     const qNum = toNumber(q);
 
-    // 포함 범위: 시작 00:00:00 ~ 종료 23:59:59 (로컬)
     const start = new Date(yFrom, mFrom - 1, dFrom, 0, 0, 0, 0);
     const end = new Date(yTo, mTo - 1, dTo, 23, 59, 59, 999);
 
     return rows.filter((r) => {
-      // ✅ 날짜 비교는 'YYYY-MM-DD'를 로컬로 파싱하여 하루 밀림 방지
       const rDate = parseYMDLocal(r.date);
       if (!(rDate instanceof Date) || isNaN(rDate)) return false;
 
@@ -335,9 +312,7 @@ export default function IncomeImportPage() {
       if (qNum > 0) {
         const inEq = toNumber(r.inAmt) === qNum;
         const outEq = toNumber(r.outAmt) === qNum;
-        const contains =
-          fmtComma(r.inAmt).includes(q) ||
-          fmtComma(r.outAmt).includes(q);
+        const contains = fmtComma(r.inAmt).includes(q) || fmtComma(r.outAmt).includes(q);
         if (inEq || outEq || contains) return true;
       }
 
@@ -346,7 +321,7 @@ export default function IncomeImportPage() {
     });
   }, [rows, query, onlyIncome, yFrom, mFrom, dFrom, yTo, mTo, dTo]);
 
-  /* ===== 정렬 ===== */
+  /* 정렬 */
   const [sortKey, setSortKey] = useState("datetime");
   const [sortDir, setSortDir] = useState("desc");
   const sorted = useMemo(() => {
@@ -362,14 +337,24 @@ export default function IncomeImportPage() {
     return list;
   }, [filtered, sortKey, sortDir]);
 
-  /* ===== 페이지네이션 ===== */
+  /* ✅ 정렬 클릭 핸들러 (누락 보완) */
+  const clickSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  /* 페이지 */
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const curPage = Math.min(page, pageCount);
   const startIdx = (curPage - 1) * pageSize;
   const endIdx = startIdx + pageSize;
   const pageRows = sorted.slice(startIdx, endIdx);
 
-  /* ===== 선택 처리 ===== */
+  /* 선택(체크) 유틸 */
   const isChecked = (id) => selected.has(id);
   const toggleOne = (id) => {
     setSelected((prev) => {
@@ -389,6 +374,7 @@ export default function IncomeImportPage() {
     });
   };
 
+  /* 삭제 */
   const confirmRemoveSelected = () => {
     if (selected.size === 0) return;
     setConfirmOpenPayload({ count: selected.size });
@@ -403,12 +389,7 @@ export default function IncomeImportPage() {
     setConfirmOpen(false);
   };
 
-  const clickSort = (key) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
-  };
-
-  /* ===== 옵션 ===== */
+  /* 기간 컴포넌트 */
   const yearOptions = useMemo(() => {
     const thisYear = new Date().getFullYear();
     const arr = [];
@@ -416,8 +397,6 @@ export default function IncomeImportPage() {
     return arr;
   }, []);
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
-
-  /* ===== 기간 드롭다운 컴포넌트 ===== */
   const DateTriple = ({ y, m, d, onY, onM, onD }) => {
     const maxDay = new Date(y, m, 0).getDate();
     const dayOptions = Array.from({ length: maxDay }, (_, i) => i + 1);
@@ -435,8 +414,6 @@ export default function IncomeImportPage() {
       </div>
     );
   };
-
-  // 변경 시 유효성 보정 + 페이지 리셋
   const onFromChange = (ny, nm, nd) => {
     const [aY, aM, aD, bY, bM, bD] = clampRange(ny, nm, nd, yTo, mTo, dTo);
     setYFrom(aY); setMFrom(aM); setDFrom(aD);
@@ -448,6 +425,72 @@ export default function IncomeImportPage() {
     setYFrom(aY); setMFrom(aM); setDFrom(aD);
     setYTo(bY); setMTo(bM); setDTo(bD);
     setPage(1);
+  };
+
+  /* ✅ 인라인 수정 핸들러 (누락 보완) */
+  const updateRow = (id, patch) => {
+    setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
+  };
+
+  // 거래메모 엔터 이동
+  const memoRefs = useRef({});
+  const setMemoRef = (id, el) => {
+    memoRefs.current[id] = el;
+  };
+  const focusNextMemo = (currentId) => {
+    const idsInPageOrder = pageRows.map((r) => r._id);
+    const idx = idsInPageOrder.indexOf(currentId);
+    if (idx >= 0 && idx < idsInPageOrder.length - 1) {
+      const nextId = idsInPageOrder[idx + 1];
+      const el = memoRefs.current[nextId];
+      if (el) el.focus();
+    }
+  };
+
+  // 미확인 목록/합계/검색
+  const unconfirmedList = useMemo(() => sorted.filter((r) => r.unconfirmed), [sorted]);
+  const unconfirmedTotalInAmt = useMemo(
+    () => unconfirmedList.reduce((sum, r) => sum + toNumber(r.inAmt), 0),
+    [unconfirmedList]
+  );
+
+  useEffect(() => {
+    if (unconfOpen) {
+      const initial = {};
+      unconfirmedList.forEach((r) => {
+        initial[r._id] = { memo: r.memo, unconfirmed: !!r.unconfirmed };
+      });
+      setUnconfDraft(initial);
+      setUnconfQuery("");
+    }
+  }, [unconfOpen, unconfirmedList]);
+
+  const modalList = useMemo(() => {
+    const q = s(unconfQuery).toLowerCase();
+    if (!q) return unconfirmedList;
+    const qNum = toNumber(q);
+    return unconfirmedList.filter((r) => {
+      const draftMemo = unconfDraft[r._id]?.memo ?? r.memo ?? "";
+      const bag = [r.record, draftMemo].join("\n").toLowerCase();
+      const textHit = bag.includes(q);
+      const amtHit = qNum > 0 && (toNumber(r.inAmt) === qNum || fmtComma(r.inAmt).includes(q));
+      return textHit || amtHit;
+    });
+  }, [unconfQuery, unconfirmedList, unconfDraft]);
+
+  const setDraftMemo = (id, memo) =>
+    setUnconfDraft((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), memo } }));
+  const setDraftFlag = (id, flag) =>
+    setUnconfDraft((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), unconfirmed: !!flag } }));
+
+  const applyUnconfEdits = () => {
+    setRows((prev) =>
+      prev.map((r) => {
+        const d = unconfDraft[r._id];
+        return d ? { ...r, memo: d.memo, unconfirmed: !!d.unconfirmed } : r;
+      })
+    );
+    setUnconfOpen(false);
   };
 
   return (
@@ -467,10 +510,18 @@ export default function IncomeImportPage() {
             <input type="checkbox" checked={onlyIncome} onChange={(e) => setOnlyIncome(e.target.checked)} />
             입금만
           </label>
+          <label className="chk">
+            <input type="checkbox" checked={editMode} onChange={(e) => setEditMode(e.target.checked)} />
+            수정모드
+          </label>
+
+          {/* 미확인 목록 버튼 */}
+          <button className="btn warn" onClick={() => setUnconfOpen(true)}>
+            미확인
+          </button>
         </div>
 
         <div className="mid">
-          {/* 조회시작일자 — 조회끝일자 (가운데 대시) */}
           <div className="range-pickers compact">
             <DateTriple
               y={yFrom} m={mFrom} d={dFrom}
@@ -499,12 +550,12 @@ export default function IncomeImportPage() {
             className="page-size"
             value={pageSize}
             onChange={(e) => {
-              const v = Number(e.target.value) || 30;
+              const v = Number(e.target.value) || 24;
               setPageSize(v);
               setPage(1);
             }}
           >
-            {[30, 50, 100, 200].map((n) => (
+            {pageSizeOptions.map((n) => (
               <option key={n} value={n}>{n}/페이지</option>
             ))}
           </select>
@@ -521,28 +572,26 @@ export default function IncomeImportPage() {
 
       {error && <pre className="error tight">{error}</pre>}
 
-      {/* 메인 영역 */}
+      {/* 테이블 */}
       <div className="table-wrap">
         <table className="dense modern">
           <thead>
             <tr>
-              {/* ✅ 체크박스 헤더만 좌측정렬(중앙정렬 제외) */}
-              <th className="th-check" style={{ width: 40 }}>
+              <th className="th-check center" style={{ width: 40 }}>
                 <input
                   type="checkbox"
                   checked={pageRows.length > 0 && pageRows.every((r) => selected.has(r._id))}
                   onChange={toggleAllPage}
                 />
               </th>
-              {/* 헤더: 중앙정렬 + 더 선명한 스타일 */}
               <th onClick={() => clickSort("type")} className="col-type">구분</th>
-              <th onClick={() => clickSort("accountNo")}>계좌번호</th>
+              <th onClick={() => clickSort("accountNo")} className="col-account">계좌번호</th>
               <th onClick={() => clickSort("date")} className="col-date">거래일</th>
               <th onClick={() => clickSort("time")} className="col-time">시간</th>
-              <th onClick={() => clickSort("inAmt")} className="num">입금금액</th>
-              <th onClick={() => clickSort("outAmt")} className="num">출금금액</th>
-              <th onClick={() => clickSort("record")}>거래기록사항</th>
-              <th onClick={() => clickSort("memo")}>거래메모</th>
+              <th onClick={() => clickSort("inAmt")} className="num col-in">입금금액</th>
+              <th onClick={() => clickSort("outAmt")} className="num col-out">출금금액</th>
+              <th onClick={() => clickSort("record")} className="col-record">거래기록사항</th>
+              <th onClick={() => clickSort("memo")} className="col-memo">거래메모</th>
             </tr>
           </thead>
           <tbody>
@@ -551,14 +600,72 @@ export default function IncomeImportPage() {
                 <td className="td-check">
                   <input type="checkbox" checked={isChecked(r._id)} onChange={() => toggleOne(r._id)} />
                 </td>
-                <td className={`type-pill ${r.type === "입금" ? "in" : r.type === "출금" ? "out" : ""}`}>{r.type}</td>
-                <td className="mono">{r.accountNo}</td>
-                <td className="mono">{r.date}</td>
-                <td className="mono">{r.time}</td>
+
+                {/* 구분: 내용 중앙정렬 */}
+                <td className="center">
+                  {editMode ? (
+                    <select
+                      className="edit-select type-select pretty-select"
+                      value={r.type}
+                      onChange={(e) => updateRow(r._id, { type: e.target.value })}
+                    >
+                      <option value="">선택</option>
+                      <option value="입금">입금</option>
+                      <option value="출금">출금</option>
+                    </select>
+                  ) : (
+                    <span className={`type-badge ${r.type === "입금" ? "in" : r.type === "출금" ? "out" : ""}`}>
+                      {r.type || "-"}
+                    </span>
+                  )}
+                </td>
+
+                {/* 계좌번호: 중앙정렬 */}
+                <td className="mono center">{r.accountNo}</td>
+
+                {/* 거래일/시간: 중앙정렬 */}
+                <td className="mono center">{r.date}</td>
+                <td className="mono center">{r.time}</td>
+
                 <td className="num strong in">{fmtComma(r.inAmt)}</td>
                 <td className="num out">{fmtComma(r.outAmt)}</td>
-                <td className="clip">{r.record}</td>
-                <td className="clip">{r.memo}</td>
+
+                {/* 거래기록사항: 중앙정렬 */}
+                <td className="clip center">{r.record}</td>
+
+                {/* 거래메모: 수정모드에서만 미확인 체크 표시/수정 */}
+                <td className="memo-cell">
+                  {editMode ? (
+                    <div className="memo-wrap">
+                      <input
+                        ref={(el) => setMemoRef(r._id, el)}
+                        className="edit-input memo-input"
+                        value={r.memo}
+                        onChange={(e) => updateRow(r._id, { memo: e.target.value })}
+                        placeholder=""
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            focusNextMemo(r._id);
+                          }
+                        }}
+                      />
+                      <label className="chk mi">
+                        <input
+                          type="checkbox"
+                          checked={!!r.unconfirmed}
+                          onChange={(e) => updateRow(r._id, { unconfirmed: e.target.checked })}
+                        />
+                        미확인
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="memo-wrap">
+                      <div className="memo-text" title={r.memo || ""}>{r.memo}</div>
+                      {/* 비수정모드: 체크박스 표시하지 않음 */}
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -599,6 +706,75 @@ export default function IncomeImportPage() {
         onConfirm={removeSelected}
       >
         선택한 {confirmOpenPayload?.count?.toLocaleString() ?? 0}건을 삭제할까요?
+      </Modal>
+
+      {/* 미확인 목록 모달 (검색/편집/저장) */}
+      <Modal
+        open={unconfOpen}
+        title="미확인 목록"
+        mode="confirm"
+        cancelText="닫기"
+        confirmText="저장"
+        onClose={() => setUnconfOpen(false)}
+        onConfirm={applyUnconfEdits}
+      >
+        <div className="unconf-top">
+          <div className="unconf-summary">
+            <div>총 건수: <b>{unconfirmedList.length.toLocaleString()}</b>건</div>
+            <div>미확인 금액: <b>{fmtComma(unconfirmedTotalInAmt)}</b>원</div>
+          </div>
+          <input
+            className="search unconf-search"
+            placeholder="미확인 내역 검색 (금액/거래기록/메모)"
+            value={unconfQuery}
+            onChange={(e) => setUnconfQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="unconf-list">
+          <table className="dense mini">
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>시간</th>
+                <th>구분</th>
+                <th className="num">입금</th>
+                <th>거래기록</th>
+                <th>메모</th>
+                <th>미확인</th>
+              </tr>
+            </thead>
+            <tbody>
+              {modalList.map((r) => (
+                <tr key={`u_${r._id}`}>
+                  <td className="center mono">{r.date}</td>
+                  <td className="center mono">{r.time}</td>
+                  <td className="center">{r.type || "-"}</td>
+                  <td className="num">{fmtComma(r.inAmt)}</td>
+                  <td className="clip center">{r.record}</td>
+                  <td>
+                    <input
+                      className="edit-input memo-input"
+                      value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
+                      onChange={(e) => setDraftMemo(r._id, e.target.value)}
+                      placeholder=""
+                    />
+                  </td>
+                  <td className="center">
+                    <input
+                      type="checkbox"
+                      checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
+                      onChange={(e) => setDraftFlag(r._id, e.target.checked)}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {modalList.length === 0 && (
+                <tr><td colSpan={7} className="center muted">검색 결과가 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Modal>
     </div>
   );

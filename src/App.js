@@ -45,6 +45,9 @@ import CalendarPage from "./pages/CalendarPage";
 /* ✅ 부가서비스 · 도배 */
 import PaperingPage from "./pages/PaperingPage";
 
+/* ✅ 새로 추가: 메모 페이지 */
+import MemoPage from "./pages/MemoPage";
+
 import "./App.css";
 
 function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }) {
@@ -174,6 +177,12 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <PaperingPage />}
       />
 
+      {/* ✅ 메모 라우트 */}
+      <Route
+        path="/memo"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <MemoPage userId={userId} />}
+      />
+
       {/* 기타 메뉴 */}
       <Route path="/villa" element={!isLoggedIn ? <Navigate to="/login" replace /> : <VillaCodePage />} />
       <Route path="/telco" element={!isLoggedIn ? <Navigate to="/login" replace /> : <TelcoPage />} />
@@ -216,7 +225,7 @@ function App() {
     setUserId(id);
     setEmployeeId(employeeNo);
     setUserName(name);
-    localStorage.setItem("autoLogin", JSON.stringify({ id, employeeNo, name }));
+    try { localStorage.setItem("autoLogin", JSON.stringify({ id, employeeNo, name })); } catch {}
   };
 
   const handleLogout = () => {

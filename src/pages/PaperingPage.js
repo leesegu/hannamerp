@@ -497,10 +497,7 @@ export default function PaperingPage() {
     return () => unsub();
   }, []);
 
-  /* 🔁 B. 이사정산 → 도배 자동 동기화
-        - moveouts.extras 에 desc에 '도배'가 포함된 항목들의 금액을 '모두 합산'
-        - 합계가 0이면 paperings/mo_<id> 삭제
-  */
+  /* 🔁 B. 이사정산 → 도배 자동 동기화 */
   useEffect(() => {
     const moQ = collection(db, "moveouts");
     const unsub = onSnapshot(
@@ -518,11 +515,11 @@ export default function PaperingPage() {
 
             if (amountSum > 0) {
               const payload = {
-                sourceMoveoutId: d.id,                 // ✅ 연동 키
+                sourceMoveoutId: d.id,
                 settleDate: fmtDate(x.moveDate),
                 villaName: s(x.villaName),
                 unitNumber: s(x.unitNumber),
-                depositIn: amountSum,                  // ✅ '도배' 포함 extras 합계
+                depositIn: amountSum,
                 status: s(prev.data()?.status) || s(x.paperStatus) || "미접수",
                 note: s(prev.data()?.note) || s(x.paperNote) || "",
                 updatedAt: serverTimestamp(),
@@ -684,7 +681,7 @@ export default function PaperingPage() {
   const targetYm = sumYear && sumMonth ? `${sumYear}-${sumMonth}` : "";
   const monthlyTotals = useMemo(() => {
     if (!targetYm) return { deposit: 0, payout: 0, diff: 0 };
-    return rows.reduce(
+    const acc = rows.reduce(
       (acc, r) => {
         if (r.__settleYm === targetYm) {
           acc.deposit += r.__depositNum || 0;
@@ -692,10 +689,10 @@ export default function PaperingPage() {
         }
         return acc;
       },
-      { deposit: 0, payout: 0, diff: 0 }
+      { deposit: 0, payout: 0 }
     );
+    return { ...acc, diff: (acc.deposit || 0) - (acc.payout || 0) };
   }, [rows, targetYm]);
-  monthlyTotals.diff = (monthlyTotals.deposit || 0) - (monthlyTotals.payout || 0);
 
   return (
     <div className="page-wrapper">
@@ -723,7 +720,7 @@ export default function PaperingPage() {
         onClose={() => {
           setFormOpen(false);
           setEditingRow(null);
-          setFormMode="create";
+          setFormMode("create"); // ✅ 고친 부분
         }}
       >
         <EditForm

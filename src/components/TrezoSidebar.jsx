@@ -19,18 +19,16 @@ import EmployeePage from "../pages/EmployeePage";
 import ReceiptIssuePage from "../pages/ReceiptIssuePage";
 import MoveInCleaningPage from "../pages/MoveInCleaningPage";
 import Dashboard from "../pages/Dashboard";
-
 /* ✅ 관리비회계 · 수입정리 페이지 */
 import IncomeImportPage from "../pages/IncomeImportPage";
-
 /* ✅ 전기요금 추출(문자) 페이지 */
 import MessageExtractor from "../pages/MessageExtractor";
-
 /* ✅ 캘린더 페이지 */
 import CalendarPage from "../pages/CalendarPage";
-
 /* ✅ 부가서비스 · 도배 페이지 */
 import PaperingPage from "../pages/PaperingPage";
+/* ✅ 새로 추가: 메모 페이지 */
+import MemoPage from "../pages/MemoPage";
 
 import "remixicon/fonts/remixicon.css";
 
@@ -143,15 +141,24 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
           </div>
         </div>
 
-        {/* 사용자 정보 + 로그아웃 */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <div className="font-medium text-gray-800">{userName}</div>
-            <div className="text-sm text-gray-400">로그인 중</div>
+        {/* 사용자 정보 + 로그아웃 아이콘(정사각형) */}
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium text-gray-800">{userName}</div>
+              <div className="text-sm text-gray-400">로그인 중</div>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-10 h-10 grid place-items-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
+              title="로그아웃"
+              aria-label="로그아웃"
+            >
+              {/* 이전에 쓰던 로그아웃 아이콘 계열 */}
+              <i className="ri-logout-box-r-line text-xl"></i>
+            </button>
           </div>
-          <button onClick={handleLogout} className="text-red-500 hover:text-red-600" title="로그아웃">
-            <i className="ri-logout-box-r-line text-xl"></i>
-          </button>
         </div>
 
         {/* 메뉴 */}
@@ -217,7 +224,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "이사정산"}
             />
 
-            {/* ✅ 캘린더 (이사정산 아래) */}
+            {/* 캘린더 */}
             <SidebarItem
               icon="ri-calendar-line"
               label="캘린더"
@@ -250,20 +257,16 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                     setActiveMenu(item);
                     const pages = {
                       입주청소: <MoveInCleaningPage />,
-                      도배: <PaperingPage />, // ✅ 도배 페이지 연결
+                      도배: <PaperingPage />,
                       "전기요금 추출": <MessageExtractor />,
                     };
                     handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
-
-                    // URL 이동도 함께 하고 싶으면 주석 해제:
-                    // if (item === "도배") navigate("/papering", { replace: true });
-                    // if (item === "전기요금 추출") navigate("/extract", { replace: true });
                   }}
                 />
               )}
             </div>
 
-            {/* ✅ 관리비회계 */}
+            {/* 관리비회계 */}
             <div>
               <SidebarItem
                 icon="ri-coins-line"
@@ -355,6 +358,17 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                 />
               )}
             </div>
+
+            {/* 메모 */}
+            <SidebarItem
+              icon="ri-sticky-note-line"
+              label="메모"
+              onClick={() => {
+                setOpenMenu("");
+                handleNavigate(<MemoPage userId={userId} />, "메모");
+              }}
+              active={activeMenu === "메모"}
+            />
           </nav>
         </div>
       </aside>
