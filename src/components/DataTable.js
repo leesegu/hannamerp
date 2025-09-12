@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection } from "firebase/firestore";
 import "./DataTable.css";
 
 export default function DataTable({
@@ -18,26 +18,27 @@ export default function DataTable({
   enableExcel = false,
   excelFields = [],
 
-  // 좌측 커스텀 컨트롤(필터 등) 렌더 슬롯
+  // 좌/우 컨트롤
   leftControls = null,
-
-  // ✅ 우측 커스텀 컨트롤 슬롯
   rightControls = null,
 
-  // 등록 버튼 라벨/아이콘
+  // 등록 버튼
   addButtonLabel = "등록",
   addButtonIcon = "➕",
 
-  // ⚠️ 엑셀 업로드 관련
+  // 엑셀 업로드 관련
   collectionName,
   idKey,
   idAliases = [],
   idResolver,
   onUploadComplete,
 
-  // ✅ 신규: 포커스 행/ID키
-  focusId,                 // ex) "311"
-  rowIdKey = "id",         // ex) "id" (행의 고유키 필드명)
+  // 포커스
+  focusId,
+  rowIdKey = "id",
+
+  // ✅ ID 없이도 업로드(append) 허용
+  appendWithoutId = false,
 }) {
   const defaultSortKey = columns?.[0]?.key ?? "code";
   const [searchText, setSearchText] = useState("");
@@ -49,9 +50,8 @@ export default function DataTable({
   const fileInputRef = useRef(null);
   const allowUploadRef = useRef(false);
 
-  // ✅ 스크롤/하이라이트용 ref들
-  const tableContainerRef = useRef(null); // 스크롤 컨테이너(필요 시 사용)
-  const rowRefs = useRef({});             // { [rowId]: <tr> }
+  const tableContainerRef = useRef(null);
+  const rowRefs = useRef({});
 
   // ====== 기본값 자동 추론 ======
   const resolveIdKeyFromColumns = (cols) => {
@@ -198,14 +198,32 @@ export default function DataTable({
     return `${yy}-${mm}-${dd}`;
   };
 
+  // ✅ 엑셀 날짜 직렬값 → 날짜
+  const excelSerialToDate = (serial) => {
+    // 엑셀 기준일: 1899-12-30
+    const ms = Math.round((serial - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const normalizeDateYYMMDD = (value) => {
     if (!value && value !== 0) return "";
+
+    // Firestore Timestamp(seconds)
     if (typeof value === "object" && value?.seconds) return toYYMMDD(new Date(value.seconds * 1000));
     if (value instanceof Date) return toYYMMDD(value);
+
     if (typeof value === "number") {
+      // ✅ 엑셀 직렬값 범위 추정 처리
+      if (value > 20000 && value < 60000) {
+        const d = excelSerialToDate(value);
+        return d ? toYYMMDD(d) : "";
+      }
+      // 일반 timestamp(ms)일 수 있음
       const d = new Date(value);
       return isNaN(d.getTime()) ? "" : toYYMMDD(d);
     }
+
     const s = String(value).trim();
     if (s === "" || s === "-") return "";
     if (/^\d{8}$/.test(s)) return `${s.slice(2,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
@@ -352,8 +370,12 @@ export default function DataTable({
 
   const openUploadDialog = () => {
     if (!enableExcel) return;
-    if (!resolvedCollectionName || !resolvedIdKey) {
-      alert("엑셀 업로드가 비활성화되었습니다.\n(기본값 추론 실패: 컬렉션/ID 키를 확인하세요)");
+    if (!resolvedCollectionName) {
+      alert("엑셀 업로드가 비활성화되었습니다.\n(컬렉션 이름이 필요합니다)");
+      return;
+    }
+    if (!appendWithoutId && !resolvedIdKey) {
+      alert("엑셀 업로드가 비활성화되었습니다.\n(ID 키를 찾을 수 없습니다)");
       return;
     }
     if (!askPassword()) return;
@@ -364,8 +386,13 @@ export default function DataTable({
   const handleExcelUpload = async (event) => {
     const inputEl = event.target;
 
-    if (!resolvedCollectionName || !resolvedIdKey) {
-      alert("업로드할 수 없습니다. collectionName, idKey 추론에 실패했습니다.");
+    if (!resolvedCollectionName) {
+      alert("업로드할 수 없습니다. collectionName 이 필요합니다.");
+      inputEl.value = "";
+      return;
+    }
+    if (!appendWithoutId && !resolvedIdKey) {
+      alert("업로드할 수 없습니다. idKey 추론에 실패했습니다.");
       inputEl.value = "";
       return;
     }
@@ -378,7 +405,7 @@ export default function DataTable({
     }
     allowUploadRef.current = false;
 
-    if (!window.confirm(`[${resolvedCollectionName}] 컬렉션에 이 엑셀을 업로드할까요?\n(ID 키: ${resolvedIdKey})`)) {
+    if (!window.confirm(`[${resolvedCollectionName}] 컬렉션에 이 엑셀을 업로드할까요?`)) {
       inputEl.value = "";
       return;
     }
@@ -401,13 +428,6 @@ export default function DataTable({
       const keyIndex = buildKeyIndex(originalRow);
 
       const idValue = resolveUploadId(originalRow, keyIndex, fields);
-      if (!idValue) { skipped++; continue; }
-
-      const originalId = String(idValue);
-      const docId = safeDocId(originalId);
-      if (!docId) { skipped++; continue; }
-      if (docId !== originalId) replacedCount++;
-
       const rowToSave = {};
       for (const f of fields) {
         const { key } = f;
@@ -424,38 +444,50 @@ export default function DataTable({
         if (val !== undefined) rowToSave[key] = val;
       }
 
+      // ✅ amount만 있는 시트라면 totalAmount도 채워서 목록에서 바로 보이게
+      if (rowToSave.amount != null && rowToSave.totalAmount == null) {
+        rowToSave.totalAmount = rowToSave.amount;
+      }
+
+      if (!idValue && appendWithoutId) {
+        await addDoc(collection(db, resolvedCollectionName), rowToSave);
+        updated++;
+        continue;
+      }
+
+      if (!idValue) { skipped++; continue; }
+
+      const originalId = String(idValue);
+      const docId = safeDocId(originalId);
+      if (!docId) { skipped++; continue; }
+      if (docId !== originalId) replacedCount++;
+
       await setDoc(doc(db, resolvedCollectionName, docId), rowToSave, { merge: true });
       updated++;
     }
 
     alert(
-      `엑셀 업로드 완료 (컬렉션: ${resolvedCollectionName}, ID 키: ${resolvedIdKey})\n업데이트: ${updated}건, 스킵: ${skipped}건` +
+      `엑셀 업로드 완료 (컬렉션: ${resolvedCollectionName})\n업데이트/추가: ${updated}건, 스킵: ${skipped}건` +
       (replacedCount ? `\n(참고: '/' 포함 ID ${replacedCount}건은 '∕'로 치환됨)` : "")
     );
     onUploadComplete?.({ updated, skipped });
     inputEl.value = "";
   };
 
-  // =========================
-  // ✅ 포커스(스크롤/하이라이트) 로직
-  // 1) focusId가 있는 행이 어느 페이지에 있는지 계산 후, 그 페이지로 자동 이동
+  // ========================= 포커스 스크롤/하이라이트 =========================
   useEffect(() => {
     if (!focusId) return;
     const idx = filteredData.findIndex((r) => String(r?.[rowIdKey]) === String(focusId));
     if (idx === -1) return;
     const targetPage = Math.floor(idx / itemsPerPage) + 1;
     if (targetPage !== currentPage) setCurrentPage(targetPage);
-    // currentPage가 바뀌면 아래 2) 효과가 후속으로 실행됨
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId, filteredData, itemsPerPage]);
 
-  // 2) 현재 페이지에 포커스 행이 있으면 중앙으로 스크롤 + 하이라이트
   useEffect(() => {
     if (!focusId) return;
-    // currentData에 대상 행이 있는지 확인
     const has = currentData.some((r) => String(r?.[rowIdKey]) === String(focusId));
     if (!has) return;
-    // 렌더가 반영되도록 약간 지연 후 스크롤/하이라이트
     const t = setTimeout(() => {
       const el = rowRefs.current[focusId];
       if (el && typeof el.scrollIntoView === "function") {
@@ -466,7 +498,6 @@ export default function DataTable({
     }, 60);
     return () => clearTimeout(t);
   }, [focusId, currentData, rowIdKey]);
-  // =========================
 
   return (
     <div className="data-table-wrapper">
@@ -480,7 +511,6 @@ export default function DataTable({
         </div>
 
         <div className="control-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* 우측 커스텀 컨트롤 */}
           {rightControls}
 
           {onAdd && (
@@ -589,7 +619,7 @@ export default function DataTable({
       {/* 하이라이트 효과 스타일 */}
       <style>{`
         .row-flash {
-          background-color: #fff3cd !important; /* 은은한 노란색 */
+          background-color: #fff3cd !important;
           transition: background-color 300ms ease;
         }
       `}</style>

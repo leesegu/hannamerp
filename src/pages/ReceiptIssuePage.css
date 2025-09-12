@@ -1,249 +1,161 @@
-/* ===== 공통 변수 (한 곳에서만 폭 관리) ===== */
-:root {
-  --item-min: 160px;   /* 품목(내용) 최소 가로폭 */
-  --modal-w: 800px;    /* 발행/등록 모달 가로폭 */
-  --date-col-w: 130px; /* 날짜 칼럼 폭 */
+:root{
+  --modal-w: 960px;
   --input-h: 40px;
-  --edge-gutter: 12px;
+  --gap: 12px;
+
+  /* 폼(품목 테이블) 전용 폭 조절 */
+  --date-col-w: 200px;  /* 날짜 열 살짝 축소 */
+  --item-min: 280px;    /* 품목(내용) 최소폭 확대 */
+
   --col-gap: 10px;
-  --actions-w: 2px;
+
+  --icon-size: 20px;
+  --btn-h-lg: 44px;
+  --btn-font-lg: 16px;
+
+  /* 삭제 아이콘 전용 컬럼 폭 */
+  --actions-w: 40px;
 }
 
-/* 페이지 패딩 */
-.receipt-page { padding: 14px; }
+/* 페이지 */
+.receipt-page{ padding:14px; }
+.receipt-page, .receipt-page *, .modal, .modal *{ -ms-overflow-style:none; scrollbar-width:none; }
+.receipt-page ::-webkit-scrollbar, .modal ::-webkit-scrollbar{ width:0; height:0; }
+.receipt-page > .data-table-wrapper{ margin:-14px -14px 0; }
 
-/* DataTable를 페이지 좌측/상단과 붙이기 */
-.receipt-page > .data-table-wrapper { margin: -14px -14px 0; }
-
-/* Grid */
-.grid { display: grid; gap: 12px; }
-.grid-3 { grid-template-columns: repeat(3, 1fr); }
-.col-span-3 { grid-column: 1 / -1; }
-
-/* 라벨 + 인풋 */
-.labeled { display: flex; flex-direction: column; gap: 6px; cursor: default; }
-.labeled .lab { font-size: 13px; font-weight: 700; color: #111827; }
-
-/* 일반 인풋 */
-.input {
-  width: 100%;
-  height: var(--input-h);
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 0 12px;
-  font-size: 14px;
-  outline: none;
-  transition: box-shadow .15s, border-color .15s, background .15s;
-  background: #fff;
+/* 좌측 컨트롤(미수금 + 합계) */
+.chip-row{ display:inline-flex; align-items:center; gap:8px; }
+.btn-chip, .badge-unpaid-sum{
+  height:36px; padding:0 14px; border:1px solid #d9d6ff; border-radius:999px;
+  font-weight:800; font-size:14px; line-height:1;
+  background:#f5f3ff; color:#4f46e5; display:inline-flex; align-items:center; justify-content:center;
 }
-.input:focus { border-color: #c7d2fe; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+.btn-chip{ cursor:pointer; }
+.btn-chip.on{ background:#7A5FFF; color:#fff; border-color:#7A5FFF; box-shadow:0 0 0 3px rgba(122,95,255,.15); }
 
-/* === 날짜 선택창 === */
-.date-field {
-  width: 100%;
-  height: var(--input-h);
-  position: relative;
-  display: flex; align-items: center;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 0 20px 0 0;
-  box-sizing: border-box;
-  min-width: 0;
-  z-index: 1;
-  pointer-events: auto;
-  transition: box-shadow .15s, border-color .15s, background .15s;
+/* 모달 */
+.modal-backdrop{ position:fixed; inset:0; background:rgba(17,24,39,.38); backdrop-filter: blur(2px); z-index:1000; }
+.modal.modal-neo.modal-compact{
+  position:fixed; top:5vh; left:50%; transform:translateX(-50%);
+  width:var(--modal-w); max-width:calc(100vw - 40px); max-height:92vh;
+  display:flex; flex-direction:column; overflow:hidden;
+  background:#fff; border-radius:18px; border:1px solid #e8eaf1;
+  box-shadow:0 30px 80px rgba(17,24,39,.25); z-index:1001;
 }
-.date-field[data-clear="true"] { padding-right: 46px; }
-.date-field.compact { height: var(--input-h); padding: 0 18px 0 0; font-size: 14px; }
-.date-field:focus-within { border-color: #c7d2fe; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+.modal-head{ display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #eef2f7; background:linear-gradient(180deg, #ffffff 0%, #f7f9ff 100%); }
+.modal-head .title{ font-weight:900; font-size:18px; }
+.badge-total{ background:#f5f3ff; color:#5b5bd6; border:1px solid #d9d6ff; padding:7px 12px; border-radius:999px; font-weight:800; }
 
-.date-inner {
-  flex: 1;
-  border: 0; outline: 0; background: transparent;
-  font-size: inherit; padding: 0;
-  text-align: left;
-  height: 100%;
-  font-variant-numeric: tabular-nums;
-  min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.modal-body{ flex:1; overflow:auto; padding:18px 0; background:linear-gradient(180deg, #f9fafb 0%, #ffffff 60%); }
+
+/* 입력/라벨 */
+.labeled{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.labeled .lab{ font-size:13px; font-weight:700; color:#111827; }
+.input{
+  width:100%; height:var(--input-h);
+  border:1px solid #e5e7eb; border-radius:10px;
+  padding:0 12px; font-size:14px; background:#fff; outline:none;
+  transition: box-shadow .15s, border-color .15s; box-sizing:border-box;
 }
-.date-icon {
-  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-  font-size: 14px; color: #7A5FFF; pointer-events: none;
+.input:focus{ border-color:#c7d2fe; box-shadow:0 0 0 3px rgba(99,102,241,0.15); }
+
+/* 폼 그리드 */
+.neo-form-shell{ padding: 0 16px; }
+.neo-form-grid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  align-items:start;
+  justify-content:center;
+  margin-bottom:16px;
 }
-
-/* react-datepicker */
-.react-datepicker__input-container { position: relative; }
-.col-date .react-datepicker-wrapper,
-.col-date .react-datepicker__input-container { width: 100% !important; min-width: 0 !important; display: block; }
-.react-datepicker__close-icon {
-  position: absolute !important; right: 22px !important; top: 50% !important; transform: translateY(-50%) !important;
-  z-index: 3 !important; pointer-events: auto !important; width: 18px !important; height: 18px !important; line-height: 18px !important;
+@media (max-width: 1024px){ .neo-form-grid{ grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px){ .neo-form-grid{ grid-template-columns: 1fr; } }
+.neo-form-grid > .labeled{
+  background:#fff; border:1px solid #eef2f7; border-radius:12px;
+  padding:10px; box-shadow:0 8px 24px rgba(16,24,40,.05);
+  min-width:0;
 }
-.react-datepicker__close-icon::after {
-  content: "×"; display: block; width: 18px; height: 18px; text-align: center;
-  font-size: 12px; font-weight: 700; background: #ef4444; color: #fff; border-radius: 50%;
+.neo-form-grid .neo-empty{ visibility:hidden; }
+
+/* 날짜 인풋 */
+.date-field{
+  width:100%; height:var(--input-h);
+  position:relative; display:flex; align-items:center;
+  border:1px solid #e5e7eb; border-radius:10px; padding:0 12px 0 0;
+  background:#fff; transition: box-shadow .15s, border-color .15s;
+  box-sizing:border-box;
 }
-.react-datepicker { border: 1px solid #e5e7eb !important; border-radius: 10px !important; box-shadow: 0 10px 24px rgba(16,24,40,0.08); }
-.react-datepicker__header { background: #fafafa !important; border-bottom: 1px solid #e5e7eb !important; border-top-left-radius: 10px !important; border-top-right-radius: 10px !important; }
+.date-field[data-clear="true"]{ padding-right:42px; }
+.date-field:focus-within{ border-color:#c7d2fe; box-shadow:0 0 0 3px rgba(99,102,241,0.15); }
+.date-inner{ flex:1; border:0; outline:0; background:transparent; font-size:14px; min-width:0; }
+.date-icon{ position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:14px; color:#7A5FFF; pointer-events:none; }
+.react-datepicker-popper{ z-index:4000 !important; }
 
-/* 콤보 */
-.namecombo, .codecombo { position: relative; }
-.combo-caret { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; color: #7A5FFF; cursor: pointer; }
-.combo-list { position: absolute; z-index: 20; left: 0; right: 0; margin-top: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 30px rgba(16,24,40,0.12); overflow: hidden; }
-.combo-items { max-height: 320px; overflow-y: auto; }
-.combo-item { padding: 10px 12px; cursor: pointer; }
-.combo-item.small { padding: 6px 10px; }
-.combo-item:hover { background: #f8f9ff; }
-.ci-code { font-weight: 800; color: #4f46e5; }
-.ci-name { color: #374151; }
-.codecombo .combo-search { display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid #eef2f7; }
-.codecombo .combo-search-input { width:100%; border:1px solid #eef2f7; border-radius:8px; padding:8px 10px; font-size:13px; }
+/* 드롭다운 (기존 디자인 유지) */
+.combo-wrap{ position:relative; width:100%; }
+.combo-input{ position:relative; }
+.combo-caret{ position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:18px; color:#7A5FFF; cursor:pointer; background:transparent; border:0; }
+.combo-pop{ position:absolute; left:0; top:calc(100% + 8px); z-index:5000; width:100%; }
+.combo-panel{ background:linear-gradient(180deg, #ffffff 0%, #f7f8ff 100%); border:1px solid #e6e8f2; border-radius:14px; box-shadow:0 16px 44px rgba(31,35,48,.16); overflow:hidden; }
+.combo-search{ display:flex; align-items:center; gap:6px; padding:10px 12px; border-bottom:1px solid #eef2f7; background:#fbfbff; }
+.combo-search-input{ width:100%; border:1px solid #eef2f7; border-radius:8px; padding:8px 10px; font-size:13px; outline:none; }
+.combo-items{ max-height:320px; overflow:auto; }
+.combo-items.stylish .combo-item.btnlike{ display:flex; gap:10px; align-items:center; width:100%; text-align:left; padding:10px 12px; background:transparent; border:0; cursor:pointer; font-size:14px; }
+.combo-items.stylish .combo-item.btnlike:hover{ background:rgba(109,94,252,.08); }
+.ci-code{ font-weight:800; color:#4f46e5; }
+.ci-name{ color:#374151; }
+.combo-empty{ padding:14px; color:#6b7280; }
 
-/* 카드/모달/버튼 */
-.card { background:#fff; border:1px solid #eef2f7; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.06); padding:14px; }
-.section { margin-top: 10px; }
-.receipt-icon { background: transparent; border: none; padding: 0; cursor: pointer; line-height: 1; }
-.receipt-icon .emoji { font-size: 18px; }
+/* 품목 섹션 */
+.card{ background:#fff; border:1px solid #eef2f7; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.06); padding:14px; }
+.section{ margin-top:16px; }
 
-.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:1000; }
-.modal {
-  position: fixed; top: 6vh; left: 50%; transform: translateX(-50%);
-  max-height: 88vh;
-  z-index: 1001;
-  background: #fff; border: 1px solid #eef2f7; border-radius: 14px;
-  box-shadow: 0 12px 30px rgba(16,24,40,0.06);
-  display: flex; flex-direction: column;
+.neo-items .table-head,
+.neo-items .table-row{
+  display:grid; align-items:center; column-gap:var(--col-gap);
+  grid-template-columns: var(--date-col-w) minmax(var(--item-min),2fr) 60px 120px 120px var(--actions-w) !important;
 }
-.modal-head {
-  position: sticky; top: 0; z-index: 2;
-  display:flex; align-items:center; justify-content:space-between;
-  padding:14px; border-bottom:1px solid #eef2f7;
-  background: linear-gradient(#ffffff 80%, rgba(255,255,255,0.9));
-  backdrop-filter: saturate(180%) blur(4px);
+.table-head{ background:#fafafa; padding:10px 12px; font-weight:800; border-bottom:1px solid #e5e7eb; border-radius:10px 10px 0 0; }
+.table-head.small{ font-size:13px; }
+.table-row{ padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+.center > div, .table-row.center > div{ text-align:center; }
+.table-row.center input.input{ text-align:center; }
+.neo-items .col-date .date-item{ width:100%; }
+.neo-items .amount{ white-space:nowrap; text-align:right !important; font-weight:800; }
+.row-actions{ justify-self:center; }
+
+/* 항목추가/합계 */
+.btn-outline.add-item{
+  display:inline-flex; align-items:center; gap:8px;
+  height:38px; padding:0 16px; border-radius:12px; border:1.5px solid #d9d6ff;
+  background:#f5f3ff; color:#4f46e5; font-weight:900;
 }
-.modal-head .title { font-weight:800; font-size:18px; }
-.badge-total { background:#f5f3ff; color:#5b5bd6; border:1px solid #d9d6ff; padding:6px 10px; border-radius:999px; font-weight:700; }
-.modal-body { flex:1; overflow:auto; padding:16px 14px 14px 14px; background:#fff; }
-.modal-actions { position: sticky; bottom: 0; z-index: 2; display:flex; gap:8px; justify-content:flex-end; padding:12px 14px; border-top:1px solid #eef2f7; background: linear-gradient(rgba(255,255,255,0.9), #ffffff 80%); backdrop-filter: saturate(180%) blur(4px); }
-.btn-primary { background:#7A5FFF; color:#fff; border:2px solid transparent; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; }
-.btn-primary:hover { background:#8F7CFF; border-color:#BFAEFF; box-shadow:0 0 0 3px rgba(122,95,255,.25); }
-.btn-primary:disabled { opacity:.6; cursor:not-allowed; }
-.btn-neutral { background:#eef2f7; color:#111; border:2px solid transparent; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; }
+.table-foot{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#fff; border-top:1px solid #e5e7eb; border-radius:0 0 10px 10px; }
 
-/* ▶ 품목 테이블 그리드 */
-.receipt-page .card.section .table-head,
-.receipt-page .card.section .table-row {
-  display: grid;
-  grid-template-columns: var(--date-col-w) minmax(var(--item-min), 1fr) 60px 120px 140px 0px !important;
-  align-items: center;
-  column-gap: var(--col-gap);
-}
+/* 하단 버튼 */
+.modal-actions.neo-actions{ display:flex; gap:10px; justify-content:flex-end; padding:14px 18px; border-top:1px solid #eef2f7; background:linear-gradient(rgba(255,255,255,.96), #ffffff 80%); }
+.modal-actions .btn-lg{ height:var(--btn-h-lg); padding:0 20px; font-size:var(--btn-font-lg); border-radius:12px; font-weight:800; }
+.btn-primary.same{ background:#7A5FFF; color:#fff; border:1px solid #6b61ff; }
+.btn-neutral.same{ background:#eef1ff; color:#3f3bce; border:1px solid #d2d6ff; }
 
-/* 날짜 칼럼 */
-.receipt-page .card.section .table-head > div:first-child,
-.receipt-page .card.section .table-row > div:first-child,
-.receipt-page .card.section .table-row .col-date {
-  width: var(--date-col-w);
-  min-width: 0 !important;
-  overflow: visible;
-  position: relative;
-  z-index: 2;
-}
-
-/* 정렬 */
-.table-head { background:#fafafa; padding:10px var(--edge-gutter); font-weight:700; border-bottom:1px solid #e5e7eb; border-radius:10px 10px 0 0; }
-.table-head.small { font-size: 13px; }
-.table-row { padding:8px var(--edge-gutter); border-bottom:1px solid #f1f5f9; position: relative; }
-
-.center > div, .table-row.center > div { text-align: center; }
-.table-row.center input.input { text-align: center; }
-.receipt-page .card.section .table-row .col-date { justify-self: start; }
-
-/* 금액 */
-.receipt-page .card.section .table-row .amount { white-space: nowrap; text-align: right !important; }
-.table-row .amount { font-weight:700; }
-
-/* X 아이콘 */
-.row-actions {
-  position: absolute; top: 50%; right: var(--edge-gutter); transform: translateY(-50%);
-  display: flex; justify-content: center; align-items: center;
-  width: var(--actions-w); height: var(--input-h);
-}
-.icon-btn { background: transparent; border: 0; padding: 4px; border-radius: 8px; cursor: pointer; }
-.icon-btn.danger:hover { background: #fff1f2; color: #ef4444; }
-
-/* 하단 */
-.table-foot { display:flex; justify-content:space-between; align-items:center; padding:10px var(--edge-gutter); background:#fff; border-top:1px solid #e5e7eb; border-radius:0 0 10px 10px; }
+/* 영수증 아이콘 */
+.receipt-icon{ background:transparent; border:0; padding:4px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.receipt-icon .emoji{ font-size:var(--icon-size); }
 
 /* 툴팁 */
-.desc-ellipsis { display:inline-block; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
-.hover-tooltip { position:fixed; z-index:1500; max-width:460px; white-space:pre-wrap; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,0.25); pointer-events:none; font-size:13px; line-height:1.55; }
+.desc-ellipsis{ display:inline-block; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
+.hover-tooltip{ position:fixed; z-index:1500; max-width:460px; white-space:pre-wrap; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,0.25); }
 
-/* 아웃라인 버튼 */
-.btn-outline { background:#fff; border:1px dashed #c7d2fe; color:#5b5bd6; padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
-.btn-outline:hover { background:#f5f7ff; }
+/* ✅ 비고 말줄임: 열 폭 안에서만 줄임, 오버플로우 방지 */
+.note-ellipsis{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
 
-/* 모달 폭 오버라이드 */
-.receipt-page > .modal,
-.receipt-page .modal { width: var(--modal-w) !important; max-width: none !important; }
-
-/* 달력 팝업 항상 위 */
-.react-datepicker-popper { z-index: 3000 !important; }
-
-
-/* =========================
-   🖨️ 인쇄/PDF/JPG 동일 룩: A4 내부 균일 여백 + 비율 유지(contain)
-   ========================= */
-@media print {
-  /* 균일 여백(mm) — 필요 시 한 곳만 조정 */
-  :root { --pad: 8mm; }
-
-  @page { size: A4 portrait; margin: 0; }
-
-  html, body {
-    width: 210mm; height: 297mm;
-    margin: 0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background: #fff !important;
-  }
-
-  /* 인쇄 시 기본 UI 숨기고 .paper만 노출 */
-  body * { visibility: hidden !important; }
-  .paper, .paper * { visibility: visible !important; }
-
-  /* A4 종이 박스 */
-  .paper {
-    position: fixed; inset: 0;
-    width: 210mm !important; height: 297mm !important;
-    margin: 0 !important; padding: var(--pad) !important; /* ← 패딩으로 균일 여백 확보 */
-    border: none !important; border-radius: 0 !important;
-    box-shadow: none !important; background: #fff !important;
-    overflow: hidden !important;
-  }
-
-  /* ⚠️ 기존의 .paper > * 강제 절대/크기 지정은 제거합니다 (레이아웃 왜곡 방지) */
-
-  /* 이미지/캔버스/SVG가 들어올 경우에도 contain으로 맞춤 (옵션) */
-  .paper img,
-  .paper canvas,
-  .paper svg,
-  .paper figure,
-  .paper .receipt-template,
-  .paper .template-root {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: contain !important;
-    object-position: center center !important;
-    page-break-inside: avoid !important;
-    background: #fff !important;
-  }
-
-  /* 표/라인 유지 */
-  .paper table, .paper th, .paper td {
-    border-color: inherit !important;
-    border-style: inherit !important;
-  }
+/* 인쇄 */
+@media print{
+  @page{ size:A4 portrait; margin:0; }
+  html, body{ width:210mm; height:297mm; margin:0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; background:#fff !important; }
+  body *{ visibility:hidden !important; }
+  .paper, .paper *{ visibility:visible !important; }
+  .paper{ position:fixed; inset:0; width:210mm !important; height:297mm !important; margin:0 auto !important; padding:8mm !important; border:none !important; border-radius:0 !important; box-shadow:none !important; background:#fff !important; overflow:hidden !important; }
+  .paper img, .paper canvas, .paper svg, .paper .receipt-template, .paper .template-root{ width:100% !important; height:100% !important; object-fit:contain !important; page-break-inside:avoid !important; }
 }
