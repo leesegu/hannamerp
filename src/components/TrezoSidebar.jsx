@@ -32,6 +32,9 @@ import MemoPage from "../pages/MemoPage";
 
 import "remixicon/fonts/remixicon.css";
 
+/* ✅ 로고 이미지 추가 */
+import HNLogo from "../assets/HN LOGO.png";
+
 const ComingSoon = ({ title }) => (
   <div className="p-6">
     <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
@@ -47,7 +50,7 @@ const SidebarItem = ({ icon, label, onClick, active, hasChildren, isOpen }) => (
     }`}
   >
     <div className="flex items-center gap-2">
-      <i className={`${icon} text-lg`}></i>
+      {icon && <i className={`${icon} text-lg`}></i>}
       <span>{label}</span>
     </div>
     {hasChildren && (
@@ -133,15 +136,13 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
     <div className="flex w-full h-screen">
       {/* 사이드바 */}
       <aside className="w-60 h-full bg-white border-r border-gray-200 flex flex-col">
-        {/* 로고 */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-          <div onClick={goHome} className="flex items-center gap-2 cursor-pointer" title="대시보드로 이동">
-            <i className="ri-home-4-line text-xl text-gray-700"></i>
-            <span className="font-bold text-lg text-gray-800">한남주택관리</span>
-          </div>
+        {/* ✅ 로고 (크고 선명하게) */}
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3 cursor-pointer" onClick={goHome} title="대시보드로 이동">
+          <img src={HNLogo} alt="HN Logo" className="w-10 h-10 object-contain" />
+          <span className="font-bold text-lg text-gray-800">한남주택관리</span>
         </div>
 
-        {/* 사용자 정보 + 로그아웃 아이콘(정사각형) */}
+        {/* 사용자 정보 + 로그아웃 */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div>
@@ -155,7 +156,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               title="로그아웃"
               aria-label="로그아웃"
             >
-              {/* 이전에 쓰던 로그아웃 아이콘 계열 */}
               <i className="ri-logout-box-r-line text-xl"></i>
             </button>
           </div>
@@ -318,6 +318,17 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "거래처관리"}
             />
 
+            {/* ✅ 메모: 거래처관리 아래로 이동 */}
+            <SidebarItem
+              icon="ri-sticky-note-line"
+              label="메모"
+              onClick={() => {
+                setOpenMenu("");
+                handleNavigate(<MemoPage userId={userId} />, "메모");
+              }}
+              active={activeMenu === "메모"}
+            />
+
             {/* 사원관리 */}
             <SidebarItem
               icon="ri-user-line"
@@ -358,17 +369,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                 />
               )}
             </div>
-
-            {/* 메모 */}
-            <SidebarItem
-              icon="ri-sticky-note-line"
-              label="메모"
-              onClick={() => {
-                setOpenMenu("");
-                handleNavigate(<MemoPage userId={userId} />, "메모");
-              }}
-              active={activeMenu === "메모"}
-            />
           </nav>
         </div>
       </aside>

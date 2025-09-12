@@ -150,12 +150,5 @@
 /* ✅ 비고 말줄임: 열 폭 안에서만 줄임, 오버플로우 방지 */
 .note-ellipsis{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
 
-/* 인쇄 */
-@media print{
-  @page{ size:A4 portrait; margin:0; }
-  html, body{ width:210mm; height:297mm; margin:0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; background:#fff !important; }
-  body *{ visibility:hidden !important; }
-  .paper, .paper *{ visibility:visible !important; }
-  .paper{ position:fixed; inset:0; width:210mm !important; height:297mm !important; margin:0 auto !important; padding:8mm !important; border:none !important; border-radius:0 !important; box-shadow:none !important; background:#fff !important; overflow:hidden !important; }
-  .paper img, .paper canvas, .paper svg, .paper .receipt-template, .paper .template-root{ width:100% !important; height:100% !important; object-fit:contain !important; page-break-inside:avoid !important; }
-}
+/* ⚠️ 인쇄용 CSS는 이 파일에서 제거합니다.
+   (ReceiptPreviewModal 내부 <style>이 전담) */
