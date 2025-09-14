@@ -19,20 +19,20 @@ import EmployeePage from "../pages/EmployeePage";
 import ReceiptIssuePage from "../pages/ReceiptIssuePage";
 import MoveInCleaningPage from "../pages/MoveInCleaningPage";
 import Dashboard from "../pages/Dashboard";
-/* ✅ 관리비회계 · 수입정리 페이지 */
+/* 관리비회계 · 수입정리 */
 import IncomeImportPage from "../pages/IncomeImportPage";
-/* ✅ 전기요금 추출(문자) 페이지 */
+/* 전기요금 추출(문자) */
 import MessageExtractor from "../pages/MessageExtractor";
-/* ✅ 캘린더 페이지 */
+/* 캘린더 */
 import CalendarPage from "../pages/CalendarPage";
-/* ✅ 부가서비스 · 도배 페이지 */
+/* 부가서비스 · 도배 */
 import PaperingPage from "../pages/PaperingPage";
-/* ✅ 새로 추가: 메모 페이지 */
+/* 메모 */
 import MemoPage from "../pages/MemoPage";
+/* ✅ 사이드 콘텐츠로 띄울 관리비회계 설정 페이지 */
+import AccountingSettingsPage from "../pages/AccountingSettingsPage";
 
 import "remixicon/fonts/remixicon.css";
-
-/* ✅ 로고 이미지 추가 */
 import HNLogo from "../assets/HN LOGO.png";
 
 const ComingSoon = ({ title }) => (
@@ -93,28 +93,23 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
     setActiveMenu(menuKey);
   };
 
-  const handleLogout = () => {
-    onLogout?.();
-    navigate("/login", { replace: true });
-  };
-
   const goHome = () => {
-    setActiveContent(null); // 대시보드
+    setActiveContent(null);
     setActiveMenu("");
     setOpenMenu("");
     navigate("/main", { replace: true });
   };
 
-  /** ✅ URL 쿼리 변화에 반응해서 내부 화면을 전환 */
+  /* URL 쿼리로 콘텐츠 스위칭 (사이드바는 유지) */
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const go = params.get("go");
     const sub = params.get("sub");
 
+    // 빌라정보 하위
     if (go === "빌라정보" && sub) {
       setOpenMenu("villa");
       setActiveMenu(sub);
-
       const pages = {
         코드별빌라: <VillaCodePage />,
         통신사: <TelcoPage />,
@@ -127,8 +122,16 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         건물청소: <CleaningPage />,
         CCTV: <CctvPage />,
       };
-
       setActiveContent(pages[sub] ?? <ComingSoon title={`빌라정보 · ${sub}`} />);
+      return;
+    }
+
+    // ✅ 기초등록 → 설정 내부 버튼: 관리비회계설정
+    if ((go === "기초등록" || go === "settings") && sub === "관리비회계설정") {
+      setOpenMenu("settings");
+      setActiveMenu("기초등록");
+      setActiveContent(<AccountingSettingsPage />);
+      return;
     }
   }, [location.search]);
 
@@ -136,7 +139,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
     <div className="flex w-full h-screen">
       {/* 사이드바 */}
       <aside className="w-60 h-full bg-white border-r border-gray-200 flex flex-col">
-        {/* ✅ 로고 (크고 선명하게) */}
         <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3 cursor-pointer" onClick={goHome} title="대시보드로 이동">
           <img src={HNLogo} alt="HN Logo" className="w-10 h-10 object-contain" />
           <span className="font-bold text-lg text-gray-800">한남주택관리</span>
@@ -151,7 +153,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
             </div>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={onLogout}
               className="w-10 h-10 grid place-items-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition"
               title="로그아웃"
               aria-label="로그아웃"
@@ -181,16 +183,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               {openMenu === "villa" && (
                 <SidebarSubmenu
                   items={[
-                    "코드별빌라",
-                    "통신사",
-                    "승강기",
-                    "정화조",
-                    "소방안전",
-                    "전기안전",
-                    "상수도",
-                    "공용전기",
-                    "건물청소",
-                    "CCTV",
+                    "코드별빌라", "통신사", "승강기", "정화조", "소방안전",
+                    "전기안전", "상수도", "공용전기", "건물청소", "CCTV",
                   ]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
@@ -282,7 +276,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "accounting" && (
                 <SidebarSubmenu
-                  items={["수입정리", "지출정리", "일마감", "월마감", "수입뷰어", "지출뷰어", "수입DB", "지출DB", "연간시트"]}
+                  /* ✅ 수입DB/지출DB 제거 */
+                  items={["수입정리", "지출정리", "일마감", "월마감", "수입뷰어", "지출뷰어", "연간시트"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
@@ -318,7 +313,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               active={activeMenu === "거래처관리"}
             />
 
-            {/* ✅ 메모: 거래처관리 아래로 이동 */}
+            {/* 메모 */}
             <SidebarItem
               icon="ri-sticky-note-line"
               label="메모"
@@ -356,6 +351,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "settings" && (
                 <SidebarSubmenu
+                  /* ⚠️ 여기엔 '관리비회계 설정' 메뉴를 두지 않음 */
                   items={["사원코드생성", "설정"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
@@ -373,7 +369,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         </div>
       </aside>
 
-      {/* 메인 콘텐츠: 기본은 대시보드 */}
+      {/* 메인 콘텐츠 */}
       <main className="flex-1 p-6 bg-gray-50 overflow-auto">
         {activeContent || <Dashboard userId={userId} userName={userName} />}
       </main>

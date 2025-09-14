@@ -53,9 +53,10 @@
   background-color: #f7f7f7;
 }
 
+/* ✅ 여기만 퍼플톤으로 변경 */
 .data-table tbody tr:hover {
-  background-color: #fff0dc !important;
-  outline: 2px solid #f4c88a;
+  background-color: #f3eaff !important;   /* 옅은 퍼플 배경 */
+  outline: 2px solid #cdb6ff;             /* 은은한 퍼플 아웃라인 */
   outline-offset: -1px;
   transition: background-color 0.2s ease, outline 0.2s ease;
 }

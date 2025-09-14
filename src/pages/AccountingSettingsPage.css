@@ -1,0 +1,146 @@
+:root{
+  --ink:#1f2330;
+  --muted:#7b80a0;
+  --line:#e6e9f5;
+  --card:#ffffff;
+  --bg:#f7f8ff;
+  --primary:#6d5efc;
+  --primary-weak:rgba(109,94,252,.15);
+  --danger:#e74c3c;
+}
+
+/* 전체 레이아웃(컴팩트) */
+.accset-page.compact{
+  padding:10px 12px;
+  background: radial-gradient(1200px 600px at 10% -10%, rgba(109,94,252,.08), transparent 60%),
+              radial-gradient(900px 500px at 100% 0%, rgba(34,193,195,.08), transparent 55%),
+              var(--bg);
+  min-height:calc(100vh - 60px);
+  color:var(--ink);
+  font-size:12px; /* 작게 */
+}
+
+/* 탭(작고 화려) */
+.as-tabs.compact{
+  display:flex; gap:6px; margin-bottom:10px;
+}
+.as-tabs.compact button{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 10px;
+  border:1px solid var(--line);
+  background:linear-gradient(180deg,#fff, #f6f7ff);
+  border-radius:10px;
+  color:#3a3f60;
+  cursor:pointer;
+  box-shadow:0 1px 6px rgba(0,0,0,.05);
+  transition:transform .05s ease, box-shadow .15s ease;
+}
+.as-tabs.compact button:hover{ box-shadow:0 2px 10px rgba(109,94,252,.18); transform:translateY(-1px); }
+.as-tabs.compact button.active{
+  background:linear-gradient(135deg,#7a6cff,#5d8bff);
+  color:#fff; border-color:transparent; box-shadow:0 4px 16px rgba(93,139,255,.35);
+}
+.as-tabs.compact button i{ font-size:14px; }
+.as-tabs.compact button span{ font-weight:800; letter-spacing:.1px; }
+
+/* 카드 */
+.as-card.compact{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:10px;
+  box-shadow:0 10px 26px rgba(109,94,252,.07), 0 1px 0 rgba(0,0,0,.03);
+}
+
+/* 카드 헤더 (컴팩트) */
+.as-head.compact{
+  display:flex; justify-content:space-between; align-items:center;
+  padding-bottom:6px; margin-bottom:8px;
+  border-bottom:1px dashed var(--line);
+}
+.as-title{
+  display:flex; align-items:center; gap:6px;
+  font-size:13px; font-weight:900;
+}
+.as-title i{ color:#5d8bff; }
+
+/* 버튼들 (더 작게) */
+.as-btn{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:8px;
+  padding:4px 8px;
+  font-size:12px;
+  cursor:pointer;
+  transition: box-shadow .12s, transform .05s;
+}
+.as-btn:hover{ box-shadow:0 0 0 3px var(--primary-weak); }
+.as-btn.primary{ background:linear-gradient(135deg,#7a6cff,#5d8bff); color:#fff; border-color:transparent; }
+.as-btn.danger{ background:linear-gradient(135deg,#ff6a6a,#e74c3c); color:#fff; border-color:transparent; }
+
+.as-btn.sm{ padding:4px 8px; font-size:12px; border-radius:8px; }
+.as-btn.xs{ padding:2px 6px; font-size:11px; border-radius:7px; }
+
+/* 표 (컴팩트) */
+.as-table.compact{
+  width:100%; border-collapse:separate; border-spacing:0;
+  font-size:12px;
+  border:1px solid var(--line); border-radius:10px; overflow:hidden;
+  box-shadow:0 3px 12px rgba(0,0,0,.04) inset;
+}
+.as-table.compact thead th{
+  background:linear-gradient(180deg,#fbfbff,#eef1ff);
+  border-bottom:1px solid var(--line);
+  padding:6px 8px;
+  font-size:11px; letter-spacing:.2px; color:#2b3150; white-space:nowrap;
+}
+.as-table.compact tbody td{
+  border-bottom:1px dashed var(--line);
+  padding:6px 8px; white-space:nowrap;
+}
+.as-table.compact tbody tr:last-child td{ border-bottom:none; }
+.as-table.compact td.left{text-align:left;}
+.as-table.compact td.actions{ text-align:center; }
+
+/* 지출 대/소분류 리스트(컴팩트) */
+.as-expense-list{ display:flex; flex-direction:column; gap:8px; }
+.as-expense-item{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:8px;
+  background:linear-gradient(180deg,#ffffff,#fafbff);
+  box-shadow:0 1px 6px rgba(0,0,0,.04);
+}
+.exp-row{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:4px;
+}
+.exp-name{ font-weight:900; font-size:12.5px; letter-spacing:.1px; }
+.exp-actions{ display:flex; gap:4px; }
+
+.subs{ display:flex; flex-wrap:wrap; gap:6px; }
+.sub-chip{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 6px; font-size:11px;
+  border:1px solid var(--line);
+  border-radius:9999px;
+  background:linear-gradient(180deg,#f0f3ff,#ffffff);
+  color:#3b4160;
+  box-shadow:0 1px 6px rgba(109,94,252,.12);
+}
+.sub-chip i{ font-size:12px; color:#5d8bff; }
+.sub-chip .x{
+  border:none; background:transparent; cursor:pointer; font-size:12px; line-height:1;
+  color:#a13a3a; margin-left:2px;
+}
+.sub-empty{ color:#9aa0b9; font-size:11px; }
+
+.empty{ color:#9aa0b9; padding:8px 0; }
+.empty-block{
+  text-align:center; padding:12px; color:#9aa0b9;
+  border:1px dashed var(--line); border-radius:10px;
+  background:#fff;
+}
+
+/* 본문 래퍼 (컴팩트 여백) */
+.as-body.compact{ display:block; }

@@ -644,7 +644,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         </div>
       )}
 
-      {/* 영수증 미리보기 */}
+      {/* ▼▼▼ 여기부터: 요청하신 “영수증 모달” 부분만 수정 ▼▼▼ */}
       {receiptOpen && receiptRow && (
         <div
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.25)", display:"flex",
@@ -652,28 +652,82 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
           onClick={closeReceiptPreview}
         >
           <div
+            /* 모달 프레임을 ReceiptTemplate 폭(600px) + 여백에 맞춰 조정 */
             style={{
-              width: 720, maxWidth: "90vw", maxHeight: "90vh", overflowY: "auto",
-              background:"#fff", borderRadius:10, padding:16, boxShadow:"0 10px 30px rgba(0,0,0,0.3)"
+              width: "min(640px, 95vw)",       // 600 본문 + 좌우 패딩 여유
+              maxHeight: "90vh",
+              background:"#fff",
+              borderRadius:10,
+              boxShadow:"0 10px 30px rgba(0,0,0,0.3)",
+              overflow:"hidden",                // 헤더 sticky 위해 컨테이너는 hidden
+              display:"flex",
+              flexDirection:"column",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+            {/* 상단 고정 헤더: 제목 + 저장 버튼 + 닫기 버튼 */}
+            <div
+              style={{
+                position:"sticky",
+                top:0,
+                zIndex:1,
+                background:"#fff",
+                borderBottom:"1px solid #eee",
+                padding:"10px 12px",
+                display:"flex",
+                alignItems:"center",
+                justifyContent:"space-between",
+                gap:8,
+              }}
+            >
               <strong>영수증 미리보기</strong>
-              <button className="close-btn" onClick={closeReceiptPreview}>닫기</button>
+              <div style={{ display:"flex", gap:8 }}>
+                <button
+                  className="save-btn"
+                  onClick={(e) => { e.stopPropagation(); downloadReceipt("jpg"); }}
+                >
+                  JPG 저장
+                </button>
+                <button
+                  className="save-btn"
+                  onClick={(e) => { e.stopPropagation(); downloadReceipt("pdf"); }}
+                >
+                  PDF 저장
+                </button>
+                <button
+                  className="close-btn"
+                  onClick={(e) => { e.stopPropagation(); closeReceiptPreview(); }}
+                >
+                  닫기
+                </button>
+              </div>
             </div>
 
-            <div style={{ textAlign:"center", marginBottom:12 }}>
-              {receiptPreviewUrl
-                ? <img src={receiptPreviewUrl} alt="영수증 미리보기" style={{ width:"100%", maxWidth:480, border:"1px solid #eee", borderRadius:8 }} />
-                : <div style={{ padding:20, color:"#888" }}>미리보기를 준비 중...</div>}
+            {/* 스크롤 영역(본문) */}
+            <div style={{ padding:16, overflowY:"auto" }}>
+              <div style={{ textAlign:"center", marginBottom:12 }}>
+                {receiptPreviewUrl
+                  ? (
+                    <img
+                      src={receiptPreviewUrl}
+                      alt="영수증 미리보기"
+                      /* ReceiptTemplate(600px)과 동일 폭으로 표시,
+                         작은 화면에서는 자동 축소 */
+                      style={{
+                        width: 600,
+                        maxWidth: "calc(95vw - 40px)",
+                        height: "auto",
+                        border: "1px solid #eee",
+                        borderRadius: 8
+                      }}
+                    />
+                  ) : (
+                    <div style={{ padding:20, color:"#888" }}>미리보기를 준비 중...</div>
+                  )}
+              </div>
             </div>
 
-            <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-              <button className="save-btn" onClick={() => downloadReceipt("jpg")}>JPG 저장</button>
-              <button className="save-btn" onClick={() => downloadReceipt("pdf")}>PDF 저장</button>
-            </div>
-
+            {/* 캡처용 숨김 원본 (변경 없음) */}
             <div style={{ position:"absolute", left:-99999, top:-99999 }}>
               <ReceiptTemplate
                 refProp={receiptRef}
@@ -695,6 +749,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
           </div>
         </div>
       )}
+      {/* ▲▲▲ 여기까지: 영수증 모달만 수정 ▲▲▲ */}
     </div>
   );
 }

@@ -1,9 +1,16 @@
 // ==================================
-// 관리비회계 · 수입정리 페이지 (중복 상태 제거/요청 기능 포함)
+// 관리비회계 · 수입정리 페이지
+// - 삭제 기능 제거
+// - 통계 카드/배치
+// - '구분' 드롭다운 = 관리비회계설정의 "수입대분류" 이름 목록 사용
 // ==================================
 import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import "./IncomeImportPage.css";
+
+/* Firebase: 수입대분류 로드 */
+import { db } from "../firebase";
+import { collection, getDocs, getDoc, doc } from "firebase/firestore";
 
 /* ===== 유틸 ===== */
 const s = (v) => String(v ?? "").trim();
@@ -28,8 +35,14 @@ const parseKoreanDateTime = (v) => {
 };
 
 const pad2 = (n) => String(n).padStart(2, "0");
-const fmtDate = (d) => (d instanceof Date && !isNaN(d) ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : "");
-const fmtTime = (d) => (d instanceof Date && !isNaN(d) ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}` : "");
+const fmtDate = (d) =>
+  d instanceof Date && !isNaN(d)
+    ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    : "";
+const fmtTime = (d) =>
+  d instanceof Date && !isNaN(d)
+    ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+    : "";
 const fmtComma = (n) => (toNumber(n) ? toNumber(n).toLocaleString() : "");
 const ymdToDate = (y, m, d) => new Date(y, m - 1, d);
 
@@ -144,7 +157,9 @@ function rowsToRecords(rows, headerRowIdx, meta) {
       record: s(row[col.record]),
       memo: s(row[col.memo]),
       _seq: s(row[col.seq]),
+      // 기본 타입 유지(입금/출금), 화면 표시/검색은 category 우선
       type: inAmt > 0 ? "입금" : outAmt > 0 ? "출금" : "",
+      category: "",             // ★ 설정에서 로드되는 수입대분류 이름
       unconfirmed: false,
     });
   }
@@ -152,22 +167,48 @@ function rowsToRecords(rows, headerRowIdx, meta) {
 }
 
 /* ===== 공용 모달 ===== */
-function Modal({ open, title, children, onClose, onConfirm, confirmText = "확인", cancelText = "닫기", mode = "info" }) {
+function Modal({
+  open,
+  title,
+  children,
+  onClose,
+  onConfirm,
+  confirmText = "확인",
+  cancelText = "닫기",
+  mode = "confirm",
+  primaryFirst = false,
+  showClose = true,
+  variant = "default", // "default" | "large"
+}) {
   if (!open) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`modal-card ${variant === "large" ? "lg" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
-          <div className="modal-title">{title}</div>
-          <button className="modal-x" onClick={onClose}>×</button>
+          <div className="modal-title nowrap">{title}</div>
+          {showClose ? <button className="modal-x" onClick={onClose}>×</button> : null}
         </div>
-        <div className="modal-body">{children}</div>
+
+        <div className="modal-body scrollable">
+          {children}
+        </div>
+
         <div className="modal-foot">
           {mode === "confirm" ? (
-            <>
-              <button className="btn" onClick={onClose}>{cancelText}</button>
-              <button className="btn danger" onClick={onConfirm}>{confirmText}</button>
-            </>
+            primaryFirst ? (
+              <>
+                <button className="btn danger" onClick={onConfirm}>{confirmText}</button>
+                <button className="btn" onClick={onClose}>{cancelText}</button>
+              </>
+            ) : (
+              <>
+                <button className="btn" onClick={onClose}>{cancelText}</button>
+                <button className="btn danger" onClick={onConfirm}>{confirmText}</button>
+              </>
+            )
           ) : (
             <button className="btn" onClick={onClose}>{cancelText}</button>
           )}
@@ -185,17 +226,18 @@ export default function IncomeImportPage() {
   const [dupInfo, setDupInfo] = useState(null);
   const [dupOpen, setDupOpen] = useState(false);
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmOpenPayload, setConfirmOpenPayload] = useState(null);
-
+  // 검색/필터/모드
   const [query, setQuery] = useState("");
   const [onlyIncome, setOnlyIncome] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
-  // ✅ 미확인 모달/상태
+  // ★ 수입대분류 목록 (관리비회계설정 → 수입 항목 → 수입대분류)
+  const [incomeCategories, setIncomeCategories] = useState([]); // [{id, name}...]
+
+  // 미확인 모달/상태
   const [unconfOpen, setUnconfOpen] = useState(false);
   const [unconfQuery, setUnconfQuery] = useState("");
-  const [unconfDraft, setUnconfDraft] = useState({}); // { id: { memo, unconfirmed } }
+  const [unconfDraft, setUnconfDraft] = useState({});
 
   /* 기간 */
   const today = useMemo(() => {
@@ -217,12 +259,9 @@ export default function IncomeImportPage() {
   }, []);
 
   /* 페이지네이션 */
-  const pageSizeOptions = [24, 50, 100, 200, 300];
-  const [pageSize, setPageSize] = useState(24);
+  const pageSizeOptions = [20, 50, 100, 300, 500];
+  const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
-
-  /* ✅ 선택(체크) — 단일 선언 */
-  const [selected, setSelected] = useState(new Set());
 
   /* 파일 업로드 */
   const fileInputRef = useRef(null);
@@ -289,22 +328,100 @@ export default function IncomeImportPage() {
     [rows, clampRange]
   );
 
-  /* 필터 */
+  /* ===== 수입대분류 로드 =====
+     관리비회계설정(수입)에서 다음 순서로 탐색:
+     1) accountingSettings/income/categories (subcollection, docs: {name})
+     2) accountingSettings/income/수입대분류 (doc: {items: [...]})
+     3) incomeCategories (root collection, docs: {name})
+  */
+  const loadIncomeCategories = useCallback(async () => {
+    try {
+      let items = [];
+
+      // 1) subcollection
+      try {
+        const sub = collection(db, "accountingSettings", "income", "categories");
+        const snap = await getDocs(sub);
+        const arr = snap.docs.map(d => s(d.data()?.name ?? d.data()?.label ?? d.id)).filter(Boolean);
+        items.push(...arr);
+      } catch (_) {}
+
+      // 2) single doc with items
+      if (items.length === 0) {
+        try {
+          const docRef = doc(db, "accountingSettings", "income", "수입대분류");
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const arr = Array.isArray(snap.data()?.items) ? snap.data().items.map(s).filter(Boolean) : [];
+            items.push(...arr);
+          }
+        } catch (_) {}
+      }
+
+      // 3) root collection fallback
+      if (items.length === 0) {
+        try {
+          const root = collection(db, "incomeCategories");
+          const snap = await getDocs(root);
+          const arr = snap.docs.map(d => s(d.data()?.name ?? d.data()?.label ?? d.id)).filter(Boolean);
+          items.push(...arr);
+        } catch (_) {}
+      }
+
+      // 정리(중복 제거 + 정렬)
+      const uniq = Array.from(new Set(items)).filter(Boolean).sort((a, b) => a.localeCompare(b, "ko"));
+      setIncomeCategories(uniq.map((name, i) => ({ id: `cat_${i}`, name })));
+    } catch (e) {
+      console.error("loadIncomeCategories error:", e);
+      setIncomeCategories([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadIncomeCategories();
+  }, [loadIncomeCategories]);
+
+  /* 기간 필터만 반영한 목록 → 통계 계산용 */
+  const rangeList = useMemo(() => {
+    const start = new Date(yFrom, mFrom - 1, dFrom, 0, 0, 0, 0);
+    const end = new Date(yTo, mTo - 1, dTo, 23, 59, 59, 999);
+    return rows.filter((r) => {
+      const rDate = parseYMDLocal(r.date);
+      if (!(rDate instanceof Date) || isNaN(rDate)) return false;
+      const d0 = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const d1 = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      return !(rDate < d0 || rDate > d1);
+    });
+  }, [rows, yFrom, mFrom, dFrom, yTo, mTo, dTo]);
+
+  /* 통계 계산 */
+  const statCount = rangeList.length;
+  const statInSum = useMemo(
+    () => rangeList.reduce((sum, r) => sum + toNumber(r.inAmt), 0),
+    [rangeList]
+  );
+  const statOutSum = useMemo(
+    () => rangeList.reduce((sum, r) => sum + toNumber(r.outAmt), 0),
+    [rangeList]
+  );
+  const statMemoMiss = useMemo(
+    () =>
+      rangeList.filter(
+        (r) =>
+          toNumber(r.inAmt) > 0 &&
+          !r.unconfirmed &&
+          s(r.memo) === ""
+      ).length,
+    [rangeList]
+  );
+
+  /* 검색/입금만까지 반영한 화면 표시용 목록 */
   const filtered = useMemo(() => {
     const q = s(query);
     const qLower = q.toLowerCase();
     const qNum = toNumber(q);
 
-    const start = new Date(yFrom, mFrom - 1, dFrom, 0, 0, 0, 0);
-    const end = new Date(yTo, mTo - 1, dTo, 23, 59, 59, 999);
-
-    return rows.filter((r) => {
-      const rDate = parseYMDLocal(r.date);
-      if (!(rDate instanceof Date) || isNaN(rDate)) return false;
-
-      if (rDate < new Date(start.getFullYear(), start.getMonth(), start.getDate())) return false;
-      if (rDate > new Date(end.getFullYear(), end.getMonth(), end.getDate())) return false;
-
+    return rangeList.filter((r) => {
       if (onlyIncome && !(r.inAmt > 0)) return false;
 
       if (!q) return true;
@@ -316,10 +433,12 @@ export default function IncomeImportPage() {
         if (inEq || outEq || contains) return true;
       }
 
-      const bag = [r.type, r.accountNo, r.holder, r.record, r.memo].join("\n").toLowerCase();
+      const bag = [(r.category || r.type), r.accountNo, r.holder, r.record, r.memo]
+        .join("\n")
+        .toLowerCase();
       return bag.includes(qLower);
     });
-  }, [rows, query, onlyIncome, yFrom, mFrom, dFrom, yTo, mTo, dTo]);
+  }, [rangeList, query, onlyIncome]);
 
   /* 정렬 */
   const [sortKey, setSortKey] = useState("datetime");
@@ -337,7 +456,6 @@ export default function IncomeImportPage() {
     return list;
   }, [filtered, sortKey, sortDir]);
 
-  /* ✅ 정렬 클릭 핸들러 (누락 보완) */
   const clickSort = (key) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -354,89 +472,14 @@ export default function IncomeImportPage() {
   const endIdx = startIdx + pageSize;
   const pageRows = sorted.slice(startIdx, endIdx);
 
-  /* 선택(체크) 유틸 */
-  const isChecked = (id) => selected.has(id);
-  const toggleOne = (id) => {
-    setSelected((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  };
-  const toggleAllPage = () => {
-    const ids = pageRows.map((r) => r._id);
-    const allSelected = ids.every((id) => selected.has(id));
-    setSelected((prev) => {
-      const n = new Set(prev);
-      if (allSelected) ids.forEach((id) => n.delete(id));
-      else ids.forEach((id) => n.add(id));
-      return n;
-    });
-  };
-
-  /* 삭제 */
-  const confirmRemoveSelected = () => {
-    if (selected.size === 0) return;
-    setConfirmOpenPayload({ count: selected.size });
-    setConfirmOpen(true);
-  };
-  const removeSelected = () => {
-    const keep = rows.filter((r) => !selected.has(r._id));
-    setRows(keep);
-    setSelected(new Set());
-    const newCount = Math.max(1, Math.ceil(keep.length / pageSize));
-    setPage((p) => Math.min(p, newCount));
-    setConfirmOpen(false);
-  };
-
-  /* 기간 컴포넌트 */
-  const yearOptions = useMemo(() => {
-    const thisYear = new Date().getFullYear();
-    const arr = [];
-    for (let y = thisYear; y >= thisYear - 10; y--) arr.push(y);
-    return arr;
-  }, []);
-  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
-  const DateTriple = ({ y, m, d, onY, onM, onD }) => {
-    const maxDay = new Date(y, m, 0).getDate();
-    const dayOptions = Array.from({ length: maxDay }, (_, i) => i + 1);
-    return (
-      <div className="date-triple">
-        <select value={y} onChange={(e) => onY(+e.target.value)}>
-          {yearOptions.map((yy) => <option key={yy} value={yy}>{yy}년</option>)}
-        </select>
-        <select value={m} onChange={(e) => onM(+e.target.value)}>
-          {monthOptions.map((mm) => <option key={mm} value={mm}>{mm}월</option>)}
-        </select>
-        <select value={Math.min(d, maxDay)} onChange={(e) => onD(+e.target.value)}>
-          {dayOptions.map((dd) => <option key={dd} value={dd}>{dd}일</option>)}
-        </select>
-      </div>
-    );
-  };
-  const onFromChange = (ny, nm, nd) => {
-    const [aY, aM, aD, bY, bM, bD] = clampRange(ny, nm, nd, yTo, mTo, dTo);
-    setYFrom(aY); setMFrom(aM); setDFrom(aD);
-    setYTo(bY); setMTo(bM); setDTo(bD);
-    setPage(1);
-  };
-  const onToChange = (ny, nm, nd) => {
-    const [aY, aM, aD, bY, bM, bD] = clampRange(yFrom, mFrom, dFrom, ny, nm, nd);
-    setYFrom(aY); setMFrom(aM); setDFrom(aD);
-    setYTo(bY); setMTo(bM); setDTo(bD);
-    setPage(1);
-  };
-
-  /* ✅ 인라인 수정 핸들러 (누락 보완) */
+  /* 인라인 수정 */
   const updateRow = (id, patch) => {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
   };
 
-  // 거래메모 엔터 이동
+  // 엔터로 다음 메모로 (현재 페이지 내 이동)
   const memoRefs = useRef({});
-  const setMemoRef = (id, el) => {
-    memoRefs.current[id] = el;
-  };
+  const setMemoRef = (id, el) => { memoRefs.current[id] = el; };
   const focusNextMemo = (currentId) => {
     const idsInPageOrder = pageRows.map((r) => r._id);
     const idx = idsInPageOrder.indexOf(currentId);
@@ -493,52 +536,60 @@ export default function IncomeImportPage() {
     setUnconfOpen(false);
   };
 
+  /* 화면 */
   return (
     <div className="income-page">
-      {/* 상단 툴바 */}
+      {/* === 툴바 #1: 왼쪽 버튼들 / 오른쪽 검색+페이지 === */}
       <div className="toolbar tight">
         <div className="left">
-          <button className="btn" onClick={onPickFiles}>
-            <i className="ri-file-excel-2-line" /> 엑셀 업로드
+          {/* 엑셀업로드 */}
+          <button className="btn excel" onClick={onPickFiles} title="엑셀 업로드">
+            <span className="ico" aria-hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="3" y="3" width="18" height="18" rx="2.5" fill="#1F6F43"/>
+                <path d="M8.5 8.5l2.5 3-2.5 3M12.5 8.5l-2.5 3 2.5 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="13.5" y="5" width="6" height="14" fill="#2EA06B" />
+              </svg>
+            </span>
+            <span className="btn-label">엑셀 업로드</span>
           </button>
+
           <input
             ref={fileInputRef}
-            type="file" accept=".xlsx,.xls" multiple style={{ display: "none" }}
+            type="file"
+            accept=".xlsx,.xls"
+            multiple
+            style={{ display: "none" }}
             onChange={(e) => e.target.files && handleFiles([...e.target.files])}
           />
-          <label className="chk">
-            <input type="checkbox" checked={onlyIncome} onChange={(e) => setOnlyIncome(e.target.checked)} />
-            입금만
-          </label>
-          <label className="chk">
-            <input type="checkbox" checked={editMode} onChange={(e) => setEditMode(e.target.checked)} />
-            수정모드
-          </label>
 
-          {/* 미확인 목록 버튼 */}
-          <button className="btn warn" onClick={() => setUnconfOpen(true)}>
-            미확인
+          <button className="btn unconf" onClick={() => setUnconfOpen(true)}>
+            <span className="ico" aria-hidden>🔎</span>
+            <span className="btn-label">미확인</span>
           </button>
+
+          <label className="chk fancy">
+            <input
+              type="checkbox"
+              checked={onlyIncome}
+              onChange={(e) => setOnlyIncome(e.target.checked)}
+            />
+            <span className="toggle" aria-hidden></span>
+            <span className="lbl">입금만</span>
+          </label>
+
+          <label className="chk fancy">
+            <input
+              type="checkbox"
+              checked={editMode}
+              onChange={(e) => setEditMode(e.target.checked)}
+            />
+            <span className="toggle" aria-hidden></span>
+            <span className="lbl">수정모드</span>
+          </label>
         </div>
 
-        <div className="mid">
-          <div className="range-pickers compact">
-            <DateTriple
-              y={yFrom} m={mFrom} d={dFrom}
-              onY={(v) => onFromChange(v, mFrom, dFrom)}
-              onM={(v) => onFromChange(yFrom, v, dFrom)}
-              onD={(v) => onFromChange(yFrom, mFrom, v)}
-            />
-            <span className="dash">—</span>
-            <DateTriple
-              y={yTo} m={mTo} d={dTo}
-              onY={(v) => onToChange(v, mTo, dTo)}
-              onM={(v) => onToChange(yTo, v, dTo)}
-              onD={(v) => onToChange(yTo, mTo, v)}
-            />
-          </div>
-        </div>
-
+        {/* 오른쪽: 검색 + 페이지 사이즈 */}
         <div className="right">
           <input
             className="search"
@@ -550,23 +601,74 @@ export default function IncomeImportPage() {
             className="page-size"
             value={pageSize}
             onChange={(e) => {
-              const v = Number(e.target.value) || 24;
+              const v = Number(e.target.value) || 20;
               setPageSize(v);
               setPage(1);
             }}
           >
             {pageSizeOptions.map((n) => (
-              <option key={n} value={n}>{n}/페이지</option>
+              <option key={n} value={n}>
+                {n}/페이지
+              </option>
             ))}
           </select>
-          <button
-            className="btn danger"
-            disabled={selected.size === 0}
-            onClick={confirmRemoveSelected}
-            title="선택 삭제"
-          >
-            삭제({selected.size})
-          </button>
+        </div>
+      </div>
+
+      {/* === 툴바 #2: 날짜범위 / 오른쪽 통계카드 === */}
+      <div className="toolbar tight">
+        <div className="mid">
+          <div className="range-pickers compact">
+            <DateTriple
+              y={yFrom}
+              m={mFrom}
+              d={dFrom}
+              onY={(v) => setYFrom(v)}
+              onM={(v) => setMFrom(v)}
+              onD={(v) => setDFrom(v)}
+            />
+            <span className="dash">—</span>
+            <DateTriple
+              y={yTo}
+              m={mTo}
+              d={dTo}
+              onY={(v) => setYTo(v)}
+              onM={(v) => setMTo(v)}
+              onD={(v) => setDTo(v)}
+            />
+          </div>
+        </div>
+
+        {/* 통계 카드 */}
+        <div className="right stats-row">
+          <div className="stat-card count">
+            <div className="icon" aria-hidden>🧾</div>
+            <div className="meta">
+              <div className="label">총 건수</div>
+              <div className="value">{statCount.toLocaleString()}건</div>
+            </div>
+          </div>
+          <div className="stat-card in">
+            <div className="icon" aria-hidden>💵</div>
+            <div className="meta">
+              <div className="label">입금합계</div>
+              <div className="value">{fmtComma(statInSum)}원</div>
+            </div>
+          </div>
+          <div className="stat-card out">
+            <div className="icon" aria-hidden>💸</div>
+            <div className="meta">
+              <div className="label">출금합계</div>
+              <div className="value">{fmtComma(statOutSum)}원</div>
+            </div>
+          </div>
+          <div className="stat-card warn">
+            <div className="icon" aria-hidden>⚠️</div>
+            <div className="meta">
+              <div className="label">메모누락</div>
+              <div className="value">{statMemoMiss.toLocaleString()}건</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -577,14 +679,8 @@ export default function IncomeImportPage() {
         <table className="dense modern">
           <thead>
             <tr>
-              <th className="th-check center" style={{ width: 40 }}>
-                <input
-                  type="checkbox"
-                  checked={pageRows.length > 0 && pageRows.every((r) => selected.has(r._id))}
-                  onChange={toggleAllPage}
-                />
-              </th>
-              <th onClick={() => clickSort("type")} className="col-type">구분</th>
+              {/* 삭제/체크 컬럼 없음 */}
+              <th onClick={() => clickSort("category")} className="col-type">구분</th>
               <th onClick={() => clickSort("accountNo")} className="col-account">계좌번호</th>
               <th onClick={() => clickSort("date")} className="col-date">거래일</th>
               <th onClick={() => clickSort("time")} className="col-time">시간</th>
@@ -597,43 +693,41 @@ export default function IncomeImportPage() {
           <tbody>
             {pageRows.map((r) => (
               <tr key={r._id}>
-                <td className="td-check">
-                  <input type="checkbox" checked={isChecked(r._id)} onChange={() => toggleOne(r._id)} />
-                </td>
-
-                {/* 구분: 내용 중앙정렬 */}
                 <td className="center">
                   {editMode ? (
-                    <select
-                      className="edit-select type-select pretty-select"
-                      value={r.type}
-                      onChange={(e) => updateRow(r._id, { type: e.target.value })}
-                    >
-                      <option value="">선택</option>
-                      <option value="입금">입금</option>
-                      <option value="출금">출금</option>
-                    </select>
+                    <div className="category-select-wrap">
+                      <select
+                        className="edit-select type-select pretty-select rich"
+                        value={r.category || ""}
+                        onChange={(e) => updateRow(r._id, { category: e.target.value })}
+                      >
+                        <option value="">— 수입대분류 선택 —</option>
+                        {incomeCategories.map((c) => (
+                          <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   ) : (
-                    <span className={`type-badge ${r.type === "입금" ? "in" : r.type === "출금" ? "out" : ""}`}>
-                      {r.type || "-"}
+                    <span
+                      className={`type-badge ${
+                        r.category ? "cat" : (toNumber(r.inAmt) > 0 ? "in" : toNumber(r.outAmt) > 0 ? "out" : "")
+                      }`}
+                      title={r.category || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
+                    >
+                      {r.category || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
                     </span>
                   )}
                 </td>
 
-                {/* 계좌번호: 중앙정렬 */}
                 <td className="mono center">{r.accountNo}</td>
-
-                {/* 거래일/시간: 중앙정렬 */}
                 <td className="mono center">{r.date}</td>
                 <td className="mono center">{r.time}</td>
 
                 <td className="num strong in">{fmtComma(r.inAmt)}</td>
                 <td className="num out">{fmtComma(r.outAmt)}</td>
 
-                {/* 거래기록사항: 중앙정렬 */}
                 <td className="clip center">{r.record}</td>
 
-                {/* 거래메모: 수정모드에서만 미확인 체크 표시/수정 */}
                 <td className="memo-cell">
                   {editMode ? (
                     <div className="memo-wrap">
@@ -644,25 +738,22 @@ export default function IncomeImportPage() {
                         onChange={(e) => updateRow(r._id, { memo: e.target.value })}
                         placeholder=""
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            focusNextMemo(r._id);
-                          }
+                          if (e.key === "Enter") { e.preventDefault(); focusNextMemo(r._id); }
                         }}
                       />
-                      <label className="chk mi">
+                      <label className="chk mi2">
                         <input
                           type="checkbox"
                           checked={!!r.unconfirmed}
                           onChange={(e) => updateRow(r._id, { unconfirmed: e.target.checked })}
                         />
-                        미확인
+                        <span className="box" aria-hidden></span>
+                        <span className="lbl">미확인</span>
                       </label>
                     </div>
                   ) : (
                     <div className="memo-wrap">
                       <div className="memo-text" title={r.memo || ""}>{r.memo}</div>
-                      {/* 비수정모드: 체크박스 표시하지 않음 */}
                     </div>
                   )}
                 </td>
@@ -695,20 +786,7 @@ export default function IncomeImportPage() {
         )}
       </Modal>
 
-      {/* 삭제 확인 모달 */}
-      <Modal
-        open={confirmOpen}
-        title="선택 삭제"
-        mode="confirm"
-        cancelText="취소"
-        confirmText="삭제"
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={removeSelected}
-      >
-        선택한 {confirmOpenPayload?.count?.toLocaleString() ?? 0}건을 삭제할까요?
-      </Modal>
-
-      {/* 미확인 목록 모달 (검색/편집/저장) */}
+      {/* 미확인 목록 모달 */}
       <Modal
         open={unconfOpen}
         title="미확인 목록"
@@ -717,6 +795,9 @@ export default function IncomeImportPage() {
         confirmText="저장"
         onClose={() => setUnconfOpen(false)}
         onConfirm={applyUnconfEdits}
+        primaryFirst={true}
+        showClose={false}
+        variant="large"
       >
         <div className="unconf-top">
           <div className="unconf-summary">
@@ -733,6 +814,15 @@ export default function IncomeImportPage() {
 
         <div className="unconf-list">
           <table className="dense mini">
+            <colgroup>
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "9%" }} />      {/* 입금 */}
+              <col style={{ width: "22%" }} />     {/* 거래기록 */}
+              <col style={{ width: "39%" }} />     {/* 메모 */}
+              <col style={{ width: "2%" }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>날짜</th>
@@ -745,37 +835,65 @@ export default function IncomeImportPage() {
               </tr>
             </thead>
             <tbody>
-              {modalList.map((r) => (
-                <tr key={`u_${r._id}`}>
-                  <td className="center mono">{r.date}</td>
-                  <td className="center mono">{r.time}</td>
-                  <td className="center">{r.type || "-"}</td>
-                  <td className="num">{fmtComma(r.inAmt)}</td>
-                  <td className="clip center">{r.record}</td>
-                  <td>
-                    <input
-                      className="edit-input memo-input"
-                      value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
-                      onChange={(e) => setDraftMemo(r._id, e.target.value)}
-                      placeholder=""
-                    />
-                  </td>
-                  <td className="center">
-                    <input
-                      type="checkbox"
-                      checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
-                      onChange={(e) => setDraftFlag(r._id, e.target.checked)}
-                    />
-                  </td>
+              {modalList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="center muted">검색 결과가 없습니다.</td>
                 </tr>
-              ))}
-              {modalList.length === 0 && (
-                <tr><td colSpan={7} className="center muted">검색 결과가 없습니다.</td></tr>
+              ) : (
+                modalList.map((r) => (
+                  <tr key={`u_${r._id}`}>
+                    <td className="center mono">{r.date}</td>
+                    <td className="center mono">{r.time}</td>
+                    <td className="center">{r.category || r.type || "-"}</td>
+                    <td className="num">{fmtComma(r.inAmt)}</td>
+                    <td className="center">{r.record}</td>
+                    <td>
+                      <input
+                        className="edit-input memo-input"
+                        value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
+                        onChange={(e) => setDraftMemo(r._id, e.target.value)}
+                        placeholder=""
+                      />
+                    </td>
+                    <td className="center">
+                      <input
+                        type="checkbox"
+                        checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
+                        onChange={(e) => setDraftFlag(r._id, e.target.checked)}
+                      />
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+/* ===== 내부 컴포넌트: DateTriple ===== */
+function DateTriple({ y, m, d, onY, onM, onD }) {
+  const yearOptions = useMemo(() => {
+    const thisYear = new Date().getFullYear();
+    const arr = [];
+    for (let yy = thisYear; yy >= thisYear - 10; yy--) arr.push(yy);
+    return arr;
+  }, []);
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+  const maxDay = new Date(y, m, 0).getDate();
+  return (
+    <div className="date-triple">
+      <select value={y} onChange={(e) => onY(+e.target.value)}>
+        {yearOptions.map((yy) => (<option key={yy} value={yy}>{yy}년</option>))}
+      </select>
+      <select value={m} onChange={(e) => onM(+e.target.value)}>
+        {monthOptions.map((mm) => (<option key={mm} value={mm}>{mm}월</option>))}
+      </select>
+      <select value={Math.min(d, maxDay)} onChange={(e) => onD(+e.target.value)}>
+        {Array.from({ length: maxDay }, (_, i) => i + 1).map((dd) => (<option key={dd} value={dd}>{dd}일</option>))}
+      </select>
     </div>
   );
 }

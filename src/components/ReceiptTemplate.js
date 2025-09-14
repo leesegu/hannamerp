@@ -1,7 +1,17 @@
 // components/ReceiptTemplate.js
 import React from "react";
 
-export default function ReceiptTemplate({ item, refProp }) {
+/* 로고 기본 경로 (필요시 경로만 바꿔서 사용) */
+import headerLogoDefault from "../assets/logo-header.png";   // 상단 로고
+import brandLogoDefault from "../assets/logo-brand.png";     // 하단 로고
+
+export default function ReceiptTemplate({
+  item,
+  refProp,
+  /* 외부에서 덮어쓰기 가능 */
+  logoSrc = headerLogoDefault,
+  brandLogoSrc = brandLogoDefault,
+}) {
   if (!item) return null;
 
   const parseAmount = (value) =>
@@ -10,153 +20,311 @@ export default function ReceiptTemplate({ item, refProp }) {
   const currency = (value) =>
     parseAmount(value) > 0 ? `${parseAmount(value).toLocaleString()}원` : null;
 
+  /* ===== Theme ===== */
+  const ACCENT = "#6d28d9";
+  const ACCENT_SOFT = "rgba(109,40,217,.08)";
+  const LINE = "#e6e8ef";
+  const TEXT = "#111827";
+  const MUTED = "#6b7280";
+  const CARD = "#ffffff";
+
+  /* ▶ 금액 색상을 아주 조금 옅게 표시할 라이트 톤 */
+  const LIGHT_ACCENT = "#7c3aed";
+
+  const sectionCard = {
+    background: CARD,
+    border: `1px solid ${LINE}`,
+    borderRadius: 12,
+    boxShadow: "0 4px 18px rgba(17,24,39,.06)",
+  };
+
+  /* 안내 문구 (개행/띄어쓰기 그대로 유지) */
+  const NOTICE_TEXT =
+`※ 위 금액은 현금가 기준으로 산정된 금액입니다.
+현금영수증 또는 세금계산서를 요청 시 해당 항목은 정가로 적용됩니다.
+단, 공과금(관리비, 수도, 전기요금 등)은 실비정산 항목으로 영수증 발급 대상이 아닙니다.`;
+
+  const InfoRow = ({ label, value }) => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "110px 1fr",
+        gap: 10,
+        alignItems: "center",
+        padding: "8px 0",
+        borderBottom: `1px dashed ${LINE}`,
+      }}
+    >
+      <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 700, letterSpacing: ".02em" }}>
+        {label}
+      </div>
+      {/* 값 폰트 크기 소폭 증가 */}
+      <div style={{ fontSize: 15.2, color: TEXT, fontWeight: 600, wordBreak: "keep-all" }}>
+        {value}
+      </div>
+    </div>
+  );
+
+  const MoneyRow = ({ label, value, isSub = false }) => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: 10,
+        alignItems: "center",
+        padding: "10px 12px",
+        background: isSub ? "rgba(246,247,251,.6)" : CARD,
+        border: `1px solid ${LINE}`,
+        borderRadius: 10,
+      }}
+    >
+      <div style={{ fontSize: 14, color: isSub ? "#374151" : "#111827", fontWeight: isSub ? 600 : 700 }}>
+        {label}
+      </div>
+      {/* 금액 색상을 아주 살짝 더 옅은 보라로 */}
+      <div
+        style={{
+          fontVariantNumeric: "tabular-nums",
+          fontSize: 15.5,
+          color: LIGHT_ACCENT,
+          fontWeight: 800,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+
   return (
     <div
       ref={refProp}
       style={{
-        width: "440px",
-        padding: "28px 36px",
-        border: "1px solid #ccc",
-        borderRadius: "10px",
-        backgroundColor: "#ffffff",
-        fontFamily: "'Noto Sans KR', sans-serif",
-        fontSize: "15px",
-        color: "#111",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-        lineHeight: "1.6",
-        wordBreak: "keep-all",
+        width: 600,
+        padding: 16,
+        backgroundColor: "#f7f8fb",
+        fontFamily: "'Noto Sans KR', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        color: TEXT,
         WebkitFontSmoothing: "antialiased",
-        MozOsxFontSmoothing: "grayscale"
+        MozOsxFontSmoothing: "grayscale",
+        lineHeight: 1.5,
+        borderRadius: 14,
+        border: `1px solid ${LINE}`,
+        boxShadow: "0 8px 24px rgba(17,24,39,.08)",
       }}
     >
-      <h2 style={{
-        textAlign: "center",
-        marginBottom: "20px",
-        fontSize: "21px",
-        fontWeight: "800",
-        borderBottom: "2px solid #ff8c00",
-        paddingBottom: "12px",
-        color: "#222"
-      }}>
-        🧾 이사 정산 영수증
-      </h2>
+      {/* ===== 상단 헤더 (로고 더 큼 + 테두리 제거) ===== */}
+      <div
+        style={{
+          ...sectionCard,
+          padding: "12px 14px",
+          marginBottom: 10,
+          background: `linear-gradient(0deg, ${CARD}, ${CARD}), radial-gradient(120% 120% at 0% 0%, ${ACCENT_SOFT}, transparent)`,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        {/* 상단 로고 이미지 */}
+        <img
+          src={logoSrc}
+          alt="logo"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            objectFit: "cover",
+            border: "none",
+            background: "transparent",
+          }}
+        />
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <tbody>
-          <Row label="이사날짜" value={item.moveOutDate} />
-          <Row label="빌라명" value={item.name} />
-          <Row label="호수" value={item.roomNumber} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 18,
+              fontWeight: 900,
+              letterSpacing: ".02em",
+              color: TEXT,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            이사정산 영수증
+          </h2>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+            HanNam Housing Management
+          </div>
+        </div>
+      </div>
 
-          {currency(item.arrears) && <Row label="미납관리비" value={currency(item.arrears)} />}
-          {currency(item.currentFee) && <Row label="당월관리비" value={currency(item.currentFee)} />}
-          {currency(item.waterCost) && <Row label="수도요금" value={currency(item.waterCost)} />}
-          {currency(item.electricity) && <Row label="전기요금" value={currency(item.electricity)} />}
-          {currency(item.tvFee) && <Row label="TV수신료" value={currency(item.tvFee)} />}
-          {currency(item.cleaning) && <Row label="청소비용" value={currency(item.cleaning)} />}
+      {/* ===== 기본 정보 ===== */}
+      <div style={{ ...sectionCard, padding: 12, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+          <div style={{ width: 6, height: 6, borderRadius: 999, background: ACCENT }} />
+          <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 800, letterSpacing: ".02em" }}>
+            기본 정보
+          </div>
+        </div>
+        <div style={{ paddingTop: 2 }}>
+          <InfoRow label="이사날짜" value={item.moveOutDate || "-"} />
+          <InfoRow label="빌라명" value={item.name || "-"} />
+          <InfoRow label="호수" value={item.roomNumber || "-"} />
+        </div>
+      </div>
 
-          {Array.isArray(item.defects) && item.defects.length > 0 && (
-            <>
-              <tr>
-                <td colSpan="2" style={{ padding: "10px 6px 4px", fontWeight: "700", color: "#444" }}>
-                  📌 추가내역
-                </td>
-              </tr>
+      {/* ===== 정산 항목 (2열) ===== */}
+      <div style={{ ...sectionCard, padding: 12, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 6, height: 6, borderRadius: 999, background: ACCENT }} />
+          <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 800, letterSpacing: ".02em" }}>
+            정산 항목
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: 8,
+            gridTemplateColumns: "1fr 1fr",
+          }}
+        >
+          {currency(item.arrears) && <MoneyRow label="미납관리비" value={currency(item.arrears)} />}
+          {currency(item.currentFee) && <MoneyRow label="당월관리비" value={currency(item.currentFee)} />}
+          {currency(item.waterCost) && <MoneyRow label="수도요금" value={currency(item.waterCost)} />}
+          {currency(item.electricity) && <MoneyRow label="전기요금" value={currency(item.electricity)} />}
+          {currency(item.tvFee) && <MoneyRow label="TV수신료" value={currency(item.tvFee)} />}
+          {currency(item.cleaning) && <MoneyRow label="청소비용" value={currency(item.cleaning)} />}
+        </div>
+
+        {/* 추가내역 */}
+        {Array.isArray(item.defects) && item.defects.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "4px 0 6px" }}>
+              <div style={{ width: 6, height: 6, borderRadius: 999, background: ACCENT }} />
+              <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 800, letterSpacing: ".02em" }}>
+                추가내역
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gap: 8,
+                gridTemplateColumns: "1fr 1fr",
+              }}
+            >
               {item.defects.map((def, i) => (
-                <Row
+                <MoneyRow
                   key={i}
                   label={`- ${def.desc}`}
                   value={`${parseAmount(def.amount).toLocaleString()}원`}
                   isSub
                 />
               ))}
-            </>
-          )}
-        </tbody>
-      </table>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* 총 금액 박스 */}
-      <div style={{
-        marginTop: "20px",
-        borderTop: "2px dashed #bbb",
-        paddingTop: "10px",
-        backgroundColor: "#fffdf5",
-        borderRadius: "6px",
-        padding: "8px 12px"
-      }}>
-        <p style={{
-          fontWeight: "700",
-          fontSize: "15.5px",
-          color: "#d35400",
+      {/* ===== 총 금액 ===== */}
+      <div
+        style={{
+          ...sectionCard,
+          padding: 12,
+          marginBottom: 10,
+          background: `linear-gradient(0deg, ${CARD}, ${CARD}), radial-gradient(120% 120% at 0% 0%, ${ACCENT_SOFT}, transparent)`,
+          display: "grid",
+          gridTemplateColumns: "1fr auto",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        {/* ▶ 제목: 검정색 + 더 진하게 */}
+        <div style={{ fontSize: 14.5, color: TEXT, fontWeight: 900, letterSpacing: ".02em" }}>
+          총 이사정산 금액
+        </div>
+        <div
+          style={{
+            fontSize: 20,
+            fontWeight: 900,
+            color: ACCENT,
+            fontVariantNumeric: "tabular-nums",
+            textAlign: "right",
+          }}
+        >
+          {currency(item.total) || "0원"}
+        </div>
+      </div>
+
+      {/* ===== 안내 ===== */}
+      <div style={{ ...sectionCard, padding: 12, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 6,
+              background: ACCENT_SOFT,
+              color: ACCENT,
+              display: "grid",
+              placeItems: "center",
+              fontWeight: 900,
+              fontSize: 11,
+            }}
+          >
+            i
+          </span>
+          <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 800, letterSpacing: ".02em" }}>
+            안내
+          </div>
+        </div>
+        {/* ▶ 사용자 제공 문구를 공백/개행 그대로 유지 */}
+        <div
+          style={{
+            margin: 0,
+            fontSize: 12.8,
+            color: MUTED,
+            lineHeight: 1.55,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {NOTICE_TEXT}
+        </div>
+      </div>
+
+      {/* ===== 하단 브랜드: 중앙정렬 + 로고/텍스트 확대 ===== */}
+      <div
+        style={{
+          ...sectionCard,
+          padding: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
           textAlign: "center",
-          margin: 0
-        }}>
-          총 이사정산 금액: {currency(item.total)}
-        </p>
-      </div>
-
-      {/* 안내문 */}
-      <div style={{
-        marginTop: "16px",
-        fontSize: "13.3px",
-        color: "#666",
-        backgroundColor: "#f9f9f9",
-        padding: "10px 14px",
-        borderRadius: "6px",
-        lineHeight: "1.5"
-      }}>
-        <p style={{ margin: 0 }}>
-          ※ 위 금액은 <strong>현금가 기준</strong>으로 산정된 금액입니다.<br />
-          <strong>현금영수증</strong> 또는 <strong>세금계산서</strong>를 요청하실 경우,<br />해당 항목은 <strong>정가</strong>로 적용됩니다.<br />
-          단, <strong>공과금(관리비, 수도, 전기요금 등)</strong>은 실비 정산 항목으로,<br />
-          영수증 발급 대상이 아닌 점 참고 부탁드립니다.<br />
-          영수증 발급을 원하시는 항목이 있다면 <strong>별도로 말씀해 주세요.</strong>
-        </p>
-      </div>
-
-      {/* 계좌 정보 */}
-      <div style={{ marginTop: "20px", textAlign: "center" }}>
-        <table style={{
-          margin: "0 auto",
-          fontSize: "13.5px",
-          borderCollapse: "collapse",
-          color: "#444"
-        }}>
-          <tbody>
-            <tr>
-              <td style={{
-                fontWeight: "600",
-                padding: "4px 8px",
-                borderBottom: "1px solid #eee"
-              }}>입금은행</td>
-              <td style={{
-                padding: "4px 8px",
-                borderBottom: "1px solid #eee"
-              }}>농협</td>
-            </tr>
-            <tr>
-              <td style={{
-                fontWeight: "600",
-                padding: "4px 8px",
-                borderBottom: "1px solid #eee"
-              }}>계좌번호</td>
-              <td style={{
-                padding: "4px 8px",
-                borderBottom: "1px solid #eee"
-              }}>042-489-8555-009</td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "600", padding: "4px 8px" }}>예금주</td>
-              <td style={{ padding: "4px 8px" }}>이세구</td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* 👇 추가된 하단 브랜드명 문구 */}
-        <div style={{
-          marginTop: "10px",
-          fontSize: "16.5px",
-          color: "#999",
-        }}>
+        }}
+      >
+        <img
+          src={brandLogoSrc}
+          alt="brand"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            objectFit: "cover",
+            border: "none",
+            background: "transparent",
+          }}
+        />
+        <div
+          style={{
+            color: "#8b95a1",
+            fontSize: 16,
+            fontWeight: 900,
+            letterSpacing: ".04em",
+          }}
+        >
           한남주택관리
         </div>
       </div>
@@ -164,21 +332,30 @@ export default function ReceiptTemplate({ item, refProp }) {
   );
 }
 
-const Row = ({ label, value, isSub = false }) => (
-  <tr style={{ backgroundColor: isSub ? "#f9f9f9" : "#fff" }}>
-    <td style={{
-      padding: "6px 6px",
-      fontWeight: isSub ? "400" : "600",
-      fontSize: "14px",
-      borderBottom: "1px solid #eee",
-      color: isSub ? "#666" : "#333"
-    }}>{label}</td>
-    <td style={{
-      padding: "6px 6px",
-      textAlign: "right",
-      borderBottom: "1px solid #eee",
-      fontSize: "14px",
-      color: isSub ? "#666" : "#111"
-    }}>{value}</td>
-  </tr>
+/* (옵션) 호환용 Row - 외부 의존 고려해 유지 */
+export const Row = ({ label, value, isSub = false }) => (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "110px 1fr",
+      gap: 10,
+      alignItems: "center",
+      padding: "6px 0",
+      borderBottom: `1px dashed #e6e8ef`,
+      background: isSub ? "rgba(246,247,251,.6)" : "transparent",
+    }}
+  >
+    <div style={{ fontSize: 12.5, color: "#6b7280", fontWeight: 700 }}>{label}</div>
+    <div
+      style={{
+        fontSize: 14,
+        color: isSub ? "#374151" : "#111827",
+        fontWeight: isSub ? 600 : 700,
+        textAlign: "right",
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {value}
+    </div>
+  </div>
 );

@@ -45,7 +45,7 @@ import CalendarPage from "./pages/CalendarPage";
 /* ✅ 부가서비스 · 도배 */
 import PaperingPage from "./pages/PaperingPage";
 
-/* ✅ 새로 추가: 메모 페이지 */
+/* ✅ 메모 페이지 */
 import MemoPage from "./pages/MemoPage";
 
 import "./App.css";
@@ -153,31 +153,31 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <ReceiptIssuePage />}
       />
 
-      {/* ✅ 관리비회계 · 수입정리 */}
+      {/* ✅ 관리비회계 · 수입정리 (사이드바 콘텐츠로 표시) */}
       <Route
         path="/accounting/income"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <IncomeImportPage />}
       />
 
-      {/* ✅ 전기요금 추출(문자) 페이지 라우트 */}
+      {/* ✅ 전기요금 추출(문자) */}
       <Route
         path="/extract"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <MessageExtractor />}
       />
 
-      {/* ✅ 캘린더 라우트 */}
+      {/* ✅ 캘린더 */}
       <Route
         path="/calendar"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <CalendarPage />}
       />
 
-      {/* ✅ 부가서비스 · 도배 라우트 */}
+      {/* ✅ 부가서비스 · 도배 */}
       <Route
         path="/papering"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <PaperingPage />}
       />
 
-      {/* ✅ 메모 라우트 */}
+      {/* ✅ 메모 */}
       <Route
         path="/memo"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <MemoPage userId={userId} />}
@@ -198,6 +198,8 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       {/* 기초등록/사원 */}
       <Route path="/basic/vendor-register" element={!isLoggedIn ? <Navigate to="/login" replace /> : <VendorRegisterPage />} />
       <Route path="/employee" element={!isLoggedIn ? <Navigate to="/login" replace /> : <EmployeePage />} />
+
+      {/* ⚠️ '/settings/accounting' 라우트는 제거 — 전체화면 방지 */}
 
       {/* 와일드카드 */}
       <Route
