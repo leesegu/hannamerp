@@ -21,6 +21,8 @@ import MoveInCleaningPage from "../pages/MoveInCleaningPage";
 import Dashboard from "../pages/Dashboard";
 /* 관리비회계 · 수입정리 */
 import IncomeImportPage from "../pages/IncomeImportPage";
+/* ✅ 관리비회계 · 지출정리 (추가) */
+import ExpensePage from "../pages/ExpensePage";
 /* 전기요금 추출(문자) */
 import MessageExtractor from "../pages/MessageExtractor";
 /* 캘린더 */
@@ -283,6 +285,11 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                     setActiveMenu(item);
                     if (item === "수입정리") {
                       handleNavigate(<IncomeImportPage />, item);
+                      return;
+                    }
+                    /* ✅ 지출정리 연결 추가 */
+                    if (item === "지출정리") {
+                      handleNavigate(<ExpensePage />, item);
                       return;
                     }
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
