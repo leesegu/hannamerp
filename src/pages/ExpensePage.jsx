@@ -5,12 +5,13 @@ import React, {
 import "./ExpensePage.css";
 import { db } from "../firebase";
 import {
-  collection, getDocs, addDoc, serverTimestamp, query, orderBy, where, limit,
+  collection, getDocs, addDoc, serverTimestamp, query, where, limit,
 } from "firebase/firestore";
 
 /** ====== 상수 ====== */
 const INITIAL_ROWS = 20;
 const LS_KEY = "ExpensePage:WIP:v1";
+const LS_HOLD_KEY = "ExpensePage:HOLD:v1";
 
 /** 숫자 유틸 */
 const toNumber = (v) => {
@@ -28,20 +29,123 @@ const todayYMD = () => {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
 };
+const weekdayKo = ["일", "월", "화", "수", "목", "금", "토"];
+const getWeekdayLabel = (ymd) => {
+  const d = new Date(ymd);
+  if (isNaN(d)) return "";
+  return `(${weekdayKo[d.getDay()]})`;
+};
 
 /** 행 기본값 */
 const makeEmptyRow = (i) => ({
   no: i + 1,
-  mainId: "",     // 대분류: acct_expense_main.id
-  mainName: "",   // 표시용
-  subName: "",    // 소분류는 문자열(해당 대분류의 subs 값)
+  mainId: "",
+  mainName: "",
+  subName: "",
   desc: "",
   amount: "",
-  inAccount: "",  // 입금 계좌번호 (자유입력 + 제안 선택)
-  outMethod: "",  // 출금계좌(결제방법) - 이름 문자열
-  paid: "",       // ✅ 기본값 = 빈칸
+  inAccount: "",
+  outMethod: "",
+  paid: "",
   note: "",
 });
+
+const hasAnyContent = (rows) =>
+  rows.some((r) => r.mainId || r.subName || r.desc || toNumber(r.amount) || r.inAccount || r.outMethod || r.paid || r.note);
+
+/* ========== 공통 모달 래퍼 ========== */
+function Modal({ open, onClose, title, children, width = 720, showCloseX = true }) {
+  if (!open) return null;
+  return (
+    <div className="xp-modal-backdrop" onMouseDown={(e)=>{ if (e.target.classList.contains("xp-modal-backdrop")) onClose?.(); }}>
+      <div className="xp-modal" style={{ width }}>
+        <div className="xp-modal-head">
+          <div className="xp-modal-title">{title}</div>
+          {showCloseX && (
+            <button className="xp-modal-close" onClick={onClose} title="닫기">
+              <i className="ri-close-line" />
+            </button>
+          )}
+        </div>
+        <div className="xp-modal-body">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========== 커스텀 달력 (화려/깔끔) ========== */
+function ymdToDate(ymd) {
+  const [y,m,d] = (ymd||"").split("-").map((x)=>parseInt(x,10));
+  if(!y||!m||!d) return new Date();
+  return new Date(y, m-1, d);
+}
+function toYMD(d) {
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function getMonthMatrix(year, month){
+  const first = new Date(year, month, 1);
+  const startWeekday = first.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const prevDays = startWeekday;
+  const totalCells = Math.ceil((prevDays + daysInMonth)/7)*7;
+  const cells = [];
+  for(let i=0; i<totalCells; i++){
+    const dayNum = i - prevDays + 1;
+    const date = new Date(year, month, dayNum);
+    const inMonth = dayNum>=1 && dayNum<=daysInMonth;
+    cells.push({ date, inMonth });
+  }
+  return cells;
+}
+function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜 선택" }) {
+  const base = defaultDate ? ymdToDate(defaultDate) : new Date();
+  const [view, setView] = useState({ y: base.getFullYear(), m: base.getMonth() });
+  const cells = useMemo(()=>getMonthMatrix(view.y, view.m), [view]);
+  const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+  const go = (delta)=> setView((v)=> {
+    const m = v.m + delta;
+    const y = v.y + Math.floor(m/12);
+    const nm = (m%12+12)%12;
+    return { y, m: nm };
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} title={titleText} width={380}>
+      <div className="cal-wrap">
+        <div className="cal-top">
+          <button className="cal-nav" onClick={()=>go(-1)} title="이전 달"><i className="ri-arrow-left-s-line"/></button>
+          <div className="cal-title">
+            <div className="cal-month">{months[view.m]}</div>
+            <div className="cal-year">{view.y}</div>
+          </div>
+          <button className="cal-nav" onClick={()=>go(1)} title="다음 달"><i className="ri-arrow-right-s-line"/></button>
+        </div>
+        <div className="cal-head">
+          {["일","월","화","수","목","금","토"].map((w)=><div key={w} className="cal-head-cell">{w}</div>)}
+        </div>
+        <div className="cal-grid">
+          {cells.map((c, idx)=>{
+            const isToday = toYMD(c.date) === toYMD(new Date());
+            return (
+              <button
+                key={idx}
+                className={`cal-cell ${c.inMonth ? "" : "muted"} ${isToday ? "today": ""}`}
+                onClick={()=>{ onPick?.(toYMD(c.date)); onClose?.(); }}
+                title={toYMD(c.date)}
+              >
+                <span className="cal-daynum">{c.date.getDate()}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 /** ====== 간단 드롭다운 ====== */
 const SimpleCombo = forwardRef(function SimpleCombo(
@@ -51,6 +155,7 @@ const SimpleCombo = forwardRef(function SimpleCombo(
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [focus, setFocus] = useState(false);
+  const btnRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
@@ -59,6 +164,7 @@ const SimpleCombo = forwardRef(function SimpleCombo(
       setFocus(true);
       setOpen(true);
       setTimeout(() => setFocus(false), 0);
+      btnRef.current?.focus();
     },
   }));
 
@@ -82,6 +188,7 @@ const SimpleCombo = forwardRef(function SimpleCombo(
   return (
     <div className="scombo" ref={wrapRef}>
       <button
+        ref={btnRef}
         type="button"
         className={`xp-input scombo-btn ${!value ? "scombo-placeholder" : ""}`}
         onClick={() => setOpen((v) => !v)}
@@ -106,10 +213,11 @@ const SimpleCombo = forwardRef(function SimpleCombo(
 });
 
 /** ====== 검색형 콤보(입금 계좌번호) ====== */
-const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors, placeholder }, ref) {
+const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors, placeholder, onComplete }, ref) {
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(value || "");
+  const inputRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
@@ -119,10 +227,8 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
 
   useEffect(() => setQ(value || ""), [value]);
 
-  const inputRef = useRef(null);
-
   const list = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = (q || "").trim().toLowerCase();
     const base = vendors || [];
     if (!needle) return base.slice(0, 10);
     return base
@@ -130,7 +236,8 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
         return (
           String(v.vendor).toLowerCase().includes(needle) ||
           String(v.accountName).toLowerCase().includes(needle) ||
-          String(v.accountNo).toLowerCase().includes(needle)
+          String(v.accountNo).toLowerCase().includes(needle) ||
+          String(v.bank).toLowerCase().includes(needle)
         );
       })
       .slice(0, 12);
@@ -149,6 +256,7 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
     const label = [hit.bank, hit.accountNo, hit.accountName].filter(Boolean).join(" ");
     onChange(label, hit);
     setOpen(false);
+    onComplete?.();
   };
 
   const onKeyDown = (e) => {
@@ -158,6 +266,7 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
       } else {
         onChange(q, null);
         setOpen(false);
+        onComplete?.();
       }
     }
   };
@@ -202,15 +311,13 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
   );
 });
 
-/** ====== 출금확인 콤보 ======
- * - 목록: 출금대기 / 출금완료
- * - 기본 표시: 빈칸
- * - '출금완료' 시 회색 진하게 + 내용에 선
- */
+/** ====== 출금확인 콤보 ====== */
 const PaidCombo = forwardRef(function PaidCombo({ value, onPick }, ref) {
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const items = ["출금대기", "출금완료"]; // ✅ (공란) 제거, 기본표시는 value가 빈칸이라 버튼엔 공백으로만 보임
+  const items = ["출금대기", "출금완료"];
+
+  const btnRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
@@ -227,8 +334,7 @@ const PaidCombo = forwardRef(function PaidCombo({ value, onPick }, ref) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const btnRef = useRef(null);
-  const label = value || ""; // ✅ 기본은 빈칸
+  const label = value || "";
 
   return (
     <div className="scombo" ref={wrapRef}>
@@ -263,36 +369,159 @@ const PaidCombo = forwardRef(function PaidCombo({ value, onPick }, ref) {
   );
 });
 
+/* ========== 출금보류 모달 컨텐츠 ========== */
+function HoldTable({ rows, setRows }) {
+  const update = (idx, key, val) => {
+    setRows((prev)=>{
+      const next = [...prev];
+      next[idx] = { ...next[idx], [key]: key==="amount" ? fmtComma(val) : val };
+      return next;
+    });
+  };
+  const add = ()=> setRows((prev)=> [...prev, { type:"", desc:"", bank:"", accountNo:"", amount:"", note:"" }]);
+  useEffect(()=>{ if(rows.length===0) add(); },[]);
+
+  // Enter 이동용: data-row / data-col 사용
+  const onEnterNext = (e) => {
+    if (e.key !== "Enter") return;
+    const r = Number(e.currentTarget.getAttribute("data-row"));
+    const c = Number(e.currentTarget.getAttribute("data-col"));
+    const nextCol = Math.min(c + 1, 5);
+    const nextSel = document.querySelector(`input[data-row="${r}"][data-col="${nextCol}"]`);
+    if (nextSel) nextSel.focus();
+  };
+
+  return (
+    <div className="hold-wrap">
+      <div className="hold-table-wrap">
+        <div className="hold-viewport">
+          <table className="hold-table">
+            <thead>
+              <tr>
+                <th style={{width:100}}>구분</th>{/* ↓ 조금 줄임 */}
+                <th style={{width:260}}>내용</th>
+                <th style={{width:100}}>은행</th>{/* ↓ 조금 줄임 */}
+                <th style={{width:180}}>계좌번호</th>
+                <th style={{width:150}}>금액</th>
+                <th>비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i)=>(
+                <tr key={i}>
+                  <td>
+                    <input className="xp-input"
+                      data-row={i} data-col={0}
+                      value={r.type||""}
+                      onChange={(e)=>update(i,"type",e.target.value)}
+                      onKeyDown={onEnterNext}
+                    />
+                  </td>
+                  <td>
+                    <input className="xp-input"
+                      data-row={i} data-col={1}
+                      value={r.desc||""}
+                      onChange={(e)=>update(i,"desc",e.target.value)}
+                      onKeyDown={onEnterNext}
+                    />
+                  </td>
+                  <td>
+                    <input className="xp-input"
+                      data-row={i} data-col={2}
+                      value={r.bank||""}
+                      onChange={(e)=>update(i,"bank",e.target.value)}
+                      onKeyDown={onEnterNext}
+                    />
+                  </td>
+                  <td>
+                    <input className="xp-input"
+                      data-row={i} data-col={3}
+                      value={r.accountNo||""}
+                      onChange={(e)=>update(i,"accountNo",e.target.value)}
+                      onKeyDown={onEnterNext}
+                    />
+                  </td>
+                  <td>
+                    <input className="xp-input xp-amt"
+                      data-row={i} data-col={4}
+                      value={r.amount||""}
+                      onChange={(e)=>update(i,"amount",e.target.value)}
+                      onKeyDown={onEnterNext}
+                    />
+                  </td>
+                  <td>
+                    <input className="xp-input"
+                      data-row={i} data-col={5}
+                      value={r.note||""}
+                      onChange={(e)=>update(i,"note",e.target.value)}
+                      onKeyDown={(e)=>{ if(e.key==="Enter"){ /* 행 마지막: 다음 행 첫 입력으로 */ const nxt = document.querySelector(`input[data-row="${i+1}"][data-col="0"]`); if(nxt) nxt.focus(); } }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="hold-actions">
+        <button className="xp-add-rows" onClick={()=>setRows((p)=>[...p, { type:"", desc:"", bank:"", accountNo:"", amount:"", note:"" }])}>+ 행 추가</button>
+      </div>
+    </div>
+  );
+}
+
 /** ====== 메인 컴포넌트 ====== */
 export default function ExpensePage() {
-  const dateRef = useRef(null);
   const [date, setDate] = useState(todayYMD());
-  const [rows, setRows] = useState(() => Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i)));
+  const [dateModalOpen, setDateModalOpen] = useState(false);
+  const [loadModalOpen, setLoadModalOpen] = useState(false);
 
-  // 드롭다운 원본 데이터
-  const [mainCats, setMainCats] = useState([]);     // [{id, name, subs:[]}]
-  const [payMethods, setPayMethods] = useState([]); // [{id, name}]
-  const [vendors, setVendors] = useState([]);       // [{id,vendor,bank,accountName,accountNo}]
+  const [rows, setRows] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.date) return Array.isArray(parsed.rows) && parsed.rows.length
+          ? parsed.rows
+          : Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+      }
+    } catch {}
+    return Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+  });
 
-  // 각 행 컨트롤 참조/오프너
+  const [mainCats, setMainCats] = useState([]);
+  const [payMethods, setPayMethods] = useState([]);
+  const [vendors, setVendors] = useState([]);
+
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [holdRows, setHoldRows] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_HOLD_KEY);
+      if (raw) return JSON.parse(raw) || [];
+    } catch {}
+    return [];
+  });
+
   const openers = useRef({});
   const registerOpeners = (i, obj) => { openers.current[i] = obj; };
 
-  /** 초기 로드 + 로컬 복구 */
   useEffect(() => {
     (async () => {
       try {
-        const qsMain = await getDocs(query(collection(db, "acct_expense_main"), orderBy("order", "asc")));
-        const mains = qsMain.docs.map((d) => {
-          const x = { id: d.id, ...(d.data() || {}) };
-          return { id: x.id, name: x.name || x.title || "", subs: Array.isArray(x.subs) ? x.subs : [] };
-        });
+        const qsMain = await getDocs(collection(db, "acct_expense_main"));
+        const mains = qsMain.docs
+          .map((d) => ({ id: d.id, ...(d.data() || {}) }))
+          .sort((a,b)=> (a.order??0)-(b.order??0))
+          .map((x)=>({ id:x.id, name:x.name || x.title || "", subs: Array.isArray(x.subs)?x.subs:[] }));
         setMainCats(mains);
       } catch { setMainCats([]); }
 
       try {
-        const qsPay = await getDocs(query(collection(db, "acct_payment_methods"), orderBy("order", "asc")));
-        const pays = qsPay.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })).map((x) => ({ id: x.id, name: x.name || x.title || "" }));
+        const qsPay = await getDocs(collection(db, "acct_payment_methods"));
+        const pays = qsPay.docs
+          .map((d) => ({ id: d.id, ...(d.data() || {}) }))
+          .sort((a,b)=> (a.order??0)-(b.order??0))
+          .map((x)=>({ id:x.id, name:x.name || x.title || "" }));
         setPayMethods(pays);
       } catch { setPayMethods([]); }
 
@@ -307,25 +536,11 @@ export default function ExpensePage() {
         }));
         setVendors(v);
       } catch { setVendors([]); }
-
-      // 로컬 미저장 작업 복구
-      try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.date) setDate(parsed.date);
-          if (Array.isArray(parsed?.rows) && parsed.rows.length) {
-            setRows(parsed.rows.map((r, i) => ({ ...makeEmptyRow(i), ...r })));
-          }
-        }
-      } catch {}
     })();
   }, []);
 
-  /** 합계 */
   const total = useMemo(() => rows.reduce((acc, r) => acc + toNumber(r.amount), 0), [rows]);
 
-  /** 행 변경 처리 */
   const updateRow = (idx, patch) => {
     setRows((prev) => {
       const next = [...prev];
@@ -335,106 +550,115 @@ export default function ExpensePage() {
         row.mainName = mainCats.find((m) => m.id === patch.mainId)?.name || "";
       }
       next[idx] = row;
+      try { localStorage.setItem(LS_KEY, JSON.stringify({ date, rows: next })); } catch {}
       return next;
     });
   };
 
-  /** 빈 행 추가 */
   const addRows = (n = 10) => {
     setRows((prev) => {
       const start = prev.length;
       const extra = Array.from({ length: n }, (_, i) => makeEmptyRow(start + i));
-      return [...prev, ...extra];
+      const next = [...prev, ...extra];
+      try { localStorage.setItem(LS_KEY, JSON.stringify({ date, rows: next })); } catch {}
+      return next;
     });
   };
 
-  /** 로컬 WIP 자동 저장 */
   useEffect(() => {
-    const payload = { date, rows };
-    try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch {}
-  }, [date, rows]);
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ date, rows })); } catch {}
+  }, [date]);
 
-  /** 저장 */
-  const onSave = async () => {
-    const cleaned = rows
+  const saveToFirestore = async (theDate, theRows) => {
+    const cleaned = (theRows || [])
       .map((r) => ({ ...r, amount: toNumber(r.amount) }))
       .filter((r) =>
         r.mainId || r.subName || r.desc || r.amount || r.inAccount || r.outMethod || r.paid || r.note
       );
+    if (cleaned.length === 0) return false;
 
-    if (cleaned.length === 0) {
-      alert("저장할 내용이 없습니다.");
-      return;
-    }
+    await addDoc(collection(db, "expenses"), {
+      date: theDate,
+      rows: cleaned.map((r, i) => ({
+        no: i + 1,
+        mainId: r.mainId,
+        mainName: r.mainName,
+        subName: r.subName,
+        desc: r.desc,
+        amount: toNumber(r.amount),
+        inAccount: r.inAccount,
+        outMethod: r.outMethod,
+        paid: r.paid || "",
+        note: r.note,
+      })),
+      total: cleaned.reduce((acc, r)=>acc + toNumber(r.amount), 0),
+      createdAt: serverTimestamp(),
+    });
+    return true;
+  };
 
+  const onSave = async () => {
     try {
-      await addDoc(collection(db, "expenses"), {
-        date,
-        rows: cleaned.map((r) => ({
-          no: r.no,
-          mainId: r.mainId,
-          mainName: r.mainName,
-          subName: r.subName,
-          desc: r.desc,
-          amount: r.amount,
-          inAccount: r.inAccount,
-          outMethod: r.outMethod,
-          paid: r.paid,
-          note: r.note,
-        })),
-        total,
-        createdAt: serverTimestamp(),
-      });
+      const changed = await saveToFirestore(date, rows);
+      if (!changed) { alert("저장할 내용이 없습니다."); return; }
 
-      // ✅ 저장 성공 처리
       alert("저장되었습니다.");
       try { localStorage.removeItem(LS_KEY); } catch {}
 
-      // ✅ 테이블 비우기(초기 빈 행으로 재설정)
-      setRows(Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i)));
-
+      const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+      setRows(init);
     } catch (err) {
       console.error(err);
       alert("저장 중 오류가 발생했습니다.");
     }
   };
 
-  /** 불러오기: 현재 날짜 최신 1건 */
-  const onLoad = async () => {
+  /** 🔧 인덱스 없이 동작하도록 수정: where(date)==target + limit 후 클라이언트 정렬 */
+  const performLoadForDate = async (targetYMD) => {
     try {
+      if (hasAnyContent(rows)) {
+        await saveToFirestore(date, rows);
+      }
+
       const qs = await getDocs(
         query(
           collection(db, "expenses"),
-          where("date", "==", date),
-          orderBy("createdAt", "desc"),
-          limit(1)
+          where("date", "==", targetYMD),
+          limit(50)
         )
       );
-      if (qs.empty) {
-        alert("해당 날짜의 저장된 데이터가 없습니다.");
-        return;
+
+      let padded = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+      if (!qs.empty) {
+        const docs = qs.docs.map(d => ({ id: d.id, ...(d.data()||{}) }));
+        // createdAt 내림차순으로 클라이언트 정렬
+        docs.sort((a,b)=>{
+          const ta = a.createdAt?.toMillis?.() ?? 0;
+          const tb = b.createdAt?.toMillis?.() ?? 0;
+          return tb - ta;
+        });
+        const data = docs[0];
+        const loadedRows = Array.isArray(data.rows) ? data.rows : [];
+        const normalized = loadedRows.map((r, i) => ({
+          ...makeEmptyRow(i),
+          ...r,
+          no: i + 1,
+          amount: r.amount ? fmtComma(r.amount) : "",
+          paid: r.paid || "",
+        }));
+        const pad = Math.max(0, INITIAL_ROWS - normalized.length);
+        padded = pad > 0
+          ? [...normalized, ...Array.from({ length: pad }, (_, k) => makeEmptyRow(normalized.length + k))]
+          : normalized;
       }
-      const data = qs.docs[0].data() || {};
-      const loadedRows = Array.isArray(data.rows) ? data.rows : [];
 
-      const normalized = loadedRows.map((r, i) => ({
-        ...makeEmptyRow(i),
-        ...r,
-        no: i + 1,
-        amount: r.amount ? fmtComma(r.amount) : "",
-        paid: r.paid || "", // ✅ 기본 빈칸 유지
-      }));
-      const pad = Math.max(0, INITIAL_ROWS - normalized.length);
-      const padded = pad > 0
-        ? [...normalized, ...Array.from({ length: pad }, (_, k) => makeEmptyRow(normalized.length + k))]
-        : normalized;
-
+      setDate(targetYMD);
       setRows(padded);
-      try { localStorage.setItem(LS_KEY, JSON.stringify({ date, rows: padded })); } catch {}
+      try { localStorage.setItem(LS_KEY, JSON.stringify({ date: targetYMD, rows: padded })); } catch {}
       alert("불러오기가 완료되었습니다.");
     } catch (e) {
       console.error(e);
-      alert("불러오기 중 오류가 발생했습니다.");
+      alert("불러오기 중 오류가 발생했습니다. (네트워크/권한 확인)");
     }
   };
 
@@ -443,44 +667,63 @@ export default function ExpensePage() {
     if (next?.openMain) next.openMain();
   };
 
+  const saveHoldToLocal = () => {
+    try {
+      localStorage.setItem(LS_HOLD_KEY, JSON.stringify(holdRows));
+      alert("출금보류 목록이 저장되었습니다.");
+      setHoldOpen(false);
+    } catch {
+      alert("출금보류 저장 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <div className="xp-page">
-      {/* 상단 바: 좌측 버튼 / 우측 축소 패널 */}
+      {/* 상단 바 */}
       <div className="xp-top slim fancy">
         <div className="xp-actions">
-          <button className="xp-btn xp-load small" onClick={onLoad} title="불러오기">불러오기</button>
+          <button className="xp-btn xp-load small" onClick={()=>setLoadModalOpen(true)} title="불러오기">불러오기</button>
           <button className="xp-btn xp-save small" onClick={onSave} title="저장">저장</button>
+          <button className="xp-btn xp-hold small" onClick={()=>setHoldOpen(true)} title="출금보류">출금보류</button>
         </div>
 
-        <div
-          className="xp-side fancy-panel narrow"
-          onClick={() => document.activeElement?.blur()}
-        >
+        <div className="xp-side fancy-panel narrow" onClick={()=>document.activeElement?.blur()}>
           <div className="xp-side-row xp-side-sum">
             <div className="xp-side-label">합계</div>
             <div className="xp-side-krw">₩</div>
             <div className="xp-side-val">{fmtComma(total) || "-"}</div>
           </div>
+
+          {/* 지출일자: 날짜 왼쪽, 요일 오른쪽으로 분리 */}
           <div
             className="xp-side-row xp-side-date"
-            onClick={(e) => {
-              const input = e.currentTarget.querySelector("input[type='date']");
-              input?.showPicker?.();
-            }}
+            onClick={() => setDateModalOpen(true)}
+            role="button"
+            title="날짜 선택"
           >
             <div className="xp-side-label">지출일자</div>
-            <input
-              ref={dateRef}
-              type="date"
-              className="xp-date-input"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
+
+            {/* 시각적으로 보이는 날짜 박스 (왼쪽 정렬) */}
+            <div className="xp-date-wrap">
+              <div className="xp-date-display">
+                <span className="xp-date-text">{date}</span>
+                <button
+                  className="xp-date-open"
+                  onClick={(e)=>{ e.stopPropagation(); setDateModalOpen(true); }}
+                  title="달력 열기"
+                >
+                  <i className="ri-calendar-2-line" />
+                </button>
+              </div>
+
+              {/* 요일 뱃지: 우측에 별도 배치 */}
+              <span className="xp-weekday">{getWeekdayLabel(date)}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 테이블 (스크롤 가능) */}
+      {/* 테이블 */}
       <div className="xp-table-wrap scrollable">
         <table className="xp-table">
           <thead>
@@ -517,6 +760,31 @@ export default function ExpensePage() {
       <div className="xp-bottom-actions">
         <button className="xp-add-rows" onClick={() => addRows(10)}>+ 10줄 더 추가</button>
       </div>
+
+      {/* 모달들 */}
+      <CalendarModal
+        open={dateModalOpen}
+        defaultDate={date}
+        titleText="지출일자 날짜선택"
+        onPick={(ymd)=>{ setDate(ymd); try { localStorage.setItem(LS_KEY, JSON.stringify({ date: ymd, rows })); } catch {} }}
+        onClose={()=>setDateModalOpen(false)}
+      />
+
+      <CalendarModal
+        open={loadModalOpen}
+        defaultDate={date}
+        titleText="불러오기 날짜선택"
+        onPick={(ymd)=>performLoadForDate(ymd)}
+        onClose={()=>setLoadModalOpen(false)}
+      />
+
+      <Modal open={holdOpen} onClose={()=>setHoldOpen(false)} title="출금보류" width={960} showCloseX={false}>
+        <HoldTable rows={holdRows} setRows={setHoldRows} />
+        <div className="hold-footer">
+          <button className="xp-btn xp-save small" onClick={saveHoldToLocal}>저장</button>
+          <button className="xp-add-rows" onClick={()=>setHoldOpen(false)}>닫기</button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -556,7 +824,6 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
     <tr className={isPaidDone ? "xp-tr-paid" : ""}>
       <td className="xp-td-no">{row.no}</td>
 
-      {/* 대분류 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <SimpleCombo
           ref={mainRef}
@@ -570,7 +837,6 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
         />
       </td>
 
-      {/* 소분류 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <SimpleCombo
           ref={subRef}
@@ -584,7 +850,6 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
         />
       </td>
 
-      {/* 내용 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <input
           ref={descRef}
@@ -595,7 +860,6 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
         />
       </td>
 
-      {/* 금액 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <input
           ref={amtRef}
@@ -607,7 +871,6 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
         />
       </td>
 
-      {/* 입금 계좌번호 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <AccountCombo
           ref={inAccRef}
@@ -615,10 +878,13 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
           onChange={(v) => onChange({ inAccount: v })}
           vendors={vendors}
           placeholder="거래처/예금주/계좌번호 검색"
+          onComplete={() => {
+            outRef.current?.open?.();
+            outRef.current?.focus?.();
+          }}
         />
       </td>
 
-      {/* 출금계좌 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <SimpleCombo
           ref={outRef}
@@ -632,19 +898,17 @@ function RowEditor({ idx, row, mains, payMethods, vendors, onChange, registerOpe
         />
       </td>
 
-      {/* 출금확인 */}
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
         <PaidCombo
           ref={paidRef}
           value={row.paid}
           onPick={(v) => {
-            onChange({ paid: v || "" }); // ✅ 빈칸 허용
+            onChange({ paid: v || "" });
             if (v) setTimeout(() => noteRef.current?.focus(), 0);
           }}
         />
       </td>
 
-      {/* 비고 (회색 처리 제외) */}
       <td>
         <input
           ref={noteRef}

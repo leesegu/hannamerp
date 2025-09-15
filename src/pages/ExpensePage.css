@@ -1,25 +1,29 @@
+/* src/pages/ExpensePage.css */
+
 /* ===== 전체 레이아웃 ===== */
 .xp-page {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px;
+  padding: 10px 12px;
   background: #ffffff;
   height: 100%;
   box-sizing: border-box;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+  overflow: hidden; /* 상단 패널 그림자 등이 잘리지 않게 */
 }
 
 /* ===== 상단 바 (좌:버튼 / 우:축소 패널) ===== */
 .xp-top {
   display: grid;
-  grid-template-columns: 1fr auto; /* 우측 패널을 끝으로 붙임 */
+  grid-template-columns: 1fr max-content; /* ✅ 우측 ‘여분 칸’ 제거 */
   gap: 12px;
   align-items: stretch;
-  position: relative;   /* ✅ 잘림 방지 */
-  z-index: 2;           /* ✅ 상단이 다른 요소에 가려지지 않도록 */
+  position: relative;
+  z-index: 2;
+  overflow: visible;
 }
-.xp-top.slim { grid-template-columns: 1fr auto; }
+.xp-top.slim { grid-template-columns: 1fr max-content; }
 .xp-top.fancy { margin-bottom: 2px; }
 
 /* 좌측 버튼 그룹 */
@@ -27,88 +31,160 @@
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: max-content;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   justify-content: start;
 }
 
-/* 공통 버튼 */
+/* ===== 버튼 리뉴얼 (완전 새 디자인 + 아이콘) ===== */
 .xp-btn {
-  height: 38px;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 18px;
+  border: 0;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: 14px;
   color: #fff;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: .2px;
+  position: relative;
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.14),
+    inset 0 1px 0 rgba(255,255,255,.35);
+  transition: transform .08s ease, box-shadow .18s ease, filter .12s ease;
+}
+.xp-btn i { font-size: 18px; line-height: 1; }
+.xp-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.45); }
+.xp-btn:active { transform: translateY(1px) scale(.99); }
+
+.xp-load {
+  /* 보라 글로시 + 테두리 그라데이션 */
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  outline: 2px solid transparent;
+  outline-offset: 0;
+  --border1: rgba(216,180,254,.65);
+  --border2: rgba(124,58,237,.65);
+  box-shadow:
+    0 8px 22px rgba(124,58,237,.34),
+    inset 0 1px 0 rgba(255,255,255,.4);
+  border-image: linear-gradient(135deg, var(--border1), var(--border2)) 1;
+}
+.xp-load:hover { filter: brightness(1.06); box-shadow: 0 14px 30px rgba(124,58,237,.44), inset 0 1px 0 rgba(255,255,255,.55); }
+
+.xp-save {
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow:
+    0 8px 22px rgba(37,99,235,.34),
+    inset 0 1px 0 rgba(255,255,255,.4);
+}
+.xp-save:hover { filter: brightness(1.06); box-shadow: 0 14px 30px rgba(37,99,235,.44), inset 0 1px 0 rgba(255,255,255,.55); }
+
+.xp-hold {
+  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  box-shadow:
+    0 8px 22px rgba(217,119,6,.34),
+    inset 0 1px 0 rgba(255,255,255,.4);
+}
+.xp-hold:hover { filter: brightness(1.06); box-shadow: 0 14px 30px rgba(217,119,6,.44), inset 0 1px 0 rgba(255,255,255,.55); }
+
+/* ===== 우측: 합계/지출일자 패널 — 완전 새 디자인 ===== */
+.xp-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 360px;                 /* ✅ 사이즈 확장 */
+  padding: 18px 20px;
+  margin-right: 16px;           /* ✅ 우측 트리밍 방지: 살짝 안쪽 */
+  border-radius: 20px;
+  background: rgba(255,255,255,0.66);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.16);
+  border: 2px solid transparent;
+  background-clip: padding-box, border-box;
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(245,243,255,0.78)),
+    linear-gradient(135deg, #a78bfa, #ec4899, #60a5fa);
+}
+
+/* 기존 grid 레이아웃 대신 카드 내부에서 수평 정렬 */
+.xp-side-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+}
+
+/* 합계 카드 */
+.xp-side-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+  box-shadow: inset 0 2px 6px rgba(167,139,250,0.22);
+}
+.xp-side-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+  color: #5b21b6;
+}
+.xp-side-krw {
+  font-weight: 900;
+  color: #1f2937;
+  margin-right: 6px;
+}
+.xp-side-val {
+  font-weight: 900;
+  font-size: 22px;             /* ✅ 더 크게 */
+  color: #111827;
+  text-align: right;
+  min-width: 120px;
+}
+
+/* 지출일자 카드 */
+.xp-side-date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.xp-side-date .xp-side-label { color: #5b21b6; }
+
+.xp-date-wrap {
+  position: relative;
+  flex: 1 1 auto;
+}
+.xp-date-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 44px 0 16px;       /* 아이콘 영역 확보 */
+  border: 2px solid #c4b5fd;
+  border-radius: 12px;
+  background: #fdfdff;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.06);
   font-weight: 800;
   font-size: 14px;
-  letter-spacing: 0.2px;
-  box-shadow: 0 10px 26px rgba(0,0,0,0.12);
-  transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
-}
-.xp-btn.small { height: 38px; font-size: 14px; border-radius: 10px; }
-
-/* 불러오기: 보라 */
-.xp-load {
-  background: linear-gradient(180deg, #e9ddff 0%, #b48cff 55%, #8b5cf6 100%);
-  box-shadow: 0 10px 24px rgba(139,92,246,0.35);
-}
-.xp-load:hover { filter: brightness(1.06); box-shadow: 0 12px 28px rgba(139,92,246,0.45); }
-.xp-load:active { transform: translateY(1px) scale(0.99); }
-
-/* 저장: 블루 */
-.xp-save {
-  background: linear-gradient(180deg, #b9e6ff 0%, #47a3ff 60%, #2f7bdc 100%);
-  box-shadow: 0 10px 24px rgba(71,163,255,0.35);
-}
-.xp-save:hover { filter: brightness(1.06); box-shadow: 0 12px 28px rgba(71,163,255,0.45); }
-.xp-save:active { transform: translateY(1px) scale(0.99); }
-
-/* 우측: 합계/지출일자 패널 (축소 + 우측 정렬) */
-.xp-side {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(168, 85, 247, 0.22);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(216, 180, 254, 0.25) 0%, rgba(216,180,254,0) 60%),
-    linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.78));
-  backdrop-filter: blur(6px);
-  justify-self: end;      /* 우측 정렬 */
-  width: 260px;           /* ✅ 가로 폭 소폭 확대(기존 220px → 260px) */
-}
-.xp-side.narrow { width: 260px; } /* 명시적 클래스 */
-.xp-side.fancy-panel { box-shadow: 0 20px 40px rgba(168,85,247,0.12); }
-
-.xp-side-row {
-  display: grid;
-  grid-template-columns: 90px 60px 1fr;
-  align-items: center;
-  border-bottom: 1px solid rgba(168,85,247,0.18);
-  padding: 6px 10px;
-  font-size: 14px;
-}
-.xp-side-row:last-child { border-bottom: 0; }
-.xp-side-sum {
-  background: linear-gradient(180deg, rgba(243,232,255,0.55), rgba(233,213,255,0.3));
-}
-.xp-side-label { font-weight: 800; color: #3b0764; }
-.xp-side-krw { text-align: center; font-weight: 900; color: #1f2937; }
-.xp-side-val { text-align: right; font-weight: 900; color: #111827; padding-right: 4px; }
-.xp-side-date { grid-template-columns: 90px 1fr; cursor: pointer; }
-.xp-date-input {
-  height: 28px;
-  border: 1px solid #c4b5fd;
-  border-radius: 8px;
-  padding: 0 10px;
-  background: #ffffff;
-  font-size: 13px;
   color: #111827;
-  outline: none;
 }
-.xp-date-input:focus {
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139,92,246,0.22);
+.xp-date-text { flex: 1; text-align: center; }
+.xp-weekday { display: none !important; } /* ✅ 요일 숨김 */
+.xp-date-open {
+  position: absolute;
+  right: 12px; top: 50%; transform: translateY(-50%);
+  border: none; background: transparent; cursor: pointer;
+  color: #7c3aed; font-size: 20px;
 }
 
 /* ===== 테이블 ===== */
@@ -118,28 +194,33 @@
   overflow: hidden;
   background: #fff;
 }
+
+/* ✅ 기본 15행 보이도록 높이 고정 + 스크롤 */
 .xp-table-wrap.scrollable {
-  max-height: calc(100vh - 210px);
+  max-height: calc(36px + 34px * 15 + 10px); /* 헤더 36 + 본문행 34*15 */
   overflow: auto;
 }
 
 /* 스크롤바 연보라 */
 .xp-table-wrap.scrollable::-webkit-scrollbar,
 .combo-panel::-webkit-scrollbar,
-.scombo-panel::-webkit-scrollbar {
+.scombo-panel::-webkit-scrollbar,
+.xp-modal-body::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 .xp-table-wrap.scrollable::-webkit-scrollbar-thumb,
 .combo-panel::-webkit-scrollbar-thumb,
-.scombo-panel::-webkit-scrollbar-thumb {
+.scombo-panel::-webkit-scrollbar-thumb,
+.xp-modal-body::-webkit-scrollbar-thumb {
   background: #d8b4fe;
   border-radius: 8px;
   border: 2px solid #f5f3ff;
 }
 .xp-table-wrap.scrollable::-webkit-scrollbar-track,
 .combo-panel::-webkit-scrollbar-track,
-.scombo-panel::-webkit-scrollbar-track {
+.scombo-panel::-webkit-scrollbar-track,
+.xp-modal-body::-webkit-scrollbar-track {
   background: #faf5ff;
   border-radius: 8px;
 }
@@ -195,22 +276,16 @@
 /* ✅ 출금완료 시 “대분류~출금확인(2~8열)”을 더 진한 회색으로 덮고 내용에도 선 */
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8),
 .xp-td-dim-dark {
-  background: #cbd5e1 !important; /* 더 진한 회색(이전 #e2e8f0 → #cbd5e1) */
+  background: #cbd5e1 !important;
   color: #374151;
 }
-
-/* ✅ 선(취소선) 처리: 해당 범위의 입력/버튼/텍스트에 적용 */
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .xp-input,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-btn,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .combo-input {
   text-decoration: line-through;
-  background-color: #cbd5e1; /* 동일 톤으로 덮음 */
+  background-color: #cbd5e1;
 }
-
-/* 드롭다운 버튼 내부 텍스트가 잘 보이도록 */
-.xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-text {
-  text-decoration: line-through;
-}
+.xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-text { text-decoration: line-through; }
 
 /* ===== 하단 버튼 ===== */
 .xp-bottom-actions {
@@ -265,6 +340,17 @@
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
   text-align: left;
+  width: 100%;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0 28px 0 8px;
+  font-size: 13px;
+  background: #fff;
+}
+.scombo-btn:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 2px rgba(167,139,250,0.25);
 }
 .scombo-placeholder { color: #9ca3af; }
 .scombo-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -284,3 +370,101 @@
 }
 .scombo-item:hover { background: #f3f4f6; }
 .scombo-empty { padding: 10px 12px; color: #6b7280; font-size: 12px; }
+
+/* ===== 모달 공통 ===== */
+.xp-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(17,24,39,0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.xp-modal {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.35);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+.xp-modal-head {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #ede9fe 0%, #faf5ff 100%);
+  border-bottom: 1px solid #e9d5ff;
+}
+.xp-modal-title { font-weight: 900; color: #4c1d95; }
+.xp-modal-close {
+  border: none; background: transparent; cursor: pointer; font-size: 20px; color: #6b7280;
+}
+.xp-modal-body {
+  padding: 12px;
+  overflow: auto;
+}
+
+/* ✅ 출금보류 모달만 가로 더 넓게 (Chrome/Edge 지원) */
+.xp-modal:has(.hold-wrap) {
+  width: 1200px !important;
+}
+
+/* ===== 커스텀 달력 ===== */
+.cal-wrap { display: grid; gap: 8px; }
+.cal-top {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  padding: 6px 4px;
+  background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 100%);
+  border-radius: 12px;
+  color: #fff;
+}
+.cal-title { text-align: center; }
+.cal-month { font-size: 18px; font-weight: 900; line-height: 1; }
+.cal-year { font-size: 12px; opacity: 0.9; }
+.cal-nav {
+  border: none; background: transparent; color: #fff; font-size: 22px; cursor: pointer;
+}
+.cal-head {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  color: #6b21a8; font-weight: 800; font-size: 12px;
+}
+.cal-head-cell { text-align: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-cell {
+  height: 42px; border: 1px solid #e9d5ff; border-radius: 10px; background: #fff;
+  cursor: pointer; position: relative;
+  transition: transform .06s ease, box-shadow .12s ease, background .12s ease;
+}
+.cal-cell:hover { background: #f5f3ff; box-shadow: 0 8px 18px rgba(139,92,246,0.18); transform: translateY(-1px); }
+.cal-cell.muted { opacity: 0.45; }
+.cal-daynum { position: absolute; top: 8px; right: 8px; font-weight: 800; color: #4c1d95; }
+.cal-cell.today { border-color: #8b5cf6; box-shadow: inset 0 0 0 2px #8b5cf6; }
+
+/* ===== 출금보류 테이블 ===== */
+.hold-wrap { display: grid; gap: 8px; }
+.hold-table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+
+/* ✅ 15행 고정 높이 + 스크롤 */
+.hold-viewport {
+  max-height: calc(34px * 15 + 10px); /* 본문행 기준 */
+  overflow: auto;
+}
+
+.hold-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+/* ✅ '구분'과 '은행' 너비 조금 더 줄임 (컴포넌트 인라인 width 덮어쓰기) */
+.hold-table thead th:nth-child(1),
+.hold-table tbody td:nth-child(1) { width: 90px !important; }
+.hold-table thead th:nth-child(3),
+.hold-table tbody td:nth-child(3) { width: 90px !important; }
+
+.hold-table thead th {
+  background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
+  color: #111827; font-weight: 900; font-size: 13px; height: 36px; border-right: 1px solid rgba(0,0,0,0.08);
+}
+.hold-table thead th:last-child { border-right: 0; }
+.hold-table tbody td { border-top: 1px solid #f3f4f6; border-right: 1px solid #f3f4f6; padding: 4px; height: 34px; }
+.hold-table tbody td:last-child { border-right: 0; }
+.hold-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px; }
+.hold-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 10px; }
