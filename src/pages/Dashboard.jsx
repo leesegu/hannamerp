@@ -103,6 +103,136 @@ function getByPath(obj, path) {
   return path.split(".").reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj);
 }
 
+/** ✅ 불리언 체크 통합 */
+function isChecked(v) {
+  if (v === true) return true;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    return ["y", "yes", "true", "1", "on", "checked"].includes(s);
+  }
+  return false;
+}
+
+/** ✅ 여러 경로 중 최초 truthy 불리언 찾기 */
+function truthyByPaths(obj, paths) {
+  for (const p of paths) {
+    const v = getByPath(obj, p);
+    if (isChecked(v)) return true;
+  }
+  return false;
+}
+
+/** ✅ 영수증 ‘입금날짜’ 후보 키들 중 첫 번째 유효 날짜 반환 */
+function getDepositDate(obj) {
+  const candidates = [
+    "depositDate",
+    "paidAt",
+    "paymentDate",
+    "deposit_at",
+    "dates.deposit",
+    "pay.depositDate",
+  ];
+  for (const p of candidates) {
+    const d = toDateSafe(getByPath(obj, p));
+    if (d) return d;
+  }
+  return null;
+}
+
+/** ✅ 금액 추출(여러 후보키 허용) */
+function getAmount(obj) {
+  const candidates = [
+    "amount",
+    "total",
+    "totalAmount",
+    "finalAmount",
+    "settlementAmount",
+    "sum",
+    "pay.amount",
+    "money.total",
+  ];
+  for (const p of candidates) {
+    const raw = getByPath(obj, p);
+    const v = parseInt(String(raw ?? "").replace(/[^0-9-]/g, ""), 10);
+    if (Number.isFinite(v)) return v;
+  }
+  return 0;
+}
+
+/** ✅ 빌라명 / 나머지주소 / 전체주소 추출(미수금 카드용) */
+function getVillaName(obj) {
+  const candidates = ["villaName", "buildingName", "빌라명", "houseName", "name"];
+  for (const p of candidates) {
+    const v = getByPath(obj, p);
+    if (v) return String(v);
+  }
+  return "-";
+}
+/* 🔸 나머지주소: 주소로 대체(fallback)하지 않음 — 값이 없으면 빈 문자열 반환 */
+function getRestAddress(obj) {
+  const candidates = [
+    "restAddress",
+    "addressRest",
+    "addr2",
+    "address2",
+    "detailAddress",
+    "나머지주소",
+    "추가주소",
+  ];
+  for (const p of candidates) {
+    const v = getByPath(obj, p);
+    if (v) return String(v);
+  }
+  return ""; // ← 주소로 대체하지 않음
+}
+/** 🔹 전체 주소 후보키 */
+function getFullAddress(obj) {
+  const candidates = [
+    "address",
+    "addr",
+    "fullAddress",
+    "address1",
+    "주소",
+    "buildingAddress",
+    "addr1",
+  ];
+  for (const p of candidates) {
+    const v = getByPath(obj, p);
+    if (v) return String(v);
+  }
+  // 그래도 없으면 addressDetail이라도 제공
+  const a2 = getByPath(obj, "addressDetail") || "";
+  return String(a2 || "");
+}
+
+/** 금액 포맷 */
+const fmtComma = (n) => {
+  const v = parseInt(String(n ?? "").replace(/[^0-9-]/g, ""), 10);
+  return Number.isFinite(v) ? v.toLocaleString() : "0";
+};
+
+/* ===== 🔹 이사정산 총액 계산 유틸(입금확인 카드용) ===== */
+const toNum = (v) =>
+  v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0);
+
+const sumExtrasFromArray = (extras) =>
+  (extras || []).reduce((acc, it) => acc + (Number(it?.amount || 0) || 0), 0);
+
+const getExtraTotal = (x) => {
+  const sx = Array.isArray(x.extras) ? sumExtrasFromArray(x.extras) : 0;
+  return sx || toNum(x.extraAmount);
+};
+
+const sumMoveoutTotal = (x) =>
+  toNum(x.arrears) +
+  toNum(x.currentMonth) +
+  toNum(x.waterFee) +
+  toNum(x.electricity) +
+  toNum(x.tvFee) +
+  toNum(x.cleaningFee) +
+  getExtraTotal(x);
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -113,6 +243,7 @@ export default function Dashboard() {
   const [villas, setVillas] = useState([]);
   const [moveouts, setMoveouts] = useState([]);
   const [cleanings, setCleanings] = useState([]);
+  const [receipts, setReceipts] = useState([]); // ✅ 미수금(영수증)용
 
   useEffect(() => {
     const qV = query(collection(db, "villas"), orderBy("name", "asc"));
@@ -136,6 +267,14 @@ export default function Dashboard() {
       setCleanings(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsubC();
+  }, []);
+
+  // ✅ 영수증(미수금)
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "receipts"), (snap) => {
+      setReceipts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
   }, []);
 
   /** 상단 섹션(빌라 기반 날짜) 계산 */
@@ -219,24 +358,41 @@ export default function Dashboard() {
   }, [villas, horizonDays]);
 
   /** 하단 섹션(업무 컬렉션) */
-  const todayStr = format(now, "yyyy-MM-dd");
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // 이사정산대기: 오늘 + status=정산대기
+  // ✅ ‘1차정산’ & ‘보증금제외’ 체크 여부 (배지 표시에만 사용)
+  const isFirstAndExclude = (m) => {
+    const firstOk = truthyByPaths(m, [
+      "firstSettlement", "firstSettle", "first", "isFirstSettlement", "firstCheck", "정산1차", "flags.firstSettlement",
+    ]);
+    const excludeOk = truthyByPaths(m, [
+      "excludeDeposit", "withoutDeposit", "depositExcluded", "보증금제외", "flags.excludeDeposit",
+    ]);
+    return firstOk && excludeOk;
+  };
+
+  // ✅ 이사정산대기: 상태=정산대기 + (이전 날짜 포함) … moveDate ≤ 오늘
   const sectionMoveoutWait = useMemo(() => {
     return moveouts
       .filter((m) => {
         const prog = (m.progress || m.status || "").trim();
-        const md = String(m.moveDate || "").slice(0, 10);
-        return prog === "정산대기" && md === todayStr;
+        if (prog !== "정산대기") return false;
+
+        const d = toDateSafe(m.moveDate ?? m.movedate);
+        if (!d) return true; // 날짜 없으면 일단 포함
+        const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        return d0.getTime() <= today0.getTime(); // 과거 + 오늘 포함
       })
       .sort((a, b) => String(a.villaName).localeCompare(String(b.villaName)));
-  }, [moveouts, todayStr]);
+  }, [moveouts]);
 
-  // 이사정산 입금확인: status=입금대기 (✅ 날짜 제거 대상)
+  // ✅ 이사정산 입금확인: 상태=입금대기 (전체 날짜) + 합계 계산
   const sectionMoveoutDeposit = useMemo(() => {
-    return moveouts
+    const items = moveouts
       .filter((m) => (m.progress || m.status || "").trim() === "입금대기")
       .sort((a, b) => String(a.moveDate || "").localeCompare(String(b.movedate || "")));
+    const sum = items.reduce((acc, m) => acc + getAmount(m), 0);
+    return { items, sum };
   }, [moveouts]);
 
   // 입주청소 접수확인: **미접수** 인 모든 날짜
@@ -246,14 +402,33 @@ export default function Dashboard() {
       .sort((a, b) => String(a.createdAt || 0) - String(b.createdAt || 0));
   }, [cleanings]);
 
+  // ✅ 미수금: 영수증발행에서 ‘입금날짜’가 없는 모든 건 + 합계
+  const sectionReceivables = useMemo(() => {
+    const items = receipts
+      .filter((r) => !getDepositDate(r))
+      .map((r) => ({
+        id: r.id,
+        villaName: getVillaName(r),
+        restAddr: getRestAddress(r),        // 나머지주소(없으면 빈 문자열)
+        fullAddr: getFullAddress(r),        // 전체 주소
+        amount: getAmount(r),
+        issueDate: toDateSafe(r.issueDate ?? r.issuedAt ?? r.date), // 정렬용(표시는 안함)
+      }))
+      .sort((a, b) => {
+        const ad = a.issueDate ? a.issueDate.getTime() : 0;
+        const bd = b.issueDate ? b.issueDate.getTime() : 0;
+        return bd - ad; // 최신일자 우선
+      });
+    const sum = items.reduce((acc, r) => acc + (r.amount || 0), 0);
+    return { items, sum };
+  }, [receipts]);
+
   /** D-Day 텍스트/색상 규칙 */
-  // 통신사: 과거는 D+N, 오늘 D-Day, 미래는 D-N
   const ddTextTelco = (diff) =>
     diff < 0 ? `D+${Math.abs(diff)}` : diff === 0 ? "D-Day" : `D-${diff}`;
   const ddClassTelco = (diff) =>
     diff === 0 ? "dash-dd dash-dd--day" : diff < 0 ? "dash-dd dash-dd--plus" : "dash-dd dash-dd--minus";
 
-  // 나머지: 과거 제외 → 오늘 D-Day, 미래 D-N
   const ddTextDefault = (diff) => (diff === 0 ? "D-Day" : `D-${diff}`);
   const ddClassDefault = (diff) => (diff === 0 ? "dash-dd dash-dd--day" : "dash-dd dash-dd--minus");
 
@@ -331,7 +506,6 @@ export default function Dashboard() {
       <div className="dash-card__head">
         <i className={`${icon} dash-card__icon`} />
         <span className="dash-card__title">{title}</span>
-        {/* ✅ 요약(summary) 폰트 더 크게 */}
         <span className="dash-card__meta text-[13.5px] font-semibold">
           {isTelco && summary ? summary : `${items.length}건`}
         </span>
@@ -367,7 +541,8 @@ export default function Dashboard() {
     </div>
   );
 
-  const BottomCard = ({ title, items, renderRow, tone = "default" }) => (
+  /** 하단 카드 (헤더: 제목 → 금액 → 건 순) */
+  const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null }) => (
     <div className="dash-card">
       <div
         className={
@@ -376,7 +551,7 @@ export default function Dashboard() {
         }
       >
         <span className="dash-card__title">{title}</span>
-        {/* ✅ 건수 폰트 살짝 키움 */}
+        {amountText && <span className="dash-head-sum">{amountText}</span>}
         <span className="dash-card__meta text-[13.5px] font-semibold">{items.length}건</span>
       </div>
       <ul className="dash-list">
@@ -390,21 +565,24 @@ export default function Dashboard() {
     </div>
   );
 
+  /** 배지 렌더: 1차정산/보증금제외 */
+  const Badge = ({ children, kind }) => (
+    <span className={`tag ${kind === "first" ? "tag--first" : "tag--exclude"}`}>{children}</span>
+  );
+
   return (
-    // ✅ 사이드바 오른쪽 전체 채움: 좌우 여백 더 좁게(px-3), 가득 채우기
     <div className="dash w-full h-full px-3 py-4 sharp-text bg-white">
-      {/* 전역: 바탕 흰색 고정 */}
       <style>{`
         :root { color-scheme: light; }
         html, body, #root { background: #ffffff !important; }
       `}</style>
 
-      {/* 상단: 기준 → 우측 상단 배치 (범례 삭제) */}
+      {/* 상단: 기준 */}
       <div className="flex items-center justify-end mb-3">
         <HorizonDropdown />
       </div>
 
-      {/* 상단: 5개 섹션 (순서 고정) — gap 약간 줄여서 가로 폭 확보 */}
+      {/* 상단: 5개 섹션 */}
       <div className="dash-grid top" style={{ gap: 10 }}>
         {DATE_SECTIONS.map((sec) => (
           <TopCard
@@ -419,40 +597,73 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* 하단: 3개 섹션 (순서 고정) — gap 약간 줄이기 */}
+      {/* 하단: 4개 섹션 */}
       <div className="dash-grid bottom mt-6" style={{ gap: 10 }}>
+        {/* 이사정산대기 */}
         <BottomCard
           title="이사정산대기"
           items={sectionMoveoutWait}
           tone="amber"
-          renderRow={(m) => (
-            <div className="flex items-center justify-between gap-3 w-full">
-              <div className="min-w-0">
-                <div className="title">{m.villaName || "-"}</div>
-                <div className="sub">
-                  {(m.unitNumber ? `${m.unitNumber} · ` : "")}
-                  {(m.moveDate || "").slice(0, 10)}
+          renderRow={(m) => {
+            const showBadges = isFirstAndExclude(m);
+            return (
+              <div className="flex items-center justify-between gap-3 w-full">
+                <div className="min-w-0">
+                  <div className="title">
+                    {m.villaName || "-"}
+                    {m.unitNumber ? ` ${m.unitNumber}` : ""}
+                    {showBadges && (
+                      <>
+                        {" "}
+                        <Badge kind="first">1차정산</Badge>
+                        {" "}
+                        <Badge kind="exclude">보증금제외</Badge>
+                      </>
+                    )}
+                  </div>
+                  <div className="sub">
+                    {String(m.moveDate || m.movedate || "").slice(0, 10)}
+                  </div>
                 </div>
+                <span className="text-amber-700 font-medium text-[13px]">정산대기</span>
               </div>
-              <span className="text-amber-700 font-medium text-[13px]">정산대기</span>
-            </div>
-          )}
+            );
+          }}
         />
+
+        {/* 이사정산 입금확인 */}
         <BottomCard
           title="이사정산 입금확인"
-          items={sectionMoveoutDeposit}
+          items={sectionMoveoutDeposit.items}
           tone="blue"
-          renderRow={(m) => (
-            <div className="flex items-center justify-between gap-3 w-full">
-              <div className="min-w-0">
-                <div className="title">{m.villaName || "-"}</div>
-                {/* ✅ 날짜 제거: 호수만 표시 */}
-                <div className="sub">{m.unitNumber || "-"}</div>
+          amountText={`${fmtComma(sectionMoveoutDeposit.sum)}원`}
+          renderRow={(m) => {
+            const showBadges = isFirstAndExclude(m);
+            const total = sumMoveoutTotal(m); // 총 이사정산금액
+            return (
+              <div className="flex items-center justify-between gap-3 w-full">
+                <div className="min-w-0">
+                  <div className="title">
+                    {m.villaName || "-"}
+                    {m.unitNumber ? ` ${m.unitNumber}` : ""}
+                    {showBadges && (
+                      <>
+                        {" "}
+                        <Badge kind="first">1차정산</Badge>
+                        {" "}
+                        <Badge kind="exclude">보증금제외</Badge>
+                      </>
+                    )}
+                  </div>
+                  <div className="sub">총 이사정산금액: {fmtComma(total)}원</div>
+                </div>
+                <span className="text-blue-700 font-medium text-[13px]">입금대기</span>
               </div>
-              <span className="text-blue-700 font-medium text-[13px]">입금대기</span>
-            </div>
-          )}
+            );
+          }}
         />
+
+        {/* 입주청소 접수확인 */}
         <BottomCard
           title="입주청소 접수확인"
           items={sectionCleaningUnconfirmed}
@@ -463,6 +674,30 @@ export default function Dashboard() {
                 <div className="sub">{c.unitNumber || "-"}</div>
               </div>
               <span className="text-red-600 font-medium text-[13px]">미접수</span>
+            </div>
+          )}
+        />
+
+        {/* 미수금 */}
+        <BottomCard
+          title="미수금"
+          items={sectionReceivables.items}
+          amountText={`${fmtComma(sectionReceivables.sum)}원`}
+          renderRow={(r) => (
+            <div className="flex items-center justify-between gap-3 w-full">
+              <div className="min-w-0">
+                {/* 윗줄: 빌라명 + (정확한) 나머지주소 */}
+                <div className="title">
+                  {r.villaName}{r.restAddr ? ` ${r.restAddr}` : ""}
+                </div>
+                {/* 아랫줄: 전체 주소 */}
+                <div className="sub">
+                  {r.fullAddr || "-"}
+                </div>
+              </div>
+              <span className="text-rose-700 font-semibold text-[13px]">
+                {fmtComma(r.amount)}원
+              </span>
             </div>
           )}
         />

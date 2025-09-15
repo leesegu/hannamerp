@@ -1,16 +1,21 @@
 // ==================================
 // 관리비회계 · 수입정리 페이지
-// - 삭제 기능 제거
-// - 통계 카드/배치
-// - '구분' 드롭다운 = 관리비회계설정의 "수입대분류" 이름 목록 사용
+// (요청 반영: 수정모드 드롭다운이 acct_income_main의 순서대로 표시,
+//           수정모드 아님일 때 356→무통장입금, 352→이사정산 자동 표시)
 // ==================================
 import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import "./IncomeImportPage.css";
 
-/* Firebase: 수입대분류 로드 */
 import { db } from "../firebase";
-import { collection, getDocs, getDoc, doc } from "firebase/firestore";
+// Firestore 함수 이름 충돌 회피: query/orderBy 별칭 사용
+import {
+  collection,
+  getDocs,
+  onSnapshot,
+  query as fsQuery,
+  orderBy as fsOrderBy,
+} from "firebase/firestore";
 
 /* ===== 유틸 ===== */
 const s = (v) => String(v ?? "").trim();
@@ -21,7 +26,7 @@ const toNumber = (v) => {
   return Number.isFinite(num) ? num : 0;
 };
 
-/** 안전한 날짜/시간 파서 */
+/* 안전한 날짜/시간 파서 */
 const parseKoreanDateTime = (v) => {
   if (v instanceof Date && !isNaN(v)) return v;
   const raw = s(v);
@@ -157,45 +162,78 @@ function rowsToRecords(rows, headerRowIdx, meta) {
       record: s(row[col.record]),
       memo: s(row[col.memo]),
       _seq: s(row[col.seq]),
-      // 기본 타입 유지(입금/출금), 화면 표시/검색은 category 우선
       type: inAmt > 0 ? "입금" : outAmt > 0 ? "출금" : "",
-      category: "",             // ★ 설정에서 로드되는 수입대분류 이름
+      category: "",
       unconfirmed: false,
     });
   }
   return out;
 }
 
+/* ===== 배지/드롭다운 색 (레드 제외, 고정 매핑 포함) ===== */
+function hash(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+/** 레드계열 제외 + 고정 매핑 */
+function safeHueFromName(name) {
+  const key = s(name);
+  if (key === "무통장입금") return 140; // 녹색 고정
+  if (key === "이사정산")  return 270; // 보라 고정
+  const bands = [
+    [30, 90],   // 오렌지~옐로
+    [120, 210], // 그린~시안
+    [210, 300], // 블루~퍼플
+  ];
+  const seed = hash(key);
+  const b = bands[seed % bands.length];
+  const span = b[1] - b[0];
+  return b[0] + (seed % span);
+}
+function colorTokens(name) {
+  const h = safeHueFromName(name || "default");
+  return {
+    text: `hsl(${h}, 70%, 32%)`,
+    border: `hsl(${h}, 90%, 80%)`,
+    bgTop: `hsl(${h}, 100%, 98%)`,
+    bgBot: `hsl(${h}, 92%, 96%)`,
+  };
+}
+function colorVars(name) {
+  const { text, border, bgTop, bgBot } = colorTokens(name);
+  return { "--cat-color": text, "--cat-border": border, "--cat-bg-top": bgTop, "--cat-bg-bot": bgBot };
+}
+/** ▼ 드롭다운(select) 자체에 색 적용용 스타일 */
+function selectStyle(name) {
+  if (!s(name)) return {};
+  const { text, border, bgTop, bgBot } = colorTokens(name);
+  return {
+    color: text,
+    borderColor: border,
+    backgroundImage:
+      `linear-gradient(180deg, ${bgTop} 0%, ${bgBot} 100%),` +
+      `url("data:image/svg+xml;utf8,<svg fill='%236b7280' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.5 7.5l4.5 4 4.5-4'/></svg>")`,
+    backgroundRepeat: "no-repeat, no-repeat",
+    backgroundPosition: "right 8px center, right 8px center",
+    backgroundSize: "auto, 12px",
+  };
+}
+
 /* ===== 공용 모달 ===== */
-function Modal({
-  open,
-  title,
-  children,
-  onClose,
-  onConfirm,
-  confirmText = "확인",
-  cancelText = "닫기",
-  mode = "confirm",
-  primaryFirst = false,
-  showClose = true,
-  variant = "default", // "default" | "large"
-}) {
+function Modal({ open, title, children, onClose, onConfirm, confirmText = "확인", cancelText = "닫기", mode = "confirm", primaryFirst = false, showClose = true, variant = "default" }) {
   if (!open) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className={`modal-card ${variant === "large" ? "lg" : ""}`}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className={`modal-card ${variant === "large" ? "lg" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div className="modal-title nowrap">{title}</div>
           {showClose ? <button className="modal-x" onClick={onClose}>×</button> : null}
         </div>
-
-        <div className="modal-body scrollable">
-          {children}
-        </div>
-
+        <div className="modal-body scrollable">{children}</div>
         <div className="modal-foot">
           {mode === "confirm" ? (
             primaryFirst ? (
@@ -218,11 +256,20 @@ function Modal({
   );
 }
 
+/* ★ 계좌번호 기반 기본 카테고리 규칙 */
+function autoCategoryByAccount(accountNoRaw = "") {
+  const acct = s(accountNoRaw).replace(/[\s-]/g, "");
+  if (acct.startsWith("356")) return "무통장입금";
+  if (acct.startsWith("352")) return "이사정산";
+  return "";
+}
+
 /* ===== 메인 ===== */
 export default function IncomeImportPage() {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
 
+  // 중복 알림
   const [dupInfo, setDupInfo] = useState(null);
   const [dupOpen, setDupOpen] = useState(false);
 
@@ -231,10 +278,10 @@ export default function IncomeImportPage() {
   const [onlyIncome, setOnlyIncome] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
-  // ★ 수입대분류 목록 (관리비회계설정 → 수입 항목 → 수입대분류)
-  const [incomeCategories, setIncomeCategories] = useState([]); // [{id, name}...]
+  // ★ 수입 대분류 목록 (관리비회계설정에서 저장된 순서대로)
+  const [incomeCategories, setIncomeCategories] = useState([]); // string[]
 
-  // 미확인 모달/상태
+  // 미확인 모달
   const [unconfOpen, setUnconfOpen] = useState(false);
   const [unconfQuery, setUnconfQuery] = useState("");
   const [unconfDraft, setUnconfDraft] = useState({});
@@ -266,122 +313,130 @@ export default function IncomeImportPage() {
   /* 파일 업로드 */
   const fileInputRef = useRef(null);
   const onPickFiles = useCallback(() => fileInputRef.current?.click(), []);
-  const handleFiles = useCallback(
-    async (files) => {
-      setError("");
-      const merged = [];
+  const handleFiles = useCallback(async (files) => {
+    setError("");
+    const merged = [];
 
-      const abKeys = new Set(rows.map((r) => makeDupKey(r)));
-      const dupExamples = new Set();
-      let dupCount = 0;
+    const abKeys = new Set(rows.map((r) => makeDupKey(r)));
+    const dupExamples = new Set();
+    let dupCount = 0;
 
-      for (const file of files) {
-        try {
-          const ab = await file.arrayBuffer();
-          const wb = XLSX.read(ab, { type: "array", cellDates: true });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const aoo = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
+    for (const file of files) {
+      try {
+        const ab = await file.arrayBuffer();
+        const wb = XLSX.read(ab, { type: "array", cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoo = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
 
-          const meta = parseMeta(aoo);
-          const headerRowIdx = findHeaderRow(aoo);
-          if (headerRowIdx === -1) throw new Error("헤더(거래일시/입금금액)를 찾지 못했습니다.");
+        const meta = parseMeta(aoo);
+        const headerRowIdx = findHeaderRow(aoo);
+        if (headerRowIdx === -1) throw new Error("헤더(거래일시/입금금액)를 찾지 못했습니다.");
 
-          const recs = rowsToRecords(aoo, headerRowIdx, meta);
-          for (const r of recs) {
-            const key = makeDupKey(r);
-            if (abKeys.has(key)) {
-              dupCount++;
-              if (dupExamples.size < 5)
-                dupExamples.add(`${r.date} ${r.time} | ${r.type} ${fmtComma(r.inAmt || r.outAmt)} | ${r.record}`);
-              continue;
-            }
-            abKeys.add(key);
-            merged.push(r);
+        const recs = rowsToRecords(aoo, headerRowIdx, meta);
+        for (const r of recs) {
+          const key = makeDupKey(r);
+          if (abKeys.has(key)) {
+            dupCount++;
+            if (dupExamples.size < 5)
+              dupExamples.add(`${r.date} ${r.time} | ${r.type} ${fmtComma(r.inAmt || r.outAmt)} | ${r.record}`);
+            continue;
           }
-        } catch (e) {
-          console.error(e);
-          setError((prev) => prev + `\n[${file.name}] ${e.message || String(e)}`);
+          abKeys.add(key);
+          merged.push(r);
+        }
+      } catch (e) {
+        console.error(e);
+        setError((prev) => prev + `\n[${file.name}] ${e.message || String(e)}`);
+      }
+    }
+
+    if (dupCount > 0) {
+      setDupInfo({ count: dupCount, examples: Array.from(dupExamples) });
+      setDupOpen(true);
+    } else {
+      setDupInfo(null);
+      setDupOpen(false);
+    }
+
+    merged.sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
+    const nextRows = [...rows, ...merged].sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
+    setRows(nextRows);
+    setPage(1);
+
+    const last = nextRows.find((r) => r.date);
+    if (last?.date) {
+      const [yy, mm, dd] = last.date.split("-").map((t) => +t);
+      const [nyF, nmF, ndF, nyT, nmT, ndT] = clampRange(yy, mm, dd, yy, mm, dd);
+      setYFrom(nyF); setMFrom(nmF); setDFrom(ndF);
+      setYTo(nyT);   setMTo(nmT);   setDTo(ndT);
+    }
+  }, [rows, clampRange]);
+
+  /* ===== 수입 대분류 로드: acct_income_main의 order 순서대로 ===== */
+  useEffect(() => {
+    // 안전 정렬: order(숫자) → createdAt → name
+    const safeSort = (arr) =>
+      [...arr].sort((a, b) => {
+        const ao = Number.isFinite(+a.order) ? +a.order : Number.MAX_SAFE_INTEGER;
+        const bo = Number.isFinite(+b.order) ? +b.order : Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        const ac = a.createdAt ?? Number.MAX_SAFE_INTEGER;
+        const bc = b.createdAt ?? Number.MAX_SAFE_INTEGER;
+        if (ac !== bc) return (ac > bc ? 1 : -1);
+        return s(a.name).localeCompare(s(b.name));
+      });
+
+    const colRef = collection(db, "acct_income_main");
+
+    // 1) 실시간 구독: order 기준
+    const qy = fsQuery(colRef, fsOrderBy("order", "asc"));
+    const unsub = onSnapshot(
+      qy,
+      (snap) => {
+        let items = snap.docs
+          .map((d) => {
+            const data = d.data() || {};
+            return {
+              name: s(data.name || d.id),
+              order: data.order,
+              createdAt: data.createdAt ?? data.created_at ?? data.created ?? undefined,
+            };
+          })
+          .filter((x) => !!x.name);
+
+        items = safeSort(items);
+        const names = items.map((x) => x.name);
+        setIncomeCategories(names);
+      },
+      async (err) => {
+        console.warn("onSnapshot failed, fallback to one-time fetch:", err?.message || err);
+        try {
+          const snap2 = await getDocs(colRef);
+          let items = snap2.docs
+            .map((d) => {
+              const data = d.data() || {};
+              return {
+                name: s(data.name || d.id),
+                order: data.order,
+                createdAt: data.createdAt ?? data.created_at ?? data.created ?? undefined,
+              };
+            })
+            .filter((x) => !!x.name);
+
+          items = safeSort(items);
+          const names = items.map((x) => x.name);
+          setIncomeCategories(names);
+        } catch (e2) {
+          console.error("fallback getDocs failed:", e2);
+          setIncomeCategories([]);
         }
       }
+    );
 
-      if (dupCount > 0) {
-        setDupInfo({ count: dupCount, examples: Array.from(dupExamples) });
-        setDupOpen(true);
-      } else {
-        setDupInfo(null);
-        setDupOpen(false);
-      }
-
-      merged.sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
-      const nextRows = [...rows, ...merged].sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
-      setRows(nextRows);
-      setPage(1);
-
-      const last = nextRows.find((r) => r.date);
-      if (last?.date) {
-        const [yy, mm, dd] = last.date.split("-").map((t) => +t);
-        const [nyF, nmF, ndF, nyT, nmT, ndT] = clampRange(yy, mm, dd, yy, mm, dd);
-        setYFrom(nyF); setMFrom(nmF); setDFrom(ndF);
-        setYTo(nyT);   setMTo(nmT);   setDTo(ndT);
-      }
-    },
-    [rows, clampRange]
-  );
-
-  /* ===== 수입대분류 로드 =====
-     관리비회계설정(수입)에서 다음 순서로 탐색:
-     1) accountingSettings/income/categories (subcollection, docs: {name})
-     2) accountingSettings/income/수입대분류 (doc: {items: [...]})
-     3) incomeCategories (root collection, docs: {name})
-  */
-  const loadIncomeCategories = useCallback(async () => {
-    try {
-      let items = [];
-
-      // 1) subcollection
-      try {
-        const sub = collection(db, "accountingSettings", "income", "categories");
-        const snap = await getDocs(sub);
-        const arr = snap.docs.map(d => s(d.data()?.name ?? d.data()?.label ?? d.id)).filter(Boolean);
-        items.push(...arr);
-      } catch (_) {}
-
-      // 2) single doc with items
-      if (items.length === 0) {
-        try {
-          const docRef = doc(db, "accountingSettings", "income", "수입대분류");
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            const arr = Array.isArray(snap.data()?.items) ? snap.data().items.map(s).filter(Boolean) : [];
-            items.push(...arr);
-          }
-        } catch (_) {}
-      }
-
-      // 3) root collection fallback
-      if (items.length === 0) {
-        try {
-          const root = collection(db, "incomeCategories");
-          const snap = await getDocs(root);
-          const arr = snap.docs.map(d => s(d.data()?.name ?? d.data()?.label ?? d.id)).filter(Boolean);
-          items.push(...arr);
-        } catch (_) {}
-      }
-
-      // 정리(중복 제거 + 정렬)
-      const uniq = Array.from(new Set(items)).filter(Boolean).sort((a, b) => a.localeCompare(b, "ko"));
-      setIncomeCategories(uniq.map((name, i) => ({ id: `cat_${i}`, name })));
-    } catch (e) {
-      console.error("loadIncomeCategories error:", e);
-      setIncomeCategories([]);
-    }
+    return () => unsub();
   }, []);
 
-  useEffect(() => {
-    loadIncomeCategories();
-  }, [loadIncomeCategories]);
-
-  /* 기간 필터만 반영한 목록 → 통계 계산용 */
+  /* 기간 필터 → 통계용 */
   const rangeList = useMemo(() => {
     const start = new Date(yFrom, mFrom - 1, dFrom, 0, 0, 0, 0);
     const end = new Date(yTo, mTo - 1, dTo, 23, 59, 59, 999);
@@ -394,28 +449,16 @@ export default function IncomeImportPage() {
     });
   }, [rows, yFrom, mFrom, dFrom, yTo, mTo, dTo]);
 
-  /* 통계 계산 */
+  /* 통계 */
   const statCount = rangeList.length;
-  const statInSum = useMemo(
-    () => rangeList.reduce((sum, r) => sum + toNumber(r.inAmt), 0),
-    [rangeList]
-  );
-  const statOutSum = useMemo(
-    () => rangeList.reduce((sum, r) => sum + toNumber(r.outAmt), 0),
-    [rangeList]
-  );
+  const statInSum = useMemo(() => rangeList.reduce((sum, r) => sum + toNumber(r.inAmt), 0), [rangeList]);
+  const statOutSum = useMemo(() => rangeList.reduce((sum, r) => sum + toNumber(r.outAmt), 0), [rangeList]);
   const statMemoMiss = useMemo(
-    () =>
-      rangeList.filter(
-        (r) =>
-          toNumber(r.inAmt) > 0 &&
-          !r.unconfirmed &&
-          s(r.memo) === ""
-      ).length,
+    () => rangeList.filter((r) => toNumber(r.inAmt) > 0 && !r.unconfirmed && s(r.memo) === "").length,
     [rangeList]
   );
 
-  /* 검색/입금만까지 반영한 화면 표시용 목록 */
+  /* 검색/입금만 반영한 목록 */
   const filtered = useMemo(() => {
     const q = s(query);
     const qLower = q.toLowerCase();
@@ -423,7 +466,6 @@ export default function IncomeImportPage() {
 
     return rangeList.filter((r) => {
       if (onlyIncome && !(r.inAmt > 0)) return false;
-
       if (!q) return true;
 
       if (qNum > 0) {
@@ -433,9 +475,7 @@ export default function IncomeImportPage() {
         if (inEq || outEq || contains) return true;
       }
 
-      const bag = [(r.category || r.type), r.accountNo, r.holder, r.record, r.memo]
-        .join("\n")
-        .toLowerCase();
+      const bag = [(r.category || r.type), r.accountNo, r.holder, r.record, r.memo].join("\n").toLowerCase();
       return bag.includes(qLower);
     });
   }, [rangeList, query, onlyIncome]);
@@ -457,12 +497,8 @@ export default function IncomeImportPage() {
   }, [filtered, sortKey, sortDir]);
 
   const clickSort = (key) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
   };
 
   /* 페이지 */
@@ -473,11 +509,9 @@ export default function IncomeImportPage() {
   const pageRows = sorted.slice(startIdx, endIdx);
 
   /* 인라인 수정 */
-  const updateRow = (id, patch) => {
-    setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
-  };
+  const updateRow = (id, patch) => setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
 
-  // 엔터로 다음 메모로 (현재 페이지 내 이동)
+  // 엔터로 다음 메모로
   const memoRefs = useRef({});
   const setMemoRef = (id, el) => { memoRefs.current[id] = el; };
   const focusNextMemo = (currentId) => {
@@ -490,18 +524,21 @@ export default function IncomeImportPage() {
     }
   };
 
-  // 미확인 목록/합계/검색
+  // 미확인
   const unconfirmedList = useMemo(() => sorted.filter((r) => r.unconfirmed), [sorted]);
   const unconfirmedTotalInAmt = useMemo(
     () => unconfirmedList.reduce((sum, r) => sum + toNumber(r.inAmt), 0),
     [unconfirmedList]
   );
-
   useEffect(() => {
     if (unconfOpen) {
       const initial = {};
       unconfirmedList.forEach((r) => {
-        initial[r._id] = { memo: r.memo, unconfirmed: !!r.unconfirmed };
+        initial[r._id] = {
+          memo: r.memo,
+          unconfirmed: !!r.unconfirmed,
+          category: r.category || autoCategoryByAccount(r.accountNo) || "",
+        };
       });
       setUnconfDraft(initial);
       setUnconfQuery("");
@@ -521,16 +558,21 @@ export default function IncomeImportPage() {
     });
   }, [unconfQuery, unconfirmedList, unconfDraft]);
 
+  // 드래프트 조작자
   const setDraftMemo = (id, memo) =>
-    setUnconfDraft((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), memo } }));
+    setUnconfDraft((p) => ({ ...p, [id]: { ...(p[id] || {}), memo } }));
   const setDraftFlag = (id, flag) =>
-    setUnconfDraft((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), unconfirmed: !!flag } }));
+    setUnconfDraft((p) => ({ ...p, [id]: { ...(p[id] || {}), unconfirmed: !!flag } }));
+  const setDraftCategory = (id, category) =>
+    setUnconfDraft((p) => ({ ...p, [id]: { ...(p[id] || {}), category } }));
 
   const applyUnconfEdits = () => {
     setRows((prev) =>
       prev.map((r) => {
         const d = unconfDraft[r._id];
-        return d ? { ...r, memo: d.memo, unconfirmed: !!d.unconfirmed } : r;
+        return d
+          ? { ...r, memo: d.memo, unconfirmed: !!d.unconfirmed, category: d.category ?? r.category }
+          : r;
       })
     );
     setUnconfOpen(false);
@@ -539,10 +581,9 @@ export default function IncomeImportPage() {
   /* 화면 */
   return (
     <div className="income-page">
-      {/* === 툴바 #1: 왼쪽 버튼들 / 오른쪽 검색+페이지 === */}
+      {/* === 툴바 1 === */}
       <div className="toolbar tight">
         <div className="left">
-          {/* 엑셀업로드 */}
           <button className="btn excel" onClick={onPickFiles} title="엑셀 업로드">
             <span className="ico" aria-hidden>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -553,7 +594,6 @@ export default function IncomeImportPage() {
             </span>
             <span className="btn-label">엑셀 업로드</span>
           </button>
-
           <input
             ref={fileInputRef}
             type="file"
@@ -569,106 +609,39 @@ export default function IncomeImportPage() {
           </button>
 
           <label className="chk fancy">
-            <input
-              type="checkbox"
-              checked={onlyIncome}
-              onChange={(e) => setOnlyIncome(e.target.checked)}
-            />
-            <span className="toggle" aria-hidden></span>
-            <span className="lbl">입금만</span>
+            <input type="checkbox" checked={onlyIncome} onChange={(e) => setOnlyIncome(e.target.checked)} />
+            <span className="toggle" aria-hidden></span><span className="lbl">입금만</span>
           </label>
 
           <label className="chk fancy">
-            <input
-              type="checkbox"
-              checked={editMode}
-              onChange={(e) => setEditMode(e.target.checked)}
-            />
-            <span className="toggle" aria-hidden></span>
-            <span className="lbl">수정모드</span>
+            <input type="checkbox" checked={editMode} onChange={(e) => setEditMode(e.target.checked)} />
+            <span className="toggle" aria-hidden></span><span className="lbl">수정모드</span>
           </label>
         </div>
 
-        {/* 오른쪽: 검색 + 페이지 사이즈 */}
         <div className="right">
-          <input
-            className="search"
-            placeholder=""
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className="page-size"
-            value={pageSize}
-            onChange={(e) => {
-              const v = Number(e.target.value) || 20;
-              setPageSize(v);
-              setPage(1);
-            }}
-          >
-            {pageSizeOptions.map((n) => (
-              <option key={n} value={n}>
-                {n}/페이지
-              </option>
-            ))}
+          <input className="search" placeholder="" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <select className="page-size" value={pageSize} onChange={(e) => { const v = Number(e.target.value) || 20; setPageSize(v); setPage(1); }}>
+            {pageSizeOptions.map((n) => (<option key={n} value={n}>{n}/페이지</option>))}
           </select>
         </div>
       </div>
 
-      {/* === 툴바 #2: 날짜범위 / 오른쪽 통계카드 === */}
+      {/* === 기간 + 통계 === */}
       <div className="toolbar tight">
         <div className="mid">
           <div className="range-pickers compact">
-            <DateTriple
-              y={yFrom}
-              m={mFrom}
-              d={dFrom}
-              onY={(v) => setYFrom(v)}
-              onM={(v) => setMFrom(v)}
-              onD={(v) => setDFrom(v)}
-            />
+            <DateTriple y={yFrom} m={mFrom} d={dFrom} onY={(v) => setYFrom(v)} onM={(v) => setMFrom(v)} onD={(v) => setDFrom(v)} />
             <span className="dash">—</span>
-            <DateTriple
-              y={yTo}
-              m={mTo}
-              d={dTo}
-              onY={(v) => setYTo(v)}
-              onM={(v) => setMTo(v)}
-              onD={(v) => setDTo(v)}
-            />
+            <DateTriple y={yTo} m={mTo} d={dTo} onY={(v) => setYTo(v)} onM={(v) => setMTo(v)} onD={(v) => setDTo(v)} />
           </div>
         </div>
 
-        {/* 통계 카드 */}
         <div className="right stats-row">
-          <div className="stat-card count">
-            <div className="icon" aria-hidden>🧾</div>
-            <div className="meta">
-              <div className="label">총 건수</div>
-              <div className="value">{statCount.toLocaleString()}건</div>
-            </div>
-          </div>
-          <div className="stat-card in">
-            <div className="icon" aria-hidden>💵</div>
-            <div className="meta">
-              <div className="label">입금합계</div>
-              <div className="value">{fmtComma(statInSum)}원</div>
-            </div>
-          </div>
-          <div className="stat-card out">
-            <div className="icon" aria-hidden>💸</div>
-            <div className="meta">
-              <div className="label">출금합계</div>
-              <div className="value">{fmtComma(statOutSum)}원</div>
-            </div>
-          </div>
-          <div className="stat-card warn">
-            <div className="icon" aria-hidden>⚠️</div>
-            <div className="meta">
-              <div className="label">메모누락</div>
-              <div className="value">{statMemoMiss.toLocaleString()}건</div>
-            </div>
-          </div>
+          <div className="stat-card count"><div className="icon">🧾</div><div className="meta"><div className="label">총 건수</div><div className="value">{statCount.toLocaleString()}건</div></div></div>
+          <div className="stat-card in"><div className="icon">💵</div><div className="meta"><div className="label">입금합계</div><div className="value">{fmtComma(statInSum)}원</div></div></div>
+          <div className="stat-card out"><div className="icon">💸</div><div className="meta"><div className="label">출금합계</div><div className="value">{fmtComma(statOutSum)}원</div></div></div>
+          <div className="stat-card warn"><div className="icon">⚠️</div><div className="meta"><div className="label">메모누락</div><div className="value">{statMemoMiss.toLocaleString()}건</div></div></div>
         </div>
       </div>
 
@@ -679,86 +652,101 @@ export default function IncomeImportPage() {
         <table className="dense modern">
           <thead>
             <tr>
-              {/* 삭제/체크 컬럼 없음 */}
               <th onClick={() => clickSort("category")} className="col-type">구분</th>
               <th onClick={() => clickSort("accountNo")} className="col-account">계좌번호</th>
               <th onClick={() => clickSort("date")} className="col-date">거래일</th>
               <th onClick={() => clickSort("time")} className="col-time">시간</th>
               <th onClick={() => clickSort("inAmt")} className="num col-in">입금금액</th>
-              <th onClick={() => clickSort("outAmt")} className="num col-out">출금금액</th>
+              {/* 헤더 제목 조건 표시 */}
+              <th onClick={() => clickSort("outAmt")} className="num col-out">{onlyIncome ? "" : "출금금액"}</th>
               <th onClick={() => clickSort("record")} className="col-record">거래기록사항</th>
               <th onClick={() => clickSort("memo")} className="col-memo">거래메모</th>
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((r) => (
-              <tr key={r._id}>
-                <td className="center">
-                  {editMode ? (
-                    <div className="category-select-wrap">
-                      <select
-                        className="edit-select type-select pretty-select rich"
-                        value={r.category || ""}
-                        onChange={(e) => updateRow(r._id, { category: e.target.value })}
+            {pageRows.map((r) => {
+              const cat = s(r.category);
+              const autoCat = autoCategoryByAccount(r.accountNo);
+              const shownCat = cat || autoCat;
+              const displayValue = shownCat || (incomeCategories[0] || "");
+              const hasDisplayInList = incomeCategories.includes(displayValue);
+
+              return (
+                <tr key={r._id}>
+                  <td className="center">
+                    {editMode ? (
+                      <div className="category-select-wrap">
+                        {/* ▼ 드롭다운 자체에 색상 적용 */}
+                        <select
+                          className="edit-select type-select pretty-select rich"
+                          style={selectStyle(displayValue)}
+                          value={displayValue}
+                          onChange={(e) => updateRow(r._id, { category: e.target.value })}
+                        >
+                          {incomeCategories.length === 0 ? (
+                            <option value="">불러오는 중…</option>
+                          ) : (
+                            <>
+                              {!hasDisplayInList && displayValue && (
+                                <option value={displayValue}>{displayValue}</option>
+                              )}
+                              {incomeCategories.map((name) => (
+                                <option key={name} value={name}>{name}</option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    ) : (
+                      <span
+                        className={`type-badge ${shownCat ? "cat" : toNumber(r.inAmt) > 0 ? "in" : toNumber(r.outAmt) > 0 ? "out" : ""}`}
+                        title={shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
+                        style={shownCat ? colorVars(shownCat) : undefined}
                       >
-                        <option value="">— 수입대분류 선택 —</option>
-                        {incomeCategories.map((c) => (
-                          <option key={c.id || c.name} value={c.name}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <span
-                      className={`type-badge ${
-                        r.category ? "cat" : (toNumber(r.inAmt) > 0 ? "in" : toNumber(r.outAmt) > 0 ? "out" : "")
-                      }`}
-                      title={r.category || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
-                    >
-                      {r.category || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
-                    </span>
-                  )}
-                </td>
+                        {shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
+                      </span>
+                    )}
+                  </td>
 
-                <td className="mono center">{r.accountNo}</td>
-                <td className="mono center">{r.date}</td>
-                <td className="mono center">{r.time}</td>
+                  <td className="mono center">{r.accountNo}</td>
+                  <td className="mono center">{r.date}</td>
+                  <td className="mono center">{r.time}</td>
 
-                <td className="num strong in">{fmtComma(r.inAmt)}</td>
-                <td className="num out">{fmtComma(r.outAmt)}</td>
+                  <td className="num strong in">{fmtComma(r.inAmt)}</td>
+                  <td className="num out">{fmtComma(r.outAmt)}</td>
 
-                <td className="clip center">{r.record}</td>
+                  <td className="clip center">{r.record}</td>
 
-                <td className="memo-cell">
-                  {editMode ? (
-                    <div className="memo-wrap">
-                      <input
-                        ref={(el) => setMemoRef(r._id, el)}
-                        className="edit-input memo-input"
-                        value={r.memo}
-                        onChange={(e) => updateRow(r._id, { memo: e.target.value })}
-                        placeholder=""
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { e.preventDefault(); focusNextMemo(r._id); }
-                        }}
-                      />
-                      <label className="chk mi2">
+                  <td className="memo-cell">
+                    {editMode ? (
+                      <div className="memo-wrap">
                         <input
-                          type="checkbox"
-                          checked={!!r.unconfirmed}
-                          onChange={(e) => updateRow(r._id, { unconfirmed: e.target.checked })}
+                          ref={(el) => setMemoRef(r._id, el)}
+                          className="edit-input memo-input"
+                          value={r.memo}
+                          onChange={(e) => updateRow(r._id, { memo: e.target.value })}
+                          placeholder=""
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); focusNextMemo(r._id); } }}
                         />
-                        <span className="box" aria-hidden></span>
-                        <span className="lbl">미확인</span>
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="memo-wrap">
-                      <div className="memo-text" title={r.memo || ""}>{r.memo}</div>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
+                        <label className="chk mi2">
+                          <input
+                            type="checkbox"
+                            checked={!!r.unconfirmed}
+                            onChange={(e) => updateRow(r._id, { unconfirmed: e.target.checked })}
+                          />
+                          <span className="box" aria-hidden></span>
+                          <span className="lbl">미확인</span>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="memo-wrap">
+                        <div className="memo-text" title={r.memo || ""}>{r.memo}</div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -772,21 +760,19 @@ export default function IncomeImportPage() {
         <button className="btn" onClick={() => setPage(pageCount)} disabled={curPage === pageCount}>»</button>
       </div>
 
-      {/* 중복 안내 모달 */}
+      {/* 중복 안내 */}
       <Modal open={dupOpen} title="중복 항목 안내" onClose={() => setDupOpen(false)}>
         {dupInfo && (
           <>
             <p>업로드 중 <b>{dupInfo.count.toLocaleString()}</b>건의 중복 항목을 발견하여 추가하지 않았습니다.</p>
             {dupInfo.examples?.length > 0 && (
-              <ul className="dup-list">
-                {dupInfo.examples.map((t, i) => (<li key={i}>• {t}</li>))}
-              </ul>
+              <ul className="dup-list">{dupInfo.examples.map((t, i) => (<li key={i}>• {t}</li>))}</ul>
             )}
           </>
         )}
       </Modal>
 
-      {/* 미확인 목록 모달 */}
+      {/* 미확인 목록 */}
       <Modal
         open={unconfOpen}
         title="미확인 목록"
@@ -795,7 +781,7 @@ export default function IncomeImportPage() {
         confirmText="저장"
         onClose={() => setUnconfOpen(false)}
         onConfirm={applyUnconfEdits}
-        primaryFirst={true}
+        primaryFirst
         showClose={false}
         variant="large"
       >
@@ -814,56 +800,70 @@ export default function IncomeImportPage() {
 
         <div className="unconf-list">
           <table className="dense mini">
+            {/* 가로 스크롤 방지: 비율 미세 조정(메모 입력은 셀 내부 100%) */}
             <colgroup>
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "9%" }} />      {/* 입금 */}
-              <col style={{ width: "22%" }} />     {/* 거래기록 */}
-              <col style={{ width: "39%" }} />     {/* 메모 */}
-              <col style={{ width: "2%" }} />
+              <col style={{ width: "10%" }} />  {/* 날짜 */}
+              <col style={{ width: "8%" }} />   {/* 시간 */}
+              <col style={{ width: "14%" }} />  {/* 구분(드롭다운) - 약간 넓힘 */}
+              <col style={{ width: "10%" }} />  {/* 입금 */}
+              <col style={{ width: "21%" }} />  {/* 거래기록 */}
+              <col style={{ width: "35%" }} />  {/* 메모 전체 폭 살짝 축소 */}
+              <col style={{ width: "2%" }} />   {/* 미확인 */}
             </colgroup>
             <thead>
               <tr>
-                <th>날짜</th>
-                <th>시간</th>
-                <th>구분</th>
-                <th className="num">입금</th>
-                <th>거래기록</th>
-                <th>메모</th>
-                <th>미확인</th>
+                <th>날짜</th><th>시간</th><th>구분</th><th className="num">입금</th><th>거래기록</th><th>메모</th><th>미확인</th>
               </tr>
             </thead>
             <tbody>
               {modalList.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="center muted">검색 결과가 없습니다.</td>
-                </tr>
+                <tr><td colSpan={7} className="center muted">검색 결과가 없습니다.</td></tr>
               ) : (
-                modalList.map((r) => (
-                  <tr key={`u_${r._id}`}>
-                    <td className="center mono">{r.date}</td>
-                    <td className="center mono">{r.time}</td>
-                    <td className="center">{r.category || r.type || "-"}</td>
-                    <td className="num">{fmtComma(r.inAmt)}</td>
-                    <td className="center">{r.record}</td>
-                    <td>
-                      <input
-                        className="edit-input memo-input"
-                        value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
-                        onChange={(e) => setDraftMemo(r._id, e.target.value)}
-                        placeholder=""
-                      />
-                    </td>
-                    <td className="center">
-                      <input
-                        type="checkbox"
-                        checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
-                        onChange={(e) => setDraftFlag(r._id, e.target.checked)}
-                      />
-                    </td>
-                  </tr>
-                ))
+                modalList.map((r) => {
+                  const catDraft = unconfDraft[r._id]?.category ?? r.category ?? "";
+                  const autoCat = autoCategoryByAccount(r.accountNo);
+                  const displayCat = catDraft || autoCat || (incomeCategories[0] || "");
+                  const hasDisplayInList = incomeCategories.includes(displayCat);
+
+                  return (
+                    <tr key={`u_${r._id}`}>
+                      <td className="center mono">{r.date}</td>
+                      <td className="center mono">{r.time}</td>
+                      <td className="center">
+                        {/* ▼ 드롭다운 자체에 색상 적용 */}
+                        <select
+                          className="pretty-select"
+                          style={selectStyle(displayCat)}
+                          value={displayCat}
+                          onChange={(e) => setDraftCategory(r._id, e.target.value)}
+                        >
+                          {!hasDisplayInList && displayCat && <option value={displayCat}>{displayCat}</option>}
+                          {incomeCategories.map((name) => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="num">{fmtComma(r.inAmt)}</td>
+                      <td className="center">{r.record}</td>
+                      <td>
+                        <input
+                          className="edit-input"
+                          style={{ width: "100%" }}   // 메모 입력창 가로 늘림 (셀은 조금 줄임)
+                          value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
+                          onChange={(e) => setDraftMemo(r._id, e.target.value)}
+                          placeholder=""
+                        />
+                      </td>
+                      <td className="center">
+                        <input
+                          type="checkbox"
+                          checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
+                          onChange={(e) => setDraftFlag(r._id, e.target.checked)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -873,7 +873,7 @@ export default function IncomeImportPage() {
   );
 }
 
-/* ===== 내부 컴포넌트: DateTriple ===== */
+/* ===== 내부: DateTriple ===== */
 function DateTriple({ y, m, d, onY, onM, onD }) {
   const yearOptions = useMemo(() => {
     const thisYear = new Date().getFullYear();

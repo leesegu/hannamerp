@@ -29,8 +29,8 @@ import CalendarPage from "../pages/CalendarPage";
 import PaperingPage from "../pages/PaperingPage";
 /* 메모 */
 import MemoPage from "../pages/MemoPage";
-/* ✅ 사이드 콘텐츠로 띄울 관리비회계 설정 페이지 */
-import AccountingSettingsPage from "../pages/AccountingSettingsPage";
+/* ✅ (삭제됨) 사이드 콘텐츠로 띄우던 관리비회계 설정 페이지 임포트 제거 */
+// import AccountingSettingsPage from "../pages/AccountingSettingsPage";
 
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
@@ -126,13 +126,13 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
       return;
     }
 
-    // ✅ 기초등록 → 설정 내부 버튼: 관리비회계설정
-    if ((go === "기초등록" || go === "settings") && sub === "관리비회계설정") {
-      setOpenMenu("settings");
-      setActiveMenu("기초등록");
-      setActiveContent(<AccountingSettingsPage />);
-      return;
-    }
+    // ✅ (삭제됨) 기초등록 → 관리비회계설정 별도 페이지 연결 로직
+    // if ((go === "기초등록" || go === "settings") && sub === "관리비회계설정") {
+    //   setOpenMenu("settings");
+    //   setActiveMenu("기초등록");
+    //   setActiveContent(<AccountingSettingsPage />);
+    //   return;
+    // }
   }, [location.search]);
 
   return (
@@ -351,7 +351,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "settings" && (
                 <SidebarSubmenu
-                  /* ⚠️ 여기엔 '관리비회계 설정' 메뉴를 두지 않음 */
+                  /* ⚠️ 여기엔 '관리비회계 설정' 메뉴를 두지 않음 — VendorRegisterPage 내부에 포함 */
                   items={["사원코드생성", "설정"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {

@@ -222,15 +222,7 @@ function EditForm({ initial, onCancel, onSaved }) {
     try {
       if (form.id) {
         await updateDoc(doc(db, "paperings", form.id), payload);
-
-        // ✅ 연동 항목이면 moveouts에도 "도배 전용 필드" 반영
-        if (linked) {
-          await updateDoc(doc(db, "moveouts", form.sourceMoveoutId), {
-            paperStatus: payload.status,
-            paperNote: payload.note,
-            updatedAt: serverTimestamp(),
-          });
-        }
+        /* 🔒 역방향 업데이트 없음: moveouts에는 아무것도 반영하지 않음 */
       } else {
         await addDoc(collection(db, "paperings"), {
           ...payload,
@@ -497,7 +489,12 @@ export default function PaperingPage() {
     return () => unsub();
   }, []);
 
-  /* 🔁 B. 이사정산 → 도배 자동 동기화 */
+  /* 🔁 B. 이사정산 → 도배 자동 동기화 (단방향)
+     - '도배' 포함 추가내역 합계(amountSum)를 계산
+     - 이사정산 진행현황이 '정산완료'일 때에만 depositIn = amountSum
+     - 정산완료가 아니면 depositIn = 0 (문서는 유지, 사용자 상태/비고 유지)
+     - '도배' 항목 자체가 없으면 해당 연동 문서 삭제
+  */
   useEffect(() => {
     const moQ = collection(db, "moveouts");
     const unsub = onSnapshot(
@@ -508,6 +505,7 @@ export default function PaperingPage() {
             const x = d.data() || {};
             const extras = Array.isArray(x.extras) ? x.extras : [];
             const amountSum = sumPaperingAmount(extras);
+            const moStatus = s(x.status); // 이사정산 진행현황
 
             const ref = doc(db, "paperings", `mo_${d.id}`);
             const prev = await getDoc(ref);
@@ -519,14 +517,21 @@ export default function PaperingPage() {
                 settleDate: fmtDate(x.moveDate),
                 villaName: s(x.villaName),
                 unitNumber: s(x.unitNumber),
-                depositIn: amountSum,
-                status: s(prev.data()?.status) || s(x.paperStatus) || "미접수",
-                note: s(prev.data()?.note) || s(x.paperNote) || "",
+
+                // ✅ 정산완료일 때만 자동 입금 반영
+                depositIn: moStatus === "정산완료" ? amountSum : 0,
+
+                // ⚠ 상태/비고는 사용자가 관리 (기존 값 유지, 없으면 기본값 부여)
+                status: s(prev.data()?.status) || "미접수",
+                note: s(prev.data()?.note) || "",
+
                 updatedAt: serverTimestamp(),
               };
               if (!exists) payload.createdAt = serverTimestamp();
+
               await setDoc(ref, payload, { merge: true });
             } else {
+              // '도배' 항목 자체가 없으면 문서 제거
               if (exists) await deleteDoc(ref);
             }
           } catch (e) {
@@ -717,10 +722,11 @@ export default function PaperingPage() {
       <SimpleModal
         open={formOpen}
         title={formMode === "edit" ? "도배 수정" : "도배 등록"}
+        width={720}
         onClose={() => {
           setFormOpen(false);
           setEditingRow(null);
-          setFormMode("create"); // ✅ 고친 부분
+          setFormMode("create"); // ✅ 유지
         }}
       >
         <EditForm

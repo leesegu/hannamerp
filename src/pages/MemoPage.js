@@ -369,7 +369,7 @@ export default function MemoPage({ userId }) {
                     disabled={saving}
                     className="h-10 px-5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
                   >
-                    {saving ? "저장 중..." : selectedId ? "수정 저장" : "추가 저장"}
+                    {saving ? "저장 중..." : selectedId ? "수정" : "추가"}
                   </button>
                 </div>
               </section>

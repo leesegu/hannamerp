@@ -15,6 +15,7 @@ import {
  * - 삭제 버튼/기능 제거
  * - 진행현황 드롭다운 펼침 시 팝오버 스크롤 안생김(overflow: visible)
  * - ✅ 같은 날짜에서 임의 위치로 재정렬 (앞/중간/마지막) + _order 평균값/리넘버링
+ * - ✅ "가려진 항목 더보기"는 오버레이로 펼침 (오버레이 항목 사이즈/폰트 = 달력과 동일)
  */
 
 const STATUS_COLORS = [
@@ -75,26 +76,38 @@ export default function CalendarPage() {
   // 드래그 상태
   const [dragState, setDragState] = useState({ dragId: null, overId: null, overYMD: null });
 
-  // 날짜 셀 오버플로우 측정
+  // 날짜 셀/콘텐츠 레퍼런스
   const contentRefs = useRef({});
-  const [overflowMap, setOverflowMap] = useState({});
-  const makeKey = (c) => `${c.y}-${c.m}-${c.d}`;
+  const cellRefs = useRef({});
   const setContentRef = (key) => (el) => {
     if (el) {
       contentRefs.current[key] = el;
       updateOverflowForKey(key, el);
     }
   };
+  const setCellRef = (key) => (el) => {
+    if (el) cellRefs.current[key] = el;
+  };
+
+  // 오버플로우/더보기
+  const [overflowMap, setOverflowMap] = useState({});
+  const makeKey = (c) => `${c.y}-${c.m}-${c.d}`;
+
+  // 가려진 항목 오버레이 상태
+  const [moreOverlay, setMoreOverlay] = useState({
+    open: false, key: null, x: 0, y: 0, w: 0, events: []
+  });
+
   const updateOverflowForKey = (key, el = contentRefs.current[key]) => {
     if (!el) return;
     const items = el.querySelectorAll('[data-evpill="1"]');
-    const visibleBottom = el.scrollTop + el.clientHeight;
+    const visibleBottom = el.clientHeight;
     let visible = 0;
     items.forEach((it) => {
       if (it.offsetTop + it.offsetHeight <= visibleBottom) visible++;
     });
     const hiddenBelow = Math.max(0, items.length - visible);
-    const top = el.scrollTop > 1;
+    const top = false;
     const bottom = hiddenBelow > 0;
     setOverflowMap((prev) => {
       const pv = prev[key] || {};
@@ -283,7 +296,6 @@ export default function CalendarPage() {
       const d = targetCell.d;
       const ymd = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 
-      // 대상 날짜의 끝 order 계산
       const dayEvts = dayEvents(events, y, targetCell.m, d).sort((a,b)=>a.order-b.order);
       const last = dayEvts[dayEvts.length-1];
       const newOrder = last ? last.order + ORDER_STEP : ORDER_STEP;
@@ -308,7 +320,6 @@ export default function CalendarPage() {
     const dragged = events.find(x => x.id === payload.id);
     if (!dragged) return;
 
-    // 동일 날짜가 아니면 무시 (날짜 이동은 셀 바닥 드롭에서 처리)
     if (!(dragged.y === targetEvent.y && dragged.m === targetEvent.m && dragged.d === targetEvent.d)) {
       setDragState({ dragId: null, overId: null, overYMD: null });
       return;
@@ -330,7 +341,6 @@ export default function CalendarPage() {
       if (gap > ORDER_EPS) {
         newOrder = prevEvt.order + gap / 2;
       } else {
-        // 간격이 너무 좁음 → 리넘버링 후 다시 계산
         await renumberDayOrders(y, m, d);
         const day2 = dayEvents(events, y, m, d).sort((a,b)=>a.order-b.order);
         const t2 = day2.findIndex(x => x.id === targetEvent.id);
@@ -341,7 +351,6 @@ export default function CalendarPage() {
         else newOrder = p2.order + (n2.order - p2.order) / 2;
       }
     } else {
-      // 대상 날짜가 비정상인 경우 맨 앞으로
       newOrder = ORDER_STEP;
     }
 
@@ -356,7 +365,7 @@ export default function CalendarPage() {
     setDragState({ dragId: null, overId: null, overYMD: null });
   };
 
-  // ✅ 동일 날짜 내 항목 위로 드래그할 때 스페이서 표시를 위한 오버 핸들러
+  /* ✅ 동일 날짜 내 항목 위로 드래그할 때 스페이서 표시를 위한 오버 핸들러 */
   const onDragOverTarget = (e, targetEvent) => {
     e.preventDefault();
     const payload = safeParseDrag(e.dataTransfer.getData("text/plain"));
@@ -410,6 +419,34 @@ export default function CalendarPage() {
   useEffect(() => {
     daysGrid.forEach((c) => updateOverflowForKey(makeKey(c)));
   }, [events, daysGrid]); // eslint-disable-line
+
+  /* ===== "가려진 항목 더보기" 오버레이 열기/닫기 ===== */
+  const openMoreOverlay = (key, cellObj, cellEvents) => {
+    const el = cellRefs.current[key];
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+
+    setMoreOverlay({
+      open: true,
+      key,
+      x: rect.left,
+      y: rect.bottom + 4,
+      w: rect.width,
+      events: cellEvents,
+    });
+  };
+  const closeMoreOverlay = () => setMoreOverlay({ open: false, key: null, x: 0, y: 0, w: 0, events: [] });
+
+  useEffect(() => {
+    if (!moreOverlay.open) return;
+    const onDocClick = (e) => {
+      const overlay = document.getElementById("calendar-more-overlay");
+      if (!overlay) return;
+      if (!overlay.contains(e.target)) closeMoreOverlay();
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [moreOverlay.open]);
 
   /* ===== 렌더 ===== */
   return (
@@ -467,6 +504,7 @@ export default function CalendarPage() {
             return (
               <div
                 key={idx}
+                ref={setCellRef(key)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => onDropToDate(e, cell)}
                 className={`day-cell ${isToday ? "day-cell--today" : ""}`}
@@ -480,7 +518,6 @@ export default function CalendarPage() {
                 <div
                   ref={setContentRef(key)}
                   className="event-area no-scrollbar"
-                  onScroll={(e) => updateOverflowForKey(key, e.currentTarget)}
                   onDoubleClick={(e) => { e.stopPropagation(); }}
                 >
                   <div className="event-stack">
@@ -500,7 +537,7 @@ export default function CalendarPage() {
                       </React.Fragment>
                     ))}
 
-                    {/* ✅ 동일 날짜 끝 드롭존: 맨 끝으로 이동 */}
+                    {/* 동일 날짜 끝 드롭존: 맨 끝으로 이동 */}
                     {isDragSameDay && (
                       <div
                         className="drop-end"
@@ -512,13 +549,16 @@ export default function CalendarPage() {
                   </div>
                 </div>
 
-                {/* 하단 'N건 더보기' (표시만) */}
+                {/* 하단 'N건 더보기' */}
                 {ov.hiddenBelow > 0 && (
                   <div className="more-gradient">
                     <button
                       className="more-button"
-                      title="가려진 항목 수 표시 (열리지 않음)"
-                      onClick={(evt) => { evt.stopPropagation(); }}
+                      title="가려진 항목 펼치기"
+                      onClick={(evt) => {
+                        evt.stopPropagation();
+                        openMoreOverlay(key, cell, cellEvents);
+                      }}
                     >
                       가려진 항목 {ov.hiddenBelow}건 더보기
                     </button>
@@ -550,20 +590,15 @@ export default function CalendarPage() {
               </div>
 
               <div className="popover-body">
-                {/* 읽기전용 필드 */}
                 <div className="two-col">
                   <Field label="빌라명" value={selected.villaName} readOnly />
                   <Field label="호수" value={selected.unitNumber} readOnly />
                 </div>
                 <Field label="금액" value={selected.amount} readOnly />
-
-                {/* 진행현황 변경 가능 */}
                 <StatusPicker
                   value={selected.statusKey}
                   onChange={(key) => patchEvent(selected, applyStatusFromKey(key))}
                 />
-
-                {/* 비고는 수정 가능 */}
                 <TextArea
                   label="비고"
                   value={selected.note || ""}
@@ -574,6 +609,38 @@ export default function CalendarPage() {
           </>
         );
       })()}
+
+      {/* 가려진 항목 오버레이 */}
+      {moreOverlay.open && (
+        <div
+          id="calendar-more-overlay"
+          className="more-overlay"
+          style={{ left: moreOverlay.x, top: moreOverlay.y, width: moreOverlay.w }}
+        >
+          <div className="more-overlay-head">
+            <div className="more-overlay-title">가려진 항목</div>
+            <button className="btn-x" onClick={closeMoreOverlay} title="닫기">✕</button>
+          </div>
+
+          {/* 달력과 동일한 스택/간격/폰트/사이즈 */}
+          <div className="more-overlay-body">
+            <div className="event-stack">
+              {moreOverlay.events.map((e) => (
+                <EventPill
+                  key={`ov-${e.id}`}
+                  event={e}
+                  highlight={highlightId === e.id || (queryText && isMatch(e, queryText))}
+                  onOpenPopover={(domEvent) => openPopover(e, domEvent)}
+                  onDoubleClick={null}
+                  onDragStart={(evt) => onDragStart(evt, e)}
+                  onDragOver={(evt) => onDragOverTarget(evt, e)}
+                  onDropBefore={(evt) => onDropBeforeTarget(evt, e)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -615,7 +682,6 @@ export default function CalendarPage() {
     return raw?.status ?? null;
   }
 
-  /* ===== 동일 날짜 유틸 ===== */
   function dayEvents(all, y, m, d) {
     return all.filter(e => e.y===y && e.m===m && e.d===d);
   }
@@ -628,12 +694,11 @@ export default function CalendarPage() {
       batch.update(doc(db, "moveouts", ev.id), { _order: newOrder });
     });
     await batch.commit();
-    // 로컬 상태도 갱신
     setEvents(prev => prev.map(ev => {
       if (ev.y===y && ev.m===m && ev.d===d) {
         const idx = day.findIndex(dv => dv.id===ev.id);
         return { ...ev, order: (idx + 1) * ORDER_STEP, raw: { ...ev.raw, _order: (idx + 1) * ORDER_STEP } };
-        }
+      }
       return ev;
     }));
   }

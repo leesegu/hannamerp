@@ -13,6 +13,11 @@
 
   --dash-title: #111827;
   --dash-sub: #6b7280;
+
+  --tag-first-bg: #eef2ff;   /* 1차정산 연한 남색 */
+  --tag-first-fg: #3730a3;
+  --tag-ex-bg: #fdf2f8;      /* 보증금제외 연한 분홍 */
+  --tag-ex-fg: #9d174d;
 }
 
 /* 페이지 전체(사이드바 오른쪽 공간을 꽉 채우는 컨테이너) */
@@ -39,56 +44,6 @@
 }
 .dash-chip i { color: var(--dash-purple); }
 
-/* 커스텀 드롭다운 */
-.hz-dropdown {
-  position: relative;
-}
-.hz-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(124,58,237,0.35);
-  background: #fff;
-  font-size: 13px;
-  color: var(--dash-ink);
-  cursor: pointer;
-  transition: box-shadow .15s ease, transform .05s ease;
-}
-.hz-btn:hover {
-  box-shadow: 0 4px 12px rgba(124,58,237,0.18);
-}
-.hz-btn:active { transform: translateY(0.5px); }
-.hz-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 160px;
-  background: #fff;
-  border: 1px solid var(--dash-border);
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(17,24,39,.14);
-  overflow: hidden;
-  z-index: 30;
-}
-.hz-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  font-size: 13px;
-  color: var(--dash-ink);
-  cursor: pointer;
-  transition: background-color .12s ease;
-}
-.hz-item:hover { background: var(--dash-purple-50); }
-.hz-item.active {
-  background: var(--dash-purple-100);
-  color: var(--dash-purple);
-  font-weight: 600;
-}
-
 /* 카드 공통 */
 .dash-card {
   border: 1px solid var(--dash-border);
@@ -100,7 +55,7 @@
 }
 .dash-card:hover { box-shadow: 0 6px 18px rgba(17, 24, 39, 0.08); }
 
-/* 카드 헤더 (여유 있는 높이) */
+/* 카드 헤더 */
 .dash-card__head {
   display: flex;
   align-items: center;
@@ -109,15 +64,26 @@
   border-bottom: 1px solid var(--dash-border);
   background: linear-gradient(180deg, var(--dash-purple-50), rgba(124,58,237,0.02));
 }
+.dash-head--blue { background: linear-gradient(180deg, rgba(29,78,216,0.06), rgba(29,78,216,0.02)); }
+.dash-head--amber { background: linear-gradient(180deg, rgba(217,119,6,0.06), rgba(217,119,6,0.02)); }
+
 .dash-card__icon { font-size: 18px; color: var(--dash-purple); }
 .dash-card__title { font-size: 14.5px; font-weight: 700; color: #374151; }
 
-/* 우측 요약 메타(지남/예정/총/건) — 강조 폰트 */
+/* 헤더: 금액 표시(제목 뒤) */
+.dash-head-sum {
+  font-weight: 800;
+  color: #111827;
+  margin-left: 8px;
+  font-size: 13.5px;
+}
+
+/* 우측 메타(건수) */
 .dash-card__meta {
   margin-left: auto;
-  font-size: 12.5px;            /* ▲ 살짝 키움 */
+  font-size: 12.5px;
   color: var(--dash-ink);
-  font-weight: 700;             /* ▲ 굵게 */
+  font-weight: 700;
 }
 
 /* 리스트 */
@@ -134,14 +100,14 @@
 .dash-list__item:hover { background: var(--dash-purple-50); }
 .dash-list__item:active { background: var(--dash-purple-100); transform: translateY(0.5px); }
 
-/* 텍스트 통일 (모든 카드 동일 스타일) */
+/* 텍스트 통일 */
 .title {
   font-weight: 600;
   color: var(--dash-title);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sub {
-  font-size: 12px;               /* ▲ 통일 */
+  font-size: 12px;
   color: var(--dash-sub);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -159,7 +125,20 @@
   color: #9ca3af;
 }
 
-/* 가득찬 그리드 레이아웃 (사이드바 오른쪽 전체 채움) */
+/* 배지 (1차정산 / 보증금제외) */
+.tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  font-size: 11px;
+  line-height: 1;
+  vertical-align: middle;
+  border: 1px solid transparent;
+}
+.tag--first   { background: var(--tag-first-bg); color: var(--tag-first-fg); border-color: #c7d2fe; }
+.tag--exclude { background: var(--tag-ex-bg);   color: var(--tag-ex-fg);   border-color: #fbcfe8; }
+
+/* 그리드 */
 .dash-grid { display: grid; gap: 14px; }
 .dash-grid.top   { grid-template-columns: repeat(1, minmax(0, 1fr)); }
 .dash-grid.bottom{ grid-template-columns: repeat(1, minmax(0, 1fr)); }
@@ -169,8 +148,8 @@
   .dash-grid.bottom{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (min-width: 1280px) {
-  .dash-grid.top   { grid-template-columns: repeat(5, minmax(0, 1fr)); } /* ▲ 상단 5칸 가득 */
-  .dash-grid.bottom{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-grid.top   { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dash-grid.bottom{ grid-template-columns: repeat(4, minmax(0, 1fr)); } /* 미수금 포함 4칸 */
 }
 
 /* 전역 텍스트 스무딩 */

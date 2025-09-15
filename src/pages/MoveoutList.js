@@ -644,7 +644,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         </div>
       )}
 
-      {/* ▼▼▼ 여기부터: 요청하신 “영수증 모달” 부분만 수정 ▼▼▼ */}
+      {/* ▼▼▼ 영수증 모달 ▼▼▼ */}
       {receiptOpen && receiptRow && (
         <div
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.25)", display:"flex",
@@ -652,20 +652,18 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
           onClick={closeReceiptPreview}
         >
           <div
-            /* 모달 프레임을 ReceiptTemplate 폭(600px) + 여백에 맞춰 조정 */
             style={{
               width: "min(640px, 95vw)",       // 600 본문 + 좌우 패딩 여유
               maxHeight: "90vh",
               background:"#fff",
               borderRadius:10,
               boxShadow:"0 10px 30px rgba(0,0,0,0.3)",
-              overflow:"hidden",                // 헤더 sticky 위해 컨테이너는 hidden
+              overflow:"hidden",
               display:"flex",
               flexDirection:"column",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 상단 고정 헤더: 제목 + 저장 버튼 + 닫기 버튼 */}
             <div
               style={{
                 position:"sticky",
@@ -703,7 +701,6 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
               </div>
             </div>
 
-            {/* 스크롤 영역(본문) */}
             <div style={{ padding:16, overflowY:"auto" }}>
               <div style={{ textAlign:"center", marginBottom:12 }}>
                 {receiptPreviewUrl
@@ -711,8 +708,6 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
                     <img
                       src={receiptPreviewUrl}
                       alt="영수증 미리보기"
-                      /* ReceiptTemplate(600px)과 동일 폭으로 표시,
-                         작은 화면에서는 자동 축소 */
                       style={{
                         width: 600,
                         maxWidth: "calc(95vw - 40px)",
@@ -727,7 +722,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
               </div>
             </div>
 
-            {/* 캡처용 숨김 원본 (변경 없음) */}
+            {/* 캡처용 숨김 원본 */}
             <div style={{ position:"absolute", left:-99999, top:-99999 }}>
               <ReceiptTemplate
                 refProp={receiptRef}
@@ -749,7 +744,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
           </div>
         </div>
       )}
-      {/* ▲▲▲ 여기까지: 영수증 모달만 수정 ▲▲▲ */}
+      {/* ▲▲▲ 영수증 모달 ▲▲▲ */}
     </div>
   );
 }

@@ -205,16 +205,8 @@ function EditForm({ initial, onCancel, onSaved }) {
 
     try {
       if (form.id) {
+        // 🔒 이 페이지 데이터만 수정 (moveouts 역방향 업데이트 제거)
         await updateDoc(doc(db, "moveInCleanings", form.id), payload);
-
-        // 연동 항목이면 moveouts에도 공통 필드 반영
-        if (linked) {
-          await updateDoc(doc(db, "moveouts", form.sourceMoveoutId), {
-            status: payload.status,
-            note: payload.note,
-            updatedAt: serverTimestamp(),
-          });
-        }
       } else {
         await addDoc(collection(db, "moveInCleanings"), {
           ...payload,
@@ -237,7 +229,7 @@ function EditForm({ initial, onCancel, onSaved }) {
   };
 
   const dateInputClass =
-  "h-10 px-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 w-[332px]";
+    "h-10 px-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 w-[332px]";
 
   const ro = { readOnly: true, style: { background: "#f9fafb", pointerEvents: "none" } };
   const roDp = { disabled: true };
@@ -348,7 +340,7 @@ function EditForm({ initial, onCancel, onSaved }) {
           </select>
         </div>
         <div>
-          <label className="block text-sm text-gray-600 mb-1">거래처</label>
+          <label className="block text.sm text-gray-600 mb-1">거래처</label>
           <select
             value={form.vendor}
             onChange={(e) => handleChange("vendor", e.target.value)}
@@ -481,7 +473,7 @@ export default function MoveInCleaningPage() {
     return () => unsub();
   }, []);
 
-  /* 🔁 B. 이사정산 → 입주청소 자동 동기화 */
+  /* 🔁 B. 이사정산 → 입주청소 자동 동기화 (단방향) */
   useEffect(() => {
     const moQ = collection(db, "moveouts");
     const unsub = onSnapshot(
@@ -495,6 +487,8 @@ export default function MoveInCleaningPage() {
             const unitNumber = s(x.unitNumber);
             const moStatus = s(x.status);
             const cleaningFee = parseNumber(x.cleaningFee);
+
+            // ⬇ 정산완료일 때만 청소비를 입금금액으로 반영
             const depositIn = moStatus === "정산완료" ? cleaningFee : 0;
 
             const ref = doc(db, "moveInCleanings", `mo_${d.id}`);
@@ -502,6 +496,7 @@ export default function MoveInCleaningPage() {
             const exists = prev.exists();
             const prevStatus = s(prev.data()?.status);
 
+            // ⚠ 이 모듈의 status는 사용자가 관리. moveouts 변경이 status를 덮어쓰지 않도록 prev 유지.
             const payload = {
               sourceMoveoutId: d.id,   // ✅ 연동 키
               settleDate,
