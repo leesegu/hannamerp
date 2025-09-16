@@ -10,13 +10,13 @@
   height: 100%;
   box-sizing: border-box;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
-  overflow: hidden; /* 상단 패널 그림자 등이 잘리지 않게 */
+  overflow: hidden;
 }
 
-/* ===== 상단 바 (좌:버튼 / 우:축소 패널) ===== */
+/* ===== 상단 바 ===== */
 .xp-top {
   display: grid;
-  grid-template-columns: 1fr max-content; /* ✅ 우측 ‘여분 칸’ 제거 */
+  grid-template-columns: 1fr max-content;
   gap: 12px;
   align-items: stretch;
   position: relative;
@@ -36,7 +36,7 @@
   justify-content: start;
 }
 
-/* ===== 버튼 리뉴얼 (완전 새 디자인 + 아이콘) ===== */
+/* ===== 버튼 리뉴얼 ===== */
 .xp-btn {
   display: inline-flex;
   align-items: center;
@@ -51,53 +51,33 @@
   font-size: 15px;
   letter-spacing: .2px;
   position: relative;
-  box-shadow:
-    0 8px 18px rgba(0,0,0,.14),
-    inset 0 1px 0 rgba(255,255,255,.35);
+  box-shadow: 0 8px 18px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.35);
   transition: transform .08s ease, box-shadow .18s ease, filter .12s ease;
 }
 .xp-btn i { font-size: 18px; line-height: 1; }
 .xp-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.45); }
 .xp-btn:active { transform: translateY(1px) scale(.99); }
 
-.xp-load {
-  /* 보라 글로시 + 테두리 그라데이션 */
-  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
-  outline: 2px solid transparent;
-  outline-offset: 0;
-  --border1: rgba(216,180,254,.65);
-  --border2: rgba(124,58,237,.65);
-  box-shadow:
-    0 8px 22px rgba(124,58,237,.34),
-    inset 0 1px 0 rgba(255,255,255,.4);
-  border-image: linear-gradient(135deg, var(--border1), var(--border2)) 1;
-}
-.xp-load:hover { filter: brightness(1.06); box-shadow: 0 14px 30px rgba(124,58,237,.44), inset 0 1px 0 rgba(255,255,255,.55); }
+.xp-load { background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); box-shadow: 0 8px 22px rgba(124,58,237,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-save { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); box-shadow: 0 8px 22px rgba(37,99,235,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-hold { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); box-shadow: 0 8px 22px rgba(217,119,6,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-delete { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); box-shadow: 0 8px 22px rgba(220,38,38,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-delete.on { filter: brightness(1.08) saturate(1.1); box-shadow: 0 14px 30px rgba(220,38,38,.44), inset 0 1px 0 rgba(255,255,255,.55); }
 
-.xp-save {
-  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
-  box-shadow:
-    0 8px 22px rgba(37,99,235,.34),
-    inset 0 1px 0 rgba(255,255,255,.4);
-}
-.xp-save:hover { filter: brightness(1.06); box-shadow: 0 14px 30px rgba(37,99,235,.44), inset 0 1px 0 rgba(255,255,255,.55); }
+/* 추가: 새로고침 / 추가 / 닫기 */
+.xp-refresh { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); box-shadow: 0 8px 22px rgba(100,116,139,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-add { background: linear-gradient(135deg, #34d399 0%, #059669 100%); box-shadow: 0 8px 22px rgba(5,150,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-close { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); box-shadow: 0 8px 22px rgba(71,85,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 
-.xp-hold {
-  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
-  box-shadow:
-    0 8px 22px rgba(217,119,6,.34),
-    inset 0 1px 0 rgba(255,255,255,.4);
-}
-.xp-hold:hover { filter: brightness(1.06); box-shadow: 0 14px 30px rgba(217,119,6,.44), inset 0 1px 0 rgba(255,255,255,.55); }
-
-/* ===== 우측: 합계/지출일자 패널 — 완전 새 디자인 ===== */
+/* ===== 우측 패널: (좌)지출일자 / (우)합계 나란히 ===== */
 .xp-side {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: 360px;                 /* ✅ 사이즈 확장 */
-  padding: 18px 20px;
-  margin-right: 16px;           /* ✅ 우측 트리밍 방지: 살짝 안쪽 */
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  width: 560px;
+  padding: 14px;
+  margin-right: 16px;
   border-radius: 20px;
   background: rgba(255,255,255,0.66);
   backdrop-filter: blur(12px);
@@ -108,172 +88,117 @@
     linear-gradient(180deg, rgba(255,255,255,0.88), rgba(245,243,255,0.78)),
     linear-gradient(135deg, #a78bfa, #ec4899, #60a5fa);
 }
+.xp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0; border: 0; font-size: 14px; flex: 1 1 0; min-width: 0; }
 
-/* 기존 grid 레이아웃 대신 카드 내부에서 수평 정렬 */
-.xp-side-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0;
-  border: 0;
-  font-size: 14px;
-}
-
-/* 합계 카드 */
-.xp-side-sum {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 14px 16px;
+/* 지출일자(좌) */
+.xp-side-date {
+  padding: 10px 12px;
   border-radius: 14px;
+  background: linear-gradient(135deg, #faf5ff, #ede9fe);
+  box-shadow: inset 0 2px 6px rgba(167,139,250,0.18);
+}
+.xp-side-date .xp-side-label { color: #5b21b6; white-space: nowrap; }
+.xp-date-wrap { position: relative; flex: 1 1 auto; }
+.xp-date-display {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 40px; padding: 0 44px 0 16px;
+  border: 2px solid #c4b5fd; border-radius: 12px; background: #fdfdff;
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.06);
+  font-weight: 800; font-size: 14px; color: #111827;
+}
+.xp-date-text { flex: 1; text-align: center; min-width: 0; }
+.xp-weekday { display: none !important; }
+.xp-date-open { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; color: #7c3aed; font-size: 20px; }
+
+/* 합계(우) */
+.xp-side-sum {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  padding: 14px 16px; border-radius: 14px;
   background: linear-gradient(135deg, #ede9fe, #ddd6fe);
   box-shadow: inset 0 2px 6px rgba(167,139,250,0.22);
 }
-.xp-side-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 900;
-  color: #5b21b6;
-}
-.xp-side-krw {
-  font-weight: 900;
-  color: #1f2937;
-  margin-right: 6px;
-}
-.xp-side-val {
-  font-weight: 900;
-  font-size: 22px;             /* ✅ 더 크게 */
-  color: #111827;
-  text-align: right;
-  min-width: 120px;
-}
-
-/* 지출일자 카드 */
-.xp-side-date {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.xp-side-date .xp-side-label { color: #5b21b6; }
-
-.xp-date-wrap {
-  position: relative;
-  flex: 1 1 auto;
-}
-.xp-date-display {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 40px;
-  padding: 0 44px 0 16px;       /* 아이콘 영역 확보 */
-  border: 2px solid #c4b5fd;
-  border-radius: 12px;
-  background: #fdfdff;
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.06);
-  font-weight: 800;
-  font-size: 14px;
-  color: #111827;
-}
-.xp-date-text { flex: 1; text-align: center; }
-.xp-weekday { display: none !important; } /* ✅ 요일 숨김 */
-.xp-date-open {
-  position: absolute;
-  right: 12px; top: 50%; transform: translateY(-50%);
-  border: none; background: transparent; cursor: pointer;
-  color: #7c3aed; font-size: 20px;
-}
+.xp-side-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; color: #5b21b6; white-space: nowrap; }
+.xp-side-krw { font-weight: 900; color: #1f2937; margin-right: 6px; }
+.xp-side-val { font-weight: 900; font-size: 22px; color: #111827; text-align: right; min-width: 120px; }
 
 /* ===== 테이블 ===== */
-.xp-table-wrap {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #fff;
-}
+.xp-table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #fff; }
 
-/* ✅ 기본 15행 보이도록 높이 고정 + 스크롤 */
+/* ▶ 세로 사이즈 조금 증가 (헤더+본문 17행 기준) */
 .xp-table-wrap.scrollable {
-  max-height: calc(36px + 34px * 15 + 10px); /* 헤더 36 + 본문행 34*15 */
+  /* (헤더 38px) + (행 38px * 17) + (여유 12px) */
+  max-height: calc(38px + 38px * 17 + 12px);
   overflow: auto;
 }
 
-/* 스크롤바 연보라 */
+/* 스크롤바 */
 .xp-table-wrap.scrollable::-webkit-scrollbar,
 .combo-panel::-webkit-scrollbar,
 .scombo-panel::-webkit-scrollbar,
-.xp-modal-body::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
+.xp-modal-body::-webkit-scrollbar { width: 10px; height: 10px; }
 .xp-table-wrap.scrollable::-webkit-scrollbar-thumb,
 .combo-panel::-webkit-scrollbar-thumb,
 .scombo-panel::-webkit-scrollbar-thumb,
-.xp-modal-body::-webkit-scrollbar-thumb {
-  background: #d8b4fe;
-  border-radius: 8px;
-  border: 2px solid #f5f3ff;
-}
+.xp-modal-body::-webkit-scrollbar-thumb { background: #d8b4fe; border-radius: 8px; border: 2px solid #f5f3ff; }
 .xp-table-wrap.scrollable::-webkit-scrollbar-track,
 .combo-panel::-webkit-scrollbar-track,
 .scombo-panel::-webkit-scrollbar-track,
-.xp-modal-body::-webkit-scrollbar-track {
-  background: #faf5ff;
-  border-radius: 8px;
-}
+.xp-modal-body::-webkit-scrollbar-track { background: #faf5ff; border-radius: 8px; }
 
-.xp-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
+.xp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
-/* 헤더: 보라 + 흰 글자 */
+/* 헤더 */
 .xp-table thead th {
   background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 100%);
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 13px;
-  height: 36px;
+  color: #ffffff; font-weight: 800; font-size: 13px; height: 38px;  /* ▲ 36→38 */
   border-right: 1px solid rgba(255,255,255,0.25);
 }
 .xp-table thead th:last-child { border-right: 0; }
 
+/* 본문 셀 */
 .xp-table tbody td {
   border-top: 1px solid #f3f4f6;
   border-right: 1px solid #f3f4f6;
-  height: 34px;
+  height: 38px;                 /* ▲ 34→38 : 행 높이 증가 */
   padding: 4px;
   background: #fff;
+  overflow: visible;             /* 삭제 텍스트/버튼 잘림 방지 */
 }
 .xp-table tbody td:last-child { border-right: 0; }
 
-/* 번호 칸 */
-.xp-td-no { text-align: center; color: #6b7280; }
+/* 번호 칸 + 삭제 오버레이 */
+.xp-td-no { position: relative; text-align: center; color: #6b7280; }
+
+/* 삭제 모드: 번호칸에 '삭제' 텍스트 */
+.xp-td-del-on::after {
+  content: '삭제';
+  position: absolute;
+  top: 2px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 800; color: #dc2626;
+  line-height: 1; pointer-events: none;
+}
+
+/* 행 삭제 버튼(작게) */
+.xp-del-row-btn {
+  position: absolute;
+  top: 2px; left: 50%; transform: translateX(-50%);
+  height: 16px; line-height: 16px; padding: 0 6px;
+  font-size: 10px; border: 0; border-radius: 999px; cursor: pointer; color: #fff;
+  background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+  box-shadow: 0 4px 10px rgba(220,38,38,.25), inset 0 1px 0 rgba(255,255,255,.4);
+  z-index: 1;
+}
+.xp-del-row-btn:hover { filter: brightness(1.05); }
 
 /* 입력 공통 */
 .xp-input, .xp-select {
-  width: 100%;
-  height: 28px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 0 8px;
-  font-size: 13px;
-  outline: none;
-  background: #fff;
+  width: 100%; height: 28px; border: 1px solid #d1d5db; border-radius: 6px; padding: 0 8px;
+  font-size: 13px; outline: none; background: #fff;
 }
-.xp-input:focus, .xp-select:focus {
-  border-color: #a78bfa;
-  box-shadow: 0 0 0 2px rgba(167,139,250,0.25);
-}
-
-/* 금액 우측정렬 */
+.xp-input:focus, .xp-select:focus { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167,139,250,0.25); }
 .xp-amt { text-align: right; }
 
-/* ✅ 출금완료 시 “대분류~출금확인(2~8열)”을 더 진한 회색으로 덮고 내용에도 선 */
+/* 출금완료 회색 덮기 */
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8),
 .xp-td-dim-dark {
   background: #cbd5e1 !important;
@@ -282,51 +207,25 @@
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .xp-input,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-btn,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .combo-input {
-  text-decoration: line-through;
-  background-color: #cbd5e1;
+  text-decoration: line-through; background-color: #cbd5e1;
 }
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-text { text-decoration: line-through; }
 
 /* ===== 하단 버튼 ===== */
-.xp-bottom-actions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
-}
-.xp-add-rows {
-  height: 36px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 8px;
-  padding: 0 12px;
-  cursor: pointer;
-  font-weight: 600;
-}
+.xp-bottom-actions { margin-top: 8px; display: flex; justify-content: flex-end; }
+.xp-add-rows { height: 36px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 0 12px; cursor: pointer; font-weight: 600; }
 .xp-add-rows:hover { background: #f9fafb; }
 
 /* ===== 검색형 콤보 ===== */
 .combo { position: relative; }
 .combo-input { padding-right: 32px; }
 .combo-panel {
-  position: absolute;
-  z-index: 30;
-  left: 0; right: 0; top: calc(100% + 4px);
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.12);
-  max-height: 260px;
-  overflow: auto;
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);
+  border: 1px solid #d1d5db; background: #fff; border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.12); max-height: 260px; overflow: auto;
 }
 .combo-empty { padding: 10px 12px; color: #6b7280; font-size: 12px; }
-.combo-item {
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: #fff;
-  padding: 8px 12px;
-  cursor: pointer;
-}
+.combo-item { width: 100%; text-align: left; border: 0; background: #fff; padding: 8px 12px; cursor: pointer; }
 .combo-item:hover { background: #f3f4f6; }
 .combo-line1 { font-weight: 700; font-size: 13px; color: #111827; }
 .combo-line2 { display: flex; gap: 8px; margin-top: 2px; font-size: 12px; color: #374151; }
@@ -337,134 +236,129 @@
 /* ===== SimpleCombo ===== */
 .scombo { position: relative; }
 .scombo-btn {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px;
-  text-align: left;
-  width: 100%;
-  height: 28px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 0 28px 0 8px;
-  font-size: 13px;
-  background: #fff;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  text-align: left; width: 100%; height: 28px; border: 1px solid #d1d5db; border-radius: 6px; padding: 0 28px 0 8px; font-size: 13px; background: #fff;
 }
-.scombo-btn:focus {
-  border-color: #a78bfa;
-  box-shadow: 0 0 0 2px rgba(167,139,250,0.25);
-}
+.scombo-btn:focus { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167,139,250,0.25); }
 .scombo-placeholder { color: #9ca3af; }
 .scombo-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scombo-caret, .scombo-caret-input {
-  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-  color: #6b7280; font-size: 16px; cursor: pointer;
-}
+.scombo-caret { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: #6b7280; font-size: 16px; cursor: pointer; }
 .scombo-panel {
   position: absolute; z-index: 25; left: 0; right: 0; top: calc(100% + 4px);
   border: 1px solid #d1d5db; background: #fff; border-radius: 8px;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.12);
-  max-height: 220px; overflow: auto;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.12); max-height: 220px; overflow: auto;
 }
-.scombo-item {
-  width: 100%; text-align: left; border: 0; background: #fff;
-  padding: 8px 12px; cursor: pointer; font-size: 13px;
-}
+.scombo-item { width: 100%; text-align: left; border: 0; background: #fff; padding: 8px 12px; cursor: pointer; font-size: 13px; }
 .scombo-item:hover { background: #f3f4f6; }
 .scombo-empty { padding: 10px 12px; color: #6b7280; font-size: 12px; }
 
 /* ===== 모달 공통 ===== */
-.xp-modal-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(17,24,39,0.48);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
+.xp-modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,0.48); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .xp-modal {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 30px 70px rgba(0,0,0,0.35);
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
+  background: #fff; border-radius: 16px; box-shadow: 0 30px 70px rgba(0,0,0,0.35);
+  max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e5e7eb;
 }
-.xp-modal-head {
-  display: grid; grid-template-columns: 1fr auto; align-items: center;
-  padding: 12px 14px;
-  background: linear-gradient(180deg, #ede9fe 0%, #faf5ff 100%);
-  border-bottom: 1px solid #e9d5ff;
-}
+.xp-modal-head { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 12px 14px; background: linear-gradient(180deg, #ede9fe 0%, #faf5ff 100%); border-bottom: 1px solid #e9d5ff; }
 .xp-modal-title { font-weight: 900; color: #4c1d95; }
-.xp-modal-close {
-  border: none; background: transparent; cursor: pointer; font-size: 20px; color: #6b7280;
-}
-.xp-modal-body {
-  padding: 12px;
-  overflow: auto;
-}
+.xp-modal-close { border: none; background: transparent; cursor: pointer; font-size: 20px; color: #6b7280; }
+.xp-modal-body { padding: 12px; overflow: auto; }
 
-/* ✅ 출금보류 모달만 가로 더 넓게 (Chrome/Edge 지원) */
-.xp-modal:has(.hold-wrap) {
-  width: 1200px !important;
-}
+/* 출금보류 모달 너비 */
+.xp-modal:has(.hold-wrap) { width: 1200px !important; }
 
 /* ===== 커스텀 달력 ===== */
 .cal-wrap { display: grid; gap: 8px; }
-.cal-top {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  padding: 6px 4px;
-  background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 100%);
-  border-radius: 12px;
-  color: #fff;
-}
+.cal-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 6px 4px; background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 100%); border-radius: 12px; color: #fff; }
 .cal-title { text-align: center; }
 .cal-month { font-size: 18px; font-weight: 900; line-height: 1; }
 .cal-year { font-size: 12px; opacity: 0.9; }
-.cal-nav {
-  border: none; background: transparent; color: #fff; font-size: 22px; cursor: pointer;
-}
-.cal-head {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
-  color: #6b21a8; font-weight: 800; font-size: 12px;
-}
+.cal-nav { border: none; background: transparent; color: #fff; font-size: 22px; cursor: pointer; }
+.cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; color: #6b21a8; font-weight: 800; font-size: 12px; }
 .cal-head-cell { text-align: center; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.cal-cell {
-  height: 42px; border: 1px solid #e9d5ff; border-radius: 10px; background: #fff;
-  cursor: pointer; position: relative;
-  transition: transform .06s ease, box-shadow .12s ease, background .12s ease;
-}
+.cal-cell { height: 42px; border: 1px solid #e9d5ff; border-radius: 10px; background: #fff; cursor: pointer; position: relative; transition: transform .06s ease, box-shadow .12s ease, background .12s ease; }
 .cal-cell:hover { background: #f5f3ff; box-shadow: 0 8px 18px rgba(139,92,246,0.18); transform: translateY(-1px); }
 .cal-cell.muted { opacity: 0.45; }
 .cal-daynum { position: absolute; top: 8px; right: 8px; font-weight: 800; color: #4c1d95; }
 .cal-cell.today { border-color: #8b5cf6; box-shadow: inset 0 0 0 2px #8b5cf6; }
 
-/* ===== 출금보류 테이블 ===== */
+/* ===== 출금보류 테이블 & 툴바 ===== */
 .hold-wrap { display: grid; gap: 8px; }
-.hold-table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
 
-/* ✅ 15행 고정 높이 + 스크롤 */
+/* ▶ 테이블 위 우측 상단 정렬 (행추가, 삭제 버튼) */
+.hold-toolbar {
+  display: flex;               /* ▲ grid → flex */
+  justify-content: flex-end;   /* ▲ 우측 정렬 */
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;          /* 테이블과 간격 */
+}
+/* 예전 spacer가 남아있어도 영향 없도록 */
+.hold-toolbar .spacer { display: none; height: 0; }
+
+/* 공통: 출금보류 창 버튼 룩앤필 */
+.hold-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.35);
+  transition: transform .08s ease, box-shadow .18s ease, filter .12s ease;
+}
+.hold-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 22px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.45); }
+.hold-btn:active { transform: translateY(0) scale(.99); }
+
+/* 개별 컬러 */
+.hold-btn.add    { background: linear-gradient(135deg, #34d399 0%, #059669 100%); }
+.hold-btn.delete { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+.hold-btn.delete.on { filter: brightness(1.06) saturate(1.05); }
+.hold-btn.save   { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); }
+.hold-btn.close  { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); }
+
+/* 테이블 */
+.hold-table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
 .hold-viewport {
-  max-height: calc(34px * 15 + 10px); /* 본문행 기준 */
+  /* ▶ 세로 사이즈 조금 증가 (본문 17행 기준) */
+  max-height: calc(38px * 17 + 12px);
   overflow: auto;
 }
 
 .hold-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-
-/* ✅ '구분'과 '은행' 너비 조금 더 줄임 (컴포넌트 인라인 width 덮어쓰기) */
 .hold-table thead th:nth-child(1),
 .hold-table tbody td:nth-child(1) { width: 90px !important; }
 .hold-table thead th:nth-child(3),
 .hold-table tbody td:nth-child(3) { width: 90px !important; }
-
 .hold-table thead th {
   background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
-  color: #111827; font-weight: 900; font-size: 13px; height: 36px; border-right: 1px solid rgba(0,0,0,0.08);
+  color: #111827; font-weight: 900; font-size: 13px; height: 38px; /* ▲ 36→38 */
+  border-right: 1px solid rgba(0,0,0,0.08);
 }
 .hold-table thead th:last-child { border-right: 0; }
-.hold-table tbody td { border-top: 1px solid #f3f4f6; border-right: 1px solid #f3f4f6; padding: 4px; height: 34px; }
+.hold-table tbody td {
+  border-top: 1px solid #f3f4f6; border-right: 1px solid #f3f4f6;
+  padding: 4px; height: 38px; /* ▲ 34→38 */
+}
 .hold-table tbody td:last-child { border-right: 0; }
-.hold-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px; }
-.hold-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 10px; }
+
+/* 출금보류: 구분 칸 위 삭제 버튼(지출정리와 동일 스타일 재사용) */
+.hold-table tbody td:nth-child(1) { position: relative; }
+.hold-table .xp-del-row-btn {}
+
+/* 하단: 저장/닫기 버튼을 우측 하단에 고정 느낌으로 */
+.hold-footer  {
+  position: sticky;            /* ▲ 모달 내부 스크롤 시 하단에 붙도록 */
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 0 0 0;
+  background: linear-gradient(0deg, #fff 70%, rgba(255,255,255,0));
+  border-top: 1px solid #e5e7eb;
+}
