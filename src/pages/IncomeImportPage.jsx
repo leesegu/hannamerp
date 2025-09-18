@@ -1,14 +1,10 @@
 // ==================================
-// 관리비회계 · 수입정리 페이지
-// (수정)
-// 1) 엑셀 업로드: 파싱 → 표 반영 → Firestore 자동 저장
-// 2) 저장 컬렉션: acct_income  (※ income_records 사용 안 함)
-// 3) 엑셀 컬럼 매핑: 일자→date, 구분→category, 입금금액→inAmt, 거래기록사항→record, 거래메모→memo
-// 4) '엑셀자료추가' 기능 및 관련 코드 제거
-// 5) 날짜 -1일 표시 문제: EPS 보정 + 날짜전용열 시간 소수부 제거(자정 고정) + 1900/1904 대응 + 문자열파서 미사용
-// 6) 수동 '추가'(모달) 포함
-// 7) Firestore 실시간(onSnapshot) 반영 + 수정 실시간 저장(디바운스)
-// 8) '입금만' / '수정모드' 토글 퍼플 스타일
+// 관리비회계 · 수입정리 페이지 (Storage JSON 버전 · 정리본)
+// - 월별 JSON: acct_income_json/<YYYY-MM>.json
+// - 대용량 엑셀: Storage 업로드 → IMPORT_API 호출 (백엔드가 월 JSON 갱신)
+// - 소량 엑셀/수동 추가/인라인 수정: 클라가 해당 월 JSON 읽어와 병합 저장
+// - IME(한글) 입력 안정화 + 메모 입력 시 버벅임 개선(메모 드래프트 분리)
+// - ✅ 즉시 커밋(메모/카테고리/미확인) + 드래프트 자동정리
 // ==================================
 import React, {
   useCallback, useMemo, useRef, useState, useEffect,
@@ -18,16 +14,14 @@ import "./IncomeImportPage.css";
 
 import { db } from "../firebase";
 import {
-  collection,
-  getDocs,
-  onSnapshot,
-  query as fsQuery,
-  orderBy as fsOrderBy,
-  writeBatch,
-  doc,
-  serverTimestamp,
-  setDoc,
+  collection, getDocs, onSnapshot, query as fsQuery,
 } from "firebase/firestore";
+import {
+  getStorage, ref as sRef, uploadBytes, getDownloadURL, getBytes,
+} from "firebase/storage";
+
+/* ===== .env (Functions API) ===== */
+const IMPORT_API = process.env.REACT_APP_IMPORT_API || "";
 
 /* ===== 유틸 ===== */
 const s = (v) => String(v ?? "").trim();
@@ -39,6 +33,10 @@ const toNumber = (v) => {
 };
 const pad2 = (n) => String(n).padStart(2, "0");
 const fmtComma = (n) => (toNumber(n) ? toNumber(n).toLocaleString() : "");
+const monthKeyOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 7) : "");
+
+// 큰 텍스트 필드 방어(과도한 payload 방지)
+const trimField = (v, max = 2000) => s(v).slice(0, max);
 
 /* ===== 날짜 처리 ===== */
 const EXCEL_EPS = 1e-7;
@@ -178,7 +176,7 @@ function parseMeta(rows) {
 }
 
 const makeDupKey = (r) =>
-  [r.date, r.time, toNumber(r.inAmt), s(r.record)].join("|"); // (balance 제외: 저장 스키마 간소화)
+  [r.date, r.time, toNumber(r.inAmt), s(r.record)].join("|");
 
 /* 컬럼 매핑/레코드 변환 */
 function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
@@ -215,7 +213,6 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
     let dateStr = "";
     let timeStr = "";
 
-    // 거래일시
     if (col.dateTime >= 0) {
       const raw = row[col.dateTime];
       const d = normalizeExcelCellToLocalDate(raw, { truncateTime: false, date1904 });
@@ -226,7 +223,6 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
       }
     }
 
-    // 일자/거래일(자정 고정)
     if (!dateStr && col.dateOnly >= 0) {
       const rawD = row[col.dateOnly];
       const d = normalizeExcelCellToLocalDate(rawD, { truncateTime: true, date1904 });
@@ -266,10 +262,10 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
       inAmt,
       outAmt,
       balance: col.balance >= 0 ? toNumber(row[col.balance]) : 0,
-      record: col.record >= 0 ? s(row[col.record]) : "",
-      memo: col.memo >= 0 ? s(row[col.memo]) : "",
-      category: col.category >= 0 ? s(row[col.category]) : "",
-      _seq: col.seq >= 0 ? s(row[col.seq]) : "",
+      record: s(row[col.record]) || "",
+      memo: s(row[col.memo]) || "",
+      category: s(row[col.category]) || "",
+      _seq: s(row[col.seq]) || "",
       type: inAmt > 0 ? "입금" : outAmt > 0 ? "출금" : "",
       unconfirmed: false,
     });
@@ -373,47 +369,72 @@ function autoCategoryByAccount(accountNoRaw = "") {
   return "";
 }
 
-/* ===== Firestore 저장/갱신 유틸 ===== */
-const collRef = collection(db, "acct_income");
+/* ===== Storage(JSON) 유틸 ===== */
+const storage = getStorage();
 
-/** 업로드 신규 레코드 자동 저장(필드 폭넓게 저장: 이후 실시간 뷰/수정 용이) */
-async function autosaveChunk(list) {
-  if (!list.length) return 0;
-  const batch = writeBatch(db);
-  list.forEach((r) => {
-    const id = `r_${hash(makeDupKey(r)).toString(16)}`;
-    const ref = doc(collRef, id);
-    batch.set(
-      ref,
-      {
-        _id: id,
-        date: s(r.date),
-        time: s(r.time || "00:00:00"),
-        datetime: s(r.datetime || `${s(r.date)} ${s(r.time || "00:00:00")}`),
-        accountNo: s(r.accountNo),
-        holder: s(r.holder),
-        category: s(r.category || ""),
-        inAmt: toNumber(r.inAmt),
-        outAmt: toNumber(r.outAmt),
-        balance: toNumber(r.balance),
-        record: s(r.record),
-        memo: s(r.memo),
-        _seq: s(r._seq || ""),
-        type: r.type || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : ""),
-        unconfirmed: !!r.unconfirmed,
-        importedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  });
-  await batch.commit();
-  return list.length;
+const MONTH_BASE = "acct_income_json"; // 폴더 루트
+const monthPath = (monthKey) => `${MONTH_BASE}/${monthKey}.json`;
+
+// 월 JSON 형태: { meta: {updatedAt: number}, items: { [id]: Row } }
+async function readMonthJSON(monthKey) {
+  const ref = sRef(storage, monthPath(monthKey));
+  try {
+    const bytes = await getBytes(ref);
+    const text = new TextDecoder().decode(bytes);
+    const obj = JSON.parse(text);
+    if (!obj || typeof obj !== "object") return { meta: {}, items: {} };
+    return { meta: obj.meta || {}, items: obj.items || {} };
+  } catch (e) {
+    const code = e?.code || "";
+    const msg = String(e?.message || "");
+    const notFound =
+      code === "storage/object-not-found" ||
+      msg.includes("object-not-found") ||
+      msg.includes("No such object");
+    if (notFound) {
+      return { meta: {}, items: {} };
+    }
+    throw e; // 상위 useEffect에서 setError로 노출
+  }
 }
 
-/** 단건 패치(디바운스용) */
-async function patchDoc(id, patch) {
-  const ref = doc(collRef, id);
-  await setDoc(ref, { ...patch }, { merge: true });
+async function writeMonthJSON(monthKey, dataObj) {
+  const ref = sRef(storage, monthPath(monthKey));
+  const blob = new Blob([JSON.stringify(dataObj)], { type: "application/json" });
+  await uploadBytes(ref, blob, { contentType: "application/json" });
+}
+
+/* ===== 월 키 유틸 ===== */
+function toMonthKeys(yFrom, mFrom, yTo, mTo) {
+  const keys = [];
+  const d = new Date(yFrom, mFrom - 1, 1);
+  const end = new Date(yTo, mTo - 1, 1);
+  while (d <= end) {
+    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    d.setMonth(d.getMonth() + 1);
+  }
+  return keys;
+}
+
+/* ===== 대용량 판단: 용량(>=1MB) 또는 행수(>=3,000행) ===== */
+const SIZE_LARGE_BYTES = 1 * 1024 * 1024; // 1MB
+const ROW_LARGE_THRESHOLD = 3000;
+
+async function shouldUseBackend(file) {
+  if (!IMPORT_API) return false;
+  if (file.size >= SIZE_LARGE_BYTES) return true;
+  try {
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab, { type: "array", cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const ref = ws && ws["!ref"];
+    if (!ref) return false;
+    const range = XLSX.utils.decode_range(ref);
+    const rowCount = (range.e.r - range.s.r + 1) || 0;
+    return rowCount >= ROW_LARGE_THRESHOLD;
+  } catch {
+    return false;
+  }
 }
 
 /* ===== 메인 ===== */
@@ -421,29 +442,23 @@ export default function IncomeImportPage() {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
 
-  // 중복 알림
   const [dupInfo, setDupInfo] = useState(null);
   const [dupOpen, setDupOpen] = useState(false);
 
-  // 검색/필터/모드
   const [query, setQuery] = useState("");
   const [onlyIncome, setOnlyIncome] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
-  // 페이지 사이즈
   const pageSizeOptions = [50, 100, 300, 500];
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
 
-  // 분류 목록
   const [incomeCategories, setIncomeCategories] = useState([]);
 
-  // 미확인 모달
   const [unconfOpen, setUnconfOpen] = useState(false);
   const [unconfQuery, setUnconfQuery] = useState("");
   const [unconfDraft, setUnconfDraft] = useState({});
 
-  // 수동 추가 모달
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     date: "",
@@ -453,7 +468,17 @@ export default function IncomeImportPage() {
     memo: "",
   });
 
-  /* 기간 */
+  // ===== IME(한글) 입력 안정화 refs =====
+  const composingRef = useRef({});      // { [id]: true/false }
+
+  const [uploadError, setUploadError] = useState("");
+
+  // ✅ 메모 입력 버벅임 개선: 입력 중 드래프트 보관용
+  const [memoDrafts, setMemoDrafts] = useState({}); // { [id]: string }
+
+  // ===== 월별 캐시 (Storage JSON)
+  const monthsRef = useRef({});
+
   const today = useMemo(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
@@ -472,11 +497,9 @@ export default function IncomeImportPage() {
     return [nyF, nmF, ndF, nyT, nmT, ndT];
   }, []);
 
-  /* 정렬 상태 */
   const [sortKey, setSortKey] = useState("datetime");
   const [sortDir, setSortDir] = useState("desc");
 
-  // 정렬 클릭
   const clickSort = useCallback((key) => {
     setSortKey((prevKey) => {
       if (prevKey === key) {
@@ -488,87 +511,10 @@ export default function IncomeImportPage() {
     });
   }, []);
 
-  /* 파일 업로드(파싱) */
   const fileInputRef = useRef(null);
   const onPickFiles = useCallback(() => fileInputRef.current?.click(), []);
 
-  // ▼ 업로드(파싱 → rows 반영 → 자동 저장)
-  const [uploadError, setUploadError] = useState("");
-  const handleFiles = useCallback(
-    async (files) => {
-      setError("");
-      setUploadError("");
-      const merged = [];
-
-      const abKeys = new Set(rows.map((r) => makeDupKey(r)));
-      const dupExamples = new Set();
-      let dupCount = 0;
-
-      for (const file of files) {
-        try {
-          const ab = await file.arrayBuffer();
-          const wb = XLSX.read(ab, { type: "array", cellDates: true });
-          const is1904 = !!(wb?.Workbook?.WBProps?.date1904);
-
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const aoo = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
-
-          const meta = parseMeta(aoo);
-          const headerRowIdx = findHeaderRow(aoo);
-          if (headerRowIdx === -1) throw new Error("헤더(일자/거래일시/입금금액 등)를 찾지 못했습니다.");
-
-          const recs = rowsToRecords(aoo, headerRowIdx, meta, { date1904: is1904 });
-          for (const r of recs) {
-            const key = makeDupKey(r);
-            if (abKeys.has(key)) {
-              dupCount++;
-              if (dupExamples.size < 5)
-                dupExamples.add(`${r.date} ${r.time} | ${r.category || r.type} ${fmtComma(r.inAmt || r.outAmt)} | ${r.record}`);
-              continue;
-            }
-            abKeys.add(key);
-            merged.push(r);
-          }
-        } catch (e) {
-          console.error(e);
-          setUploadError((prev) => prev + `\n[${file.name}] ${e.message || String(e)}`);
-        }
-      }
-
-      if (dupCount > 0) {
-        setDupInfo({ count: dupCount, examples: Array.from(dupExamples) });
-        setDupOpen(true);
-      } else {
-        setDupInfo(null);
-        setDupOpen(false);
-      }
-
-      // UI 즉시 반영
-      const nextRows = [...rows, ...merged].sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
-      setRows(nextRows);
-      setPage(1);
-
-      // 기간 자동 보정(최근 일자)
-      const last = nextRows.find((r) => r.date);
-      if (last?.date) {
-        const [yy, mm, dd] = last.date.split("-").map((t) => +t);
-        const [nyF, nmF, ndF, nyT, nmT, ndT] = clampRange(yy, mm, dd, yy, mm, dd);
-        setYFrom(nyF); setMFrom(nmF); setDFrom(ndF);
-        setYTo(nyT);   setMTo(nmT);   setDTo(ndT);
-      }
-
-      // Firestore 저장
-      try {
-        await autosaveChunk(merged);
-      } catch (e) {
-        console.error("자동 저장 실패:", e);
-        setUploadError((prev) => prev + `\n자동 저장 실패: ${e?.message || e}`);
-      }
-    },
-    [rows, clampRange]
-  );
-
-  /* ===== 수입 대분류 로드 ===== */
+  /* ===== 수입 대분류 로드(Firestore 그대로 유지) ===== */
   useEffect(() => {
     const safeSort = (arr) =>
       [...arr].sort((a, b) => {
@@ -582,7 +528,7 @@ export default function IncomeImportPage() {
       });
 
     const col = collection(db, "acct_income_main");
-    const qy = fsQuery(col, fsOrderBy("order", "asc"));
+    const qy = fsQuery(col);
 
     const unsub = onSnapshot(
       qy,
@@ -623,62 +569,148 @@ export default function IncomeImportPage() {
     return () => unsub();
   }, []);
 
-  /* ===== Firestore 실시간 구독: 컬렉션 전체 최신 반영 ===== */
+  /* ===== 월 범위가 바뀔 때: 해당 월 JSON들을 로드 → rows 구성 ===== */
+  const rebuildRowsFromCache = useCallback(() => {
+    const list = [];
+    const store = monthsRef.current;
+    Object.keys(store).forEach((mk) => {
+      const items = store[mk]?.items || {};
+      Object.values(items).forEach((r) => list.push(r));
+    });
+
+    const start = new Date(yFrom, mFrom - 1, dFrom, 0, 0, 0, 0);
+    const end = new Date(yTo, mTo - 1, dTo, 23, 59, 59, 999);
+    const filtered = list.filter((r) => {
+      const d = parseYMDLocal(r.date);
+      if (!(d instanceof Date) || isNaN(d)) return false;
+      const d0 = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const d1 = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      return !(d < d0 || d > d1);
+    });
+
+    filtered.sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
+    setRows(filtered);
+    setPage(1);
+  }, [yFrom, mFrom, dFrom, yTo, mTo, dTo]);
+
+  const loadMonthsIfNeeded = useCallback(async (monthKeys) => {
+    const store = monthsRef.current;
+    for (const mk of monthKeys) {
+      if (!store[mk]?.loaded) {
+        const data = await readMonthJSON(mk);
+        store[mk] = {
+          loaded: true,
+          meta: data.meta || {},
+          items: data.items || {},
+          dirty: false,
+          timer: null,
+        };
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    const q = fsQuery(collRef, fsOrderBy("date", "desc"), fsOrderBy("importedAt", "desc"));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map((d) => {
-          const data = d.data() || {};
-          const inAmt = toNumber(data.inAmt);
-          const outAmt = toNumber(data.outAmt);
-          const time = s(data.time || "00:00:00");
-          const date = s(data.date || "");
-          return {
-            _id: s(data._id || d.id),
-            accountNo: s(data.accountNo),
-            holder: s(data.holder),
-            date,
-            time,
-            datetime: s(data.datetime || (date ? `${date} ${time}` : "")),
-            inAmt,
-            outAmt,
-            balance: toNumber(data.balance),
-            record: s(data.record),
-            memo: s(data.memo),
-            category: s(data.category),
-            _seq: s(data._seq),
-            type: data.type || (inAmt > 0 ? "입금" : outAmt > 0 ? "출금" : ""),
-            unconfirmed: !!data.unconfirmed,
-          };
-        });
-        setRows(list);
-      },
-      (e) => {
+    (async () => {
+      try {
+        setError("");
+        const monthKeys = toMonthKeys(yFrom, mFrom, yTo, mTo);
+        await loadMonthsIfNeeded(monthKeys);
+        rebuildRowsFromCache();
+      } catch (e) {
         console.error(e);
         setError(String(e?.message || e));
       }
-    );
-    return () => unsub();
+    })();
+  }, [yFrom, mFrom, dFrom, yTo, mTo, dTo, loadMonthsIfNeeded, rebuildRowsFromCache]);
+
+  /* ===== 월 JSON 저장 디바운서 ===== */
+  const scheduleMonthSave = useCallback((monthKey) => {
+    const store = monthsRef.current;
+    const bucket = store[monthKey];
+    if (!bucket) return;
+    bucket.dirty = true;
+    if (bucket.timer) clearTimeout(bucket.timer);
+    bucket.timer = setTimeout(async () => {
+      try {
+        const payload = {
+          meta: { updatedAt: Date.now() },
+          items: bucket.items,
+        };
+        await writeMonthJSON(monthKey, payload);
+        bucket.dirty = false;
+      } catch (e) {
+        console.error(`월 저장 실패(${monthKey}):`, e);
+      } finally {
+        bucket.timer = null;
+      }
+    }, 400);
   }, []);
 
-  /* ===== 인라인 수정 → 디바운스 저장 ===== */
+  /* ===== 인라인 수정 → 월 JSON 반영(+디바운스 저장) ===== */
   const saveTimers = useRef({});
+  const updateRowLocalAndCache = useCallback((id, patch) => {
+    // 1) 화면 즉시 갱신
+    setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch, datetime: (() => {
+      const dateStr = s((patch.date ?? r.date) || "");
+      const timeStr = s((patch.time ?? r.time) || "00:00:00");
+      return dateStr ? `${dateStr} ${timeStr}` : (patch.datetime ?? r.datetime ?? "");
+    })() } : r)));
+
+    // 2) 월 JSON 캐시 반영 + 저장 예약
+    const store = monthsRef.current;
+    // 현재 행(기존값)
+    const cur = (rows.find((r) => r._id === id)) || {};
+    const mk = monthKeyOf(patch.date || cur.date);
+    if (!mk) return;
+
+    if (!store[mk]) store[mk] = { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
+
+    const prevObj = store[mk].items[id] || cur;
+    const nextObj = { ...prevObj, ...patch };
+
+    if (nextObj.record != null) nextObj.record = trimField(nextObj.record);
+    if (nextObj.memo != null)   nextObj.memo   = trimField(nextObj.memo);
+
+    const dateStr = s(nextObj.date || "");
+    const timeStr = s(nextObj.time || "00:00:00");
+    nextObj.datetime = dateStr ? `${dateStr} ${timeStr}` : nextObj.datetime || "";
+
+    store[mk].items[id] = nextObj;
+    scheduleMonthSave(mk);
+  }, [rows, scheduleMonthSave]);
+
   const scheduleSave = useCallback((id, patch) => {
     const key = String(id);
     if (saveTimers.current[key]) clearTimeout(saveTimers.current[key]);
-    saveTimers.current[key] = setTimeout(async () => {
-      try { await patchDoc(key, patch); }
-      catch (e) { console.error("저장 실패:", e); }
-      finally { delete saveTimers.current[key]; }
+    saveTimers.current[key] = setTimeout(() => {
+      updateRowLocalAndCache(key, patch);
+      delete saveTimers.current[key];
     }, 350);
-  }, []);
+  }, [updateRowLocalAndCache]);
 
   const updateRow = (id, patch) => {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
     scheduleSave(id, patch);
   };
+
+  // ✅ 메모 드래프트 커밋 함수 (즉시 커밋)
+  const commitMemo = useCallback((id, value) => {
+    const current = (rows.find(r => r._id === id)?.memo) ?? "";
+    if (s(value) === s(current)) {
+      setMemoDrafts(prev => {
+        const { [id]: _omit, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+    // 즉시 커밋
+    updateRowLocalAndCache(id, { memo: value });
+    // 드래프트 정리
+    setMemoDrafts(prev => {
+      const { [id]: _omit, ...rest } = prev;
+      return rest;
+    });
+  }, [rows, updateRowLocalAndCache]);
 
   // 엔터로 다음 메모로
   const memoRefs = useRef({});
@@ -693,7 +725,23 @@ export default function IncomeImportPage() {
     }
   };
 
-  // 미확인
+  // ✅ rows 갱신 시, 동일 값이 된 드래프트 자동 정리 (깜빡임/점프 방지)
+  useEffect(() => {
+    setMemoDrafts((prev) => {
+      if (!prev || Object.keys(prev).length === 0) return prev;
+      let changed = false;
+      const next = { ...prev };
+      for (const id of Object.keys(prev)) {
+        const r = rows.find((x) => x._id === id);
+        if (r && s(prev[id]) === s(r.memo ?? "")) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [rows]);
+
   const unconfirmedList = useMemo(() => rows.filter((r) => r.unconfirmed), [rows]);
   const unconfirmedTotalInAmt = useMemo(
     () => unconfirmedList.reduce((sum, r) => sum + toNumber(r.inAmt), 0),
@@ -735,7 +783,6 @@ export default function IncomeImportPage() {
     setUnconfDraft((p) => ({ ...p, [id]: { ...(p[id] || {}), category } }));
 
   const applyUnconfEdits = async () => {
-    // 로컬 반영
     setRows((prev) =>
       prev.map((r) => {
         const d = unconfDraft[r._id];
@@ -746,24 +793,27 @@ export default function IncomeImportPage() {
     );
     setUnconfOpen(false);
 
-    // 서버 반영(batch)
-    try {
-      const batch = writeBatch(db);
-      Object.entries(unconfDraft).forEach(([id, d]) => {
-        const ref = doc(collRef, id);
-        batch.set(ref, {
-          memo: s(d.memo),
-          unconfirmed: !!d.unconfirmed,
-          category: s(d.category || ""),
-        }, { merge: true });
-      });
-      await batch.commit();
-    } catch (e) {
-      console.error("미확인 저장 실패:", e);
+    const store = monthsRef.current;
+    for (const [id, d] of Object.entries(unconfDraft)) {
+      const cur =
+        rows.find((x) => x._id === id) ||
+        Object.values(store).flatMap((b) => Object.values(b.items || {})).find((x) => x._id === id);
+      if (!cur) continue;
+      const mk = monthKeyOf(cur.date);
+      if (!mk) continue;
+      if (!store[mk]) store[mk] = { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
+      const next = {
+        ...(store[mk].items[id] || cur),
+        memo: s(d.memo),
+        unconfirmed: !!d.unconfirmed,
+        category: s(d.category || ""),
+      };
+      store[mk].items[id] = next;
+      scheduleMonthSave(mk);
     }
   };
 
-  /* ===== 기간 필터 → 통계용 ===== */
+  /* ===== 통계용 범위 리스트 ===== */
   const rangeList = useMemo(() => {
     const start = new Date(yFrom, mFrom - 1, dFrom, 0, 0, 0, 0);
     const end = new Date(yTo, mTo - 1, dTo, 23, 59, 59, 999);
@@ -776,7 +826,6 @@ export default function IncomeImportPage() {
     });
   }, [rows, yFrom, mFrom, dFrom, yTo, mTo, dTo]);
 
-  /* 통계 */
   const statCount = rangeList.length;
   const statInSum = useMemo(() => rangeList.reduce((sum, r) => sum + toNumber(r.inAmt), 0), [rangeList]);
   const statOutSum = useMemo(() => rangeList.reduce((sum, r) => sum + toNumber(r.outAmt), 0), [rangeList]);
@@ -785,8 +834,8 @@ export default function IncomeImportPage() {
     [rangeList]
   );
 
-  /* 검색/입금만 반영 목록 */
-  const filtered = useMemo(() => {
+  /* ===== 검색/정렬/페이지 (최종 블록) ===== */
+  const filteredView = useMemo(() => {
     const q = s(query);
     const qLower = q.toLowerCase();
     const qNum = toNumber(q);
@@ -807,28 +856,178 @@ export default function IncomeImportPage() {
     });
   }, [rangeList, query, onlyIncome]);
 
-  /* 정렬 */
-  const sorted = useMemo(() => {
-    const list = [...filtered];
+  const sortedView = useMemo(() => {
+    const list = [...filteredView];
     list.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       if (sortKey === "inAmt" || sortKey === "outAmt") {
         return (toNumber(av) - toNumber(bv)) * (sortDir === "asc" ? 1 : -1);
-        }
+      }
       return s(av).localeCompare(s(bv)) * (sortDir === "asc" ? 1 : -1);
     });
     return list;
-  }, [filtered, sortKey, sortDir]);
+  }, [filteredView, sortKey, sortDir]);
 
-  /* 페이지 */
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(sortedView.length / pageSize));
   const curPage = Math.min(page, pageCount);
   const startIdx = (curPage - 1) * pageSize;
   const endIdx = startIdx + pageSize;
-  const pageRows = sorted.slice(startIdx, endIdx);
+  const pageRows = sortedView.slice(startIdx, endIdx);
 
-  /* 수동 추가 */
+  /* ===== 파일 업로드 (대용량 위임 + 소량 로컬 파싱→월 JSON 저장) ===== */
+  const handleFiles = useCallback(
+    async (files) => {
+      setError("");
+      setUploadError("");
+
+      const onlyOne = files && files.length === 1;
+      const first = onlyOne ? files[0] : null;
+
+      if (onlyOne && first && (await shouldUseBackend(first))) {
+        try {
+          const safeName = first.name.replace(/[^\w.\-]/g, "_");
+          const path = `imports/${Date.now()}_${safeName}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, first, {
+            contentType:
+              first.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const downloadUrl = await getDownloadURL(r);
+
+          const resp = await fetch(IMPORT_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ downloadUrl, recentMonths: 12 }),
+          });
+          const js = await resp.json();
+          if (!resp.ok || !js.ok) throw new Error(js.error || "Import failed");
+
+          alert(`대량 업로드 완료: 총 ${js.total}건 (핫:${js.hotSaved}, 콜드:${js.coldSaved})`);
+
+          try {
+            const now = new Date();
+            const yToNow = now.getFullYear(), mToNow = now.getMonth() + 1;
+            const yFromGuess = yToNow - 1;
+            const mFromGuess = mToNow;
+            const keys = toMonthKeys(yFromGuess, mFromGuess, yToNow, mToNow);
+            keys.forEach((k) => { if (monthsRef.current[k]) monthsRef.current[k].loaded = false; });
+            await loadMonthsIfNeeded(keys);
+            rebuildRowsFromCache();
+          } catch (e) {
+            console.warn("대량 업로드 후 월 로드 갱신 실패(무시 가능):", e);
+          }
+          return;
+        } catch (e) {
+          console.error(e);
+          setUploadError(String(e?.message || e));
+          alert("대량 업로드 중 오류가 발생했습니다.");
+          return;
+        }
+      }
+
+      const merged = [];
+      const abKeys = new Set(rows.map((r) => makeDupKey(r)));
+      const dupExamples = new Set();
+      let dupCount = 0;
+
+      for (const file of files) {
+        try {
+          const ab = await file.arrayBuffer();
+          const wb = XLSX.read(ab, { type: "array", cellDates: true });
+          const is1904 = !!(wb?.Workbook?.WBProps?.date1904);
+
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const aoo = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
+
+          const meta = parseMeta(aoo);
+          const headerRowIdx = findHeaderRow(aoo);
+          if (headerRowIdx === -1) throw new Error("헤더(일자/거래일시/입금금액 등)를 찾지 못했습니다.");
+
+          const recs = rowsToRecords(aoo, headerRowIdx, meta, { date1904: is1904 });
+          for (const r of recs) {
+            const key = makeDupKey(r);
+            if (abKeys.has(key)) {
+              dupCount++;
+              if (dupExamples.size < 5)
+                dupExamples.add(`${r.date} ${r.time} | ${r.category || r.type} ${fmtComma(r.inAmt || r.outAmt)} | ${r.record}`);
+              continue;
+            }
+            abKeys.add(key);
+            merged.push({ ...r, monthKey: monthKeyOf(r.date) });
+          }
+        } catch (e) {
+          console.error(e);
+          setUploadError((prev) => prev + `\n[${file.name}] ${e.message || String(e)}`);
+        }
+      }
+
+      if (dupCount > 0) {
+        setDupInfo({ count: dupCount, examples: Array.from(dupExamples) });
+        setDupOpen(true);
+      } else {
+        setDupInfo(null);
+        setDupOpen(false);
+      }
+
+      try {
+        const byMonth = merged.reduce((acc, r) => {
+          const mk = r.monthKey || monthKeyOf(r.date);
+          if (!mk) return acc;
+          (acc[mk] ||= []).push(r);
+          return acc;
+        }, {});
+        const monthKeys = Object.keys(byMonth);
+
+        await loadMonthsIfNeeded(monthKeys);
+
+        const store = monthsRef.current;
+        for (const mk of monthKeys) {
+          const bucket = store[mk] || { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
+          store[mk] = bucket;
+          for (const r of byMonth[mk]) {
+            const id = `r_${hash(makeDupKey(r)).toString(16)}`;
+            const next = {
+              _id: id,
+              date: s(r.date),
+              time: s(r.time || "00:00:00"),
+              datetime: s(r.datetime || `${s(r.date)} ${s(r.time || "00:00:00")}`),
+              accountNo: s(r.accountNo),
+              holder: s(r.holder),
+              category: s(r.category || ""),
+              inAmt: toNumber(r.inAmt),
+              outAmt: toNumber(r.outAmt),
+              balance: toNumber(r.balance),
+              record: trimField(r.record),
+              memo: trimField(r.memo),
+              _seq: s(r._seq || ""),
+              type: r.type || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : ""),
+              unconfirmed: !!r.unconfirmed,
+              monthKey: s(r.monthKey || mk),
+            };
+            bucket.items[id] = next; // upsert
+          }
+          scheduleMonthSave(mk);
+        }
+
+        rebuildRowsFromCache();
+
+        const last = merged.find((r) => r.date);
+        if (last?.date) {
+          const [yy, mm, dd] = last.date.split("-").map((t) => +t);
+          const [nyF, nmF, ndF, nyT, nmT, ndT] = clampRange(yy, mm, dd, yy, mm, dd);
+          setYFrom(nyF); setMFrom(nmF); setDFrom(ndF);
+          setYTo(nyT);   setMTo(nmT);   setDTo(ndT);
+        }
+      } catch (e) {
+        console.error("소량 업로드 병합/저장 실패:", e);
+        setUploadError((prev) => prev + `\n저장 실패: ${e?.message || e}`);
+      }
+    },
+    [rows, clampRange, loadMonthsIfNeeded, rebuildRowsFromCache, scheduleMonthSave]
+  );
+
+  /* ===== 수동 추가 ===== */
   const openAdd = () => {
     setAddForm({
       date: fmtDateLocal(new Date()),
@@ -854,8 +1053,9 @@ export default function IncomeImportPage() {
       alert("거래일, 구분, 입금금액은 필수입니다.");
       return;
     }
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
     const newRow = {
-      _id: `${Date.now()}_${Math.random().toString(36).slice(2,9)}`,
+      _id: id,
       accountNo: "",
       holder: "",
       date,
@@ -870,15 +1070,26 @@ export default function IncomeImportPage() {
       _seq: "",
       type: "입금",
       unconfirmed: false,
+      monthKey: monthKeyOf(date),
     };
+
     const next = [...rows, newRow].sort((a,b)=> s(b.datetime).localeCompare(s(a.datetime)));
     setRows(next);
     setPage(1);
     setAddOpen(false);
-    try { await autosaveChunk([newRow]); } catch (e) { console.error("수동 추가 저장 실패:", e); }
+
+    try {
+      const mk = newRow.monthKey;
+      await loadMonthsIfNeeded([mk]);
+      const store = monthsRef.current;
+      if (!store[mk]) store[mk] = { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
+      store[mk].items[id] = newRow;
+      scheduleMonthSave(mk);
+    } catch (e) {
+      console.error("수동 추가 저장 실패:", e);
+    }
   };
 
-  /* 화면 */
   return (
     <div className="income-page">
       {/* === 툴바 1 === */}
@@ -898,7 +1109,7 @@ export default function IncomeImportPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx"
             multiple
             style={{ display: "none" }}
             onChange={(e) => e.target.files && handleFiles([...e.target.files])}
@@ -982,6 +1193,8 @@ export default function IncomeImportPage() {
               const shownCat = cat || autoCat;
               const displayValue = shownCat || (incomeCategories[0] || "");
               const hasDisplayInList = incomeCategories.includes(displayValue);
+              const draftValue = memoDrafts[r._id];
+              const memoValue = draftValue !== undefined ? draftValue : (r.memo ?? "");
 
               return (
                 <tr key={r._id}>
@@ -992,7 +1205,8 @@ export default function IncomeImportPage() {
                           className="edit-select type-select pretty-select rich"
                           style={selectStyle(displayValue)}
                           value={displayValue}
-                          onChange={(e) => updateRow(r._id, { category: e.target.value })}
+                          // ✅ 즉시 커밋
+                          onChange={(e) => updateRowLocalAndCache(r._id, { category: e.target.value })}
                         >
                           {incomeCategories.length === 0 ? (
                             <option value="">불러오는 중…</option>
@@ -1034,17 +1248,45 @@ export default function IncomeImportPage() {
                         <input
                           ref={(el) => setMemoRef(r._id, el)}
                           className="edit-input memo-input"
-                          value={r.memo}
-                          onChange={(e) => updateRow(r._id, { memo: e.target.value })}
+                          value={memoValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // ✅ rows 갱신 없이 draft만 갱신
+                            setMemoDrafts((p) => ({ ...p, [r._id]: val }));
+                          }}
+                          onCompositionStart={() => { composingRef.current[r._id] = true; }}
+                          // ✅ compositionend 즉시 커밋
+                          onCompositionEnd={(e) => {
+                            composingRef.current[r._id] = false;
+                            const latest = e.currentTarget.value;
+                            updateRowLocalAndCache(r._id, { memo: latest });
+                            // draft 비우기
+                            setMemoDrafts((p) => {
+                              const { [r._id]: _omit, ...rest } = p;
+                              return rest;
+                            });
+                          }}
+                          // ✅ blur 즉시 커밋
+                          onBlur={(e) => {
+                            if (composingRef.current[r._id]) return;
+                            commitMemo(r._id, e.currentTarget.value);
+                          }}
                           placeholder=""
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); focusNextMemo(r._id, pageRows); } }}
+                          // ✅ Enter 즉시 커밋 + 다음 메모로 포커스
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              commitMemo(r._id, e.currentTarget.value);
+                              focusNextMemo(r._id, pageRows);
+                            }
+                          }}
                         />
-                        {/* 미확인 토글(기존 그대로) */}
+                        {/* 미확인 토글 - ✅ 즉시 커밋 */}
                         <label className="chk mi2">
                           <input
                             type="checkbox"
                             checked={!!r.unconfirmed}
-                            onChange={(e) => updateRow(r._id, { unconfirmed: e.target.checked })}
+                            onChange={(e) => updateRowLocalAndCache(r._id, { unconfirmed: e.target.checked })}
                           />
                           <span className="box" aria-hidden></span>
                           <span className="lbl">미확인</span>
@@ -1063,7 +1305,7 @@ export default function IncomeImportPage() {
         </table>
       </div>
 
-      {/* 페이지네이션(간단 표기) */}
+      {/* 페이지네이션 */}
       <div className="pagination">
         <button className="btn" disabled={curPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>◀</button>
         <div className="pageinfo">{curPage} / {pageCount}</div>

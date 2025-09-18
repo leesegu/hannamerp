@@ -54,22 +54,28 @@
   box-shadow: 0 8px 18px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.35);
   transition: transform .08s ease, box-shadow .18s ease, filter .12s ease;
 }
+.xp-btn.small { height: 34px; padding: 0 12px; border-radius: 12px; gap: 8px; font-size: 13px; }
 .xp-btn i { font-size: 18px; line-height: 1; }
 .xp-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.45); }
 .xp-btn:active { transform: translateY(1px) scale(.99); }
 
-.xp-load { background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); box-shadow: 0 8px 22px rgba(124,58,237,.34), inset 0 1px 0 rgba(255,255,255,.4); }
-.xp-save { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); box-shadow: 0 8px 22px rgba(37,99,235,.34), inset 0 1px 0 rgba(255,255,255,.4); }
-.xp-hold { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); box-shadow: 0 8px 22px rgba(217,119,6,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+/* 유틸 패딩(인라인 제거용) */
+.pad-s { padding: 6px 10px !important; }
+
+/* 컬러 버전 */
+.xp-excel  { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); box-shadow: 0 8px 22px rgba(34,197,94,.30), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-load   { background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); box-shadow: 0 8px 22px rgba(124,58,237,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-save   { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); box-shadow: 0 8px 22px rgba(37,99,235,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-hold   { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); box-shadow: 0 8px 22px rgba(217,119,6,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-delete { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); box-shadow: 0 8px 22px rgba(220,38,38,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-delete.on { filter: brightness(1.08) saturate(1.1); box-shadow: 0 14px 30px rgba(220,38,38,.44), inset 0 1px 0 rgba(255,255,255,.55); }
 
 /* 추가: 새로고침 / 추가 / 닫기 */
 .xp-refresh { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); box-shadow: 0 8px 22px rgba(100,116,139,.34), inset 0 1px 0 rgba(255,255,255,.4); }
-.xp-add { background: linear-gradient(135deg, #34d399 0%, #059669 100%); box-shadow: 0 8px 22px rgba(5,150,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
-.xp-close { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); box-shadow: 0 8px 22px rgba(71,85,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-add     { background: linear-gradient(135deg, #34d399 0%, #059669 100%); box-shadow: 0 8px 22px rgba(5,150,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
+.xp-close   { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); box-shadow: 0 8px 22px rgba(71,85,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 
-/* ===== 우측 패널: (좌)지출일자 / (우)합계 나란히 ===== */
+/* ===== 우측 패널 ===== */
 .xp-side {
   display: flex;
   flex-direction: row;
@@ -88,15 +94,23 @@
     linear-gradient(180deg, rgba(255,255,255,0.88), rgba(245,243,255,0.78)),
     linear-gradient(135deg, #a78bfa, #ec4899, #60a5fa);
 }
+.xp-side.narrow { width: 480px; }
+.xp-side.mini   { padding: 10px; gap: 10px; }
+.fancy-panel {}
+
+/* 유틸: 스케일 */
+.scale-095 { transform: scale(0.95); transform-origin: right center; }
+
 .xp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0; border: 0; font-size: 14px; flex: 1 1 0; min-width: 0; }
 
-/* 지출일자(좌) */
+/* 지출일자 */
 .xp-side-date {
   padding: 10px 12px;
   border-radius: 14px;
   background: linear-gradient(135deg, #faf5ff, #ede9fe);
   box-shadow: inset 0 2px 6px rgba(167,139,250,0.18);
 }
+.xp-side.mini .xp-side-date { padding: 8px 10px; }
 .xp-side-date .xp-side-label { color: #5b21b6; white-space: nowrap; }
 .xp-date-wrap { position: relative; flex: 1 1 auto; }
 .xp-date-display {
@@ -106,30 +120,30 @@
   box-shadow: inset 0 1px 4px rgba(0,0,0,0.06);
   font-weight: 800; font-size: 14px; color: #111827;
 }
+.xp-side.mini .xp-date-display { height: 34px; font-size: 13px; padding: 0 40px 0 12px; }
 .xp-date-text { flex: 1; text-align: center; min-width: 0; }
 .xp-weekday { display: none !important; }
-.xp-date-open { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; color: #7c3aed; font-size: 20px; }
+.xp-date-open {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  border: none; background: transparent; cursor: pointer; color: #7c3aed; font-size: 20px;
+}
 
-/* 합계(우) */
+/* 합계 */
 .xp-side-sum {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
   padding: 14px 16px; border-radius: 14px;
   background: linear-gradient(135deg, #ede9fe, #ddd6fe);
   box-shadow: inset 0 2px 6px rgba(167,139,250,0.22);
 }
+.xp-side.mini .xp-side-sum { padding: 10px 12px; }
 .xp-side-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; color: #5b21b6; white-space: nowrap; }
 .xp-side-krw { font-weight: 900; color: #1f2937; margin-right: 6px; }
 .xp-side-val { font-weight: 900; font-size: 22px; color: #111827; text-align: right; min-width: 120px; }
+.xp-side.mini .xp-side-val { font-size: 16px; min-width: 96px; }
 
 /* ===== 테이블 ===== */
 .xp-table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #fff; }
-
-/* ▶ 세로 사이즈 조금 증가 (헤더+본문 17행 기준) */
-.xp-table-wrap.scrollable {
-  /* (헤더 38px) + (행 38px * 17) + (여유 12px) */
-  max-height: calc(38px + 38px * 17 + 12px);
-  overflow: auto;
-}
+.xp-table-wrap.scrollable { max-height: calc(38px + 38px * 17 + 12px); overflow: auto; }
 
 /* 스크롤바 */
 .xp-table-wrap.scrollable::-webkit-scrollbar,
@@ -150,7 +164,7 @@
 /* 헤더 */
 .xp-table thead th {
   background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 100%);
-  color: #ffffff; font-weight: 800; font-size: 13px; height: 38px;  /* ▲ 36→38 */
+  color: #ffffff; font-weight: 800; font-size: 13px; height: 38px;
   border-right: 1px solid rgba(255,255,255,0.25);
 }
 .xp-table thead th:last-child { border-right: 0; }
@@ -159,17 +173,15 @@
 .xp-table tbody td {
   border-top: 1px solid #f3f4f6;
   border-right: 1px solid #f3f4f6;
-  height: 38px;                 /* ▲ 34→38 : 행 높이 증가 */
+  height: 38px;
   padding: 4px;
   background: #fff;
-  overflow: visible;             /* 삭제 텍스트/버튼 잘림 방지 */
+  overflow: visible;
 }
 .xp-table tbody td:last-child { border-right: 0; }
 
 /* 번호 칸 + 삭제 오버레이 */
 .xp-td-no { position: relative; text-align: center; color: #6b7280; }
-
-/* 삭제 모드: 번호칸에 '삭제' 텍스트 */
 .xp-td-del-on::after {
   content: '삭제';
   position: absolute;
@@ -177,8 +189,6 @@
   font-size: 10px; font-weight: 800; color: #dc2626;
   line-height: 1; pointer-events: none;
 }
-
-/* 행 삭제 버튼(작게) */
 .xp-del-row-btn {
   position: absolute;
   top: 2px; left: 50%; transform: translateX(-50%);
@@ -198,12 +208,9 @@
 .xp-input:focus, .xp-select:focus { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167,139,250,0.25); }
 .xp-amt { text-align: right; }
 
-/* 출금완료 회색 덮기 */
-.xp-tr-paid td:nth-child(n+2):nth-child(-n+8),
-.xp-td-dim-dark {
-  background: #cbd5e1 !important;
-  color: #374151;
-}
+/* 출금완료 덮기 */
+.xp-td-dim-dark { background: #cbd5e1 !important; color: #374151; }
+.xp-tr-paid td:nth-child(n+2):nth-child(-n+8) { background: #cbd5e1 !important; color: #374151; }
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .xp-input,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-btn,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .combo-input {
@@ -277,7 +284,7 @@
 .cal-head-cell { text-align: center; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-cell { height: 42px; border: 1px solid #e9d5ff; border-radius: 10px; background: #fff; cursor: pointer; position: relative; transition: transform .06s ease, box-shadow .12s ease, background .12s ease; }
-.cal-cell:hover { background: #f5f3ff; box-shadow: 0 8px 18px rgba(139,92,246,0.18); transform: translateY(-1px); }
+.cal-cell:hover { background: #f5f3ff; box-shadow: 0 8px 18px rgba(139,92,246,0.18); }
 .cal-cell.muted { opacity: 0.45; }
 .cal-daynum { position: absolute; top: 8px; right: 8px; font-weight: 800; color: #4c1d95; }
 .cal-cell.today { border-color: #8b5cf6; box-shadow: inset 0 0 0 2px #8b5cf6; }
@@ -285,18 +292,15 @@
 /* ===== 출금보류 테이블 & 툴바 ===== */
 .hold-wrap { display: grid; gap: 8px; }
 
-/* ▶ 테이블 위 우측 상단 정렬 (행추가, 삭제 버튼) */
 .hold-toolbar {
-  display: flex;               /* ▲ grid → flex */
-  justify-content: flex-end;   /* ▲ 우측 정렬 */
+  display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;          /* 테이블과 간격 */
+  margin-bottom: 6px;
 }
-/* 예전 spacer가 남아있어도 영향 없도록 */
-.hold-toolbar .spacer { display: none; height: 0; }
 
-/* 공통: 출금보류 창 버튼 룩앤필 */
+/* 공통 버튼 */
 .hold-btn {
   display: inline-flex;
   align-items: center;
@@ -315,49 +319,57 @@
 .hold-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 22px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.45); }
 .hold-btn:active { transform: translateY(0) scale(.99); }
 
-/* 개별 컬러 */
 .hold-btn.add    { background: linear-gradient(135deg, #34d399 0%, #059669 100%); }
 .hold-btn.delete { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
 .hold-btn.delete.on { filter: brightness(1.06) saturate(1.05); }
 .hold-btn.save   { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); }
 .hold-btn.close  { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); }
 
+/* ✅ 보내기 버튼(보라계열) & 중앙정렬 셀 */
+.hold-btn.send { height: 30px; padding: 0 10px; background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); }
+.send-cell { text-align: center; }
+
 /* 테이블 */
 .hold-table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-.hold-viewport {
-  /* ▶ 세로 사이즈 조금 증가 (본문 17행 기준) */
-  max-height: calc(38px * 17 + 12px);
-  overflow: auto;
-}
+
+.hold-viewport { max-height: calc(38px * 17 + 12px); overflow: auto; }
 
 .hold-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.hold-table thead th:nth-child(1),
-.hold-table tbody td:nth-child(1) { width: 90px !important; }
-.hold-table thead th:nth-child(3),
-.hold-table tbody td:nth-child(3) { width: 90px !important; }
-.hold-table thead th {
-  background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
-  color: #111827; font-weight: 900; font-size: 13px; height: 38px; /* ▲ 36→38 */
-  border-right: 1px solid rgba(0,0,0,0.08);
-}
+.hold-table thead th { background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%); color: #111827; font-weight: 900; font-size: 13px; height: 38px; border-right: 1px solid rgba(0,0,0,0.08); }
 .hold-table thead th:last-child { border-right: 0; }
-.hold-table tbody td {
-  border-top: 1px solid #f3f4f6; border-right: 1px solid #f3f4f6;
-  padding: 4px; height: 38px; /* ▲ 34→38 */
-}
+.hold-table tbody td { border-top: 1px solid #f3f4f6; border-right: 1px solid #f3f4f6; padding: 4px; height: 38px; }
 .hold-table tbody td:last-child { border-right: 0; }
 
-/* 출금보류: 구분 칸 위 삭제 버튼(지출정리와 동일 스타일 재사용) */
-.hold-table tbody td:nth-child(1) { position: relative; }
-.hold-table .xp-del-row-btn {}
+/* 열 너비 유틸 */
+.w-80  { width: 80px  !important; }
+.w-90  { width: 90px  !important; }
+.w-100 { width: 100px !important; }
+/* ✅ 금액 열 축소용 새 클래스 */
+.w-110 { width: 110px !important; }
+.w-150 { width: 150px !important; }
+.w-180 { width: 180px !important; }
+.w-260 { width: 260px !important; }
+.w-320 { width: 320px !important; }
 
-/* 하단: 저장/닫기 버튼을 우측 하단에 고정 느낌으로 */
+/* 삭제 버튼(구분 칸 위) */
+.hold-table tbody td:nth-child(1) { position: relative; }
+.hold-del-row-btn {
+  position: absolute;
+  top: 2px; left: 50%; transform: translateX(-50%);
+  height: 18px; line-height: 18px; padding: 0 8px;
+  font-size: 11px; border: 0; border-radius: 999px; cursor: pointer; color: #fff;
+  background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+  box-shadow: 0 4px 10px rgba(220,38,38,.25), inset 0 1px 0 rgba(255,255,255,.4);
+  z-index: 1;
+}
+
+/* 하단: 저장/닫기 바 */
 .hold-footer  {
-  position: sticky;            /* ▲ 모달 내부 스크롤 시 하단에 붙도록 */
+  position: sticky;
   bottom: 0;
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-end; /* 저장 오른쪽에 닫기 버튼이 나란히 보이도록 우측 정렬 */
   padding: 10px 0 0 0;
   background: linear-gradient(0deg, #fff 70%, rgba(255,255,255,0));
   border-top: 1px solid #e5e7eb;
