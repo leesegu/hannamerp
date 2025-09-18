@@ -363,7 +363,7 @@
   z-index: 1;
 }
 
-/* 하단: 저장/닫기 바 */
+/* 하단: 저장/닫기 바 (기존 sticky 유지) */
 .hold-footer  {
   position: sticky;
   bottom: 0;
@@ -374,3 +374,34 @@
   background: linear-gradient(0deg, #fff 70%, rgba(255,255,255,0));
   border-top: 1px solid #e5e7eb;
 }
+
+/* ====== 추가: 내부 스크롤 제거 & 상/하단 고정 유틸 ====== */
+/* 출금보류: 안쪽 스크롤 끄기 → 바깥(.xp-modal-body)만 스크롤 */
+.no-inner-scroll {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* 상단 툴바 고정(모달 바디 스크롤 기준) */
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: linear-gradient(180deg, #ffffff 80%, rgba(255,255,255,0));
+  padding-top: 4px;
+  margin-top: -4px; /* 상단 경계 자연스럽게 */
+  border-bottom: 1px solid #e5e7eb;
+  backdrop-filter: blur(4px);
+}
+
+/* 하단 버튼바 고정(모달 바디 스크롤 기준) */
+.sticky-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: linear-gradient(0deg, #ffffff 80%, rgba(255,255,255,0));
+  backdrop-filter: blur(4px);
+}
+
+/* 출금보류 모달의 X 아이콘 비활성(예비 안전장치: JSX에서 showCloseX=false로 처리됨) */
+/* .xp-modal:has(.hold-wrap) .xp-modal-close { display:none; } */

@@ -48,6 +48,12 @@ import PaperingPage from "./pages/PaperingPage";
 /* ✅ 메모 페이지 */
 import MemoPage from "./pages/MemoPage";
 
+/* ✅ 관리비회계 · 지출정리 */
+import ExpensePage from "./pages/ExpensePage";
+
+/* ✅ 관리비회계 · 일마감 (추가) */
+import DailyClosePage from "./pages/DailyClosePage";
+
 import "./App.css";
 
 function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }) {
@@ -157,6 +163,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/accounting/income"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <IncomeImportPage />}
+      />
+
+      {/* ✅ 관리비회계 · 지출정리 (직접 라우팅 추가됨) */}
+      <Route
+        path="/accounting/expense"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <ExpensePage />}
+      />
+
+      {/* ✅ 관리비회계 · 일마감 (신규 라우트 추가) */}
+      <Route
+        path="/accounting/daily-close"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <DailyClosePage />}
       />
 
       {/* ✅ 전기요금 추출(문자) */}

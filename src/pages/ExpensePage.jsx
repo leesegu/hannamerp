@@ -117,9 +117,12 @@ const isValidForSave = (r) => !!(r.mainId || r.mainName) && !!r.subName && !!r.o
 function Modal({ open, onClose, title, children, width = 720, showCloseX = true }) {
   if (!open) return null;
   return (
-    <div className="xp-modal-backdrop" onMouseDown={(e) => {
-      if (e.target.classList.contains("xp-modal-backdrop")) onClose?.();
-    }}>
+    <div
+      className="xp-modal-backdrop"
+      onMouseDown={(e) => {
+        if (e.target.classList.contains("xp-modal-backdrop")) onClose?.();
+      }}
+    >
       <div className="xp-modal" style={{ width }}>
         <div className="xp-modal-head">
           <div className="xp-modal-title">{title}</div>
@@ -166,12 +169,13 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
   const [view, setView] = useState({ y: base.getFullYear(), m: base.getMonth() });
   const cells = useMemo(() => getMonthMatrix(view.y, view.m), [view]);
   const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
-  const go = (delta) => setView((v) => {
-    const m = v.m + delta;
-    const y = v.y + Math.floor(m / 12);
-    const nm = ((m % 12) + 12) % 12;
-    return { y, m: nm };
-  });
+  const go = (delta) =>
+    setView((v) => {
+      const m = v.m + delta;
+      const y = v.y + Math.floor(m / 12);
+      const nm = ((m % 12) + 12) % 12;
+      return { y, m: nm };
+    });
 
   return (
     <Modal open={open} onClose={onClose} title={titleText} width={380}>
@@ -190,7 +194,9 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
         </div>
         <div className="cal-head">
           {["일","월","화","수","목","금","토"].map((w) => (
-            <div key={w} className="cal-head-cell">{w}</div>
+            <div key={w} className="cal-head-cell">
+              {w}
+            </div>
           ))}
         </div>
         <div className="cal-grid">
@@ -218,7 +224,7 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
 
 /** ====== 간단 콤보/검색 콤보/출금확인 콤보 ====== */
 const SimpleCombo = forwardRef(function SimpleCombo(
-  { value, onPick, items = [], placeholder = "- 선택 -", render = (x) => x.name ?? x, getKey = (x) => x.id ?? x, getValue = (x) => x.name ?? x },
+  { value, onPick, items = [], placeholder = "- 선택 -", render = (x) => x.name ?? x, getKey = (x) => x.id ?? x, getValue = (x) => x.name ?? x, disabled = false },
   ref
 ) {
   const wrapRef = useRef(null);
@@ -227,9 +233,10 @@ const SimpleCombo = forwardRef(function SimpleCombo(
   const btnRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
-    open: () => setOpen(true),
+    open: () => !disabled && setOpen(true),
     close: () => setOpen(false),
     focus: () => {
+      if (disabled) return;
       setFocus(true);
       setOpen(true);
       setTimeout(() => setFocus(false), 0);
@@ -246,7 +253,12 @@ const SimpleCombo = forwardRef(function SimpleCombo(
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const pick = (it) => { const val = getValue(it); onPick?.(it, val); setOpen(false); };
+  const pick = (it) => {
+    if (disabled) return;
+    const val = getValue(it);
+    onPick?.(it, val);
+    setOpen(false);
+  };
   const label = value || placeholder;
 
   return (
@@ -255,9 +267,10 @@ const SimpleCombo = forwardRef(function SimpleCombo(
         ref={btnRef}
         type="button"
         className={`xp-input scombo-btn ${!value ? "scombo-placeholder" : ""}`}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => !disabled && setOpen((v) => !v)}
         onFocus={() => focus && setOpen(true)}
         title={label}
+        disabled={disabled}
       >
         <span className="scombo-text">{label}</span>
         <i className="ri-arrow-down-s-line scombo-caret" />
@@ -276,16 +289,19 @@ const SimpleCombo = forwardRef(function SimpleCombo(
   );
 });
 
-const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors, placeholder, onComplete }, ref) {
+const AccountCombo = forwardRef(function AccountCombo(
+  { value, onChange, vendors, placeholder, onComplete, disabled = false },
+  ref
+) {
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(value || "");
   const inputRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
-    open: () => setOpen(true),
+    open: () => !disabled && setOpen(true),
     close: () => setOpen(false),
-    focus: () => inputRef.current?.focus(),
+    focus: () => !disabled && inputRef.current?.focus(),
   }));
 
   useEffect(() => setQ(value || ""), [value]);
@@ -316,6 +332,7 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
   }, []);
 
   const pick = (hit) => {
+    if (disabled) return;
     const label = [hit.bank, hit.accountNo, hit.accountName].filter(Boolean).join(" ");
     onChange(label, hit);
     setOpen(false);
@@ -323,6 +340,7 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
   };
 
   const onKeyDown = (e) => {
+    if (disabled) return;
     if (e.key === "Enter") {
       if (list.length > 0) {
         pick(list[0]);
@@ -342,12 +360,14 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
         value={q}
         placeholder={placeholder}
         onChange={(e) => {
+          if (disabled) return;
           setQ(e.target.value);
           onChange(e.target.value, null);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => !disabled && setOpen(true)}
         onKeyDown={onKeyDown}
+        disabled={disabled}
       />
       {open && (
         <div className="combo-panel">
@@ -374,16 +394,16 @@ const AccountCombo = forwardRef(function AccountCombo({ value, onChange, vendors
   );
 });
 
-const PaidCombo = forwardRef(function PaidCombo({ value, onPick }, ref) {
+const PaidCombo = forwardRef(function PaidCombo({ value, onPick, disabled = false }, ref) {
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
   const items = ["출금대기", "출금완료"];
   const btnRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
-    open: () => setOpen(true),
+    open: () => !disabled && setOpen(true),
     close: () => setOpen(false),
-    focus: () => btnRef.current?.focus(),
+    focus: () => !disabled && btnRef.current?.focus(),
   }));
 
   useEffect(() => {
@@ -403,8 +423,9 @@ const PaidCombo = forwardRef(function PaidCombo({ value, onPick }, ref) {
         ref={btnRef}
         type="button"
         className={`xp-input scombo-btn ${!value ? "scombo-placeholder" : ""}`}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => !disabled && setOpen((v) => !v)}
         title={label}
+        disabled={disabled}
       >
         <span className="scombo-text">{label}</span>
         <i className="ri-arrow-down-s-line scombo-caret" />
@@ -417,6 +438,7 @@ const PaidCombo = forwardRef(function PaidCombo({ value, onPick }, ref) {
               type="button"
               className="scombo-item"
               onClick={() => {
+                if (disabled) return;
                 onPick(it);
                 setOpen(false);
               }}
@@ -450,10 +472,8 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
   const add = () =>
     setDraft((prev) => [...prev, { type: "", desc: "", bank: "", accountNo: "", amount: "", note: "" }]);
 
-  // ✅ 행 전체 삭제(드래프트에서만)
   const removeRow = (idx) => setDraft((prev) => prev.filter((_, i) => i !== idx));
 
-  // Enter 이동
   const onEnterNext = (e) => {
     if (e.key !== "Enter") return;
     const r = Number(e.currentTarget.getAttribute("data-row"));
@@ -463,7 +483,6 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
     if (nextSel) nextSel.focus();
   };
 
-  // 한 줄 보내기: 지출정리로 옮기고, 드래프트에선 해당 행 삭제(저장 시 확정)
   const sendRow = (idx) => {
     const row = draft[idx];
     if (!row) return;
@@ -473,7 +492,8 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
 
   return (
     <div className="hold-wrap">
-      <div className="hold-toolbar">
+      {/* ✅ 상단 툴바 고정 */}
+      <div className="hold-toolbar sticky-top">
         <button className="hold-btn add" onClick={add} title="행 추가">
           <i className="ri-add-line" /> 행추가
         </button>
@@ -487,26 +507,27 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
       </div>
 
       <div className="hold-table-wrap">
+        {/* ✅ 안쪽 스크롤 제거용 클래스 유지(no-inner-scroll) → CSS에서 overflow 제거 */}
         <div className="hold-viewport no-inner-scroll">
           <table className="hold-table">
             <thead>
               <tr>
-                {/* ✅ 구분 폭 축소 유지 */}
                 <th className="w-80">구분</th>
                 <th className="w-260">내용</th>
                 <th className="w-100">은행</th>
                 <th className="w-180">계좌번호</th>
-                {/* ✅ 금액 폭 축소: w-150 → w-110 */}
                 <th className="w-110">금액</th>
-                {/* ✅ 비고 폭 확대 유지 */}
                 <th className="w-320">비고</th>
-                {/* ✅ 버튼 셀 */}
                 <th className="w-90">보내기</th>
               </tr>
             </thead>
             <tbody>
               {draft.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>행이 없습니다.</td></tr>
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>
+                    행이 없습니다.
+                  </td>
+                </tr>
               ) : (
                 draft.map((r, i) => (
                   <tr key={i}>
@@ -579,13 +600,14 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
                         onChange={(e) => update(i, "note", e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            const nxt = document.querySelector(`input[data-row="${i + 1}"][data-col="0"]`);
+                            const nxt = document.querySelector(
+                              `input[data-row="${i + 1}"][data-col="0"]`
+                            );
                             if (nxt) nxt.focus();
                           }
                         }}
                       />
                     </td>
-                    {/* ✅ 버튼 셀 중앙 정렬 + 보내기 버튼 */}
                     <td className="send-cell">
                       <button
                         className="hold-btn send"
@@ -603,8 +625,8 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
         </div>
       </div>
 
-      {/* 저장 버튼 오른쪽에 닫기 버튼 노출 */}
-      <div className="hold-footer">
+      {/* ✅ 하단 저장/닫기 바 고정 */}
+      <div className="hold-footer sticky-bottom">
         <button
           className="hold-btn save"
           onClick={() => {
@@ -659,7 +681,7 @@ function normalizeExcelDateCell(cell, date1904 = false) {
   return isNaN(d) ? "" : fmtDateLocal(d);
 }
 
-/** ====== 엑셀 파서 (날짜 시리얼/문자열 + 같은 날짜 이어받기) ====== */
+/** ====== 엑셀 파서 ====== */
 const headerIndex = (header, names) => {
   const idx = names
     .flatMap((nm) => [nm, ...nm.split("|")])
@@ -677,7 +699,10 @@ function parseExpenseSheet(ws, is1904 = false) {
     const row = (aoo[i] || []).map(s);
     const hasDate = row.some((c) => /지출일자|일자/.test(c));
     const hasAmt = row.some((c) => /금액|지출금액/.test(c));
-    if (hasDate && hasAmt) { headerRow = i; break; }
+    if (hasDate && hasAmt) {
+      headerRow = i;
+      break;
+    }
   }
   if (headerRow < 0) return { headerRow: -1, rows: [] };
   const header = (aoo[headerRow] || []).map(s);
@@ -724,8 +749,12 @@ function parseExpenseSheet(ws, is1904 = false) {
 /** ====== 메인 컴포넌트 ====== */
 export default function ExpensePage() {
   const [date, setDate] = useState(() => {
-    try { const raw = localStorage.getItem(LS_KEY);
-      if (raw) { const parsed = JSON.parse(raw); if (parsed?.date) return parsed.date; }
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.date) return parsed.date;
+      }
     } catch {}
     return todayYMD();
   });
@@ -743,6 +772,10 @@ export default function ExpensePage() {
     return Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
   });
 
+  // ✅ "불러오기를 한 상태" 여부 및 불러온 기준 날짜
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedDate, setLoadedDate] = useState(""); // 불러오기 성공 시 설정
+
   // 분류/결제수단/거래처 로드 전용
   const [mainCats, setMainCats] = useState([]);
   const [payMethods, setPayMethods] = useState([]);
@@ -751,18 +784,24 @@ export default function ExpensePage() {
   // 출금보류 저장본(저장 버튼으로만 반영)
   const [holdOpen, setHoldOpen] = useState(false);
   const [holdRows, setHoldRows] = useState(() => {
-    try { const raw = localStorage.getItem(LS_HOLD_KEY); if (raw) return JSON.parse(raw) || []; } catch {}
+    try {
+      const raw = localStorage.getItem(LS_HOLD_KEY);
+      if (raw) return JSON.parse(raw) || [];
+    } catch {}
     return [];
   });
 
   const [deleteMode, setDeleteMode] = useState(false);
   const openers = useRef({});
-  const registerOpeners = (i, obj) => { openers.current[i] = obj; };
+  const registerOpeners = (i, obj) => {
+    openers.current[i] = obj;
+  };
 
-  // 파일 업로드(여러 파일 병합 → Storage JSON 저장) — 생략: 기존과 동일
   const fileInputRef = useRef(null);
   const onPickFiles = () => fileInputRef.current?.click();
-  const handleFiles = async (fileList) => { /* 기존 그대로 */ };
+  const handleFiles = async (fileList) => {
+    /* 기존 그대로 (엑셀 업로드 파이프라인이 있다면 여기에) */
+  };
 
   // 분류/결제수단/거래처 로드
   useEffect(() => {
@@ -772,9 +811,15 @@ export default function ExpensePage() {
         const mains = qsMain.docs
           .map((d) => ({ id: d.id, ...(d.data() || {}) }))
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-          .map((x) => ({ id: x.id, name: x.name || x.title || "", subs: Array.isArray(x.subs) ? x.subs : [] }));
+          .map((x) => ({
+            id: x.id,
+            name: x.name || x.title || "",
+            subs: Array.isArray(x.subs) ? x.subs : [],
+          }));
         setMainCats(mains);
-      } catch { setMainCats([]); }
+      } catch {
+        setMainCats([]);
+      }
 
       try {
         const qsPay = await getDocs(collection(db, "acct_payment_methods"));
@@ -783,25 +828,35 @@ export default function ExpensePage() {
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           .map((x) => ({ id: x.id, name: x.name || x.title || "" }));
         setPayMethods(pays);
-      } catch { setPayMethods([]); }
+      } catch {
+        setPayMethods([]);
+      }
 
       try {
         const qsVen = await getDocs(collection(db, "vendorsAll"));
         const v = qsVen.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })).map((x) => ({
-          id: x.id, vendor: String(x.vendor || ""), bank: String(x.bank || ""),
-          accountName: String(x.accountName || ""), accountNo: String(x.accountNo || ""),
+          id: x.id,
+          vendor: String(x.vendor || ""),
+          bank: String(x.bank || ""),
+          accountName: String(x.accountName || ""),
+          accountNo: String(x.accountNo || ""),
         }));
         setVendors(v);
-      } catch { setVendors([]); }
+      } catch {
+        setVendors([]);
+      }
     })();
   }, []);
 
   const total = useMemo(() => rows.reduce((acc, r) => acc + toNumber(r.amount), 0), [rows]);
 
   const persistLocal = (nextDate, nextRows) => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ date: nextDate, rows: nextRows })); } catch {}
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ date: nextDate, rows: nextRows }));
+    } catch {}
   };
 
+  // ✅ 편집은 항상 가능
   const updateRow = (idx, patch) => {
     setRows((prev) => {
       const next = [...prev];
@@ -836,7 +891,9 @@ export default function ExpensePage() {
     });
   };
 
-  useEffect(() => { persistLocal(date, rows); }, [date]);
+  useEffect(() => {
+    persistLocal(date, rows);
+  }, [date]);
 
   const onRefresh = () => {
     const ok = window.confirm("새로고침하면 현재 지출 입력 내용이 모두 삭제됩니다. 계속할까요?");
@@ -844,23 +901,66 @@ export default function ExpensePage() {
     const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
     setRows(init);
     persistLocal(date, init);
+    setIsLoaded(false);
+    setLoadedDate("");
   };
 
-  // 저장/불러오기 — 기존 유지
+  /** ===== 저장 정책 =====
+   * - 해당 날짜에 기존 저장본이 없는 경우: 자유 저장 가능
+   * - 해당 날짜에 기존 저장본이 있는 경우: 반드시 '불러오기'를 먼저 해서 isLoaded=true && loadedDate===date 인 상태에서만 저장 가능
+   * - 저장은 해당 날짜의 내용을 '덮어쓰기(Overwrite)' 하므로, 중복 불가/미병합 보장
+   */
   const saveToStorage = async (theDate, theRows) => {
     const ymd = theDate;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) { alert("유효한 날짜가 아닙니다."); return false; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+      alert("유효한 날짜가 아닙니다.");
+      return false;
+    }
+
     const mk = ymdToMonthKey(ymd);
+    const cur = await readMonthJSON(mk);
+    const existed = !!(cur?.days?.[ymd]?.rows?.length > 0);
+
+    // 기존 저장본이 있을 때: 반드시 불러오기 상태에서만 저장 가능
+    if (existed) {
+      if (!isLoaded || loadedDate !== ymd) {
+        alert(
+          "같은 지출일자에 저장된 내용이 있습니다.\n" +
+          "해당 내용을 수정/추가/삭제하려면 먼저 '불러오기'로 그 날짜를 불러온 뒤 저장해 주세요."
+        );
+        return false;
+      }
+    }
+
+    // 저장할 데이터 정리
     const nowFull = (theRows || [])
       .map((r) => ({ ...r, amount: toNumber(r.amount) }))
-      .filter((r) => r.mainId || r.mainName || r.subName || r.desc || r.amount || r.inAccount || r.outMethod || r.paid || r.note);
+      .filter(
+        (r) =>
+          r.mainId ||
+          r.mainName ||
+          r.subName ||
+          r.desc ||
+          r.amount ||
+          r.inAccount ||
+          r.outMethod ||
+          r.paid ||
+          r.note
+      );
     const nowValid = nowFull.map(normalizeRow).filter(isValidForSave);
-    if (nowValid.length === 0) return false;
-    const cur = await readMonthJSON(mk);
-    const days = cur.days || {};
+    if (nowValid.length === 0) {
+      alert("저장할 유효한 행이 없습니다.");
+      return false;
+    }
+
+    // 번호 재부여 + 합계
     const renumbered = nowValid.map((r, i) => ({ ...r, no: i + 1 }));
     const newTotal = renumbered.reduce((acc, r) => acc + toNumber(r.amount), 0);
+
+    // ✅ 덮어쓰기(Overwrite)로 중복/병합 문제 방지
+    const days = cur.days || {};
     days[ymd] = { rows: renumbered, total: newTotal, updatedAt: Date.now() };
+
     await writeMonthJSON(mk, { meta: { updatedAt: Date.now() }, days });
     return true;
   };
@@ -868,11 +968,15 @@ export default function ExpensePage() {
   const onSave = async () => {
     try {
       const changed = await saveToStorage(date, rows);
-      if (!changed) { alert("저장할 내용이 없습니다. (대분류/소분류/출금계좌 필수)"); return; }
+      if (!changed) return;
       alert("저장되었습니다.");
+
+      // 저장 후에도 계속 편집하실 수 있지만, 초기화가 필요하면 아래 유지
       const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
       setRows(init);
       persistLocal(date, init);
+      setIsLoaded(false);
+      setLoadedDate("");
     } catch (err) {
       console.error(err);
       alert("저장 중 오류가 발생했습니다.");
@@ -881,11 +985,13 @@ export default function ExpensePage() {
 
   const performLoadForDate = async (targetYMD) => {
     try {
-      if (hasAnyContent(rows)) { persistLocal(date, rows); }
+      if (hasAnyContent(rows)) {
+        persistLocal(date, rows);
+      }
       const mk = ymdToMonthKey(targetYMD);
       const { days } = await readMonthJSON(mk);
       const pack = days[targetYMD];
-      let padded = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+
       if (pack && Array.isArray(pack.rows)) {
         const normalized = pack.rows.map((r, i) => ({
           ...makeEmptyRow(i),
@@ -895,21 +1001,31 @@ export default function ExpensePage() {
           paid: r.paid || "",
         }));
         const pad = Math.max(0, INITIAL_ROWS - normalized.length);
-        padded = pad > 0 ? [...normalized, ...Array.from({ length: pad }, (_, k) => makeEmptyRow(normalized.length + k))] : normalized;
+        const padded =
+          pad > 0
+            ? [...normalized, ...Array.from({ length: pad }, (_, k) => makeEmptyRow(normalized.length + k))]
+            : normalized;
+
+        setDate(targetYMD);
+        setRows(padded);
+        persistLocal(targetYMD, padded);
+        setIsLoaded(true);
+        setLoadedDate(targetYMD); // ✅ 불러온 날짜 기록
+        alert("불러오기가 완료되었습니다.");
       } else {
         const keys = Object.keys(days || {}).sort();
         alert(
           `선택한 날짜(${targetYMD})에는 저장된 지출 데이터가 없습니다.\n` +
-            (keys.length ? `이 월에 저장된 날짜: ${keys.join(", ")}` : "이 월의 저장된 날짜도 없습니다. (엑셀 업로드 결과를 확인)")
+            (keys.length ? `이 월에 저장된 날짜: ${keys.join(", ")}` : "이 월의 저장된 날짜도 없습니다.")
         );
+        setIsLoaded(false);
+        setLoadedDate("");
       }
-      setDate(targetYMD);
-      setRows(padded);
-      persistLocal(targetYMD, padded);
-      alert("불러오기가 완료되었습니다.");
     } catch (e) {
       console.error(e);
       alert("불러오기 중 오류가 발생했습니다.");
+      setIsLoaded(false);
+      setLoadedDate("");
     }
   };
 
@@ -951,12 +1067,25 @@ export default function ExpensePage() {
           <button className="xp-btn xp-excel small pad-s" onClick={onPickFiles} title="엑셀 업로드">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ marginRight: 6 }}>
               <rect x="3" y="3" width="18" height="18" rx="2.5" fill="#1F6F43" />
-              <path d="M8.5 8.5l2.5 3-2.5 3M12.5 8.5l-2.5 3 2.5 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M8.5 8.5l2.5 3-2.5 3M12.5 8.5l-2.5 3 2.5 3"
+                stroke="#fff"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
               <rect x="13.5" y="5" width="6" height="14" fill="#2EA06B" />
             </svg>
             엑셀 업로드
           </button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: "none" }} onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          />
 
           <button className="xp-btn xp-refresh small pad-s" onClick={onRefresh} title="새로고침">
             <i className="ri-refresh-line" /> 새로고침
@@ -967,7 +1096,11 @@ export default function ExpensePage() {
           <button className="xp-btn xp-hold small pad-s" onClick={() => setHoldOpen(true)} title="출금보류">
             <i className="ri-pause-circle-line" /> 출금보류
           </button>
-          <button className="xp-btn xp-save small pad-s" onClick={onSave} title="저장">
+          <button
+            className="xp-btn xp-save small pad-s"
+            onClick={onSave}
+            title="저장"
+          >
             <i className="ri-save-3-line" /> 저장
           </button>
           <button
@@ -981,12 +1114,24 @@ export default function ExpensePage() {
 
         {/* 우측 패널: 지출일자 → 합계 */}
         <div className="xp-side fancy-panel narrow mini" onClick={() => document.activeElement?.blur()}>
-          <div className="xp-side-row xp-side-date scale-095" onClick={() => setDateModalOpen(true)} role="button" title="날짜 선택">
+          <div
+            className="xp-side-row xp-side-date scale-095"
+            onClick={() => setDateModalOpen(true)}
+            role="button"
+            title="날짜 선택"
+          >
             <div className="xp-side-label">지출일자</div>
             <div className="xp-date-wrap">
               <div className="xp-date-display">
                 <span className="xp-date-text">{date}</span>
-                <button className="xp-date-open" onClick={(e) => { e.stopPropagation(); setDateModalOpen(true); }} title="달력 열기">
+                <button
+                  className="xp-date-open"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDateModalOpen(true);
+                  }}
+                  title="달력 열기"
+                >
                   <i className="ri-calendar-2-line" />
                 </button>
               </div>
@@ -1039,7 +1184,9 @@ export default function ExpensePage() {
       </div>
 
       <div className="xp-bottom-actions">
-        <button className="xp-add-rows" onClick={() => addRows(10)}>+ 10줄 더 추가</button>
+        <button className="xp-add-rows" onClick={() => addRows(10)}>
+          + 10줄 더 추가
+        </button>
       </div>
 
       {/* 모달들 */}
@@ -1047,7 +1194,10 @@ export default function ExpensePage() {
         open={dateModalOpen}
         defaultDate={date}
         titleText="지출일자 날짜선택"
-        onPick={(ymd) => { setDate(ymd); persistLocal(ymd, rows); }}
+        onPick={(ymd) => {
+          setDate(ymd);
+          persistLocal(ymd, rows);
+        }}
         onClose={() => setDateModalOpen(false)}
       />
       <CalendarModal
@@ -1059,6 +1209,7 @@ export default function ExpensePage() {
       />
 
       {/* 출금보류: 드래프트 편집 → 저장 시에만 반영 */}
+      {/* ❌ 상단 X 아이콘 제거(showCloseX=false) */}
       <Modal open={holdOpen} onClose={() => setHoldOpen(false)} title="출금보류" width={960} showCloseX={false}>
         <HoldTable
           initialRows={holdRows}
@@ -1078,7 +1229,16 @@ export default function ExpensePage() {
 
 /** ====== Row ====== */
 function RowEditor({
-  idx, row, mains, payMethods, vendors, onChange, registerOpeners, openNextRowMain, deleteMode, onDeleteRow,
+  idx,
+  row,
+  mains,
+  payMethods,
+  vendors,
+  onChange,
+  registerOpeners,
+  openNextRowMain,
+  deleteMode,
+  onDeleteRow,
 }) {
   const mainRef = useRef(null);
   const subRef = useRef(null);
@@ -1089,7 +1249,9 @@ function RowEditor({
   const paidRef = useRef(null);
   const noteRef = useRef(null);
 
-  useEffect(() => { registerOpeners(idx, { openMain: () => mainRef.current?.focus() }); }, [idx, registerOpeners]);
+  useEffect(() => {
+    registerOpeners(idx, { openMain: () => mainRef.current?.focus() });
+  }, [idx, registerOpeners]);
 
   const subItems = useMemo(() => {
     const m = mains.find((x) => x.id === row.mainId);
@@ -1109,7 +1271,9 @@ function RowEditor({
     <tr className={isPaidDone ? "xp-tr-paid" : ""}>
       <td className={`xp-td-no ${deleteMode ? "xp-td-del-on" : ""}`}>
         {deleteMode && (
-          <button type="button" className="xp-del-row-btn" onClick={onDeleteRow} title="이 줄 내용 삭제">삭제</button>
+          <button type="button" className="xp-del-row-btn" onClick={onDeleteRow} title="이 줄 내용 삭제">
+            삭제
+          </button>
         )}
         {row.no}
       </td>
@@ -1119,7 +1283,10 @@ function RowEditor({
           ref={mainRef}
           value={row.mainName}
           items={mains}
-          onPick={(it) => { onChange({ mainId: it.id, mainName: it.name }); setTimeout(() => subRef.current?.open(), 0); }}
+          onPick={(it) => {
+            onChange({ mainId: it.id, mainName: it.name });
+            setTimeout(() => subRef.current?.open(), 0);
+          }}
           placeholder="- 선택 -"
         />
       </td>
@@ -1129,33 +1296,93 @@ function RowEditor({
           ref={subRef}
           value={row.subName}
           items={subItems}
-          onPick={(it) => { onChange({ subName: it.name }); setTimeout(() => descRef.current?.focus(), 0); }}
+          onPick={(it) => {
+            onChange({ subName: it.name });
+            setTimeout(() => descRef.current?.focus(), 0);
+          }}
           placeholder={row.mainId ? "- 선택 -" : "대분류 먼저 선택"}
+          disabled={!row.mainId}
         />
       </td>
 
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
-        <input ref={descRef} className="xp-input" value={row.desc} onChange={(e) => onChange({ desc: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") amtRef.current?.focus(); }} />
+        <input
+          ref={descRef}
+          className="xp-input"
+          value={row.desc}
+          onChange={(e) => onChange({ desc: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") amtRef.current?.focus();
+          }}
+        />
       </td>
 
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
-        <input ref={amtRef} className="xp-input xp-amt" inputMode="numeric" value={row.amount} onChange={onAmountChange} onKeyDown={(e) => { if (e.key === "Enter") { inAccRef.current?.focus(); inAccRef.current?.open(); } }} />
+        <input
+          ref={amtRef}
+          className="xp-input xp-amt"
+          inputMode="numeric"
+          value={row.amount}
+          onChange={onAmountChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              inAccRef.current?.focus();
+              inAccRef.current?.open();
+            }
+          }}
+        />
       </td>
 
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
-        <AccountCombo ref={inAccRef} value={row.inAccount} onChange={(v) => onChange({ inAccount: v })} vendors={vendors} placeholder="거래처/예금주/계좌번호 검색" onComplete={() => { outRef.current?.open?.(); outRef.current?.focus?.(); }} />
+        <AccountCombo
+          ref={inAccRef}
+          value={row.inAccount}
+          onChange={(v) => onChange({ inAccount: v })}
+          vendors={vendors}
+          placeholder="거래처/예금주/계좌번호 검색"
+          onComplete={() => {
+            outRef.current?.open?.();
+            outRef.current?.focus?.();
+          }}
+        />
       </td>
 
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
-        <SimpleCombo ref={outRef} value={row.outMethod} items={payMethods} onPick={(it) => { onChange({ outMethod: it.name }); setTimeout(() => { paidRef.current?.open(); }, 0); }} placeholder="- 선택 -" />
+        <SimpleCombo
+          ref={outRef}
+          value={row.outMethod}
+          items={payMethods}
+          onPick={(it) => {
+            onChange({ outMethod: it.name });
+            setTimeout(() => {
+              paidRef.current?.open();
+            }, 0);
+          }}
+          placeholder="- 선택 -"
+        />
       </td>
 
       <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
-        <PaidCombo ref={paidRef} value={row.paid} onPick={(v) => { onChange({ paid: v || "" }); if (v) setTimeout(() => noteRef.current?.focus(), 0); }} />
+        <PaidCombo
+          ref={paidRef}
+          value={row.paid}
+          onPick={(v) => {
+            onChange({ paid: v || "" });
+            if (v) setTimeout(() => noteRef.current?.focus(), 0);
+          }}
+        />
       </td>
 
       <td>
-        <input ref={noteRef} className="xp-input" value={row.note} onChange={(e) => onChange({ note: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") openNextRowMain(); }} />
+        <input
+          ref={noteRef}
+          className="xp-input"
+          value={row.note}
+          onChange={(e) => onChange({ note: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") openNextRowMain();
+          }}
+        />
       </td>
     </tr>
   );

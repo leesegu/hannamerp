@@ -40,6 +40,14 @@ IncomeImportPage.css
 .btn.excel{ border:none; color:#fff; font-weight:700; background: linear-gradient(135deg, #53c78b, #2aa06b); border-radius:12px; display:inline-flex; align-items:center; gap:6px; }
 .btn.unconf{ border:none; color:#fff; font-weight:700; background: linear-gradient(135deg,#9b59ff,#6d5efc); border-radius:12px; display:inline-flex; align-items:center; gap:6px; }
 .btn.add{ border:none; color:#fff; font-weight:700; background: linear-gradient(135deg,#00b4d8,#0077b6); border-radius:12px; }
+/* ✅ 추가 버튼에 아이콘(+) 추가: HTML 수정 없이 ::before 로 표시 */
+.btn.add::before{
+  content:"";
+  display:inline-block;
+  width:16px; height:16px;
+  margin-right:6px; vertical-align:-2px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 24 24'><path d='M11 5a1 1 0 0 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5z'/></svg>") no-repeat center / 16px 16px;
+}
 
 .search { height:30px; min-width:200px; padding:0 10px; border:1px solid var(--line-strong); border-radius:10px; outline:none; font-size:12px; background:#fff; }
 .page-size { height:30px; border:1px solid var(--line-strong); border-radius:10px; background:#fff; padding:0 8px; font-size:12px; }
@@ -149,7 +157,28 @@ IncomeImportPage.css
 .chk.mi2 input:checked + .box::after{ transform: translateX(14px); }
 .chk.mi2 .lbl{ font-weight:800; color: var(--danger-text); font-size:12px; }
 
-/* ✅ 퍼플 토글 (입금만/수정모드) — JSX: <label class="chk fancy"> */
+/* ✅ 퍼플 토글 (입금만/수정모드) — 미확인 토글과 동일한 스위치 형태, 색상만 퍼플 */
+/* JSX: <label class="chk purple"><input/><span class="switch"></span><span class="lbl">...</span></label> */
+.chk.purple{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer; user-select:none; }
+.chk.purple input{ position:absolute; opacity:0; width:0; height:0; }
+.chk.purple .switch{
+  width:34px; height:20px; border-radius:9999px;
+  background: linear-gradient(180deg, #edeafe, #e3e0ff);
+  border:1px solid #d1cdfc; position:relative; transition: all .2s ease;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.06);
+}
+.chk.purple .switch::after{
+  content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+  background:#fff; box-shadow: 0 1px 1px rgba(0,0,0,.15);
+  transition: transform .22s ease;
+}
+.chk.purple input:checked + .switch{
+  background: linear-gradient(180deg, #6d5efc, #4b3fd1); border-color: #6d5efc;
+}
+.chk.purple input:checked + .switch::after{ transform: translateX(14px); }
+.chk.purple .lbl{ font-weight:800; color:#4b3fd1; font-size:12px; }
+
+/* ✅ (참고) 기존 fancy 스타일은 유지하되 사용 안 해도 무방 */
 .chk.fancy {
   display: inline-flex;
   align-items: center;

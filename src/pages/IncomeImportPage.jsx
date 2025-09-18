@@ -1355,11 +1355,11 @@ export default function IncomeImportPage() {
             <colgroup>
               <col style={{ width: "10%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "14%" }} />
+              <col style={{ width: "16%" }} />
               <col style={{ width: "10%" }} />
-              <col style={{ width: "21%" }} />
-              <col style={{ width: "35%" }} />
-              <col style={{ width: "2%" }} />
+              <col style={{ width: "18%" }} />
+              <col style={{ width: "32%" }} />
+              <col style={{ width: "6%" }} />
             </colgroup>
             <thead>
               <tr>

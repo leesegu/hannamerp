@@ -31,6 +31,8 @@ import CalendarPage from "../pages/CalendarPage";
 import PaperingPage from "../pages/PaperingPage";
 /* 메모 */
 import MemoPage from "../pages/MemoPage";
+/* ✅ 관리비회계 · 일마감 (추가) */
+import DailyClosePage from "../pages/DailyClosePage";
 /* ✅ (삭제됨) 사이드 콘텐츠로 띄우던 관리비회계 설정 페이지 임포트 제거 */
 // import AccountingSettingsPage from "../pages/AccountingSettingsPage";
 
@@ -287,9 +289,14 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                       handleNavigate(<IncomeImportPage />, item);
                       return;
                     }
-                    /* ✅ 지출정리 연결 추가 */
+                    /* ✅ 지출정리 연결 */
                     if (item === "지출정리") {
                       handleNavigate(<ExpensePage />, item);
+                      return;
+                    }
+                    /* ✅ 일마감 연결 (추가) */
+                    if (item === "일마감") {
+                      handleNavigate(<DailyClosePage />, item);
                       return;
                     }
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
