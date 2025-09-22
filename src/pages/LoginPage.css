@@ -1,0 +1,153 @@
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --ink:#1f2937;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+
+  --brand:#ff9800;         /* 로고 포인트 */
+  --primary:#2f63ee;       /* 로그인 버튼 파란색 */
+  --primary-pressed:#2350d6;
+  --input-bg:#fff;
+}
+
+*{box-sizing:border-box}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans KR",
+    "Apple SD Gothic Neo", sans-serif;
+}
+
+.login-wrap{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+
+.login-card{
+  width:min(1080px, 92vw);
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.06);
+  display:grid;
+  grid-template-columns: 1fr 520px;
+  gap:0;
+  overflow:hidden;
+}
+
+/* Left */
+.login-left{
+  background:linear-gradient(135deg, #0f2747 0%, #183c6d 100%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:36px;
+}
+.login-illustration{
+  width:100%;
+  max-width:520px;
+  height:auto;
+  border-radius:12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+
+/* Right */
+.login-right{
+  padding:48px 40px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+
+.brand{
+  width:100%;
+  display:flex;
+  align-items:center;
+  margin-bottom:28px;
+  gap:12px;
+}
+.brand-mark{
+  width:42px;height:42px;
+  border-radius:10px;
+  background:var(--brand);
+  color:#fff;
+  font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+  letter-spacing:0.5px;
+  box-shadow: 0 6px 14px rgba(255,152,0,.35);
+}
+.brand-text{
+  font-size:22px;
+  font-weight:800;
+  color:#111827;
+}
+
+.login-form{
+  width:100%;
+  max-width:360px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.login-input{
+  width:100%;
+  background:var(--input-bg);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 14px;
+  font-size:15px;
+  outline:none;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.login-input:focus{
+  border-color:#b7c4ff;
+  box-shadow: 0 0 0 4px rgba(47, 99, 238, .12);
+}
+
+.login-error{
+  color:#d32f2f;
+  font-size:13px;
+  margin-top:2px;
+  text-align:center;
+}
+
+.login-button{
+  margin-top:6px;
+  width:100%;
+  border:none;
+  border-radius:10px;
+  padding:12px 14px;
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  background:var(--primary);
+  cursor:pointer;
+  transition: transform .02s ease, background .15s ease, box-shadow .15s ease;
+  box-shadow: 0 8px 16px rgba(47,99,238,.25);
+}
+.login-button:active{
+  transform: translateY(1px);
+}
+.login-button:hover{
+  background:var(--primary-pressed);
+}
+
+/* Responsive */
+@media (max-width: 960px){
+  .login-card{
+    grid-template-columns: 1fr;
+  }
+  .login-left{
+    display:none; /* 모바일에서는 이미지 영역 감춤 */
+  }
+  .login-right{
+    padding:40px 24px;
+  }
+}

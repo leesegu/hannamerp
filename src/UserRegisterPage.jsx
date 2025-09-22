@@ -1,181 +1,150 @@
 // src/UserRegisterPage.js
 import React, { useState, useEffect } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+} from "firebase/auth";
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
 import "./UserRegisterPage.css";
 
-export default function UserRegisterPage({ employeeId }) {
+const idToEmail = (id, employeeNo) =>
+  `${id.trim().toLowerCase()}+${employeeNo.trim()}@hannam-erp.local`;
+
+export default function UserRegisterPage() {
   const [id, setId] = useState("");
   const [employeeNo, setEmployeeNo] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [employeeList, setEmployeeList] = useState([]);
+  const [users, setUsers] = useState([]);
   const [editMode, setEditMode] = useState(null);
 
-  const getCurrentId = () => {
-    return id && id.trim() ? id : employeeId;
+  /** ✅ Firestore에서 전체 사용자 목록 불러오기 */
+  const fetchUsers = async () => {
+    const snap = await getDocs(collection(db, "users"));
+    const list = [];
+    snap.forEach((docSnap) => {
+      list.push({ uid: docSnap.id, ...docSnap.data() });
+    });
+    setUsers(list);
   };
 
-  const fetchEmployees = async (targetId) => {
-    if (!targetId) return;
-    try {
-      const ref = doc(db, "users", targetId);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const data = snap.data();
-        const list = (data.employeeNos || []).map((no) => ({
-          no,
-          name: data.employeeNames?.[no] || "",
-          pw: data.passwords?.[no] || "",
-        }));
-        setEmployeeList(list);
-        setMessage("");
-      } else {
-        setEmployeeList([]);
-        setMessage("❌ 해당 아이디는 존재하지 않습니다.");
-      }
-    } catch (err) {
-      console.error("사원 목록 불러오기 오류:", err);
-    }
-  };
-
-  // 페이지 처음 로딩 시 employeeId 기준으로 무조건 목록 불러오기
   useEffect(() => {
-    if (employeeId) {
-      setId(employeeId);
-      fetchEmployees(employeeId);
-    }
-  }, [employeeId]);
+    fetchUsers();
+  }, []);
 
-  // id 입력 변경 시 목록 업데이트
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      const targetId = getCurrentId();
-      if (targetId) {
-        fetchEmployees(targetId);
-      }
-    }, 400);
-    return () => clearTimeout(timeout);
-  }, [id]);
-
+  /** ✅ 등록 */
   const handleRegister = async (e) => {
     e.preventDefault();
-    setMessage("");
-
-    if (!(getCurrentId() && employeeNo && employeeName && password)) {
+    if (!id || !employeeNo || !employeeName || !password) {
       setMessage("❌ 모든 항목을 입력해주세요.");
       return;
     }
 
     try {
-      const userRef = doc(db, "users", getCurrentId());
-      const userSnap = await getDoc(userRef);
+      const email = idToEmail(id, employeeNo);
 
-      if (!userSnap.exists()) {
-        setMessage("❌ 해당 아이디는 존재하지 않습니다.");
-        return;
-      }
+      // 1) Auth 사용자 생성
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = cred.user.uid;
 
-      const userData = userSnap.data();
-      const { employeeNos = [], employeeNames = {}, passwords = {} } = userData;
-
-      if (employeeNos.includes(employeeNo)) {
-        setMessage("❌ 이미 등록된 사원번호입니다.");
-        return;
-      }
-
-      await updateDoc(userRef, {
-        employeeNos: [...employeeNos, employeeNo],
-        employeeNames: { ...employeeNames, [employeeNo]: employeeName },
-        passwords: { ...passwords, [employeeNo]: password },
+      // 2) Firestore users 문서 생성
+      await setDoc(doc(db, "users", uid), {
+        id,
+        employeeNo,
+        name: employeeName,
+        role: "user",
+        isActive: true,
+        createdAt: new Date(),
       });
 
       setMessage("✅ 등록이 완료되었습니다!");
+      setId("");
       setEmployeeNo("");
       setEmployeeName("");
       setPassword("");
-      fetchEmployees(getCurrentId());
+      fetchUsers();
     } catch (err) {
       console.error("등록 오류:", err);
-      setMessage("❌ 등록 중 오류가 발생했습니다.");
+      setMessage("❌ 등록 중 오류: " + err.message);
     }
   };
 
-  const handleDelete = async (no) => {
-    if (!window.confirm(`사원번호 ${no}을(를) 삭제하시겠습니까?`)) return;
-
-    const userRef = doc(db, "users", getCurrentId());
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) return;
-    const data = snap.data();
-    const newNos = data.employeeNos.filter((n) => n !== no);
-    const newNames = { ...data.employeeNames };
-    const newPwds = { ...data.passwords };
-    delete newNames[no];
-    delete newPwds[no];
-    await updateDoc(userRef, {
-      employeeNos: newNos,
-      employeeNames: newNames,
-      passwords: newPwds,
-    });
-    fetchEmployees(getCurrentId());
-  };
-
-  const handleEdit = (no) => {
-    setEditMode(no);
-    const emp = employeeList.find((e) => e.no === no);
-    setEmployeeNo(emp.no);
-    setEmployeeName(emp.name);
-    setPassword(emp.pw);
-  };
-
+  /** ✅ 수정 (이름만 업데이트 예시) */
   const handleUpdate = async (e) => {
     e.preventDefault();
-    const userRef = doc(db, "users", getCurrentId());
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) return;
-    const data = snap.data();
-    const newNames = { ...data.employeeNames, [employeeNo]: employeeName };
-    const newPwds = { ...data.passwords, [employeeNo]: password };
-    await updateDoc(userRef, {
-      employeeNames: newNames,
-      passwords: newPwds,
-    });
-    setMessage("✅ 수정이 완료되었습니다!");
-    setEditMode(null);
-    setEmployeeNo("");
-    setEmployeeName("");
-    setPassword("");
-    fetchEmployees(getCurrentId());
+    try {
+      await updateDoc(doc(db, "users", editMode.uid), {
+        name: employeeName,
+        updatedAt: new Date(),
+      });
+      setMessage("✅ 수정 완료!");
+      setEditMode(null);
+      setEmployeeNo("");
+      setEmployeeName("");
+      setPassword("");
+      fetchUsers();
+    } catch (err) {
+      console.error("수정 오류:", err);
+      setMessage("❌ 수정 중 오류 발생");
+    }
+  };
+
+  /** ✅ 삭제 */
+  const handleDelete = async (user) => {
+    if (!window.confirm(`아이디 ${user.id} (사번 ${user.employeeNo}) 삭제?`)) return;
+    try {
+      // Firestore 문서 삭제
+      await deleteDoc(doc(db, "users", user.uid));
+      // Auth 사용자 삭제 → 관리자용 Admin SDK에서 하는 게 권장.
+      // 클라이언트에서는 현재 로그인된 사용자만 deleteUser 가능.
+      setMessage("✅ Firestore 문서 삭제 완료 (Auth 삭제는 서버에서 처리 권장)");
+      fetchUsers();
+    } catch (err) {
+      console.error("삭제 오류:", err);
+      setMessage("❌ 삭제 오류: " + err.message);
+    }
   };
 
   return (
     <div className="user-register-wrapper">
       <div className="user-register-container">
-        <h2>사원코드등록</h2>
+        <h2>사원 코드 등록</h2>
+
         <form onSubmit={editMode ? handleUpdate : handleRegister}>
           <input
             placeholder="아이디"
             value={id}
             onChange={(e) => setId(e.target.value)}
+            disabled={!!editMode}
           />
           <input
-            placeholder="사원번호"
+            placeholder="사번"
             value={employeeNo}
             onChange={(e) => setEmployeeNo(e.target.value)}
+            disabled={!!editMode}
           />
           <input
             placeholder="이름"
             value={employeeName}
             onChange={(e) => setEmployeeName(e.target.value)}
           />
-          <input
-            placeholder="비밀번호"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          {!editMode && (
+            <input
+              placeholder="비밀번호"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
           <button type="submit">{editMode ? "수정" : "등록"}</button>
         </form>
 
@@ -183,22 +152,27 @@ export default function UserRegisterPage({ employeeId }) {
 
         <div className="employee-list">
           <h3>등록된 사원</h3>
-          {employeeList.length > 0 ? (
-            employeeList.map((emp) => (
-              <div className="employee-row" key={emp.no}>
+          {users.length > 0 ? (
+            users.map((user) => (
+              <div className="employee-row" key={user.uid}>
                 <div className="employee-info">
-                  {emp.no} - {emp.name}
+                  {user.id}+{user.employeeNo} - {user.name}
                 </div>
                 <div className="employee-actions">
                   <button
                     className="edit-button"
-                    onClick={() => handleEdit(emp.no)}
+                    onClick={() => {
+                      setEditMode(user);
+                      setId(user.id);
+                      setEmployeeNo(user.employeeNo);
+                      setEmployeeName(user.name);
+                    }}
                   >
                     수정
                   </button>
                   <button
                     className="delete-button"
-                    onClick={() => handleDelete(emp.no)}
+                    onClick={() => handleDelete(user)}
                   >
                     삭제
                   </button>

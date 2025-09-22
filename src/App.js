@@ -8,7 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import LoginPage from "./LoginPage";
+import LoginPage from "./pages/LoginPage";   // ✅ 경로 수정
 import TrezoSidebar from "./components/TrezoSidebar";
 import MoveoutForm from "./MoveoutForm";
 import MoveoutList from "./pages/MoveoutList";
@@ -159,19 +159,19 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <ReceiptIssuePage />}
       />
 
-      {/* ✅ 관리비회계 · 수입정리 (사이드바 콘텐츠로 표시) */}
+      {/* ✅ 관리비회계 · 수입정리 */}
       <Route
         path="/accounting/income"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <IncomeImportPage />}
       />
 
-      {/* ✅ 관리비회계 · 지출정리 (직접 라우팅 추가됨) */}
+      {/* ✅ 관리비회계 · 지출정리 */}
       <Route
         path="/accounting/expense"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <ExpensePage />}
       />
 
-      {/* ✅ 관리비회계 · 일마감 (신규 라우트 추가) */}
+      {/* ✅ 관리비회계 · 일마감 */}
       <Route
         path="/accounting/daily-close"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <DailyClosePage />}
@@ -216,8 +216,6 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       {/* 기초등록/사원 */}
       <Route path="/basic/vendor-register" element={!isLoggedIn ? <Navigate to="/login" replace /> : <VendorRegisterPage />} />
       <Route path="/employee" element={!isLoggedIn ? <Navigate to="/login" replace /> : <EmployeePage />} />
-
-      {/* ⚠️ '/settings/accounting' 라우트는 제거 — 전체화면 방지 */}
 
       {/* 와일드카드 */}
       <Route

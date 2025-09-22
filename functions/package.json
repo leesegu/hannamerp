@@ -3,7 +3,7 @@
   "description": "Cloud Functions for Firebase (Income Import Backend, exceljs-based)",
   "private": true,
   "engines": {
-    "node": "22"
+    "node": "20"
   },
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "firebase-functions": "^6.4.0"
   },
   "devDependencies": {
-    "eslint": "^8.15.0",
+    "eslint": "^8.57.1",
     "eslint-config-google": "^0.14.0",
     "firebase-functions-test": "^3.1.0"
   }

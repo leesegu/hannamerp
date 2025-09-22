@@ -1,7 +1,11 @@
 [
   {
-    "origin": ["http://localhost:3000"],
-    "method": ["GET", "POST", "PUT", "DELETE"],
+    "origin": [
+      "http://localhost:3000",
+      "https://hannam-move-calculate.web.app",
+      "https://hannam-move-calculate.firebaseapp.com"
+    ],
+    "method": ["GET", "HEAD", "OPTIONS", "POST", "PUT", "DELETE"],
     "maxAgeSeconds": 3600,
     "responseHeader": ["Content-Type", "Authorization"]
   }

@@ -1,7 +1,8 @@
 /* =========================================
- * Firebase Functions (JS, v2) – Income Backend
+ * Firebase Functions (Gen2, JS)
  * Endpoints:
- *   - importIncomeFromExcel:  POST { downloadUrl, recentMonths? } → 엑셀 파싱 → 월 JSON 병합
+ *   - ping:                   GET  → "pong" (헬스체크)
+ *   - importIncomeFromExcel:  POST { downloadUrl, recentMonths? }
  *   - migrateIncomeToStorage: GET/POST (?from=YYYY-MM&to=YYYY-MM&dryRun=1&rewrite=1&startAfter=DOCID)
  * Storage layout:
  *   gs://<bucket>/acct_income_json/<YYYY-MM>.json
@@ -13,12 +14,12 @@ const ExcelJS = require("exceljs");
 const { onRequest } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 
-// 💡 전역 옵션 (서울 리전 + Node 엔진은 package.json 의 engines.node 따름)
+// 🚀 전역 옵션 (서울 리전). Node 런타임은 package.json의 engines.node.
 setGlobalOptions({ region: "asia-northeast3", maxInstances: 10 });
 
 admin.initializeApp();
 
-// ====== 유틸 ======
+/* ------------------------- 공통 유틸 ------------------------- */
 const MAX_TEXT = 2000;
 const s = (v) => String(v ?? "").trim();
 const toNumber = (v) => {
@@ -31,7 +32,7 @@ const monthKeyOf = (dateStr) => (dateStr ? String(dateStr).slice(0, 7) : "");
 const trimField = (v, max = MAX_TEXT) => s(v).slice(0, max);
 const isYyyyMm = (mk) => /^\d{4}-\d{2}$/.test(mk);
 
-// FNV-1a 32bit (행 키 해시)
+// FNV-1a 32bit
 function hash(str) {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < str.length; i++) {
@@ -58,7 +59,6 @@ async function readMonthItems(mk) {
     return {};
   }
 }
-
 async function writeMonthJSON(mk, items, { merge = true } = {}) {
   const file = bucket().file(monthPath(mk));
   let base = {};
@@ -69,9 +69,8 @@ async function writeMonthJSON(mk, items, { merge = true } = {}) {
   return Object.keys(merged).length;
 }
 
-/* ====== 엑셀 파싱 (exceljs) ====== */
+/* ------------------------- 엑셀 파싱 ------------------------- */
 function normalizeExcel2D(ws) {
-  // exceljs: rows/cols 1-base
   const rows = [];
   const rowCount = ws.rowCount;
   const colCount = ws.columnCount;
@@ -81,7 +80,6 @@ function normalizeExcel2D(ws) {
     for (let c = 1; c <= colCount; c++) {
       const cell = row.getCell(c);
       const val = cell.value;
-      // 날짜/숫자는 raw, 그 외엔 cell.text
       if (val instanceof Date) arr.push(val);
       else if (typeof val === "number") arr.push(val);
       else arr.push(cell.text || "");
@@ -90,7 +88,6 @@ function normalizeExcel2D(ws) {
   }
   return rows;
 }
-
 function findHeaderRow(rows) {
   const lim = Math.min(rows.length, 50);
   for (let i = 0; i < lim; i++) {
@@ -148,18 +145,26 @@ function excelSerialToLocalDate(val, { truncateTime = false, date1904 = false } 
   if (Math.abs(serial - Math.round(serial)) < EXCEL_EPS) serial = Math.round(serial);
   if (truncateTime) serial = Math.floor(serial + EXCEL_EPS);
 
-  // exceljs에 SSF 파서는 없으므로 수동 처리(1900 기준 오프셋)
-  const base = new Date(date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30)); // Excel 기준
+  const base = new Date(date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30));
   const ms = Math.floor(serial * 24 * 60 * 60 * 1000);
   const d = new Date(base.getTime() + ms);
   if (truncateTime) d.setUTCHours(0, 0, 0, 0);
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds());
+  return new Date(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    d.getUTCSeconds()
+  );
 }
 function parseKoreanDateTime(v) {
   const raw = s(v);
   if (!raw) return null;
   const norm = raw.replace(/[.\-]/g, "/").replace(/\s+/g, " ").trim();
-  const m = norm.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  const m = norm.match(
+    /^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
   if (!m) return null;
   const [, Y, M, D, hh = "0", mm = "0", ss = "0"] = m;
   const dt = new Date(+Y, +M - 1, +D, +hh, +mm, +ss);
@@ -235,7 +240,6 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
     if (!dateStr && col.dateOnly >= 0) {
       const d = normalizeExcelCellToLocalDate(row[col.dateOnly], { truncateTime: true, date1904 });
       if (d) dateStr = fmtDateLocal(d);
-
       if (col.timeOnly >= 0) {
         const [hh, mm, ss] = parseHms(s(row[col.timeOnly]));
         timeStr = `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}`;
@@ -266,17 +270,20 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
   return out;
 }
 
-/* ====== IMPORT API (엑셀 → 월 JSON 병합) ====== */
+/* ------------------------- 핑(헬스체크) ------------------------- */
+exports.ping = onRequest((req, res) => {
+  res.status(200).send("pong");
+});
+
+/* ------------------------- IMPORT API ------------------------- */
 exports.importIncomeFromExcel = onRequest(async (req, res) => {
   try {
     if (req.method !== "POST") {
-      res.status(405).json({ ok: false, error: "Use POST" });
-      return;
+      res.status(405).json({ ok: false, error: "Use POST" }); return;
     }
     const { downloadUrl, recentMonths } = req.body || {};
     if (!s(downloadUrl)) {
-      res.status(400).json({ ok: false, error: "downloadUrl required" });
-      return;
+      res.status(400).json({ ok: false, error: "downloadUrl required" }); return;
     }
 
     // 1) 엑셀 로드
@@ -290,10 +297,9 @@ exports.importIncomeFromExcel = onRequest(async (req, res) => {
     if (!ws) throw new Error("No sheet");
     const aoo = normalizeExcel2D(ws);
 
-    // 워크북 1904 시스템 여부 추정
     const is1904 = !!wb.properties?.date1904;
 
-    // 2) 파싱 → 레코드
+    // 2) 파싱
     const meta = parseMeta(aoo);
     const headerRowIdx = findHeaderRow(aoo);
     if (headerRowIdx === -1) throw new Error("헤더(일자/거래일시/입금금액 등) 탐지 실패");
@@ -341,7 +347,7 @@ exports.importIncomeFromExcel = onRequest(async (req, res) => {
           monthKey: mk,
         };
       }
-      const mergedCount = await writeMonthJSON(mk, items, { merge: true });
+      await writeMonthJSON(mk, items, { merge: true });
       total += Object.keys(items).length;
       if (hotSet.has(mk)) hotSaved += Object.keys(items).length;
       else coldSaved += Object.keys(items).length;
@@ -354,13 +360,13 @@ exports.importIncomeFromExcel = onRequest(async (req, res) => {
   }
 });
 
-/* ====== 마이그레이션 (Firestore → Storage JSON) ====== */
+/* ------------------------- 마이그레이션 ------------------------- */
 exports.migrateIncomeToStorage = onRequest(async (req, res) => {
   try {
     const db = admin.firestore();
 
     const dryRun = s(req.query.dryRun) === "1";
-    let rewriteOnce = s(req.query.rewrite) === "1"; // 첫 write만 덮어쓰기
+    let rewriteOnce = s(req.query.rewrite) === "1";
     const startAfter = s(req.query.startAfter);
     const fromMonth = s(req.query.from);
     const toMonth = s(req.query.to);
@@ -391,8 +397,7 @@ exports.migrateIncomeToStorage = onRequest(async (req, res) => {
         if (!id || !mk || !date) { lastDocId = doc.id; continue; }
 
         if (useMonthFilter && (mk < fromMonth || mk > toMonth)) {
-          lastDocId = doc.id;
-          continue;
+          lastDocId = doc.id; continue;
         }
 
         const inAmt = toNumber(data.inAmt);
@@ -400,14 +405,12 @@ exports.migrateIncomeToStorage = onRequest(async (req, res) => {
 
         const row = {
           _id: id,
-          date,
-          time,
+          date, time,
           datetime: s(data.datetime || (date ? `${date} ${time}` : "")),
           accountNo: s(data.accountNo),
           holder: s(data.holder),
           category: s(data.category),
-          inAmt,
-          outAmt,
+          inAmt, outAmt,
           balance: toNumber(data.balance),
           record: trimField(data.record),
           memo: trimField(data.memo),
@@ -422,9 +425,9 @@ exports.migrateIncomeToStorage = onRequest(async (req, res) => {
       }
 
       // 메모리 보호: 버퍼가 커지면 중간 flush
-      const BUCKET_FLUSH_THRESHOLD = 100_000;
+      const TH = 100_000;
       const totalBuffered = Object.values(monthBuckets).reduce((n, m) => n + Object.keys(m).length, 0);
-      if (totalBuffered >= BUCKET_FLUSH_THRESHOLD) {
+      if (totalBuffered >= TH) {
         for (const mk of Object.keys(monthBuckets)) {
           const upserts = monthBuckets[mk];
           if (!Object.keys(upserts).length) continue;
