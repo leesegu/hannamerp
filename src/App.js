@@ -8,7 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import LoginPage from "./pages/LoginPage";   // ✅ 경로 수정
+import LoginPage from "./pages/LoginPage";
 import TrezoSidebar from "./components/TrezoSidebar";
 import MoveoutForm from "./MoveoutForm";
 import MoveoutList from "./pages/MoveoutList";
@@ -30,29 +30,19 @@ import CctvPage from "./pages/CctvPage";
 import VendorRegisterPage from "./pages/VendorRegisterPage";
 import EmployeePage from "./pages/EmployeePage";
 
-/* ✅ 영수증 발행 리스트 페이지 */
 import ReceiptIssuePage from "./pages/ReceiptIssuePage";
-
-/* ✅ 관리비회계 · 수입정리 페이지 */
 import IncomeImportPage from "./pages/IncomeImportPage";
-
-/* ✅ 전기요금 추출(문자 추출) 페이지 */
-import MessageExtractor from "./pages/MessageExtractor";
-
-/* ✅ 캘린더 페이지 */
-import CalendarPage from "./pages/CalendarPage";
-
-/* ✅ 부가서비스 · 도배 */
-import PaperingPage from "./pages/PaperingPage";
-
-/* ✅ 메모 페이지 */
-import MemoPage from "./pages/MemoPage";
-
-/* ✅ 관리비회계 · 지출정리 */
 import ExpensePage from "./pages/ExpensePage";
-
-/* ✅ 관리비회계 · 일마감 (추가) */
 import DailyClosePage from "./pages/DailyClosePage";
+/* ✅ 월마감 추가 */
+import MonthlyClosePage from "./pages/MonthlyClosePage";
+/* ✅ 연간시트 추가 (직접 URL 진입용 라우트) */
+import AnnualSheetPage from "./pages/AnnualSheetPage";
+
+import MessageExtractor from "./pages/MessageExtractor";
+import CalendarPage from "./pages/CalendarPage";
+import PaperingPage from "./pages/PaperingPage";
+import MemoPage from "./pages/MemoPage";
 
 import "./App.css";
 
@@ -81,7 +71,7 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
         }
       />
 
-      {/* 메인 (PC: 사이드바, 모바일: 리스트로 리다이렉트) */}
+      {/* 메인 */}
       <Route
         path="/main"
         element={
@@ -159,43 +149,55 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <ReceiptIssuePage />}
       />
 
-      {/* ✅ 관리비회계 · 수입정리 */}
+      {/* 관리비회계 · 수입정리 */}
       <Route
         path="/accounting/income"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <IncomeImportPage />}
       />
 
-      {/* ✅ 관리비회계 · 지출정리 */}
+      {/* 관리비회계 · 지출정리 */}
       <Route
         path="/accounting/expense"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <ExpensePage />}
       />
 
-      {/* ✅ 관리비회계 · 일마감 */}
+      {/* 관리비회계 · 일마감 */}
       <Route
         path="/accounting/daily-close"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <DailyClosePage />}
       />
 
-      {/* ✅ 전기요금 추출(문자) */}
+      {/* 관리비회계 · 월마감 */}
+      <Route
+        path="/accounting/monthly-close"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <MonthlyClosePage />}
+      />
+
+      {/* ✅ 관리비회계 · 연간시트 (직접 URL 접근용) */}
+      <Route
+        path="/accounting/annual-sheet"
+        element={!isLoggedIn ? <Navigate to="/login" replace /> : <AnnualSheetPage />}
+      />
+
+      {/* 전기요금 추출 */}
       <Route
         path="/extract"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <MessageExtractor />}
       />
 
-      {/* ✅ 캘린더 */}
+      {/* 캘린더 */}
       <Route
         path="/calendar"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <CalendarPage />}
       />
 
-      {/* ✅ 부가서비스 · 도배 */}
+      {/* 부가서비스 */}
       <Route
         path="/papering"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <PaperingPage />}
       />
 
-      {/* ✅ 메모 */}
+      {/* 메모 */}
       <Route
         path="/memo"
         element={!isLoggedIn ? <Navigate to="/login" replace /> : <MemoPage userId={userId} />}

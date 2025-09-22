@@ -1,6 +1,7 @@
 // src/components/TrezoSidebar.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+
 import MoveoutList from "../pages/MoveoutList";
 import UserRegisterPage from "../UserRegisterPage";
 import VillaCodePage from "../pages/VillaCodePage";
@@ -19,10 +20,14 @@ import EmployeePage from "../pages/EmployeePage";
 import ReceiptIssuePage from "../pages/ReceiptIssuePage";
 import MoveInCleaningPage from "../pages/MoveInCleaningPage";
 import Dashboard from "../pages/Dashboard";
-/* 관리비회계 · 수입정리 */
+
+/* 관리비회계 · 수입정리 / 지출정리 / 일마감 / 월마감 / 연간시트 */
 import IncomeImportPage from "../pages/IncomeImportPage";
-/* ✅ 관리비회계 · 지출정리 (추가) */
 import ExpensePage from "../pages/ExpensePage";
+import DailyClosePage from "../pages/DailyClosePage";
+import MonthlyClosePage from "../pages/MonthlyClosePage";
+import AnnualSheetPage from "../pages/AnnualSheetPage";
+
 /* 전기요금 추출(문자) */
 import MessageExtractor from "../pages/MessageExtractor";
 /* 캘린더 */
@@ -31,11 +36,8 @@ import CalendarPage from "../pages/CalendarPage";
 import PaperingPage from "../pages/PaperingPage";
 /* 메모 */
 import MemoPage from "../pages/MemoPage";
-/* ✅ 관리비회계 · 일마감 (추가) */
-import DailyClosePage from "../pages/DailyClosePage";
-/* ✅ (삭제됨) 사이드 콘텐츠로 띄우던 관리비회계 설정 페이지 임포트 제거 */
-// import AccountingSettingsPage from "../pages/AccountingSettingsPage";
 
+/* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
 
@@ -89,7 +91,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   const location = useLocation();
 
   const [activeContent, setActiveContent] = useState(null);
-  const [openMenu, setOpenMenu] = useState("");
+  const [openMenu, setOpenMenu] = useState(""); // ✅ 오류 원인 제거(앞의 'the:' 삭제)
   const [activeMenu, setActiveMenu] = useState("");
 
   const handleNavigate = (component, menuKey) => {
@@ -129,21 +131,17 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
       setActiveContent(pages[sub] ?? <ComingSoon title={`빌라정보 · ${sub}`} />);
       return;
     }
-
-    // ✅ (삭제됨) 기초등록 → 관리비회계설정 별도 페이지 연결 로직
-    // if ((go === "기초등록" || go === "settings") && sub === "관리비회계설정") {
-    //   setOpenMenu("settings");
-    //   setActiveMenu("기초등록");
-    //   setActiveContent(<AccountingSettingsPage />);
-    //   return;
-    // }
   }, [location.search]);
 
   return (
     <div className="flex w-full h-screen">
       {/* 사이드바 */}
       <aside className="w-60 h-full bg-white border-r border-gray-200 flex flex-col">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3 cursor-pointer" onClick={goHome} title="대시보드로 이동">
+        <div
+          className="px-6 py-5 border-b border-gray-100 flex items-center gap-3 cursor-pointer"
+          onClick={goHome}
+          title="대시보드로 이동"
+        >
           <img src={HNLogo} alt="HN Logo" className="w-10 h-10 object-contain" />
           <span className="font-bold text-lg text-gray-800">한남주택관리</span>
         </div>
@@ -187,8 +185,16 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               {openMenu === "villa" && (
                 <SidebarSubmenu
                   items={[
-                    "코드별빌라", "통신사", "승강기", "정화조", "소방안전",
-                    "전기안전", "상수도", "공용전기", "건물청소", "CCTV",
+                    "코드별빌라",
+                    "통신사",
+                    "승강기",
+                    "정화조",
+                    "소방안전",
+                    "전기안전",
+                    "상수도",
+                    "공용전기",
+                    "건물청소",
+                    "CCTV",
                   ]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
@@ -217,7 +223,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               label="이사정산"
               onClick={() => {
                 setOpenMenu("");
-                handleNavigate(<MoveoutList employeeId={employeeId} userId={userId} isMobile={false} />, "이사정산");
+                handleNavigate(
+                  <MoveoutList employeeId={employeeId} userId={userId} isMobile={false} />,
+                  "이사정산"
+                );
               }}
               active={activeMenu === "이사정산"}
             />
@@ -280,8 +289,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "accounting" && (
                 <SidebarSubmenu
-                  /* ✅ 수입DB/지출DB 제거 */
-                  items={["수입정리", "지출정리", "일마감", "월마감", "수입뷰어", "지출뷰어", "연간시트"]}
+                  items={["수입정리", "지출정리", "일마감", "월마감", "연간시트"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
@@ -289,14 +297,20 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                       handleNavigate(<IncomeImportPage />, item);
                       return;
                     }
-                    /* ✅ 지출정리 연결 */
                     if (item === "지출정리") {
                       handleNavigate(<ExpensePage />, item);
                       return;
                     }
-                    /* ✅ 일마감 연결 (추가) */
                     if (item === "일마감") {
                       handleNavigate(<DailyClosePage />, item);
+                      return;
+                    }
+                    if (item === "월마감") {
+                      handleNavigate(<MonthlyClosePage />, item);
+                      return;
+                    }
+                    if (item === "연간시트") {
+                      handleNavigate(<AnnualSheetPage />, item); // ✅ 연간시트 연결
                       return;
                     }
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);

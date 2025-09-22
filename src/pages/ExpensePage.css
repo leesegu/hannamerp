@@ -63,16 +63,14 @@
 .pad-s { padding: 6px 10px !important; }
 
 /* 컬러 버전 */
-.xp-excel  { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); box-shadow: 0 8px 22px rgba(34,197,94,.30), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-load   { background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); box-shadow: 0 8px 22px rgba(124,58,237,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-save   { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); box-shadow: 0 8px 22px rgba(37,99,235,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-hold   { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); box-shadow: 0 8px 22px rgba(217,119,6,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-delete { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); box-shadow: 0 8px 22px rgba(220,38,38,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-delete.on { filter: brightness(1.08) saturate(1.1); box-shadow: 0 14px 30px rgba(220,38,38,.44), inset 0 1px 0 rgba(255,255,255,.55); }
 
-/* 추가: 새로고침 / 추가 / 닫기 */
+/* 추가: 새로고침 / 닫기 */
 .xp-refresh { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); box-shadow: 0 8px 22px rgba(100,116,139,.34), inset 0 1px 0 rgba(255,255,255,.4); }
-.xp-add     { background: linear-gradient(135deg, #34d399 0%, #059669 100%); box-shadow: 0 8px 22px rgba(5,150,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 .xp-close   { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); box-shadow: 0 8px 22px rgba(71,85,105,.34), inset 0 1px 0 rgba(255,255,255,.4); }
 
 /* ===== 우측 패널 ===== */
@@ -98,7 +96,6 @@
 .xp-side.mini   { padding: 10px; gap: 10px; }
 .fancy-panel {}
 
-/* 유틸: 스케일 */
 .scale-095 { transform: scale(0.95); transform-origin: right center; }
 
 .xp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0; border: 0; font-size: 14px; flex: 1 1 0; min-width: 0; }
@@ -274,20 +271,20 @@
 .xp-modal:has(.hold-wrap) { width: 1200px !important; }
 
 /* ===== 커스텀 달력 ===== */
-.cal-wrap { display: grid; gap: 8px; }
-.cal-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 6px 4px; background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 100%); border-radius: 12px; color: #fff; }
-.cal-title { text-align: center; }
-.cal-month { font-size: 18px; font-weight: 900; line-height: 1; }
-.cal-year { font-size: 12px; opacity: 0.9; }
-.cal-nav { border: none; background: transparent; color: #fff; font-size: 22px; cursor: pointer; }
-.cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; color: #6b21a8; font-weight: 800; font-size: 12px; }
-.cal-head-cell { text-align: center; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.cal-cell { height: 42px; border: 1px solid #e9d5ff; border-radius: 10px; background: #fff; cursor: pointer; position: relative; transition: transform .06s ease, box-shadow .12s ease, background .12s ease; }
-.cal-cell:hover { background: #f5f3ff; box-shadow: 0 8px 18px rgba(139,92,246,0.18); }
-.cal-cell.muted { opacity: 0.45; }
-.cal-daynum { position: absolute; top: 8px; right: 8px; font-weight: 800; color: #4c1d95; }
-.cal-cell.today { border-color: #8b5cf6; box-shadow: inset 0 0 0 2px #8b5cf6; }
+.xp-page .cal-wrap { display: grid; gap: 8px; }
+.xp-page .cal-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 6px 4px; background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 100%); border-radius: 12px; color: #fff; }
+.xp-page .cal-title { text-align: center; }
+.xp-page .cal-month { font-size: 18px; font-weight: 900; line-height: 1; }
+.xp-page .cal-year { font-size: 12px; opacity: 0.9; }
+.xp-page .cal-nav { border: none; background: transparent; color: #fff; font-size: 22px; cursor: pointer; }
+.xp-page .cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; color: #6b21a8; font-weight: 800; font-size: 12px; }
+.xp-page .cal-head-cell { text-align: center; }
+.xp-page .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.xp-page .cal-cell { height: 42px; border: 1px solid #e9d5ff; border-radius: 10px; background: #fff; cursor: pointer; position: relative; transition: transform .06s ease, box-shadow .12s ease, background .12s ease; }
+.xp-page .cal-cell:hover { background: #f5f3ff; box-shadow: 0 8px 18px rgba(139,92,246,0.18); }
+.xp-page .cal-cell.muted { opacity: 0.45; }
+.xp-page .cal-daynum { position: absolute; top: 8px; right: 8px; font-weight: 800; color: #4c1d95; }
+.xp-page .cal-cell.today { border-color: #8b5cf6; box-shadow: inset 0 0 0 2px #8b5cf6; }
 
 /* ===== 출금보류 테이블 & 툴바 ===== */
 .hold-wrap { display: grid; gap: 8px; }
@@ -369,32 +366,29 @@
   bottom: 0;
   display: flex;
   gap: 8px;
-  justify-content: flex-end; /* 저장 오른쪽에 닫기 버튼이 나란히 보이도록 우측 정렬 */
+  justify-content: flex-end;
   padding: 10px 0 0 0;
   background: linear-gradient(0deg, #fff 70%, rgba(255,255,255,0));
   border-top: 1px solid #e5e7eb;
 }
 
 /* ====== 추가: 내부 스크롤 제거 & 상/하단 고정 유틸 ====== */
-/* 출금보류: 안쪽 스크롤 끄기 → 바깥(.xp-modal-body)만 스크롤 */
 .no-inner-scroll {
   max-height: none !important;
   overflow: visible !important;
 }
 
-/* 상단 툴바 고정(모달 바디 스크롤 기준) */
 .sticky-top {
   position: sticky;
   top: 0;
   z-index: 4;
   background: linear-gradient(180deg, #ffffff 80%, rgba(255,255,255,0));
   padding-top: 4px;
-  margin-top: -4px; /* 상단 경계 자연스럽게 */
+  margin-top: -4px;
   border-bottom: 1px solid #e5e7eb;
   backdrop-filter: blur(4px);
 }
 
-/* 하단 버튼바 고정(모달 바디 스크롤 기준) */
 .sticky-bottom {
   position: sticky;
   bottom: 0;
@@ -402,6 +396,3 @@
   background: linear-gradient(0deg, #ffffff 80%, rgba(255,255,255,0));
   backdrop-filter: blur(4px);
 }
-
-/* 출금보류 모달의 X 아이콘 비활성(예비 안전장치: JSX에서 showCloseX=false로 처리됨) */
-/* .xp-modal:has(.hold-wrap) .xp-modal-close { display:none; } */

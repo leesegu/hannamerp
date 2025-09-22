@@ -3,7 +3,6 @@ import React, {
   useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle,
 } from "react";
 import "./ExpensePage.css";
-import * as XLSX from "xlsx";
 
 // Firestore는 '분류/거래처' 조회 용도로만 사용 (저장은 Storage JSON)
 import { db } from "../firebase";
@@ -507,7 +506,6 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
       </div>
 
       <div className="hold-table-wrap">
-        {/* ✅ 안쪽 스크롤 제거용 클래스 유지(no-inner-scroll) → CSS에서 overflow 제거 */}
         <div className="hold-viewport no-inner-scroll">
           <table className="hold-table">
             <thead>
@@ -648,104 +646,6 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
   );
 }
 
-/* ===== Excel 날짜 유틸 ===== */
-const EXCEL_EPS = 1e-7;
-function excelSerialToLocalDate(val, date1904 = false) {
-  if (typeof val !== "number" || !Number.isFinite(val)) return null;
-  let serial = val;
-  if (Math.abs(serial - Math.round(serial)) < EXCEL_EPS) serial = Math.round(serial);
-  const o = XLSX.SSF.parse_date_code(serial, { date1904 });
-  if (!o) return null;
-  return new Date(o.y, (o.m || 1) - 1, o.d || 1, o.H || 0, o.M || 0, Math.floor(o.S || 0));
-}
-function fmtDateLocal(d) {
-  if (!(d instanceof Date) || isNaN(d)) return "";
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth() + 1);
-  const dd = pad2(d.getDate());
-  return `${y}-${m}-${dd}`;
-}
-function normalizeExcelDateCell(cell, date1904 = false) {
-  if (cell == null || cell === "") return "";
-  if (typeof cell === "number") {
-    const d = excelSerialToLocalDate(cell, date1904);
-    return d ? fmtDateLocal(d) : "";
-  }
-  if (cell instanceof Date && !isNaN(cell)) return fmtDateLocal(cell);
-  const raw = s(cell);
-  if (!raw) return "";
-  const norm = raw.replace(/[.]/g, "-").replace(/\//g, "-").trim();
-  const m = norm.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!m) return "";
-  const d = new Date(+m[1], +m[2] - 1, +m[3]);
-  return isNaN(d) ? "" : fmtDateLocal(d);
-}
-
-/** ====== 엑셀 파서 ====== */
-const headerIndex = (header, names) => {
-  const idx = names
-    .flatMap((nm) => [nm, ...nm.split("|")])
-    .map((nm) => header.findIndex((h) => s(h).includes(nm)))
-    .find((i) => i >= 0);
-  return typeof idx === "number" ? idx : -1;
-};
-function parseExpenseSheet(ws, is1904 = false) {
-  const aoo = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
-  if (!aoo.length) return { headerRow: -1, rows: [] };
-
-  // 헤더 탐색
-  let headerRow = -1;
-  for (let i = 0; i < Math.min(aoo.length, 50); i++) {
-    const row = (aoo[i] || []).map(s);
-    const hasDate = row.some((c) => /지출일자|일자/.test(c));
-    const hasAmt = row.some((c) => /금액|지출금액/.test(c));
-    if (hasDate && hasAmt) {
-      headerRow = i;
-      break;
-    }
-  }
-  if (headerRow < 0) return { headerRow: -1, rows: [] };
-  const header = (aoo[headerRow] || []).map(s);
-
-  const col = {
-    date: headerIndex(header, ["지출일자|일자"]),
-    main: headerIndex(header, ["대분류"]),
-    sub: headerIndex(header, ["소분류"]),
-    desc: headerIndex(header, ["내용"]),
-    amount: headerIndex(header, ["금액|지출금액"]),
-    inAcc: headerIndex(header, ["입금 계좌번호|입금계좌|입금계좌번호"]),
-    out: headerIndex(header, ["출금계좌|출금방법"]),
-    paid: headerIndex(header, ["출금확인"]),
-    note: headerIndex(header, ["비고"]),
-  };
-
-  const out = [];
-  let lastYmd = "";
-  for (let r = headerRow + 1; r < aoo.length; r++) {
-    const row = aoo[r] || [];
-    const any = row.some((c) => s(c) !== "");
-    if (!any) continue;
-
-    let ymd = normalizeExcelDateCell(row[col.date], is1904);
-    if (!ymd) ymd = lastYmd;
-    if (ymd) lastYmd = ymd;
-
-    const amount = fmtComma(row[col.amount]);
-    out.push({
-      date: ymd,
-      mainName: s(row[col.main]),
-      subName: s(row[col.sub]),
-      desc: s(row[col.desc]),
-      amount,
-      inAccount: s(row[col.inAcc]),
-      outMethod: s(row[col.out]),
-      paid: s(row[col.paid]),
-      note: s(row[col.note]),
-    });
-  }
-  return { headerRow, rows: out };
-}
-
 /** ====== 메인 컴포넌트 ====== */
 export default function ExpensePage() {
   const [date, setDate] = useState(() => {
@@ -759,7 +659,6 @@ export default function ExpensePage() {
     return todayYMD();
   });
   const [dateModalOpen, setDateModalOpen] = useState(false);
-  const [loadModalOpen, setLoadModalOpen] = useState(false);
 
   const [rows, setRows] = useState(() => {
     try {
@@ -771,10 +670,6 @@ export default function ExpensePage() {
     } catch {}
     return Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
   });
-
-  // ✅ "불러오기를 한 상태" 여부 및 불러온 기준 날짜
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [loadedDate, setLoadedDate] = useState(""); // 불러오기 성공 시 설정
 
   // 분류/결제수단/거래처 로드 전용
   const [mainCats, setMainCats] = useState([]);
@@ -797,11 +692,14 @@ export default function ExpensePage() {
     openers.current[i] = obj;
   };
 
-  const fileInputRef = useRef(null);
-  const onPickFiles = () => fileInputRef.current?.click();
-  const handleFiles = async (fileList) => {
-    /* 기존 그대로 (엑셀 업로드 파이프라인이 있다면 여기에) */
-  };
+  // === 불러오기 중/초기화 여부 플래그(자동저장 억제용) ===
+  const loadingRef = useRef(false);
+  const initialMountRef = useRef(true);
+  // 자동저장 디바운스 타이머
+  const saveTimer = useRef(null);
+  // 마지막으로 성공 저장한 스냅샷(쓸데없는 다시쓰기 방지)
+  const lastSavedKeyRef = useRef("");
+  const lastSavedHashRef = useRef("");
 
   // 분류/결제수단/거래처 로드
   useEffect(() => {
@@ -895,45 +793,17 @@ export default function ExpensePage() {
     persistLocal(date, rows);
   }, [date]);
 
-  const onRefresh = () => {
-    const ok = window.confirm("새로고침하면 현재 지출 입력 내용이 모두 삭제됩니다. 계속할까요?");
-    if (!ok) return;
-    const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
-    setRows(init);
-    persistLocal(date, init);
-    setIsLoaded(false);
-    setLoadedDate("");
-  };
-
-  /** ===== 저장 정책 =====
-   * - 해당 날짜에 기존 저장본이 없는 경우: 자유 저장 가능
-   * - 해당 날짜에 기존 저장본이 있는 경우: 반드시 '불러오기'를 먼저 해서 isLoaded=true && loadedDate===date 인 상태에서만 저장 가능
-   * - 저장은 해당 날짜의 내용을 '덮어쓰기(Overwrite)' 하므로, 중복 불가/미병합 보장
+  /** ===== 저장(자동) =====
+   * - 현재 date 기준 rows를 항상 덮어쓰기(Overwrite) 저장
+   * - 빈 내용/유효하지 않은 행 필터링
    */
-  const saveToStorage = async (theDate, theRows) => {
+  async function saveToStorageAuto(theDate, theRows) {
+    if (loadingRef.current) return false; // 불러오는 중에는 저장 금지(루프 방지)
     const ymd = theDate;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
-      alert("유효한 날짜가 아닙니다.");
-      return false;
-    }
-
-    const mk = ymdToMonthKey(ymd);
-    const cur = await readMonthJSON(mk);
-    const existed = !!(cur?.days?.[ymd]?.rows?.length > 0);
-
-    // 기존 저장본이 있을 때: 반드시 불러오기 상태에서만 저장 가능
-    if (existed) {
-      if (!isLoaded || loadedDate !== ymd) {
-        alert(
-          "같은 지출일자에 저장된 내용이 있습니다.\n" +
-          "해당 내용을 수정/추가/삭제하려면 먼저 '불러오기'로 그 날짜를 불러온 뒤 저장해 주세요."
-        );
-        return false;
-      }
-    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
 
     // 저장할 데이터 정리
-    const nowFull = (theRows || [])
+    const full = (theRows || [])
       .map((r) => ({ ...r, amount: toNumber(r.amount) }))
       .filter(
         (r) =>
@@ -947,50 +817,68 @@ export default function ExpensePage() {
           r.paid ||
           r.note
       );
-    const nowValid = nowFull.map(normalizeRow).filter(isValidForSave);
-    if (nowValid.length === 0) {
-      alert("저장할 유효한 행이 없습니다.");
-      return false;
+    const valid = full.map(normalizeRow).filter(isValidForSave);
+
+    // 스냅샷 해시 계산(간단)
+    const key = ymd;
+    const hash = JSON.stringify(valid);
+    if (lastSavedKeyRef.current === key && lastSavedHashRef.current === hash) {
+      return false; // 동일 상태면 스킵
     }
 
-    // 번호 재부여 + 합계
-    const renumbered = nowValid.map((r, i) => ({ ...r, no: i + 1 }));
+    const renumbered = valid.map((r, i) => ({ ...r, no: i + 1 }));
     const newTotal = renumbered.reduce((acc, r) => acc + toNumber(r.amount), 0);
 
-    // ✅ 덮어쓰기(Overwrite)로 중복/병합 문제 방지
+    const mk = ymdToMonthKey(ymd);
+    const cur = await readMonthJSON(mk);
     const days = cur.days || {};
     days[ymd] = { rows: renumbered, total: newTotal, updatedAt: Date.now() };
-
     await writeMonthJSON(mk, { meta: { updatedAt: Date.now() }, days });
+
+    lastSavedKeyRef.current = key;
+    lastSavedHashRef.current = hash;
     return true;
-  };
+  }
 
-  const onSave = async () => {
+  // ✅ rows 변경 시 자동 저장(디바운스)
+  useEffect(() => {
+    if (initialMountRef.current) return; // 초기 마운트 직후의 rows 세팅은 저장하지 않음
+    if (loadingRef.current) return; // 불러오기 중엔 저장 금지
+
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveToStorageAuto(date, rows);
+    }, 600); // 0.6s 디바운스
+
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, date]);
+
+  // ✅ 날짜 전환/선택 시: 현재 내용을 먼저 자동 저장 → 새 날짜 데이터 자동 불러오기
+  const switchDate = async (targetYMD) => {
     try {
-      const changed = await saveToStorage(date, rows);
-      if (!changed) return;
-      alert("저장되었습니다.");
-
-      // 저장 후에도 계속 편집하실 수 있지만, 초기화가 필요하면 아래 유지
-      const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
-      setRows(init);
-      persistLocal(date, init);
-      setIsLoaded(false);
-      setLoadedDate("");
-    } catch (err) {
-      console.error(err);
-      alert("저장 중 오류가 발생했습니다.");
+      // 1) 현재 date의 변경 내용을 먼저 저장(있으면)
+      if (hasAnyContent(rows)) {
+        await saveToStorageAuto(date, rows);
+      }
+      // 2) 새 날짜로 전환 + 자동 불러오기
+      await performLoadForDate(targetYMD, { setDateAfter: true });
+    } catch (e) {
+      console.error(e);
+      alert("날짜 전환 중 오류가 발생했습니다.");
     }
   };
 
-  const performLoadForDate = async (targetYMD) => {
+  const performLoadForDate = async (targetYMD, opts = { setDateAfter: false }) => {
     try {
-      if (hasAnyContent(rows)) {
-        persistLocal(date, rows);
-      }
+      loadingRef.current = true;
       const mk = ymdToMonthKey(targetYMD);
       const { days } = await readMonthJSON(mk);
       const pack = days[targetYMD];
+
+      if (opts.setDateAfter) setDate(targetYMD);
 
       if (pack && Array.isArray(pack.rows)) {
         const normalized = pack.rows.map((r, i) => ({
@@ -1006,27 +894,41 @@ export default function ExpensePage() {
             ? [...normalized, ...Array.from({ length: pad }, (_, k) => makeEmptyRow(normalized.length + k))]
             : normalized;
 
-        setDate(targetYMD);
         setRows(padded);
         persistLocal(targetYMD, padded);
-        setIsLoaded(true);
-        setLoadedDate(targetYMD); // ✅ 불러온 날짜 기록
-        alert("불러오기가 완료되었습니다.");
       } else {
-        const keys = Object.keys(days || {}).sort();
-        alert(
-          `선택한 날짜(${targetYMD})에는 저장된 지출 데이터가 없습니다.\n` +
-            (keys.length ? `이 월에 저장된 날짜: ${keys.join(", ")}` : "이 월의 저장된 날짜도 없습니다.")
-        );
-        setIsLoaded(false);
-        setLoadedDate("");
+        // 해당 날짜 저장본 없음 → 빈 양식 준비
+        const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+        setRows(init);
+        persistLocal(targetYMD, init);
       }
     } catch (e) {
       console.error(e);
       alert("불러오기 중 오류가 발생했습니다.");
-      setIsLoaded(false);
-      setLoadedDate("");
+      // 실패 시에도 최소한 비어있는 양식 제공
+      const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
+      if (opts.setDateAfter) setDate(targetYMD);
+      setRows(init);
+      persistLocal(targetYMD, init);
+    } finally {
+      loadingRef.current = false;
+      initialMountRef.current = false;
     }
+  };
+
+  // ⏱ 초기 마운트 시: 현재 date 기준 자동 불러오기
+  useEffect(() => {
+    performLoadForDate(date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 새로고침: 확인 → 입력 내용 초기화 + 오늘 날짜로 전환(+ 자동 불러오기)
+  const onRefresh = async () => {
+    const ok = window.confirm("새로고침하면 현재 지출 입력 내용이 모두 삭제되고 오늘 날짜로 이동합니다. 계속할까요?");
+    if (!ok) return;
+    const today = todayYMD();
+    initialMountRef.current = true; // 초기화 성격 → 첫 저장 억제
+    await performLoadForDate(today, { setDateAfter: true });
   };
 
   const openNextRowMain = (i) => {
@@ -1064,44 +966,14 @@ export default function ExpensePage() {
       {/* 상단 바 */}
       <div className="xp-top slim fancy">
         <div className="xp-actions">
-          <button className="xp-btn xp-excel small pad-s" onClick={onPickFiles} title="엑셀 업로드">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ marginRight: 6 }}>
-              <rect x="3" y="3" width="18" height="18" rx="2.5" fill="#1F6F43" />
-              <path
-                d="M8.5 8.5l2.5 3-2.5 3M12.5 8.5l-2.5 3 2.5 3"
-                stroke="#fff"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <rect x="13.5" y="5" width="6" height="14" fill="#2EA06B" />
-            </svg>
-            엑셀 업로드
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            multiple
-            style={{ display: "none" }}
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
-          />
+          {/* ⛔ 엑셀 업로드 UI/코드 제거됨 */}
+          {/* ⛔ 저장/불러오기 버튼 제거됨 */}
 
           <button className="xp-btn xp-refresh small pad-s" onClick={onRefresh} title="새로고침">
             <i className="ri-refresh-line" /> 새로고침
           </button>
-          <button className="xp-btn xp-load small pad-s" onClick={() => setLoadModalOpen(true)} title="불러오기">
-            <i className="ri-download-2-line" /> 불러오기
-          </button>
           <button className="xp-btn xp-hold small pad-s" onClick={() => setHoldOpen(true)} title="출금보류">
             <i className="ri-pause-circle-line" /> 출금보류
-          </button>
-          <button
-            className="xp-btn xp-save small pad-s"
-            onClick={onSave}
-            title="저장"
-          >
-            <i className="ri-save-3-line" /> 저장
           </button>
           <button
             className={`xp-btn xp-delete small pad-s ${deleteMode ? "on" : ""}`}
@@ -1193,23 +1065,12 @@ export default function ExpensePage() {
       <CalendarModal
         open={dateModalOpen}
         defaultDate={date}
-        titleText="지출일자 날짜선택"
-        onPick={(ymd) => {
-          setDate(ymd);
-          persistLocal(ymd, rows);
-        }}
+        titleText="지출일자 선택"
+        onPick={(ymd) => switchDate(ymd)}
         onClose={() => setDateModalOpen(false)}
-      />
-      <CalendarModal
-        open={loadModalOpen}
-        defaultDate={date}
-        titleText="불러오기 날짜선택"
-        onPick={(ymd) => performLoadForDate(ymd)}
-        onClose={() => setLoadModalOpen(false)}
       />
 
       {/* 출금보류: 드래프트 편집 → 저장 시에만 반영 */}
-      {/* ❌ 상단 X 아이콘 제거(showCloseX=false) */}
       <Modal open={holdOpen} onClose={() => setHoldOpen(false)} title="출금보류" width={960} showCloseX={false}>
         <HoldTable
           initialRows={holdRows}
