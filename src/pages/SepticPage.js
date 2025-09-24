@@ -1,6 +1,6 @@
 // src/pages/SepticPage.js
-import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom"; // ✅ 추가
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom"; // ✅ 유지
 import { db } from "../firebase";
 import {
   collection,
@@ -36,10 +36,10 @@ export default function SepticPage() {
       }));
       setVillas(list);
     });
-
     return () => unsubscribe();
   }, []);
 
+  // ===== 금액 정규화 =====
   const normalizeAmount = (v) => {
     const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
     const n = Number(cleaned);
@@ -54,7 +54,7 @@ export default function SepticPage() {
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
 
-    if (data.septicAmount) {
+    if (data.septicAmount !== undefined) {
       const n = normalizeAmount(data.septicAmount);
       if (n !== undefined) data.septicAmount = n;
       else delete data.septicAmount;
@@ -65,6 +65,7 @@ export default function SepticPage() {
     setSelectedVilla(null);
   };
 
+  // ===== 테이블 컬럼 =====
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -84,11 +85,72 @@ export default function SepticPage() {
     { label: "비고", key: "septicNote" },
   ];
 
+  // ===== 엑셀 필드 =====
   const excelFields = [
     "code", "name", "district", "address",
     "septic", "septicGrate", "septicDate",
     "septicAmount", "septicNote"
   ];
+
+  // ===== 정화조 고유값 → 필터 버튼 (좌측 상단, 검색창과 같은 행) =====
+  const septicOptions = useMemo(() => {
+    const set = new Set(
+      villas.map((v) => (v.septic ?? "").trim()).filter(Boolean)
+    );
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [villas]);
+
+  const [septicFilter, setSepticFilter] = useState(""); // "" = 전체
+
+  const filteredVillas = useMemo(() => {
+    return villas.filter((v) => {
+      const s = (v.septic ?? "").trim();
+      return septicFilter ? s === septicFilter : true;
+    });
+  }, [villas, septicFilter]);
+
+  // 옵션 변화로 선택 값이 사라지면 초기화
+  useEffect(() => {
+    if (septicFilter && !septicOptions.includes(septicFilter)) {
+      setSepticFilter("");
+    }
+  }, [septicOptions, septicFilter]);
+
+  // 좌측 컨트롤(버튼들)
+  const btn = {
+    padding: "8px 12px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+    background: "#fff",
+    cursor: "pointer",
+    fontSize: 13,
+    lineHeight: 1.1,
+  };
+  const btnActive = { ...btn, background: "#7B5CFF", color: "#fff", borderColor: "#6a4cf0" };
+
+  const leftControls = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={() => setSepticFilter("")}
+        style={septicFilter === "" ? btnActive : btn}
+        title="전체"
+      >
+        전체
+      </button>
+      {septicOptions.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setSepticFilter(opt)}
+          style={septicFilter === opt ? btnActive : btn}
+          title={`${opt}만 보기`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="page-wrapper">
@@ -96,7 +158,7 @@ export default function SepticPage() {
 
       <DataTable
         columns={columns}
-        data={villas}
+        data={filteredVillas}
         onEdit={handleEdit}
         sortKey="code"
         sortOrder="asc"
@@ -106,6 +168,8 @@ export default function SepticPage() {
         /** ✅ 포커스 적용 */
         focusId={focusVilla}
         rowIdKey="id"
+        /** ✅ 검색창과 같은 행(좌측)에 필터 버튼 배치 */
+        leftControls={leftControls}
       />
 
       <GenericEditModal

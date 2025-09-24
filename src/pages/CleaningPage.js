@@ -1,5 +1,5 @@
 // src/pages/CleaningPage.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import { collection, query, where, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import DataTable from "../components/DataTable";
@@ -11,9 +11,10 @@ export default function CleaningPage() {
   const [selectedVilla, setSelectedVilla] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // 목록 구독: cleaning 값이 있는 문서만
   useEffect(() => {
-    const q = query(collection(db, "villas"), where("cleaning", "!=", ""));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qy = query(collection(db, "villas"), where("cleaning", "!=", ""));
+    const unsubscribe = onSnapshot(qy, (snapshot) => {
       const list = snapshot.docs.map((d) => {
         const data = d.data();
         return {
@@ -25,22 +26,21 @@ export default function CleaningPage() {
           cleaning: data.cleaning || "",
           cleaningDay: data.cleaningDay || "",
           cleaningWeek: data.cleaningWeek || "",
-          cleaningAmount: data.cleaningAmount || "",
+          cleaningAmount: data.cleaningAmount ?? "",
           cleaningNote: data.cleaningNote || "",
         };
       });
       setVillas(list);
     });
-
     return () => unsubscribe();
   }, []);
 
+  // 금액 포맷/정규화
   const formatAmount = (v) => {
     if (v === null || v === undefined || v === "") return "-";
     const n = Number(String(v).replace(/[^\d.-]/g, ""));
     return isNaN(n) ? "-" : n.toLocaleString();
   };
-
   const normalizeAmount = (v) => {
     const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
     const n = Number(cleaned);
@@ -54,18 +54,41 @@ export default function CleaningPage() {
 
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
-
-    if (data.cleaningAmount) {
+    if (data.cleaningAmount !== undefined) {
       const n = normalizeAmount(data.cleaningAmount);
       if (n !== undefined) data.cleaningAmount = n;
       else delete data.cleaningAmount;
     }
-
     await updateDoc(doc(db, "villas", id), data);
     setIsModalOpen(false);
     setSelectedVilla(null);
   };
 
+  // ========= 필터: cleaning 고유값으로 버튼 =========
+  const cleaningOptions = useMemo(() => {
+    const set = new Set(
+      villas.map((v) => (v.cleaning ?? "").trim()).filter(Boolean)
+    );
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [villas]);
+
+  const [cleaningFilter, setCleaningFilter] = useState(""); // ""=전체
+
+  const filteredVillas = useMemo(() => {
+    return villas.filter((v) => {
+      const c = (v.cleaning ?? "").trim();
+      return cleaningFilter ? c === cleaningFilter : true;
+    });
+  }, [villas, cleaningFilter]);
+
+  // 선택된 필터가 옵션에서 사라지면 초기화(데이터 변동 대비)
+  useEffect(() => {
+    if (cleaningFilter && !cleaningOptions.includes(cleaningFilter)) {
+      setCleaningFilter("");
+    }
+  }, [cleaningOptions, cleaningFilter]);
+
+  // 테이블 컬럼
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -82,6 +105,7 @@ export default function CleaningPage() {
     { label: "비고", key: "cleaningNote" },
   ];
 
+  // 엑셀 필드
   const excelFields = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -94,13 +118,49 @@ export default function CleaningPage() {
     { label: "비고", key: "cleaningNote" },
   ];
 
+  // ===== 상단 버튼(검색창과 같은 행, 좌측 끝) — 통신사 페이지와 동일한 느낌 =====
+  const btn = {
+    padding: "8px 12px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+    background: "#fff",
+    cursor: "pointer",
+    fontSize: 13,
+    lineHeight: 1.1,
+  };
+  const btnActive = { ...btn, background: "#7B5CFF", color: "#fff", borderColor: "#6a4cf0" };
+
+  const leftControls = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={() => setCleaningFilter("")}
+        style={cleaningFilter === "" ? btnActive : btn}
+        title="전체"
+      >
+        전체
+      </button>
+      {cleaningOptions.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setCleaningFilter(opt)}
+          style={cleaningFilter === opt ? btnActive : btn}
+          title={`${opt}만 보기`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="page-wrapper">
       <PageTitle>건물청소 정보</PageTitle>
 
       <DataTable
         columns={columns}
-        data={villas}
+        data={filteredVillas}
         onEdit={handleEdit}
         enableExcel={true}
         excelFields={excelFields}
@@ -108,6 +168,8 @@ export default function CleaningPage() {
           "code", "name", "district", "address",
           "cleaning", "cleaningDay", "cleaningWeek", "cleaningAmount", "cleaningNote"
         ]}
+        /** ⬇️ 검색창과 같은 행의 '좌측' 슬롯에 필터 버튼 배치 */
+        leftControls={leftControls}
       />
 
       <GenericEditModal

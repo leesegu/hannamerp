@@ -25,7 +25,7 @@ const COLORS = ["#2563eb", "#f59e0b", "#10b981", "#6b7280", "#f97316", "#22c55e"
 /* ▶ 패널 전체 높이를 화면보다 살짝 줄이는 오프셋(px) */
 const PANEL_OFFSET_PX = 84;
 
-/* 색상 유틸: HEX → rgba(a) */
+/* 색상 유틸 */
 const hexToRgba = (hex, a = 1) => {
   const h = hex.replace("#", "");
   const bigint = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
@@ -34,8 +34,6 @@ const hexToRgba = (hex, a = 1) => {
   const b = bigint & 255;
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
-
-/* 텍스트 대비를 위한 간단한 밝기 판정 */
 const isLight = (hex) => {
   const h = hex.replace("#", "");
   const bigint = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h, 16);
@@ -51,20 +49,14 @@ export default function MemoPage({ userId }) {
   const [memos, setMemos] = useState([]);
   const [keyword, setKeyword] = useState("");
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({
-    title: "",
-    content: "",
-    color: COLORS[0],
-    pinned: false,
-  });
+  const [form, setForm] = useState({ title: "", content: "", color: COLORS[0], pinned: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // 정렬: pinned 우선 → updatedAt desc
+  // 정렬
   const sortMemos = (arr) =>
     [...arr].sort((a, b) => {
-      if ((b.pinned ? 1 : 0) !== (a.pinned ? 1 : 0))
-        return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+      if ((b.pinned ? 1 : 0) !== (a.pinned ? 1 : 0)) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
       return (b.updatedAt || 0) - (a.updatedAt || 0);
     });
 
@@ -92,24 +84,57 @@ export default function MemoPage({ userId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 외부 스크롤 **강제 차단** (회색 스크롤 제거)
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById("root");
+
+    const prevHtml = { overflowY: html.style.overflowY, scrollbarWidth: html.style.scrollbarWidth };
+    const prevBody = { overflowY: body.style.overflowY };
+    const prevRoot = { overflowY: root?.style.overflowY };
+
+    html.style.overflowY = "hidden";
+    body.style.overflowY = "hidden";
+    if (root) root.style.overflowY = "hidden";
+    // Firefox 전역 스크롤바 숨김
+    html.style.scrollbarWidth = "none";
+
+    // WebKit 전역 숨김용 스타일 주입
+    const STYLE_ID = "memo-no-page-scroll";
+    if (!document.getElementById(STYLE_ID)) {
+      const s = document.createElement("style");
+      s.id = STYLE_ID;
+      s.textContent = `
+        html::-webkit-scrollbar, body::-webkit-scrollbar, #root::-webkit-scrollbar {
+          width: 0 !important; height: 0 !important; background: transparent !important;
+        }
+      `;
+      document.head.appendChild(s);
+    }
+
+    return () => {
+      html.style.overflowY = prevHtml.overflowY;
+      html.style.scrollbarWidth = prevHtml.scrollbarWidth;
+      body.style.overflowY = prevBody.overflowY;
+      if (root) root.style.overflowY = prevRoot?.overflowY || "";
+    };
+  }, []);
+
   // 검색 필터
   const filtered = useMemo(() => {
     const k = s(keyword).toLowerCase();
     if (!k) return memos;
     return memos.filter(
-      (m) =>
-        s(m.title).toLowerCase().includes(k) ||
-        s(m.content).toLowerCase().includes(k)
+      (m) => s(m.title).toLowerCase().includes(k) || s(m.content).toLowerCase().includes(k)
     );
   }, [memos, keyword]);
 
-  // 새 메모
   const newMemo = () => {
     setSelectedId(null);
     setForm({ title: "", content: "", color: COLORS[0], pinned: false });
   };
 
-  // 저장(추가/수정)
   const save = async (e) => {
     e?.preventDefault?.();
     const title = s(form.title);
@@ -154,7 +179,6 @@ export default function MemoPage({ userId }) {
     }
   };
 
-  // 삭제
   const remove = async () => {
     if (!selectedId) return;
     if (!window.confirm("이 메모를 삭제할까요?")) return;
@@ -183,41 +207,44 @@ export default function MemoPage({ userId }) {
     }
   };
 
-  // 전역/스크롤 스타일 (보라색을 더 옅게 조정)
+  // 전역/스크롤 스타일 (보라 thin-scroll 유지 + 외부 스크롤 숨김)
   const InlineStyle = () => (
     <style>{`
-      /* 페이지 자체 스크롤 제거 */
-      html, body, #root { height: 100%; overflow: hidden; }
+      /* 페이지 자체 스크롤 제거 + 바운스 방지 */
+      html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
 
-      /* 얇은 스크롤: 옅은 보라색 계열 */
+      /* 최상단 래퍼에서 바깥 스크롤 완전 차단 */
+      .page-no-scroll { overflow: clip; }
+
+      /* thin-scroll만 보이도록, 그 외 스크롤바는 숨김 */
+      .page-no-scroll :not(.thin-scroll) { scrollbar-width: none; }
+      .page-no-scroll :not(.thin-scroll)::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
+
+      /* 보라색 얇은 스크롤(유지) */
       .thin-scroll {
         scrollbar-width: thin;
-        /* thumb / track */
         scrollbar-color: #a78bfa rgba(167, 139, 250, .18);
       }
       .thin-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
       .thin-scroll::-webkit-scrollbar-track { background: rgba(167,139,250,.18); border-radius: 999px; }
       .thin-scroll::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 999px; }
-      .thin-scroll::-webkit-scrollbar-thumb:hover { background: #8b5cf6; } /* hover도 비교적 옅은 톤 */
+      .thin-scroll::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
 
-      /* 리스트 타일 hover 살짝 들어올림 */
       .lift:hover { transform: translateY(-1px); }
     `}</style>
   );
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
+    <div className="h-screen overflow-hidden flex flex-col page-no-scroll">
       <InlineStyle />
 
       {/* 본문 */}
       <main className="flex-1 overflow-hidden">
         <div className="max-w-[1400px] mx-auto px-4 pt-2 pb-4">
-          {/* 패널 전체 높이 (페이지 스크롤 없음 보장) */}
           <div className="min-h-0" style={{ height: `calc(100vh - ${PANEL_OFFSET_PX}px)` }}>
             <div className="grid grid-cols-[360px,1fr] gap-4 h-full min-h-0">
-              {/* ───────── 좌측: 모든 노트 + 검색 + 리스트 ───────── */}
+              {/* 좌측 패널 */}
               <aside className="h-full min-h-0 bg-white rounded-2xl border border-gray-300 shadow-sm grid grid-rows-[auto,auto,1fr]">
-                {/* 헤더: 제목 + 새 메모 버튼 */}
                 <div className="flex items-center justify-between px-3 py-3 border-b border-gray-300">
                   <div className="text-sm font-semibold">모든 노트</div>
                   <button
@@ -229,7 +256,6 @@ export default function MemoPage({ userId }) {
                   </button>
                 </div>
 
-                {/* 검색창 */}
                 <div className="px-3 py-2 border-b border-gray-300">
                   <input
                     className="w-full h-10 px-3 rounded-lg border border-gray-300 outline-none bg-gray-50 focus:bg-white"
@@ -239,7 +265,6 @@ export default function MemoPage({ userId }) {
                   />
                 </div>
 
-                {/* 리스트: 내부 스크롤 허용 영역 */}
                 <div className="overflow-auto thin-scroll px-3 py-3 min-h-0">
                   {loading && <div className="text-gray-400 text-sm py-6">불러오는 중…</div>}
                   {!loading && filtered.length === 0 && (
@@ -281,17 +306,11 @@ export default function MemoPage({ userId }) {
                                 <div className="text-xs text-gray-700/80">
                                   {fmtDateKR(m.updatedAt || m.createdAt)}
                                 </div>
-                                {/* ▶ 고정 표시는 아이콘으로만 표기 */}
                                 {m.pinned && (
-                                  <i
-                                    className="ri-pushpin-2-fill text-[16px] text-purple-500/80"
-                                    title="고정"
-                                  />
+                                  <i className="ri-pushpin-2-fill text-[16px] text-purple-500/80" title="고정" />
                                 )}
                               </div>
                             </div>
-
-                            {/* 미리보기 텍스트 */}
                             <div className="mt-2 text-xs text-gray-800/80 line-clamp-2">
                               {s(m.content) ? s(m.content) : "내용 없음"}
                             </div>
@@ -303,9 +322,8 @@ export default function MemoPage({ userId }) {
                 </div>
               </aside>
 
-              {/* ───────── 우측: 에디터 ───────── */}
+              {/* 우측 에디터 */}
               <section className="h-full min-h-0 bg-white rounded-2xl border border-gray-300 shadow-sm grid grid-rows-[auto,1fr,auto]">
-                {/* 상단 바 */}
                 <div className="p-4 border-b border-gray-300">
                   <div className="flex items-center gap-3">
                     <input
@@ -322,10 +340,7 @@ export default function MemoPage({ userId }) {
                           type="button"
                           onClick={() => setForm((p) => ({ ...p, color: c }))}
                           className="w-6 h-6 rounded-full border border-gray-300"
-                          style={{
-                            background: c,
-                            boxShadow: form.color === c ? "0 0 0 2px rgba(99,102,241,.4)" : "none",
-                          }}
+                          style={{ background: c, boxShadow: form.color === c ? "0 0 0 2px rgba(99,102,241,.4)" : "none" }}
                           title="노트 색상"
                         />
                       ))}
@@ -343,7 +358,6 @@ export default function MemoPage({ userId }) {
                   </div>
                 </div>
 
-                {/* 중앙: 내용(여기만 스크롤 허용) */}
                 <div className="p-4 min-h-0 overflow-hidden">
                   <textarea
                     className="w-full h-full overflow-auto thin-scroll px-3 py-2 rounded-lg border border-gray-300 outline-none text-[14px]"
@@ -354,13 +368,9 @@ export default function MemoPage({ userId }) {
                   />
                 </div>
 
-                {/* 하단 버튼바 */}
                 <div className="p-4 border-t border-gray-300 flex justify-end gap-2">
                   {selectedId && (
-                    <button
-                      onClick={remove}
-                      className="h-10 px-4 rounded-lg border border-gray-300 text-red-600 hover:bg-red-50"
-                    >
+                    <button onClick={remove} className="h-10 px-4 rounded-lg border border-gray-300 text-red-600 hover:bg-red-50">
                       삭제
                     </button>
                   )}

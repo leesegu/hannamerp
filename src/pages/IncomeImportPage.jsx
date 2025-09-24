@@ -5,6 +5,9 @@
 // - 소량 엑셀/수동 추가/인라인 수정: 클라가 해당 월 JSON 읽어와 병합 저장
 // - IME(한글) 입력 안정화 + 메모 입력 시 버벅임 개선(메모 드래프트 분리)
 // - ✅ 즉시 커밋(메모/카테고리/미확인) + 드래프트 자동정리
+// - ✅ 삭제모드(행 선택 후 끌 때 확인→삭제)
+// - ✅ 중복 모달에서 체크한 항목만 ‘중복 무시하고 추가’
+// - ✅ 업로드 시 category를 실제 저장(구분 비어도 계좌번호 기반 자동설정)
 // ==================================
 import React, {
   useCallback, useMemo, useRef, useState, useEffect,
@@ -178,6 +181,14 @@ function parseMeta(rows) {
 const makeDupKey = (r) =>
   [r.date, r.time, toNumber(r.inAmt), s(r.record)].join("|");
 
+/* ★ 계좌번호 기반 자동카테고리 */
+function autoCategoryByAccount(accountNoRaw = "") {
+  const acct = s(accountNoRaw).replace(/\s|-/g, "");
+  if (acct.startsWith("356")) return "무통장입금";
+  if (acct.startsWith("352")) return "이사정산";
+  return "";
+}
+
 /* 컬럼 매핑/레코드 변환 */
 function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
   const header = (rows[headerRowIdx] || []).map((h) => s(h));
@@ -252,6 +263,8 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
     const inAmt = col.inAmt >= 0 ? toNumber(row[col.inAmt]) : 0;
     const outAmt = col.outAmt >= 0 ? toNumber(row[col.outAmt]) : 0;
 
+    const baseCategory = s(row[col.category]) || autoCategoryByAccount(meta.accountNo) || "";
+
     out.push({
       _id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       accountNo: s(meta.accountNo),
@@ -264,7 +277,7 @@ function rowsToRecords(rows, headerRowIdx, meta, { date1904 = false } = {}) {
       balance: col.balance >= 0 ? toNumber(row[col.balance]) : 0,
       record: s(row[col.record]) || "",
       memo: s(row[col.memo]) || "",
-      category: s(row[col.category]) || "",
+      category: baseCategory, // ✅ 실제 category 저장
       _seq: s(row[col.seq]) || "",
       type: inAmt > 0 ? "입금" : outAmt > 0 ? "출금" : "",
       unconfirmed: false,
@@ -361,14 +374,6 @@ function Modal({
   );
 }
 
-/* ★ 계좌번호 기반 자동카테고리 */
-function autoCategoryByAccount(accountNoRaw = "") {
-  const acct = s(accountNoRaw).replace(/\s|-/g, "");
-  if (acct.startsWith("356")) return "무통장입금";
-  if (acct.startsWith("352")) return "이사정산";
-  return "";
-}
-
 /* ===== Storage(JSON) 유틸 ===== */
 const storage = getStorage();
 
@@ -442,8 +447,14 @@ export default function IncomeImportPage() {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
 
-  const [dupInfo, setDupInfo] = useState(null);
+  // ==== 삭제모드 ====
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [deleteSel, setDeleteSel] = useState({}); // { [id]: true }
+
   const [dupOpen, setDupOpen] = useState(false);
+  // ✅ 중복 상세 목록 & 선택
+  const [dupList, setDupList] = useState([]); // [{...rowLike}]
+  const [dupChecked, setDupChecked] = useState({}); // { [idx]: true }
 
   const [query, setQuery] = useState("");
   const [onlyIncome, setOnlyIncome] = useState(true);
@@ -486,9 +497,9 @@ export default function IncomeImportPage() {
   const [yFrom, setYFrom] = useState(today.y);
   const [mFrom, setMFrom] = useState(today.m);
   const [dFrom, setDFrom] = useState(today.d);
-  const [yTo, setYTo] = useState(today.y);
-  const [mTo, setMTo] = useState(today.m);
-  const [dTo, setDTo] = useState(today.d);
+  const [yTo,   setYTo]   = useState(today.y);
+  const [mTo,   setMTo]   = useState(today.m);
+  const [dTo,   setDTo]   = useState(today.d);
 
   const clampRange = useCallback((nyF, nmF, ndF, nyT, nmT, ndT) => {
     const start = ymdToDate(nyF, nmF - 1, ndF);
@@ -658,7 +669,6 @@ export default function IncomeImportPage() {
 
     // 2) 월 JSON 캐시 반영 + 저장 예약
     const store = monthsRef.current;
-    // 현재 행(기존값)
     const cur = (rows.find((r) => r._id === id)) || {};
     const mk = monthKeyOf(patch.date || cur.date);
     if (!mk) return;
@@ -703,9 +713,7 @@ export default function IncomeImportPage() {
       });
       return;
     }
-    // 즉시 커밋
     updateRowLocalAndCache(id, { memo: value });
-    // 드래프트 정리
     setMemoDrafts(prev => {
       const { [id]: _omit, ...rest } = prev;
       return rest;
@@ -725,7 +733,7 @@ export default function IncomeImportPage() {
     }
   };
 
-  // ✅ rows 갱신 시, 동일 값이 된 드래프트 자동 정리 (깜빡임/점프 방지)
+  // ✅ rows 갱신 시, 동일 값이 된 드래프트 자동 정리
   useEffect(() => {
     setMemoDrafts((prev) => {
       if (!prev || Object.keys(prev).length === 0) return prev;
@@ -926,10 +934,9 @@ export default function IncomeImportPage() {
         }
       }
 
-      const merged = [];
-      const abKeys = new Set(rows.map((r) => makeDupKey(r)));
-      const dupExamples = new Set();
-      let dupCount = 0;
+      const merged = [];           // 즉시 추가(중복 아님)
+      const dupCandidates = [];    // 중복 목록(모달에서 선택 후 추가)
+      const existedKeys = new Set(rows.map((r) => makeDupKey(r)));
 
       for (const file of files) {
         try {
@@ -947,14 +954,13 @@ export default function IncomeImportPage() {
           const recs = rowsToRecords(aoo, headerRowIdx, meta, { date1904: is1904 });
           for (const r of recs) {
             const key = makeDupKey(r);
-            if (abKeys.has(key)) {
-              dupCount++;
-              if (dupExamples.size < 5)
-                dupExamples.add(`${r.date} ${r.time} | ${r.category || r.type} ${fmtComma(r.inAmt || r.outAmt)} | ${r.record}`);
-              continue;
+            const withMonth = { ...r, monthKey: monthKeyOf(r.date) };
+            if (existedKeys.has(key)) {
+              dupCandidates.push(withMonth);
+            } else {
+              existedKeys.add(key);
+              merged.push(withMonth);
             }
-            abKeys.add(key);
-            merged.push({ ...r, monthKey: monthKeyOf(r.date) });
           }
         } catch (e) {
           console.error(e);
@@ -962,14 +968,7 @@ export default function IncomeImportPage() {
         }
       }
 
-      if (dupCount > 0) {
-        setDupInfo({ count: dupCount, examples: Array.from(dupExamples) });
-        setDupOpen(true);
-      } else {
-        setDupInfo(null);
-        setDupOpen(false);
-      }
-
+      // ✅ 먼저 중복 아님(merged)은 바로 저장
       try {
         const byMonth = merged.reduce((acc, r) => {
           const mk = r.monthKey || monthKeyOf(r.date);
@@ -978,15 +977,13 @@ export default function IncomeImportPage() {
           return acc;
         }, {});
         const monthKeys = Object.keys(byMonth);
-
         await loadMonthsIfNeeded(monthKeys);
-
         const store = monthsRef.current;
         for (const mk of monthKeys) {
           const bucket = store[mk] || { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
           store[mk] = bucket;
           for (const r of byMonth[mk]) {
-            const id = `r_${hash(makeDupKey(r)).toString(16)}`;
+            const id = `r_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
             const next = {
               _id: id,
               date: s(r.date),
@@ -994,7 +991,7 @@ export default function IncomeImportPage() {
               datetime: s(r.datetime || `${s(r.date)} ${s(r.time || "00:00:00")}`),
               accountNo: s(r.accountNo),
               holder: s(r.holder),
-              category: s(r.category || ""),
+              category: s(r.category || autoCategoryByAccount(r.accountNo) || ""), // ✅ 실제 저장
               inAmt: toNumber(r.inAmt),
               outAmt: toNumber(r.outAmt),
               balance: toNumber(r.balance),
@@ -1005,26 +1002,40 @@ export default function IncomeImportPage() {
               unconfirmed: !!r.unconfirmed,
               monthKey: s(r.monthKey || mk),
             };
-            bucket.items[id] = next; // upsert
+            bucket.items[id] = next;
           }
           scheduleMonthSave(mk);
-        }
-
-        rebuildRowsFromCache();
-
-        const last = merged.find((r) => r.date);
-        if (last?.date) {
-          const [yy, mm, dd] = last.date.split("-").map((t) => +t);
-          const [nyF, nmF, ndF, nyT, nmT, ndT] = clampRange(yy, mm, dd, yy, mm, dd);
-          setYFrom(nyF); setMFrom(nmF); setDFrom(ndF);
-          setYTo(nyT);   setMTo(nmT);   setDTo(ndT);
         }
       } catch (e) {
         console.error("소량 업로드 병합/저장 실패:", e);
         setUploadError((prev) => prev + `\n저장 실패: ${e?.message || e}`);
       }
+
+      // ✅ 화면 갱신
+      try {
+        const now = new Date();
+        const yToNow = now.getFullYear(), mToNow = now.getMonth() + 1;
+        const keys = toMonthKeys(yToNow - 1, mToNow, yToNow, mToNow);
+        await loadMonthsIfNeeded(keys);
+        rebuildRowsFromCache();
+      } catch(e) {
+        console.warn("업로드 후 갱신 실패(무시 가능):", e);
+      }
+
+      // ✅ 중복 목록 모달로 띄우기(체크된 것만 ‘중복 무시하고 추가’)
+      if (dupCandidates.length > 0) {
+        const defaultChecked = {};
+        dupCandidates.forEach((_, idx) => { defaultChecked[idx] = true; });
+        setDupList(dupCandidates);
+        setDupChecked(defaultChecked);
+        setDupOpen(true);
+      } else {
+        setDupList([]);
+        setDupChecked({});
+        setDupOpen(false);
+      }
     },
-    [rows, clampRange, loadMonthsIfNeeded, rebuildRowsFromCache, scheduleMonthSave]
+    [rows, loadMonthsIfNeeded, rebuildRowsFromCache, scheduleMonthSave]
   );
 
   /* ===== 수동 추가 ===== */
@@ -1090,6 +1101,123 @@ export default function IncomeImportPage() {
     }
   };
 
+  /* ===== 삭제모드 토글 & 삭제 반영 (비밀번호 확인 추가) ===== */
+  const toggleDeleteMode = async () => {
+    if (!deleteMode) {
+      // 켜기 전 비밀번호 확인
+      const pw = window.prompt("삭제 비밀번호를 입력하세요.");
+      if (pw !== "20453948") {
+        alert("비밀번호가 올바르지 않습니다.");
+        return;
+      }
+      setDeleteSel({});
+      setDeleteMode(true);
+      return;
+    }
+    // 끄기 → 선택건수 확인 후 삭제 여부 묻기
+    const ids = Object.keys(deleteSel).filter((k) => deleteSel[k]);
+    if (ids.length === 0) {
+      setDeleteMode(false);
+      return;
+    }
+    const ok = window.confirm(`선택한 ${ids.length.toLocaleString()}건을 삭제하시겠습니까?`);
+    if (!ok) {
+      // 취소 → 삭제모드 유지
+      return;
+    }
+    // 실제 삭제
+    const store = monthsRef.current;
+    const affectedMonths = new Set();
+    setRows((prev) => prev.filter((r) => !deleteSel[r._id]));
+    for (const mk of Object.keys(store)) {
+      const items = store[mk]?.items || {};
+      let touched = false;
+      for (const id of ids) {
+        if (items[id]) {
+          delete items[id];
+          touched = true;
+        }
+      }
+      if (touched) affectedMonths.add(mk);
+    }
+    affectedMonths.forEach((mk) => scheduleMonthSave(mk));
+    setDeleteSel({});
+    setDeleteMode(false);
+  };
+
+  const setDeleteChecked = (id, checked) => {
+    setDeleteSel((p) => ({ ...p, [id]: !!checked }));
+  };
+
+  // 헤더(구분) 옆 전체선택 체크박스 핸들러 (현재 페이지 대상)
+  const headerToggleSelectAll = (checked) => {
+    setDeleteSel((prev) => {
+      const next = { ...prev };
+      pageRows.forEach((r) => { next[r._id] = checked; });
+      return next;
+    });
+  };
+
+  /* ===== 중복 모달: 체크된 항목만 ‘중복 무시하고 추가’ ===== */
+  const confirmDupAdd = async () => {
+    const selected = dupList.filter((_, idx) => dupChecked[idx]);
+    if (selected.length === 0) {
+      setDupOpen(false);
+      setDupList([]);
+      setDupChecked({});
+      return;
+    }
+    try {
+      const byMonth = selected.reduce((acc, r) => {
+        const mk = r.monthKey || monthKeyOf(r.date);
+        if (!mk) return acc;
+        (acc[mk] ||= []).push(r);
+        return acc;
+      }, {});
+      const monthKeys = Object.keys(byMonth);
+      await loadMonthsIfNeeded(monthKeys);
+      const store = monthsRef.current;
+      for (const mk of monthKeys) {
+        const bucket = store[mk] || { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
+        store[mk] = bucket;
+        for (const r of byMonth[mk]) {
+          const id = `r_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+          const next = {
+            _id: id,
+            date: s(r.date),
+            time: s(r.time || "00:00:00"),
+            datetime: s(r.datetime || `${s(r.date)} ${s(r.time || "00:00:00")}`),
+            accountNo: s(r.accountNo),
+            holder: s(r.holder),
+            category: s(r.category || autoCategoryByAccount(r.accountNo) || ""), // ✅ 실제 저장
+            inAmt: toNumber(r.inAmt),
+            outAmt: toNumber(r.outAmt),
+            balance: toNumber(r.balance),
+            record: trimField(r.record),
+            memo: trimField(r.memo),
+            _seq: s(r._seq || ""),
+            type: r.type || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : ""),
+            unconfirmed: !!r.unconfirmed,
+            monthKey: s(r.monthKey || mk),
+          };
+          bucket.items[id] = next;
+        }
+        scheduleMonthSave(mk);
+      }
+      const now = new Date();
+      const keys = toMonthKeys(now.getFullYear() - 1, now.getMonth() + 1, now.getFullYear(), now.getMonth() + 1);
+      await loadMonthsIfNeeded(keys);
+      rebuildRowsFromCache();
+    } catch (e) {
+      console.error("중복 무시 추가 실패:", e);
+      alert("중복 무시 추가 중 오류가 발생했습니다.");
+    } finally {
+      setDupOpen(false);
+      setDupList([]);
+      setDupChecked({});
+    }
+  };
+
   return (
     <div className="income-page">
       {/* === 툴바 1 === */}
@@ -1118,9 +1246,19 @@ export default function IncomeImportPage() {
           {/* 수동 추가 */}
           <button className="btn add" onClick={openAdd} title="수동으로 항목 추가">추가</button>
 
+          {/* 미확인 */}
           <button className="btn unconf" onClick={() => setUnconfOpen(true)}>
             <span className="ico" aria-hidden>🔎</span>
             <span className="btn-label">미확인</span>
+          </button>
+
+          {/* ✅ 삭제모드 (비밀번호 확인) */}
+          <button
+            className={`btn ${deleteMode ? "danger" : ""}`}
+            onClick={toggleDeleteMode}
+            title="삭제모드: 켜면 구분 칸에 체크박스 표시"
+          >
+            {deleteMode ? "삭제모드 끄기" : "삭제모드"}
           </button>
 
           {/* ✅ 퍼플 토글: 입금만 */}
@@ -1176,7 +1314,20 @@ export default function IncomeImportPage() {
         <table className="dense modern">
           <thead>
             <tr>
-              <th onClick={() => clickSort("category")} className="col-type">구분</th>
+              <th onClick={() => clickSort("category")} className="col-type">
+                구분
+                {/* 삭제모드일 때 전체 선택 체크박스 (현재 페이지 기준) */}
+                {deleteMode && (
+                  <label className="del-all">
+                    <input
+                      type="checkbox"
+                      checked={pageRows.length > 0 && pageRows.every((r) => !!deleteSel[r._id])}
+                      onChange={(e) => headerToggleSelectAll(e.target.checked)}
+                    />
+                    <span className="del-all-lbl">전체</span>
+                  </label>
+                )}
+              </th>
               <th onClick={() => clickSort("accountNo")} className="col-account">계좌번호</th>
               <th onClick={() => clickSort("date")} className="col-date">거래일</th>
               <th onClick={() => clickSort("time")} className="col-time">시간</th>
@@ -1199,38 +1350,50 @@ export default function IncomeImportPage() {
               return (
                 <tr key={r._id}>
                   <td className="center">
-                    {editMode ? (
-                      <div className="category-select-wrap">
-                        <select
-                          className="edit-select type-select pretty-select rich"
-                          style={selectStyle(displayValue)}
-                          value={displayValue}
-                          // ✅ 즉시 커밋
-                          onChange={(e) => updateRowLocalAndCache(r._id, { category: e.target.value })}
+                    <div className="cell-flex">
+                      {/* ✅ 삭제모드 체크박스 (구분 칸 왼쪽) */}
+                      {deleteMode && (
+                        <input
+                          type="checkbox"
+                          className="del-chk"
+                          checked={!!deleteSel[r._id]}
+                          onChange={(e) => setDeleteChecked(r._id, e.target.checked)}
+                        />
+                      )}
+
+                      {/* 구분 표시/수정 */}
+                      {editMode ? (
+                        <div className="category-select-wrap">
+                          <select
+                            className="edit-select type-select pretty-select rich"
+                            style={selectStyle(displayValue)}
+                            value={displayValue}
+                            onChange={(e) => updateRowLocalAndCache(r._id, { category: e.target.value })}
+                          >
+                            {incomeCategories.length === 0 ? (
+                              <option value="">불러오는 중…</option>
+                            ) : (
+                              <>
+                                {!hasDisplayInList && displayValue && (
+                                  <option value={displayValue}>{displayValue}</option>
+                                )}
+                                {incomeCategories.map((name) => (
+                                  <option key={name} value={name}>{name}</option>
+                                ))}
+                              </>
+                            )}
+                          </select>
+                        </div>
+                      ) : (
+                        <span
+                          className={`type-badge ${shownCat ? "cat" : toNumber(r.inAmt) > 0 ? "in" : toNumber(r.outAmt) > 0 ? "out" : ""}`}
+                          title={shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
+                          style={shownCat ? colorVars(shownCat) : undefined}
                         >
-                          {incomeCategories.length === 0 ? (
-                            <option value="">불러오는 중…</option>
-                          ) : (
-                            <>
-                              {!hasDisplayInList && displayValue && (
-                                <option value={displayValue}>{displayValue}</option>
-                              )}
-                              {incomeCategories.map((name) => (
-                                <option key={name} value={name}>{name}</option>
-                              ))}
-                            </>
-                          )}
-                        </select>
-                      </div>
-                    ) : (
-                      <span
-                        className={`type-badge ${shownCat ? "cat" : toNumber(r.inAmt) > 0 ? "in" : toNumber(r.outAmt) > 0 ? "out" : ""}`}
-                        title={shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
-                        style={shownCat ? colorVars(shownCat) : undefined}
-                      >
-                        {shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
-                      </span>
-                    )}
+                          {shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   <td className="mono center">{r.accountNo}</td>
@@ -1251,28 +1414,23 @@ export default function IncomeImportPage() {
                           value={memoValue}
                           onChange={(e) => {
                             const val = e.target.value;
-                            // ✅ rows 갱신 없이 draft만 갱신
                             setMemoDrafts((p) => ({ ...p, [r._id]: val }));
                           }}
                           onCompositionStart={() => { composingRef.current[r._id] = true; }}
-                          // ✅ compositionend 즉시 커밋
                           onCompositionEnd={(e) => {
                             composingRef.current[r._id] = false;
                             const latest = e.currentTarget.value;
                             updateRowLocalAndCache(r._id, { memo: latest });
-                            // draft 비우기
                             setMemoDrafts((p) => {
                               const { [r._id]: _omit, ...rest } = p;
                               return rest;
                             });
                           }}
-                          // ✅ blur 즉시 커밋
                           onBlur={(e) => {
                             if (composingRef.current[r._id]) return;
                             commitMemo(r._id, e.currentTarget.value);
                           }}
                           placeholder=""
-                          // ✅ Enter 즉시 커밋 + 다음 메모로 포커스
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -1312,15 +1470,75 @@ export default function IncomeImportPage() {
         <button className="btn" disabled={curPage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>▶</button>
       </div>
 
-      {/* 중복 안내 */}
-      <Modal open={dupOpen} title="중복 항목 안내" onClose={() => setDupOpen(false)}>
-        {dupInfo && (
+      {/* 중복 안내 (체크형) */}
+      <Modal
+        open={dupOpen}
+        title="중복 항목 안내"
+        mode="confirm"
+        cancelText="닫기"
+        confirmText="체크된 항목만 추가"
+        onClose={() => { setDupOpen(false); }}
+        onConfirm={confirmDupAdd}
+        primaryFirst
+        showClose={false}
+        variant="large"
+      >
+        {dupList.length > 0 ? (
           <>
-            <p>업로드 중 <b>{dupInfo.count.toLocaleString()}</b>건의 중복 항목을 발견하여 추가하지 않았습니다.</p>
-            {dupInfo.examples?.length > 0 && (
-              <ul className="dup-list">{dupInfo.examples.map((t, i) => (<li key={i}>• {t}</li>))}</ul>
-            )}
+            <p>중복으로 판정된 항목이 <b>{dupList.length.toLocaleString()}</b>건 있습니다. 기본으로 체크되어 있으며, <b>체크된 항목만 ‘중복 무시’하고 추가</b>됩니다.</p>
+            <div className="unconf-list">
+              <table className="dense mini">
+                <colgroup>
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "34%" }} />
+                  <col style={{ width: "14%" }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>추가</th>
+                    <th>날짜</th>
+                    <th>시간</th>
+                    <th>구분</th>
+                    <th className="num">입금</th>
+                    <th>거래기록</th>
+                    <th>계좌</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dupList.map((r, idx) => (
+                    <tr key={`dup_${idx}`}>
+                      <td className="center">
+                        <input
+                          type="checkbox"
+                          checked={!!dupChecked[idx]}
+                          onChange={(e) => setDupChecked((p) => ({ ...p, [idx]: e.target.checked }))}
+                        />
+                      </td>
+                      <td className="mono center">{r.date}</td>
+                      <td className="mono center">{r.time}</td>
+                      <td className="center">
+                        <span
+                          className={`type-badge ${s(r.category) ? "cat" : ""}`}
+                          style={s(r.category) ? colorVars(r.category) : undefined}
+                        >
+                          {r.category || autoCategoryByAccount(r.accountNo) || "-"}
+                        </span>
+                      </td>
+                      <td className="num">{fmtComma(r.inAmt)}</td>
+                      <td className="center">{r.record}</td>
+                      <td className="mono center">{r.accountNo}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
+        ) : (
+          <p>중복 항목이 없습니다.</p>
         )}
       </Modal>
 

@@ -4,11 +4,16 @@ import React, {
 } from "react";
 import "./ExpensePage.css";
 
-// Firestore는 '분류/거래처' 조회 용도로만 사용 (저장은 Storage JSON)
 import { db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  doc,
+  onSnapshot,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
-// ✅ Storage(JSON) 사용
 import { getStorage, ref as sRef, uploadBytes, getBytes } from "firebase/storage";
 
 /** ====== 상수/공통 ====== */
@@ -16,8 +21,6 @@ const INITIAL_ROWS = 20;
 const LS_KEY = "ExpensePage:WIP:v1";
 const LS_HOLD_KEY = "ExpensePage:HOLD:v1";
 
-// Storage 폴더/포맷: acct_expense_json/<YYYY-MM>.json
-// { meta:{}, days:{ 'YYYY-MM-DD': { rows:[], total:number, updatedAt:number } } }
 const EXPENSE_BASE = "acct_expense_json";
 const monthPath = (monthKey) => `${EXPENSE_BASE}/${monthKey}.json`;
 const storage = getStorage();
@@ -37,7 +40,7 @@ const todayYMD = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
-const weekdayKo = ["일", "월", "화", "수", "목", "금", "토"];
+const weekdayKo = ["일","월","화","수","목","금","토"];
 const getWeekdayLabel = (ymd) => {
   const d = new Date(ymd);
   if (isNaN(d)) return "";
@@ -113,7 +116,7 @@ const normalizeRow = (r) => ({
 const isValidForSave = (r) => !!(r.mainId || r.mainName) && !!r.subName && !!r.outMethod;
 
 /** ====== 공통 모달 ====== */
-function Modal({ open, onClose, title, children, width = 720, showCloseX = true }) {
+function Modal({ open, onClose, title, children, width = 720, showCloseX = true, className = "" }) {
   if (!open) return null;
   return (
     <div
@@ -122,7 +125,7 @@ function Modal({ open, onClose, title, children, width = 720, showCloseX = true 
         if (e.target.classList.contains("xp-modal-backdrop")) onClose?.();
       }}
     >
-      <div className="xp-modal" style={{ width }}>
+      <div className={`xp-modal ${className}`} style={{ width }}>
         <div className="xp-modal-head">
           <div className="xp-modal-title">{title}</div>
           {showCloseX && (
@@ -451,194 +454,208 @@ const PaidCombo = forwardRef(function PaidCombo({ value, onPick, disabled = fals
   );
 });
 
-/** ====== 출금보류 모달 (드래프트 편집, 저장 시에만 반영) ====== */
+/** =======================================================================
+ *  출금보류 모달
+ *  - Firestore 실시간 동기화(onSnapshot)
+ *  - 입력 변경 시 자동 저장(디바운스)
+ *  - 보내기/삭제 시 즉시 저장
+ *  - 저장 클릭 시 자동 닫기
+ * ======================================================================= */
 function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
-  const [delMode, setDelMode] = useState(false);
-  const [draft, setDraft] = useState(() => (initialRows ? JSON.parse(JSON.stringify(initialRows)) : []));
+  const [draft, setDraft] = useState(() =>
+    initialRows ? JSON.parse(JSON.stringify(initialRows)) : []
+  );
+  const saveTimer = useRef(null);
 
   useEffect(() => {
     setDraft(initialRows ? JSON.parse(JSON.stringify(initialRows)) : []);
   }, [initialRows]);
 
-  const update = (idx, key, val) => {
-    setDraft((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], [key]: key === "amount" ? fmtComma(val) : val };
-      return next;
+  // 자동 저장(디바운스 500ms)
+  useEffect(() => {
+    if (!onSaveDraft) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      onSaveDraft(draft);
+    }, 500);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [draft, onSaveDraft]);
+
+  const cols = [
+    { key: "type",      title: "구분",     width: 60  },
+    { key: "desc",      title: "내용",     width: 240 },
+    { key: "bank",      title: "은행",     width: 80 },
+    { key: "accountNo", title: "계좌번호", width: 240 },
+    { key: "amount",    title: "금액",     width: 80, align: "right", isAmount: true },
+    { key: "note",      title: "비고",     width: 220 },
+    { key: "_send",     title: "보내기",   width: 160,  isAction: true },
+  ];
+
+  const tableRef = useRef(null);
+
+  const addNRows = () => {
+    const n = 10;
+    setDraft((prev) => [
+      ...prev,
+      ...Array.from({ length: n }, () => ({
+        type: "", desc: "", bank: "", accountNo: "", amount: "", note: "",
+      })),
+    ]);
+    requestAnimationFrame(() => {
+      const lastRow = (draft?.length ?? 0) + n - 1;
+      const el = tableRef.current?.querySelector(
+        `.hg-cell[data-row="${lastRow}"][data-col="0"] input`
+      );
+      el?.focus();
     });
   };
 
-  const add = () =>
-    setDraft((prev) => [...prev, { type: "", desc: "", bank: "", accountNo: "", amount: "", note: "" }]);
-
-  const removeRow = (idx) => setDraft((prev) => prev.filter((_, i) => i !== idx));
-
-  const onEnterNext = (e) => {
-    if (e.key !== "Enter") return;
-    const r = Number(e.currentTarget.getAttribute("data-row"));
-    const c = Number(e.currentTarget.getAttribute("data-col"));
-    const nextCol = Math.min(c + 1, 5);
-    const nextSel = document.querySelector(`input[data-row="${r}"][data-col="${nextCol}"]`);
-    if (nextSel) nextSel.focus();
+  const deleteRow = (idx) => {
+    const next = draft.filter((_, i) => i !== idx);
+    setDraft(next);
+    onSaveDraft?.(next); // 즉시 저장
   };
 
   const sendRow = (idx) => {
     const row = draft[idx];
     if (!row) return;
     onSendRow?.(row);
-    removeRow(idx);
+    const next = draft.filter((_, i) => i !== idx);
+    setDraft(next);
+    onSaveDraft?.(next); // 즉시 저장
+  };
+
+  const setCell = (r, c, val) => {
+    setDraft((prev) => {
+      const next = [...prev];
+      const row = { ...next[r] };
+      const key = cols[c].key;
+      row[key] = cols[c].isAmount ? fmtComma(val) : val;
+      next[r] = row;
+      return next;
+    });
+  };
+
+  const onKey = (e) => {
+    if (e.key !== "Enter") return;
+    const cur = e.currentTarget;
+    const r = Number(cur.getAttribute("data-row"));
+    const c = Number(cur.getAttribute("data-col"));
+    const colsCount = cols.length;
+    let nc = c + 1;
+    while (nc < colsCount && cols[nc]?.isAction) nc++;
+    let nr = r;
+    if (nc >= colsCount) {
+      nr = r + 1;
+      nc = 0;
+      while (nc < colsCount && cols[nc]?.isAction) nc++;
+    }
+    const nxt = tableRef.current?.querySelector(
+      `.hg-cell[data-row="${nr}"][data-col="${nc}"] input`
+    );
+    if (nxt) nxt.focus();
+    else addNRows(); // 마지막이면 +10
   };
 
   return (
-    <div className="hold-wrap">
-      {/* ✅ 상단 툴바 고정 */}
-      <div className="hold-toolbar sticky-top">
-        <button className="hold-btn add" onClick={add} title="행 추가">
-          <i className="ri-add-line" /> 행추가
-        </button>
-        <button
-          className={`hold-btn delete ${delMode ? "on" : ""}`}
-          onClick={() => setDelMode((v) => !v)}
-          title="삭제 모드"
-        >
-          <i className="ri-delete-bin-6-line" /> {delMode ? "삭제모드 해제" : "삭제"}
-        </button>
-      </div>
-
-      <div className="hold-table-wrap">
-        <div className="hold-viewport no-inner-scroll">
-          <table className="hold-table">
-            <thead>
-              <tr>
-                <th className="w-80">구분</th>
-                <th className="w-260">내용</th>
-                <th className="w-100">은행</th>
-                <th className="w-180">계좌번호</th>
-                <th className="w-110">금액</th>
-                <th className="w-320">비고</th>
-                <th className="w-90">보내기</th>
-              </tr>
-            </thead>
-            <tbody>
-              {draft.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>
-                    행이 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                draft.map((r, i) => (
-                  <tr key={i}>
-                    <td style={{ position: "relative" }}>
-                      {delMode && (
-                        <button
-                          type="button"
-                          className="hold-del-row-btn"
-                          onClick={() => removeRow(i)}
-                          title="이 줄 삭제"
-                        >
-                          삭제
-                        </button>
-                      )}
-                      <input
-                        className="xp-input"
-                        data-row={i}
-                        data-col={0}
-                        value={r.type || ""}
-                        onChange={(e) => update(i, "type", e.target.value)}
-                        onKeyDown={onEnterNext}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="xp-input"
-                        data-row={i}
-                        data-col={1}
-                        value={r.desc || ""}
-                        onChange={(e) => update(i, "desc", e.target.value)}
-                        onKeyDown={onEnterNext}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="xp-input"
-                        data-row={i}
-                        data-col={2}
-                        value={r.bank || ""}
-                        onChange={(e) => update(i, "bank", e.target.value)}
-                        onKeyDown={onEnterNext}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="xp-input"
-                        data-row={i}
-                        data-col={3}
-                        value={r.accountNo || ""}
-                        onChange={(e) => update(i, "accountNo", e.target.value)}
-                        onKeyDown={onEnterNext}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="xp-input xp-amt"
-                        data-row={i}
-                        data-col={4}
-                        value={r.amount || ""}
-                        onChange={(e) => update(i, "amount", e.target.value)}
-                        onKeyDown={onEnterNext}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="xp-input"
-                        data-row={i}
-                        data-col={5}
-                        value={r.note || ""}
-                        onChange={(e) => update(i, "note", e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const nxt = document.querySelector(
-                              `input[data-row="${i + 1}"][data-col="0"]`
-                            );
-                            if (nxt) nxt.focus();
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="send-cell">
-                      <button
-                        className="hold-btn send"
-                        onClick={() => sendRow(i)}
-                        title="지출정리로 보내기"
-                      >
-                        보내기
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+    <div className="hold-new">
+      <div className="hg-toolbar">
+        <div className="hg-left">
+          <button className="hg-btn add" onClick={addNRows} title="10행 추가">
+            <i className="ri-add-line" /> 행추가 (+10)
+          </button>
         </div>
+        <div className="hg-right"></div>
       </div>
 
-      {/* ✅ 하단 저장/닫기 바 고정 */}
-      <div className="hold-footer sticky-bottom">
+      <div className="hg-wrap" ref={tableRef}>
+        <table className="hg-table" style={{ width: 1200 }}>
+          <thead>
+            <tr>
+              {cols.map((col) => (
+                <th key={col.key} style={{ width: col.width }}>{col.title}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {draft.length === 0 ? (
+              <tr>
+                <td colSpan={cols.length} className="hg-empty">
+                  출금보류 내역이 없습니다.
+                </td>
+              </tr>
+            ) : (
+              draft.map((row, rIdx) => (
+                <tr key={rIdx}>
+                  {cols.map((col, cIdx) => {
+                    if (col.isAction) {
+                      return (
+                        <td key={col.key} className="hg-cell action">
+                          <div className="hg-actions">
+                            <button
+                              className="hg-btn send mini"
+                              onClick={() => sendRow(rIdx)}
+                            >
+                              보내기
+                            </button>
+                            <button
+                              className="hg-icon del mini"
+                              title="행 삭제"
+                              onClick={() => deleteRow(rIdx)}
+                            >
+                              <i className="ri-delete-bin-6-line" />
+                            </button>
+                          </div>
+                        </td>
+                      );
+                    }
+                    return (
+                      <td
+                        key={col.key}
+                        className={`hg-cell ${col.align === "right" ? "ta-right" : ""}`}
+                        data-row={rIdx}
+                        data-col={cIdx}
+                      >
+                        <input
+                          className={`hg-input ${col.isAmount ? "amt" : ""}`}
+                          value={col.isAmount ? (row[col.key] || "") : (row[col.key] ?? "")}
+                          onChange={(e) => setCell(rIdx, cIdx, e.target.value)}
+                          onKeyDown={onKey}
+                          data-row={rIdx}
+                          data-col={cIdx}
+                          placeholder=""
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 하단 버튼: 저장 오른쪽에 닫기 버튼, 저장 후 자동 닫기 */}
+      <div className="hg-footer">
         <button
-          className="hold-btn save"
-          onClick={() => {
+          className="hg-btn save"
+          onClick={async () => {
             try {
-              onSaveDraft?.(draft);
-              alert("출금보류 목록이 저장되었습니다.");
-            } catch {
+              await onSaveDraft?.(draft);
+              // alert("출금보류 내역이 저장되었습니다."); // 필요 시 주석 해제
+              onClose?.(); // ✅ 저장 성공 시 자동 닫기
+            } catch (e) {
+              console.error(e);
               alert("출금보류 저장 중 오류가 발생했습니다.");
             }
           }}
+          title="저장"
         >
           <i className="ri-save-3-line" /> 저장
         </button>
-        <button className="hold-btn close" onClick={onClose}>
+        <button className="hg-btn close" onClick={onClose} title="닫기">
           <i className="ri-close-line" /> 닫기
         </button>
       </div>
@@ -676,7 +693,7 @@ export default function ExpensePage() {
   const [payMethods, setPayMethods] = useState([]);
   const [vendors, setVendors] = useState([]);
 
-  // 출금보류 저장본(저장 버튼으로만 반영)
+  // 출금보류 저장본
   const [holdOpen, setHoldOpen] = useState(false);
   const [holdRows, setHoldRows] = useState(() => {
     try {
@@ -685,6 +702,24 @@ export default function ExpensePage() {
     } catch {}
     return [];
   });
+
+  // ✅ Firestore 실시간 구독: acct_expense_hold/current
+  useEffect(() => {
+    const ref = doc(db, "acct_expense_hold", "current");
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.data();
+        const rows = Array.isArray(data?.rows) ? data.rows : [];
+        setHoldRows(rows);
+        try { localStorage.setItem(LS_HOLD_KEY, JSON.stringify(rows)); } catch {}
+      },
+      (err) => {
+        console.error("holdRows onSnapshot error:", err);
+      }
+    );
+    return () => unsub();
+  }, []);
 
   const [deleteMode, setDeleteMode] = useState(false);
   const openers = useRef({});
@@ -695,9 +730,7 @@ export default function ExpensePage() {
   // === 불러오기 중/초기화 여부 플래그(자동저장 억제용) ===
   const loadingRef = useRef(false);
   const initialMountRef = useRef(true);
-  // 자동저장 디바운스 타이머
   const saveTimer = useRef(null);
-  // 마지막으로 성공 저장한 스냅샷(쓸데없는 다시쓰기 방지)
   const lastSavedKeyRef = useRef("");
   const lastSavedHashRef = useRef("");
 
@@ -793,16 +826,12 @@ export default function ExpensePage() {
     persistLocal(date, rows);
   }, [date]);
 
-  /** ===== 저장(자동) =====
-   * - 현재 date 기준 rows를 항상 덮어쓰기(Overwrite) 저장
-   * - 빈 내용/유효하지 않은 행 필터링
-   */
+  /** ===== 저장(자동) ===== */
   async function saveToStorageAuto(theDate, theRows) {
-    if (loadingRef.current) return false; // 불러오는 중에는 저장 금지(루프 방지)
+    if (loadingRef.current) return false; // 불러오는 중에는 저장 금지
     const ymd = theDate;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
 
-    // 저장할 데이터 정리
     const full = (theRows || [])
       .map((r) => ({ ...r, amount: toNumber(r.amount) }))
       .filter(
@@ -819,11 +848,10 @@ export default function ExpensePage() {
       );
     const valid = full.map(normalizeRow).filter(isValidForSave);
 
-    // 스냅샷 해시 계산(간단)
     const key = ymd;
     const hash = JSON.stringify(valid);
     if (lastSavedKeyRef.current === key && lastSavedHashRef.current === hash) {
-      return false; // 동일 상태면 스킵
+      return false;
     }
 
     const renumbered = valid.map((r, i) => ({ ...r, no: i + 1 }));
@@ -842,13 +870,13 @@ export default function ExpensePage() {
 
   // ✅ rows 변경 시 자동 저장(디바운스)
   useEffect(() => {
-    if (initialMountRef.current) return; // 초기 마운트 직후의 rows 세팅은 저장하지 않음
-    if (loadingRef.current) return; // 불러오기 중엔 저장 금지
+    if (initialMountRef.current) return;
+    if (loadingRef.current) return;
 
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       saveToStorageAuto(date, rows);
-    }, 600); // 0.6s 디바운스
+    }, 600);
 
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -856,14 +884,12 @@ export default function ExpensePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, date]);
 
-  // ✅ 날짜 전환/선택 시: 현재 내용을 먼저 자동 저장 → 새 날짜 데이터 자동 불러오기
+  // ✅ 날짜 전환/선택 시
   const switchDate = async (targetYMD) => {
     try {
-      // 1) 현재 date의 변경 내용을 먼저 저장(있으면)
       if (hasAnyContent(rows)) {
         await saveToStorageAuto(date, rows);
       }
-      // 2) 새 날짜로 전환 + 자동 불러오기
       await performLoadForDate(targetYMD, { setDateAfter: true });
     } catch (e) {
       console.error(e);
@@ -897,7 +923,6 @@ export default function ExpensePage() {
         setRows(padded);
         persistLocal(targetYMD, padded);
       } else {
-        // 해당 날짜 저장본 없음 → 빈 양식 준비
         const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
         setRows(init);
         persistLocal(targetYMD, init);
@@ -905,7 +930,6 @@ export default function ExpensePage() {
     } catch (e) {
       console.error(e);
       alert("불러오기 중 오류가 발생했습니다.");
-      // 실패 시에도 최소한 비어있는 양식 제공
       const init = Array.from({ length: INITIAL_ROWS }, (_, i) => makeEmptyRow(i));
       if (opts.setDateAfter) setDate(targetYMD);
       setRows(init);
@@ -916,18 +940,16 @@ export default function ExpensePage() {
     }
   };
 
-  // ⏱ 초기 마운트 시: 현재 date 기준 자동 불러오기
   useEffect(() => {
     performLoadForDate(date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 새로고침: 확인 → 입력 내용 초기화 + 오늘 날짜로 전환(+ 자동 불러오기)
   const onRefresh = async () => {
     const ok = window.confirm("새로고침하면 현재 지출 입력 내용이 모두 삭제되고 오늘 날짜로 이동합니다. 계속할까요?");
     if (!ok) return;
     const today = todayYMD();
-    initialMountRef.current = true; // 초기화 성격 → 첫 저장 억제
+    initialMountRef.current = true;
     await performLoadForDate(today, { setDateAfter: true });
   };
 
@@ -966,9 +988,6 @@ export default function ExpensePage() {
       {/* 상단 바 */}
       <div className="xp-top slim fancy">
         <div className="xp-actions">
-          {/* ⛔ 엑셀 업로드 UI/코드 제거됨 */}
-          {/* ⛔ 저장/불러오기 버튼 제거됨 */}
-
           <button className="xp-btn xp-refresh small pad-s" onClick={onRefresh} title="새로고침">
             <i className="ri-refresh-line" /> 새로고침
           </button>
@@ -984,7 +1003,7 @@ export default function ExpensePage() {
           </button>
         </div>
 
-        {/* 우측 패널: 지출일자 → 합계 */}
+        {/* 우측 패널 */}
         <div className="xp-side fancy-panel narrow mini" onClick={() => document.activeElement?.blur()}>
           <div
             className="xp-side-row xp-side-date scale-095"
@@ -1070,16 +1089,27 @@ export default function ExpensePage() {
         onClose={() => setDateModalOpen(false)}
       />
 
-      {/* 출금보류: 드래프트 편집 → 저장 시에만 반영 */}
-      <Modal open={holdOpen} onClose={() => setHoldOpen(false)} title="출금보류" width={960} showCloseX={false}>
+      {/* 출금보류 모달: 바디 스크롤 + sticky 푸터 + 저장 시 자동 닫힘 */}
+      <Modal
+        open={holdOpen}
+        onClose={() => setHoldOpen(false)}
+        title="출금보류"
+        width={1200}
+        showCloseX={false}   // 상단 X는 숨김
+        className="xp-modal-hold"
+      >
         <HoldTable
           initialRows={holdRows}
           onSendRow={(r) => receiveFromHold(r)}
-          onSaveDraft={(newRows) => {
+          onSaveDraft={async (newRows) => {
             try {
-              setHoldRows(newRows);
-              localStorage.setItem(LS_HOLD_KEY, JSON.stringify(newRows));
-            } catch {}
+              const ref = doc(db, "acct_expense_hold", "current");
+              await setDoc(ref, { rows: newRows, updatedAt: serverTimestamp() }, { merge: true });
+              try { localStorage.setItem(LS_HOLD_KEY, JSON.stringify(newRows)); } catch {}
+            } catch (e) {
+              console.error(e);
+              alert("출금보류 저장 중 오류가 발생했습니다.");
+            }
           }}
           onClose={() => setHoldOpen(false)}
         />

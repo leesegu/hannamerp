@@ -197,7 +197,7 @@
 
 /* 위쪽 입력 그리드와 '추가내역/추가금액/정산진행현황' 섹션 사이 간격 */
 .pc-moveout .grid + .extras-grid {
-  margin-top: 24px;   /* 숫자 키우면 더 멀어짐 (예: 32px) */
+  margin-top: 24px;
 }
 
 /* ✅ 체크박스(상단 두 칸) */
@@ -220,7 +220,7 @@
 
 /* 체크박스 줄 전체를 아래로 내림 */
 .pc-moveout .checkbox-inline {
-  margin-top: calc(14px + var(--label-gap) + 7px); /* ↑ 숫자 키우면 더 내려감 (예: +6px, +10px) */
+  margin-top: calc(14px + var(--label-gap) + 7px);
 }
 
 /* 체크박스 라벨에 기본 margin-bottom 제거(미세 높이 틀어짐 방지) */

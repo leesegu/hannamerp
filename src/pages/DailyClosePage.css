@@ -231,13 +231,13 @@ html, body, #root { height:100%; background:
 .dcx-table .ellipsis{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dcx-table .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-.dcx-table tbody tr.row-group td{
-  background:#f4f6ff;
-  font-weight:900;
-  border-bottom:1px solid var(--line-strong);
-}
 .dcx-table tbody tr.row-sub.clean td{ background:#fbfcff; }
 .dcx-table tbody tr:hover td{ background:#f7f9ff; }
+
+/* 지출표: 대분류칸에 이름 + 합계 2줄 표시용 */
+.bigcell{ display:flex; flex-direction:column; line-height:1.12; }
+.bigcell .name{ font-weight:900; }
+.bigcell .sumline{ font-size:11px; color:var(--muted); }
 
 /* ===== Recon badges ===== */
 .recon-table .badge{

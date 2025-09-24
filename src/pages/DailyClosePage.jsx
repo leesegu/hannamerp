@@ -1,6 +1,6 @@
 // ==================================
 // 관리비회계 · 일마감 (Storage JSON · 정확집계 & 새 달력)
-// 디자인 리뉴얼: 스타일만 변경 (로직·마크업 동일)
+// 디자인 리뉴얼: 스타일만 변경 (로직·마크업 동일) + 요청사항 반영
 // ==================================
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
@@ -54,7 +54,9 @@ const EXPENSE_BIG_KEYS = ["mainName", "대분류", "main", "mainCategory"];
 const EXPENSE_SUB_KEYS = ["subName", "소분류", "sub", "subCategory", "smallCategory"];
 const EXPENSE_DESC_KEYS = ["desc", "내용", "record", "memo", "메모", "note"];
 const EXPENSE_AMOUNT_KEYS = ["amount", "outAmt", "지출금액", "money", "value"];
-const EXPENSE_ACCOUNT_KEYS = ["outMethod", "출금계좌", "account", "accountNo"];
+const EXPENSE_ACCOUNT_KEYS = ["outMethod", "출금계좌", "account", "accountNo"]; // 결제방법
+// 🔧 출금확인(드롭다운) — 지출정리 JSON에서는 'paid'로 저장됨
+const EXPENSE_STATUS_KEYS = ["paid", "출금확인", "withdrawStatus", "status"];
 
 const pick = (row, keys) => {
   for (const k of keys) if (row && row[k] != null && row[k] !== "") return row[k];
@@ -72,15 +74,17 @@ const normIncome = (r) => {
   return { kind: "income", big, amount, content, account, incomeWithdraw: withdraw, raw: r };
 };
 
+// 지출의 결제방법 라벨은 그대로 보이도록 account에 원문 보존
 const normExpense = (r) => {
   const big = s(pick(r, EXPENSE_BIG_KEYS)) || "지출";
   const sub = s(pick(r, EXPENSE_SUB_KEYS)) || "(소분류없음)";
   const descFrom = s(pick(r, EXPENSE_DESC_KEYS)) || "";
   const content = descFrom || sub;
   const amount = toNumber(pick(r, EXPENSE_AMOUNT_KEYS));
-  const outAccRaw = s(pick(r, EXPENSE_ACCOUNT_KEYS));
-  const account = onlyDigits(outAccRaw) || outAccRaw || "(미지정)";
-  return { kind: "expense", big, sub, content, amount, account, raw: r };
+  const methodRaw = s(pick(r, EXPENSE_ACCOUNT_KEYS)); // 결제방법(출금계좌) 이름 그대로
+  const account = methodRaw || "(미지정)";
+  const status = s(pick(r, EXPENSE_STATUS_KEYS)) || ""; // ← 'paid' 포함해서 읽음
+  return { kind: "expense", big, sub, content, amount, account, status, raw: r };
 };
 
 /* ===== 집계 ===== */
@@ -99,6 +103,7 @@ const aggIncomeByBig = (rows) => {
   return { list, total };
 };
 
+/** ✅ 수정: 지출은 '대분류'로만 묶고, 각 행을 그대로 items에 보관(내용/금액/소분류) */
 const aggExpense = (rows) => {
   const map = new Map();
   let total = 0;
@@ -106,41 +111,47 @@ const aggExpense = (rows) => {
     if (!r.amount) return;
     total += r.amount;
     const b = r.big || "(분류없음)";
-    const sname = r.sub || "(소분류없음)";
-    const content = r.content || sname;
-
-    const bucket = map.get(b) || { sumBig: 0, subs: new Map() };
+    const bucket = map.get(b) || { sumBig: 0, items: [] };
     bucket.sumBig += r.amount;
-    const subInfo = bucket.subs.get(sname) || { sum: 0, content };
-    subInfo.sum += r.amount;
-    if (!subInfo.content) subInfo.content = content;
-    bucket.subs.set(sname, subInfo);
+    // 원본 순서대로 보관
+    bucket.items.push({ sub: r.sub || "(소분류없음)", content: r.content || r.sub || "", amount: r.amount });
     map.set(b, bucket);
   });
 
   const groups = [];
-  for (const [big, { sumBig, subs }] of map.entries()) {
-    const list = Array.from(subs.entries())
-      .map(([sub, v]) => ({ sub, sum: v.sum, content: v.content || sub }))
-      .sort((a, b) => b.sum - a.sum);
-    groups.push({ big, sumBig, subs: list });
+  for (const [big, { sumBig, items }] of map.entries()) {
+    groups.push({ big, sumBig, items }); // items: [{sub, content, amount}, ...]
   }
+  // 대분류 합계 기준 내림차순(기존 정렬 유지)
   groups.sort((a, b) => b.sumBig - a.sumBig);
   return { groups, total };
 };
 
-const aggByAccount = (rows, getAmt) => {
-  const map = new Map();
+/* ===== 356/352 전용 매핑 & 대조 ===== */
+
+// 수입 출금: 계좌번호 앞 3자리 → '356계좌' / '352계좌'
+const prefixTag356352 = (accountDigits) => {
+  const p = String(accountDigits || "").slice(0, 3);
+  if (p === "356") return "356계좌";
+  if (p === "352") return "352계좌";
+  return null;
+};
+
+// 지출 결제방법: 표시 이름 그대로 사용하되, 비교를 위해 356/352 키로 매핑
+const methodTag356352 = (methodLabel) => {
+  const dig = onlyDigits(methodLabel);
+  return prefixTag356352(dig);
+};
+
+const sumBy = (rows, keyFn, amountFn) => {
+  const m = new Map();
   rows.forEach((r) => {
-    const amt = getAmt(r);
-    if (amt > 0) {
-      const acc = r.account || "(미지정)";
-      map.set(acc, (map.get(acc) || 0) + amt);
-    }
+    const k = keyFn(r);
+    const amt = amountFn(r);
+    if (!k || !(amt > 0)) return;
+    m.set(k, (m.get(k) || 0) + amt);
   });
-  return Array.from(map.entries())
-    .map(([account, sum]) => ({ account, sum }))
-    .sort((a, b) => b.sum - a.sum);
+  return m;
 };
 
 /* ===== 커스텀 달력 ===== */
@@ -259,7 +270,11 @@ export default function DailyClosePage() {
       const exRaw = extractRowsForDate(expenseJson, date);
 
       const finalIncome = inRaw.map(normIncome).filter((r) => r.amount || r.incomeWithdraw);
-      const finalExpense = exRaw.map(normExpense).filter((r) => r.amount);
+
+      // 🔑 지출은 출금확인 = '출금완료'만 반영 (키에 'paid' 추가됨)
+      const finalExpense = exRaw
+        .map(normExpense)
+        .filter((r) => r.amount && r.status === "출금완료");
 
       setIncomeRows(finalIncome);
       setExpenseRows(finalExpense);
@@ -273,34 +288,73 @@ export default function DailyClosePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  /* ===== 수입/지출 집계 ===== */
   const incomeAgg = useMemo(() => aggIncomeByBig(incomeRows), [incomeRows]);
   const expenseAgg = useMemo(() => aggExpense(expenseRows), [expenseRows]);
   const totalIncome = incomeAgg.total;
   const totalExpense = expenseAgg.total;
   const net = totalIncome - totalExpense;
 
-  const expenseByAcc = useMemo(() => aggByAccount(expenseRows, (r) => r.amount), [expenseRows]);
-  const incomeWithdrawByAcc = useMemo(
-    () => aggByAccount(incomeRows, (r) => r.incomeWithdraw || 0),
-    [incomeRows]
-  );
-  const totalExpenseByAcc = useMemo(() => expenseByAcc.reduce((a, c) => a + c.sum, 0), [expenseByAcc]);
-  const totalIncomeWithdraw = useMemo(
-    () => incomeWithdrawByAcc.reduce((a, c) => a + c.sum, 0),
-    [incomeWithdrawByAcc]
-  );
-  const reconciliation = useMemo(() => {
-    const map = new Map();
-    expenseByAcc.forEach(({ account, sum }) => map.set(account, { expense: sum, incomeW: 0, diff: -sum }));
-    incomeWithdrawByAcc.forEach(({ account, sum }) => {
-      const prev = map.get(account) || { expense: 0, incomeW: 0, diff: 0 };
-      const m = { expense: prev.expense, incomeW: sum, diff: sum - prev.expense };
-      map.set(account, m);
+  /* ===== 356/352 전용 출금계좌 대조 ===== */
+  const incomeWithdrawMap = useMemo(() => {
+    return sumBy(
+      incomeRows,
+      (r) => prefixTag356352(onlyDigits(r.account)),
+      (r) => r.incomeWithdraw || 0
+    );
+  }, [incomeRows]);
+  const iw356 = incomeWithdrawMap.get("356계좌") || 0;
+  const iw352 = incomeWithdrawMap.get("352계좌") || 0;
+
+  const expenseByMethodAll = useMemo(() => {
+    const m = new Map();
+    expenseRows.forEach((r) => {
+      const label = r.account || "(미지정)";
+      const prev = m.get(label) || 0;
+      m.set(label, prev + (r.amount || 0));
     });
-    return Array.from(map.entries())
-      .map(([account, v]) => ({ account, ...v }))
-      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-  }, [expenseByAcc, incomeWithdrawByAcc]);
+    return m;
+  }, [expenseRows]);
+
+  const expenseByMethodFull = useMemo(() => {
+    const m = new Map();
+    expenseRows.forEach((r) => {
+      const tag = methodTag356352(r.account);
+      if (!tag) return;
+      const shownAccountName = r.account;
+      const prev = m.get(tag) || { label: shownAccountName, sum: 0 };
+      const label = prev.label || shownAccountName;
+      m.set(tag, { label, sum: prev.sum + (r.amount || 0) });
+    });
+    return m;
+  }, [expenseRows]);
+  const ex356 = expenseByMethodFull.get("356계좌")?.sum || 0;
+  const ex352 = expenseByMethodFull.get("352계좌")?.sum || 0;
+  const ex356Label = expenseByMethodFull.get("356계좌")?.label || "356계좌";
+  const ex352Label = expenseByMethodFull.get("352계좌")?.label || "352계좌";
+
+  const reconciliation = useMemo(() => {
+    const rows = [];
+    expenseByMethodAll.forEach((sum, label) => {
+      const tag = methodTag356352(label);
+      const incomeW = tag ? (incomeWithdrawMap.get(tag) || 0) : 0;
+      rows.push({ account: label, incomeW, expense: sum, diff: incomeW - sum });
+    });
+    ["356계좌", "352계좌"].forEach((tag) => {
+      const incomeW = incomeWithdrawMap.get(tag) || 0;
+      if (incomeW > 0) {
+        const present = rows.some((r) => methodTag356352(r.account) === tag);
+        if (!present) {
+          rows.push({ account: tag, incomeW, expense: 0, diff: incomeW - 0 });
+        }
+      }
+    });
+    rows.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+    return rows;
+  }, [expenseByMethodAll, incomeWithdrawMap]);
+
+  const totalIncomeWithdraw = useMemo(() => iw356 + iw352, [iw356, iw352]);
+  const totalExpenseByAcc = useMemo(() => ex356 + ex352, [ex356, ex352]);
 
   const [calOpen, setCalOpen] = useState(false);
   const dateAnchorRef = useRef(null);
@@ -363,7 +417,7 @@ export default function DailyClosePage() {
         {/* 수입(대분류 합계) */}
         <section className="dcx-card table">
           <header className="head income">
-            <div className="title"><i className="ri-download-2-line" /><span>수입 (대분류 합계)</span></div>
+            <div className="title"><i className="ri-download-2-line" /><span>수입</span></div>
             <div className="sum">합계 <b>{fmt(totalIncome)}</b> 원</div>
           </header>
           <div className="wrap">
@@ -390,10 +444,10 @@ export default function DailyClosePage() {
           </div>
         </section>
 
-        {/* 지출(대분류/소분류/내용) */}
+        {/* 지출(대분류/소분류/내용) — 각 행을 원본대로 표시 */}
         <section className="dcx-card table">
           <header className="head expense">
-            <div className="title"><i className="ri-upload-2-line" /><span>지출 (대분류/소분류/내용)</span></div>
+            <div className="title"><i className="ri-upload-2-line" /><span>지출</span></div>
             <div className="sum">합계 <b>{fmt(totalExpense)}</b> 원</div>
           </header>
           <div className="wrap">
@@ -403,7 +457,7 @@ export default function DailyClosePage() {
                   <th style={{ width: "28%" }}>대분류</th>
                   <th style={{ width: "28%" }}>소분류</th>
                   <th>내용</th>
-                  <th className="right" style={{ width: "20%" }}>합계</th>
+                  <th className="right" style={{ width: "20%" }}>금액</th>
                 </tr>
               </thead>
               <tbody>
@@ -412,20 +466,37 @@ export default function DailyClosePage() {
                 ) : (
                   expenseAgg.groups.map((g) => (
                     <React.Fragment key={g.big}>
-                      <tr className="row-group noarrow">
-                        <td className="bold">{g.big}</td>
-                        <td className="muted"></td>
-                        <td className="muted"></td>
-                        <td className="right bold">{fmt(g.sumBig)}</td>
-                      </tr>
-                      {g.subs.map((ss) => (
-                        <tr key={`${g.big}-${ss.sub}`} className="row-sub clean">
+                      {g.items.length === 0 ? (
+                        <tr>
+                          <td className="bold">
+                            <div className="bigcell">
+                              <div className="name">{g.big}</div>
+                              <div className="sumline">{fmt(g.sumBig)} 원</div>
+                            </div>
+                          </td>
                           <td className="muted"></td>
-                          <td>{ss.sub}</td>
-                          <td className="ellipsis" title={ss.content}>{ss.content}</td>
-                          <td className="right">{fmt(ss.sum)}</td>
+                          <td className="muted"></td>
+                          <td className="right">{fmt(g.sumBig)}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        g.items.map((ss, idx) => (
+                          <tr key={`${g.big}-${idx}`} className="row-sub clean">
+                            <td>
+                              {idx === 0 ? (
+                                <div className="bigcell">
+                                  <div className="name">{g.big}</div>
+                                  <div className="sumline">{fmt(g.sumBig)} 원</div>
+                                </div>
+                              ) : (
+                                <span className="muted"></span>
+                              )}
+                            </td>
+                            <td>{ss.sub}</td>
+                            <td className="ellipsis" title={ss.content}>{ss.content}</td>
+                            <td className="right">{fmt(ss.amount)}</td>
+                          </tr>
+                        ))
+                      )}
                     </React.Fragment>
                   ))
                 )}
@@ -434,7 +505,7 @@ export default function DailyClosePage() {
           </div>
         </section>
 
-        {/* 출금계좌 대조 */}
+        {/* 출금계좌 대조 — 모든 지출 결제방법 라벨 표시, 356/352는 수입 출금과 비교 */}
         <section className="dcx-card recon">
           <header className="head neutral">
             <div className="title"><i className="ri-bank-card-line" /><span>출금계좌 대조</span></div>
@@ -459,10 +530,10 @@ export default function DailyClosePage() {
                 {reconciliation.length === 0 ? (
                   <tr><td colSpan={5} className="center muted">대조 데이터 없음</td></tr>
                 ) : (
-                  reconciliation.map((r) => {
+                  reconciliation.map((r, i) => {
                     const ok = Math.abs(r.diff) < 1;
                     return (
-                      <tr key={r.account}>
+                      <tr key={`${r.account}-${i}`}>
                         <td className="mono">{r.account}</td>
                         <td className="right">{fmt(r.incomeW)}</td>
                         <td className="right">{fmt(r.expense)}</td>
@@ -474,7 +545,7 @@ export default function DailyClosePage() {
                 )}
               </tbody>
             </table>
-            <div className="hint">* 지출의 356/352 등 계좌 합계는 해당 날짜 수입의 <b>출금금액</b>(계좌별)과 일치해야 합니다.</div>
+            <div className="hint">* 356/352 계좌 지출 합계는 같은 날 수입의 <b>출금금액</b>(356/352)과 일치해야 합니다.</div>
           </div>
         </section>
       </div>

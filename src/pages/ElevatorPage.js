@@ -1,6 +1,6 @@
 // src/pages/ElevatorPage.js
-import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom"; // ✅ 추가
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection,
@@ -9,6 +9,7 @@ import {
   onSnapshot,
   updateDoc,
   doc,
+  deleteField,          // ⬅️ 추가: 필드 삭제용
 } from "firebase/firestore";
 import DataTable from "../components/DataTable";
 import GenericEditModal from "../components/GenericEditModal";
@@ -23,9 +24,7 @@ export default function ElevatorPage() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const focusVilla =
-    params.get("villa") ||
-    params.get("id") ||
-    params.get("row"); // (보조 키 허용)
+    params.get("villa") || params.get("id") || params.get("row");
 
   useEffect(() => {
     const q = query(collection(db, "villas"), where("elevator", "!=", ""));
@@ -41,6 +40,7 @@ export default function ElevatorPage() {
     setIsModalOpen(true);
   };
 
+  // ---------- 날짜 포맷 ----------
   const toYYMMDD = (date) => {
     const yy = String(date.getFullYear()).slice(2);
     const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -49,16 +49,20 @@ export default function ElevatorPage() {
   };
 
   const formatDateYYMMDD = (value) => {
-    if (!value && value !== 0) return "";
-    if (typeof value === "object" && value?.seconds) return toYYMMDD(new Date(value.seconds * 1000));
+    if (value === "" || value == null) return "";
+    if (typeof value === "object" && value?.seconds) {
+      const d = new Date(value.seconds * 1000);
+      return isNaN(d) ? "" : toYYMMDD(d);
+    }
     if (value instanceof Date) return toYYMMDD(value);
     if (typeof value === "number") {
       const d = new Date(value);
-      return isNaN(d.getTime()) ? "" : toYYMMDD(d);
+      return isNaN(d) ? "" : toYYMMDD(d);
     }
     const s = String(value).trim();
-    if (/^\d{8}$/.test(s)) return `${s.slice(2, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-    if (/^\d{6}$/.test(s)) return `${s.slice(0, 2)}-${s.slice(2, 4)}-${s.slice(4, 6)}`;
+    if (!s) return "";
+    if (/^\d{8}$/.test(s)) return `${s.slice(2,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    if (/^\d{6}$/.test(s))  return `${s.slice(0,2)}-${s.slice(2,4)}-${s.slice(4,6)}`;
     const parts = s.replace(/[./]/g, "-").split("-");
     if (parts.length === 3) {
       let [y, m, d] = parts.map((x) => x.padStart(2, "0"));
@@ -66,9 +70,10 @@ export default function ElevatorPage() {
       return `${y}-${m}-${d}`;
     }
     const d = new Date(s);
-    return isNaN(d.getTime()) ? s : toYYMMDD(d);
+    return isNaN(d) ? "" : toYYMMDD(d);
   };
 
+  // ---------- 금액 정규화 ----------
   const normalizeAmount = (v) => {
     const cleaned = String(v ?? "").replace(/[^\d.-]/g, "");
     const n = Number(cleaned);
@@ -78,16 +83,25 @@ export default function ElevatorPage() {
   const handleSave = async (updated) => {
     const { id, ...data } = updated;
 
-    if (data.contractStart) data.contractStart = formatDateYYMMDD(data.contractStart);
-    if (data.contractEnd) data.contractEnd = formatDateYYMMDD(data.contractEnd);
-    if (data.regularApply) data.regularApply = formatDateYYMMDD(data.regularApply);
-    if (data.regularExpire) data.regularExpire = formatDateYYMMDD(data.regularExpire);
-    if (data.safetyManager) data.safetyManager = formatDateYYMMDD(data.safetyManager);
+    // ✅ 날짜 필드 정규화
+    if (data.contractStart)   data.contractStart   = formatDateYYMMDD(data.contractStart);
+    if (data.contractEnd)     data.contractEnd     = formatDateYYMMDD(data.contractEnd);
+    if (data.regularApply)    data.regularApply    = formatDateYYMMDD(data.regularApply);
+    if (data.regularExpire)   data.regularExpire   = formatDateYYMMDD(data.regularExpire);
+    if (data.safetyManager)   data.safetyManager   = formatDateYYMMDD(data.safetyManager);
 
-    if (data.elevatorAmount) {
+    // ✅ 검사신청: 비우면 실제 필드 삭제, 값 있으면 포맷
+    if (data.inspectionApply === "" || data.inspectionApply == null) {
+      data.inspectionApply = deleteField();          // ⬅️ 핵심: Firestore에서 해당 필드 삭제
+    } else {
+      data.inspectionApply = formatDateYYMMDD(data.inspectionApply);
+    }
+
+    // 금액 정규화
+    if (data.elevatorAmount !== undefined) {
       const n = normalizeAmount(data.elevatorAmount);
       if (n !== undefined) data.elevatorAmount = n;
-      else delete data.elevatorAmount;
+      else data.elevatorAmount = deleteField();
     }
 
     await updateDoc(doc(db, "villas", id), data);
@@ -95,6 +109,7 @@ export default function ElevatorPage() {
     setSelectedVilla(null);
   };
 
+  // ====== 컬럼 ======
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -106,28 +121,88 @@ export default function ElevatorPage() {
       label: "금액",
       key: "elevatorAmount",
       format: (value) => {
+        if (value === "" || value == null) return "";
         const num = Number(String(value).replace(/,/g, ""));
-        return isNaN(num) ? (value ?? "-") : num.toLocaleString();
+        return isNaN(num) ? "" : num.toLocaleString();
       },
     },
     { label: "제조번호", key: "serialNumber" },
-    { label: "안전관리자", key: "safetyManager", format: formatDateYYMMDD },
-    { label: "정기신청", key: "regularApply",  format: formatDateYYMMDD },
-    { label: "정기만료", key: "regularExpire", format: formatDateYYMMDD },
-    { label: "검사신청", key: "inspectionApply" },
-    { label: "보험사", key: "insuranceCompany" },
-    { label: "계약일",   key: "contractStart", format: formatDateYYMMDD },
-    { label: "계약만기", key: "contractEnd",   format: formatDateYYMMDD },
-    { label: "비고", key: "elevatorNote" },
+    { label: "안전관리자", key: "safetyManager",    format: formatDateYYMMDD },
+    { label: "정기신청",   key: "regularApply",     format: formatDateYYMMDD },
+    { label: "정기만료",   key: "regularExpire",    format: formatDateYYMMDD },
+    { label: "검사신청",   key: "inspectionApply",  format: formatDateYYMMDD }, // ⬅️ 빈값이면 빈칸
+    { label: "보험사",     key: "insuranceCompany" },
+    { label: "계약일",     key: "contractStart",    format: formatDateYYMMDD },
+    { label: "계약만기",   key: "contractEnd",      format: formatDateYYMMDD },
+    { label: "비고",       key: "elevatorNote" },
   ];
 
   const excelFields = [
-    "code", "name", "district", "address",
-    "elevator", "manufacturer", "elevatorAmount",
-    "serialNumber", "safetyManager", "regularApply",
-    "regularExpire", "inspectionApply", "insuranceCompany",
-    "contractStart", "contractEnd", "elevatorNote"
+    "code","name","district","address",
+    "elevator","manufacturer","elevatorAmount",
+    "serialNumber","safetyManager","regularApply",
+    "regularExpire","inspectionApply","insuranceCompany",
+    "contractStart","contractEnd","elevatorNote"
   ];
+
+  // ====== 필터(승강기 고유값 → 버튼) ======
+  const elevatorOptions = useMemo(() => {
+    const set = new Set(
+      villas.map((v) => (v.elevator ?? "").trim()).filter(Boolean)
+    );
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [villas]);
+
+  const [elevatorFilter, setElevatorFilter] = useState(""); // "" = 전체
+
+  const filteredVillas = useMemo(() => {
+    return villas.filter((v) => {
+      const e = (v.elevator ?? "").trim();
+      return elevatorFilter ? e === elevatorFilter : true;
+    });
+  }, [villas, elevatorFilter]);
+
+  useEffect(() => {
+    if (elevatorFilter && !elevatorOptions.includes(elevatorFilter)) {
+      setElevatorFilter("");
+    }
+  }, [elevatorOptions, elevatorFilter]);
+
+  // ====== 상단 버튼 (검색창과 같은 행의 좌측) ======
+  const btn = {
+    padding: "8px 12px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+    background: "#fff",
+    cursor: "pointer",
+    fontSize: 13,
+    lineHeight: 1.1,
+  };
+  const btnActive = { ...btn, background: "#7B5CFF", color: "#fff", borderColor: "#6a4cf0" };
+
+  const leftControls = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={() => setElevatorFilter("")}
+        style={elevatorFilter === "" ? btnActive : btn}
+        title="전체"
+      >
+        전체
+      </button>
+      {elevatorOptions.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setElevatorFilter(opt)}
+          style={elevatorFilter === opt ? btnActive : btn}
+          title={`${opt}만 보기`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
 
   const addYears = (yyyy_mm_dd, years = 1) => {
     if (!yyyy_mm_dd) return "";
@@ -159,16 +234,16 @@ export default function ElevatorPage() {
 
       <DataTable
         columns={columns}
-        data={villas}
+        data={filteredVillas}
         onEdit={handleEdit}
         sortKey="code"
         sortOrder="asc"
         itemsPerPage={15}
         enableExcel={true}
         excelFields={excelFields}
-        /** ✅ 포커스 적용 */
         focusId={focusVilla}
         rowIdKey="id"
+        leftControls={leftControls}
       />
 
       <GenericEditModal
@@ -213,6 +288,7 @@ export default function ElevatorPage() {
           safetyManager: "date",
           regularApply: "date",
           regularExpire: "date",
+          inspectionApply: "date",   // 달력 + X(클리어)
           contractStart: "date",
           contractEnd: "date",
         }}

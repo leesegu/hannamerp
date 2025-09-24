@@ -50,33 +50,53 @@ const DPInput = forwardRef(function DPInput(
   );
 });
 
-/* 숫자 파싱/포맷 해제 */
-const parseNumber = (v) =>
-  parseInt(String(v ?? "").replace(/[^0-9]/g, ""), 10) || 0;
-const uncomma = (s) => parseNumber(s);
-const s = (v) => String(v ?? "").trim();
+/* =========================
+   🔧 숫자 유틸 (음수 지원)
+   ========================= */
 
-/* 포맷 유틸 */
-const fmtComma = (n) => {
-  const v = parseNumber(n);
-  return v ? v.toLocaleString() : "";
+/** "선행 '-' 1개 + 숫자"만 허용한 문자열로 정규화 (타이핑 중간 상태 '-' 허용) */
+const normalizeSignedString = (raw) => {
+  let s = String(raw ?? "");
+  // 숫자/하이픈 이외 제거
+  s = s.replace(/[^\d-]/g, "");
+  if (!s) return "";
+  // 선행 '-'만 남기고 나머지 '-' 제거
+  const hasMinus = s[0] === "-";
+  s = (hasMinus ? "-" : "") + s.replace(/-/g, "").replace(/^\-+/, "");
+  // 허용 패턴: "-" 또는 "-?\d+"
+  // 타이핑 중간의 단독 "-"도 허용
+  return s;
 };
 
-/* blob URL 여부 */
+/** 정수 파싱 (- 허용). 파싱 실패 시 0 */
+const parseSignedInt = (v) => {
+  const norm = normalizeSignedString(v);
+  if (norm === "-" || norm === "") return 0; // 중간 상태는 0으로 계산
+  const n = parseInt(norm, 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** 콤마 포맷 (- 허용). 0이면 기존 UX 유지 위해 빈 문자열 반환 */
+const formatSignedComma = (v) => {
+  const norm = normalizeSignedString(v);
+  if (norm === "-") return "-"; // 타이핑 중간 상태 보존
+  const n = parseInt(norm, 10);
+  if (!Number.isFinite(n) || n === 0) return "";
+  return n.toLocaleString();
+};
+
+/** blob URL 여부 */
 const isBlobUrl = (u) => typeof u === "string" && u.startsWith("blob:");
 
-/* ===== 비고 태그 정규화 유틸 (⭐ 추가) =====
-   - 두 태그(1차정산, 보증금제외)를 모두 제거
-   - 공백 정리
-   - 필요 시 단일 태그만 다시 추가
-*/
+/* ===== 비고 태그 정규화 유틸 ===== */
 const TAG_FIRST = "1차정산";
 const TAG_EXCL  = "보증금제외";
+
+const s = (v) => String(v ?? "").trim();
 
 const stripNoteTags = (text) => {
   const base = s(text);
   if (!base) return "";
-  // 태그 양옆 여백까지 정리
   const removed = base
     .replace(new RegExp(`\\s*(${TAG_FIRST}|${TAG_EXCL})\\s*`, "g"), " ")
     .replace(/\s{2,}/g, " ")
@@ -87,7 +107,6 @@ const stripNoteTags = (text) => {
 const addTagOnce = (text, tag) => {
   const base = s(text);
   if (!tag) return base;
-  // 이미 같은 태그가 있더라도 strip 이후라 중복될 일은 없지만, 안전하게 한 번 더 방지
   if (new RegExp(`(^|\\s)${tag}(\\s|$)`).test(base)) return base;
   return base ? `${base} ${tag}`.trim() : tag;
 };
@@ -156,17 +175,16 @@ export default function MoveoutForm({
       name: s(initial.villaName),
       roomNumber: s(initial.unitNumber),
       contact: s(initial.payerPhone),
-      arrears: fmtComma(initial.arrears),
-      currentFee: fmtComma(initial.currentMonth),
-      waterCurr: s(initial.currentReading ?? ""),
-      waterPrev: s(initial.previousReading ?? ""),
-      waterUnit: fmtComma(initial.unitPrice),
-      electricity: fmtComma(initial.electricity),
-      tvFee: fmtComma(initial.tvFee),
-      cleaning: fmtComma(initial.cleaningFee),
+      arrears: formatSignedComma(initial.arrears),
+      currentFee: formatSignedComma(initial.currentMonth),
+      waterCurr: normalizeSignedString(initial.currentReading ?? ""),
+      waterPrev: normalizeSignedString(initial.previousReading ?? ""),
+      waterUnit: formatSignedComma(initial.unitPrice),
+      electricity: formatSignedComma(initial.electricity),
+      tvFee: formatSignedComma(initial.tvFee),
+      cleaning: formatSignedComma(initial.cleaningFee),
       note: s(initial.note),
       status: s(initial.status) || "정산대기",
-      /* ✅ 체크박스 초기값 */
       firstSettlement: !!initial.firstSettlement,
       excludeDeposit: !!initial.excludeDeposit,
     }));
@@ -298,17 +316,27 @@ export default function MoveoutForm({
       return;
     }
     if (id === "roomNumber") return;
+
+    // 콤마 포맷 필드(음수 지원)
     if (numberFieldsWithComma.includes(id)) {
-      const numeric = String(value || "").replace(/[^0-9]/g, "");
-      const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      const norm = normalizeSignedString(value);
+      // 타이핑 중간 상태 '-' 보존
+      if (norm === "-") {
+        setForm((s) => ({ ...s, [id]: "-" }));
+        return;
+      }
+      const formatted = formatSignedComma(norm);
       setForm((s) => ({ ...s, [id]: formatted }));
       return;
     }
+
+    // 숫자만(지침) 필드(음수 허용, 콤마 없음)
     if (numberOnlyFields.includes(id)) {
-      const numeric = String(value || "").replace(/[^0-9]/g, "");
-      setForm((s) => ({ ...s, [id]: numeric }));
+      const norm = normalizeSignedString(value);
+      setForm((s) => ({ ...s, [id]: norm }));
       return;
     }
+
     setForm((s) => ({ ...s, [id]: value }));
   };
 
@@ -361,28 +389,33 @@ export default function MoveoutForm({
     if (nextId) focusId(nextId);
   };
 
-  /* ===== 자동 계산(수도요금/총액) ===== */
+  /* ===== 자동 계산(수도요금/총액) — 음수 반영 ===== */
   useEffect(() => {
-    const prev = parseNumber(form.waterPrev);
-    const curr = parseNumber(form.waterCurr);
-    const unit = parseNumber(form.waterUnit);
-    const usage = Math.max(0, curr - prev);
-    const cost = usage * unit;
-    setForm((s2) => ({ ...s2, waterCost: cost ? cost.toLocaleString() : "" }));
+    const prev = parseSignedInt(form.waterPrev);
+    const curr = parseSignedInt(form.waterCurr);
+    const unit = parseSignedInt(form.waterUnit);
+    const usage = curr - prev;                // ⬅️ 음수 허용
+    const cost = usage * unit;                // ⬅️ 음수 결과 가능
+    setForm((s2) => ({ ...s2, waterCost: formatSignedComma(cost) }));
   }, [form.waterPrev, form.waterCurr, form.waterUnit]);
 
   useEffect(() => {
     const baseKeys = ["arrears","currentFee","waterCost","electricity","tvFee","cleaning"];
-    const base = baseKeys.reduce((sum, k) => sum + parseNumber(form[k]), 0);
+    const base = baseKeys.reduce((sum, k) => sum + parseSignedInt(form[k]), 0);
     const extraSum = extras.reduce((sum, x) => sum + (x?.amount || 0), 0);
-    setForm((s2) => ({ ...s2, total: (base + extraSum) ? (base + extraSum).toLocaleString() : "" }));
+    const total = base + extraSum;            // ⬅️ 음수 합산 허용
+    setForm((s2) => ({ ...s2, total: formatSignedComma(total) }));
   }, [form.arrears, form.currentFee, form.waterCost, form.electricity, form.tvFee, form.cleaning, extras]);
 
   /* ===== 추가내역: 추가/수정/삭제 ===== */
   const addOrUpdateExtra = () => {
     const desc = s(form.extraDesc);
-    const amt = parseNumber(form.extraAmount);
-    if (!desc || !amt) return false;
+    const amt = parseSignedInt(form.extraAmount); // ⬅️ 음수 허용
+    if (!desc || (form.extraAmount !== "-" && amt === 0 && normalizeSignedString(form.extraAmount) !== "0")) {
+      // 금액이 '-'만 입력된 중간 상태이거나 실질 입력이 없으면 취소
+      if (!desc) return false;
+      if (form.extraAmount === "-" || form.extraAmount === "") return false;
+    }
     setExtras((list) => {
       const next = [...list];
       if (editIndex != null) next[editIndex] = { desc, amount: amt };
@@ -398,11 +431,11 @@ export default function MoveoutForm({
     setForm((st) => ({
       ...st,
       extraDesc: it?.desc || "",
-      extraAmount: it?.amount ? it.amount.toLocaleString() : "",
+      extraAmount: formatSignedComma(it?.amount ?? 0), // 음수 포함 포맷
     }));
     setEditIndex(index);
     setTimeout(() => extraDescRef.current?.focus?.(), 0);
-  };
+    };
   const deleteExtra = (index) => {
     setExtras((list) => list.filter((_, i) => i !== index));
     if (editIndex === index) {
@@ -420,29 +453,24 @@ export default function MoveoutForm({
     const unitNumber = s(form.roomNumber);
     const payerPhone = s(form.contact);
 
-    const arrears = uncomma(form.arrears);
-    const currentMonth = uncomma(form.currentFee);
-    const currentReading = uncomma(form.waterCurr);
-    const previousReading = uncomma(form.waterPrev);
-    const unitPrice = uncomma(form.waterUnit);
+    const arrears = parseSignedInt(form.arrears);
+    const currentMonth = parseSignedInt(form.currentFee);
+    const currentReading = parseSignedInt(form.waterCurr);
+    const previousReading = parseSignedInt(form.waterPrev);
+    const unitPrice = parseSignedInt(form.waterUnit);
 
-    const usage = Math.max(0, currentReading - previousReading);
-    const waterFee = usage * unitPrice;
+    const usage = currentReading - previousReading;     // ⬅️ 음수 허용
+    const waterFee = usage * unitPrice;                 // ⬅️ 음수 가능
 
-    const electricity = uncomma(form.electricity);
-    const tvFee = uncomma(form.tvFee);
-    const cleaningFee = uncomma(form.cleaning);
+    const electricity = parseSignedInt(form.electricity);
+    const tvFee = parseSignedInt(form.tvFee);
+    const cleaningFee = parseSignedInt(form.cleaning);
 
     const extrasArray = extras.map((e) => ({ desc: s(e.desc), amount: Number(e.amount) || 0 }));
     const extraAmount = extrasArray.reduce((sum, x) => sum + (x?.amount || 0), 0);
 
     const totalAmount = arrears + currentMonth + waterFee + electricity + tvFee + cleaningFee + extraAmount;
 
-    /* ⭐ 비고 태그 처리 로직 (요청사항 반영)
-       1) 기존 비고에서 두 태그 전부 제거
-       2) 체크 상태에 따라 단 하나의 태그만 다시 추가
-       3) 아무 것도 체크 안되면 태그 없이 저장
-    */
     const baseNote = stripNoteTags(form.note);
     const selectedTag =
       form.firstSettlement ? TAG_FIRST :
@@ -468,8 +496,7 @@ export default function MoveoutForm({
       extraAmount,
       totalAmount,
       status: s(form.status) || "정산대기",
-      note,                                   // ✅ 태그 정규화 반영된 비고
-      /* ✅ 체크박스 값 저장 */
+      note,
       firstSettlement: !!form.firstSettlement,
       excludeDeposit: !!form.excludeDeposit,
       updatedAt: serverTimestamp(),
@@ -609,7 +636,7 @@ export default function MoveoutForm({
       return {
         ...st,
         firstSettlement: willCheck,
-        excludeDeposit: willCheck ? false : st.excludeDeposit, // 배타
+        excludeDeposit: willCheck ? false : st.excludeDeposit,
       };
     });
   };
@@ -619,7 +646,7 @@ export default function MoveoutForm({
       return {
         ...st,
         excludeDeposit: willCheck,
-        firstSettlement: willCheck ? false : st.firstSettlement, // 배타
+        firstSettlement: willCheck ? false : st.firstSettlement,
       };
     });
   };
@@ -863,7 +890,7 @@ export default function MoveoutForm({
             value={form.extraAmount}
             onChange={(e) => handleChange("extraAmount", e.target.value)}
             onKeyDown={handleEnterNext("extraAmount")}
-            placeholder="예: 150,000"
+            placeholder="예: 150,000 / -30,000"
           />
         </div>
         <div className="input-group">

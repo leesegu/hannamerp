@@ -22,10 +22,10 @@ const STATUS_COLORS = [
   { key: "darkgray", label: "짙은 회색" }, // 정산완료
   { key: "deepblue", label: "진한 파랑색" }, // 입금대기
   { key: "sky",      label: "하늘색" },     // 정산대기
-  { key: "red",      label: "빨간색" },     // 보증금제외
+  { key: "red",      label: "빨간색" },     // 보증금제외 플래그
   { key: "purple",   label: "보라색" },
   { key: "amber",    label: "노란색" },
-  { key: "green",    label: "녹색" },       // 1차정산
+  { key: "green",    label: "녹색" },       // 1차정산 플래그
 ];
 
 /* ===== 공통 유틸 (총액 계산) ===== */
@@ -150,14 +150,28 @@ export default function CalendarPage() {
     });
   }, []); // eslint-disable-line
 
-  /* ===== 색상 규칙 결정 ===== */
+  /* ===== 색상 규칙 결정(표시용) ===== */
   function pickColorKey(r) {
     const s = String(r.status || "");
+
+    // 정산완료는 항상 회색
     if (s === "정산완료") return "darkgray";
-    if (r.excludeDeposit) return "red";
-    if (r.firstSettlement) return "green";
-    if (s === "정산대기") return "sky";
-    if (s === "입금대기") return "deepblue";
+
+    // 정산대기: 기본 하늘색, 플래그 반영
+    if (s === "정산대기") {
+      if (r.excludeDeposit) return "red";
+      if (r.firstSettlement) return "green";
+      return "sky";
+    }
+
+    // 입금대기: 기본 진한파랑, 플래그 반영
+    if (s === "입금대기") {
+      if (r.excludeDeposit) return "red";
+      if (r.firstSettlement) return "green";
+      return "deepblue";
+    }
+
+    // 그 외/미지정 상태는 하늘색
     return "sky";
   }
 
@@ -597,7 +611,10 @@ export default function CalendarPage() {
                 <Field label="금액" value={selected.amount} readOnly />
                 <StatusPicker
                   value={selected.statusKey}
-                  onChange={(key) => patchEvent(selected, applyStatusFromKey(key))}
+                  onChange={(key) => {
+                    const patch = applyColorTransition(selected.statusKey, key, selected.raw);
+                    patchEvent(selected, { ...patch, statusKey: key });
+                  }}
                 />
                 <TextArea
                   label="비고"
@@ -646,15 +663,22 @@ export default function CalendarPage() {
 
   /* ===== Firestore 패치 ===== */
   async function patchEvent(selected, patch) {
-    setEvents((prev) => prev.map((e) => (e.id === selected.id ? { ...e, ...patch } : e)));
+    // 로컬 즉시 반영
+    setEvents((prev) => prev.map((e) => {
+      if (e.id !== selected.id) return e;
+      const nextRaw = { ...e.raw };
+      if (patch.status != null) nextRaw.status = patch.status;
+      if (patch.firstSettlement != null) nextRaw.firstSettlement = patch.firstSettlement;
+      if (patch.excludeDeposit != null) nextRaw.excludeDeposit = patch.excludeDeposit;
+      return { ...e, ...("statusKey" in patch ? { statusKey: patch.statusKey } : {}), raw: nextRaw, ...(patch.note != null ? { note: patch.note } : {}) };
+    }));
 
+    // DB 업데이트 페이로드
     const update = {};
     if (patch.note != null) update.note = patch.note;
-
-    if (patch.statusKey != null) {
-      const s = statusFromKey(patch.statusKey, selected.raw);
-      if (s != null) update.status = s;
-    }
+    if (patch.status != null) update.status = patch.status;
+    if (patch.firstSettlement != null) update.firstSettlement = patch.firstSettlement;
+    if (patch.excludeDeposit != null) update.excludeDeposit = patch.excludeDeposit;
 
     if (Object.keys(update).length > 0) {
       try {
@@ -666,20 +690,69 @@ export default function CalendarPage() {
     }
   }
 
-  function applyStatusFromKey(key) {
-    const s =
-      key === "darkgray" ? "정산완료" :
-      key === "sky"      ? "정산대기" :
-      key === "deepblue" ? "입금대기" :
-      null;
-    return s ? { statusKey: key, status: s } : { statusKey: key };
-  }
+  /**
+   * 색 전환 규칙 → DB 필드 패치 계산
+   * oldKey, newKey ∈ {"sky","deepblue","darkgray","green","red"}
+   * 기준: 사용자 요구사항 텍스트 매핑
+   */
+  function applyColorTransition(oldKey, newKey, raw) {
+    let status = raw?.status ?? null;
+    let first = !!raw?.firstSettlement;
+    let excl  = !!raw?.excludeDeposit;
 
-  function statusFromKey(key, raw) {
-    if (key === "darkgray") return "정산완료";
-    if (key === "sky") return "정산대기";
-    if (key === "deepblue") return "입금대기";
-    return raw?.status ?? null;
+    const setStatus = (s) => { status = s; };
+    const setFirst  = (v) => { first  = !!v; };
+    const setExcl   = (v) => { excl   = !!v; };
+
+    const OK = oldKey || "sky";
+    const NK = newKey;
+
+    // ▼▼▼ 전환표 구현
+    if (OK === "sky") {
+      if (NK === "green") { setFirst(true); }                                    // 하늘→녹색: 1차정산 체크
+      else if (NK === "red") { setExcl(true); }                                  // 하늘→빨강: 보증금제외 체크
+      else if (NK === "deepblue") { setStatus("입금대기"); }                     // 하늘→파랑: 입금대기
+      else if (NK === "darkgray") { setStatus("정산완료"); }                     // 하늘→회색: 정산완료
+      // 하늘→하늘: 변화 없음
+    }
+    else if (OK === "darkgray") { // 회색(정산완료)
+      if (NK === "green") { setFirst(true); setStatus("입금대기"); }             // 회색→녹색
+      else if (NK === "red") { setExcl(true); setStatus("입금대기"); }           // 회색→빨강
+      else if (NK === "deepblue") { setStatus("입금대기"); }                     // 회색→파랑
+      else if (NK === "sky") { setStatus("정산대기"); }                          // 회색→하늘
+      // 회색→회색: 변화 없음
+    }
+    else if (OK === "red") { // 빨강(보증금제외)
+      if (NK === "sky") { setExcl(false); setStatus("정산대기"); }               // 빨강→하늘
+      else if (NK === "green") { setExcl(false); setFirst(true); }               // 빨강→녹색 (상태 유지)
+      else if (NK === "deepblue") { setExcl(false); setStatus("입금대기"); }     // 빨강→파랑
+      else if (NK === "darkgray") { setExcl(true); setStatus("정산완료"); }      // 빨강→회색(플래그 유지)
+      // 빨강→빨강: 변화 없음
+    }
+    else if (OK === "green") { // 녹색(1차정산)
+      if (NK === "red") { setFirst(false); setExcl(true); }                      // 녹색→빨강 (상태 유지)
+      else if (NK === "sky") { setFirst(false); setStatus("정산대기"); }         // 녹색→하늘
+      else if (NK === "deepblue") { setFirst(false); setStatus("입금대기"); }    // 녹색→파랑
+      else if (NK === "darkgray") { setFirst(true); setStatus("정산완료"); }     // 녹색→회색(플래그 유지)
+      // 녹색→녹색: 변화 없음
+    }
+    else if (OK === "deepblue") { // 파랑(입금대기)
+      if (NK === "sky") { setStatus("정산대기"); }                               // 파랑→하늘
+      else if (NK === "red") { setExcl(true); /* 상태 유지(입금대기) */ }        // 파랑→빨강
+      else if (NK === "green") { setFirst(true); /* 상태 유지(입금대기) */ }     // 파랑→녹색
+      else if (NK === "darkgray") { setStatus("정산완료"); }                     // 파랑→회색
+      // 파랑→파랑: 변화 없음
+    }
+    // ▲▲▲ 전환표 끝
+
+    const patch = {};
+    // status는 명시된 경우에만 패치
+    if (status !== (raw?.status ?? null)) patch.status = status;
+    // 플래그는 명시된 경우 true/false로 패치
+    if (first !== !!raw?.firstSettlement) patch.firstSettlement = first;
+    if (excl  !== !!raw?.excludeDeposit)  patch.excludeDeposit  = excl;
+
+    return patch;
   }
 
   function dayEvents(all, y, m, d) {
