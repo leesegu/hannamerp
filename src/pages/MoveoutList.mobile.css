@@ -2,7 +2,7 @@
    MoveoutList.mobile.css (refined)
    - 부드러운 컬러 팔레트
    - 균형 잡힌 대비 & 그림자
-   - 동일 클래스명 그대로 유지
+   - 동일 클래스명 그대로 유지 + 모바일 전용 신규 스타일 추가
 ================================= */
 
 /* 팔레트 & 토큰 */
@@ -57,7 +57,7 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   background: var(--bg);
 }
 
-/* 상단 타이틀 & 등록 버튼 */
+/* 상단 바 (타이틀 & 우측 메뉴) */
 .mo-topbar {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 10px;
@@ -66,6 +66,7 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   padding: 4px 0 6px;
 }
 
+/* (구) 등록 버튼 스타일 - 필요 시 재사용 가능
 .top-action {
   display: inline-flex; align-items: center; gap: 8px;
   height: 42px; padding: 0 16px; border-radius: var(--radius-md);
@@ -79,6 +80,61 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
 .top-action:hover { box-shadow: 0 10px 22px var(--primary-ring); }
 .top-action:active { transform: translateY(1px); }
 .top-action .top-icon { font-size: 18px; line-height: 1; }
+*/
+
+/* ✅ 우측 상단 메뉴(등록/로그아웃) */
+.mo-topmenu { position: relative; display: inline-block; }
+.mo-menu-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: box-shadow .15s ease, transform .12s ease, border-color .15s ease;
+}
+.mo-menu-trigger:active { transform: translateY(1px); }
+.mo-menu-trigger:hover { box-shadow: var(--shadow-md); }
+.mo-menu-trigger .dots {
+  width: 16px; height: 16px; opacity: .86;
+  background-repeat: no-repeat; background-size: 16px 16px;
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%236b7280'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+.mo-topmenu.open .mo-menu-trigger {
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+/* 메뉴 패널 (포탈/고정 위치) */
+.mo-menu-panel {
+  position: fixed; z-index: 10010;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  min-width: 160px;
+}
+.mo-menu-item {
+  width: 100%; display: grid; grid-template-columns: 20px 1fr; align-items: center;
+  gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: transparent; border: none; text-align: left; cursor: pointer;
+  color: var(--text); font-weight: 800; font-size: 14px;
+  transition: background .12s ease, transform .12s ease;
+}
+.mo-menu-item:hover { background: var(--soft); }
+.mo-menu-item:active { transform: translateY(1px); }
+.mo-menu-item .mi {
+  width: 16px; height: 16px; opacity: .9; justify-self: center;
+  background-repeat: no-repeat; background-size: 16px 16px;
+}
+.mi-add {
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%236c4cf3' d='M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z'/%3E%3C/svg%3E");
+}
+.mi-logout {
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%23ef4444' d='M10 17v2H5V5h5v2H7v10zm9.707-5.707l-4-4l-1.414 1.414L16.586 11H11v2h5.586l-2.293 2.293l1.414 1.414l4-4a1 1 0 0 0 0-1.414z'/%3E%3C/svg%3E");
+}
 
 /* 필터 바 */
 .mo-filters {
@@ -146,7 +202,7 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
   flex: 1; min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 88px;
+  padding-bottom: 108px; /* 하단 네비게이션 바 공간 확보 */
 }
 
 /* 카드 */
@@ -191,11 +247,11 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
 /* 진행현황 */
 .statusbox { position: relative; display: inline-block; z-index: 2; }
 .status-trigger {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 28px; padding: 0 10px 0 8px;
+  display: inline-flex; align-items: center; gap: 13px;
+  height: 38px; padding: 0 10px 0 8px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 9999px;
+  border-radius: 6px;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: border-color .12s, box-shadow .12s, transform .12s;
@@ -327,7 +383,7 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
 .i-btn .i { font-size: 16px; }
 .i-btn.disabled { opacity: .45; pointer-events: none; cursor: default; }
 
-/* 모달 */
+/* 모달 공통 */
 .overlay {
   position: fixed; inset: 0;
   background: rgba(2,6,23,0.46);
@@ -369,3 +425,53 @@ html, body, #root { min-height: 100%; height: auto; overflow: auto; background: 
 
 /* 영수증 모달 버튼 정렬 + 비고/사진 닫기 버튼 공용 */
 .actions.center { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 12px; }
+
+/* ===============================
+   ✅ 하단 페이지네이션 바 (모바일 전용)
+   - 안전 영역 고려
+   - 버튼/페이지 표시 일체형
+================================= */
+.mo-pager {
+  position: sticky; bottom: 0; z-index: 6;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(247,248,251,0.0), rgba(247,248,251,1) 20%);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+}
+.pager-btn {
+  height: 40px; border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-weight: 900; font-size: 13px;
+  box-shadow: var(--shadow-sm);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  transition: box-shadow .15s ease, transform .12s ease, background .12s ease;
+}
+.pager-btn:hover { background: var(--soft-2); box-shadow: var(--shadow-md); }
+.pager-btn:active { transform: translateY(1px); }
+.pager-btn:disabled {
+  opacity: .45; cursor: default; transform: none;
+  background: var(--card); box-shadow: var(--shadow-sm);
+}
+.pager-status {
+  min-width: 96px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  color: var(--text-2);
+  border-radius: 10px;
+  font-weight: 900; font-size: 13px; text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 아이콘 텍스트 일관성 */
+.pager-ico {
+  width: 14px; height: 14px; opacity: .9;
+  background-repeat: no-repeat; background-size: 14px 14px;
+}
+.pager-left {
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%231f2937' d='M15.41 7.41L14 6l-6 6l6 6l1.41-1.41L10.83 12z'/%3E%3C/svg%3E");
+}
+.pager-right {
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%231f2937' d='M8.59 16.59L10 18l6-6l-6-6l-1.41 1.41L13.17 12z'/%3E%3C/svg%3E");
+}

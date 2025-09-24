@@ -11,10 +11,12 @@ import PageTitle from "../components/PageTitle";
 import ReceiptTemplate from "../components/ReceiptTemplate";
 import "./MoveoutList.mobile.css";
 
+/* ✅ 로그아웃용 (Firebase Auth) */
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+
 /* =========================
    안드로이드 저장/공유/SMS 유틸
-   - 저장(갤러리): ExternalStorage/Pictures/HannamReceipts
-   - 전송(MMS 첨부): Cache 디렉토리에 저장(권한 無) → MmsComposer 호출
 ========================= */
 const isHybrid = () => {
   try {
@@ -254,6 +256,68 @@ function FilterSelect({ value, onChange }) {
   );
 }
 
+/* ===== 상단 계정/메뉴 (등록 · 로그아웃) — CSS와 클래스명 일치 ===== */
+function TopKebabMenu({ onRegister, onLogout }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const trigRef = useRef(null);
+  const { pos, place } = usePortalMenuPosition();
+
+  useEffect(() => {
+    const onDocClick = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false); };
+    const onEsc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, []);
+  useEffect(() => {
+    const reflow = () => place(trigRef.current, 180);
+    if (open) {
+      reflow();
+      window.addEventListener("resize", reflow);
+      window.addEventListener("scroll", reflow, true);
+      return () => {
+        window.removeEventListener("resize", reflow);
+        window.removeEventListener("scroll", reflow, true);
+      };
+    }
+  }, [open, place]);
+
+  return (
+    <div className={`mo-topmenu ${open ? "open" : ""}`} ref={wrapRef}>
+      <button
+        type="button"
+        ref={trigRef}
+        className="mo-menu-trigger"
+        onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="메뉴 열기"
+        title="메뉴"
+      >
+        <span className="dots" />
+      </button>
+
+      {open && ReactDOM.createPortal(
+        <div className="mo-menu-panel" style={{ top: pos.top, left: pos.left, width: pos.width }}>
+          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onRegister?.(); }}>
+            <span className="mi mi-add" aria-hidden />
+            <span>등록</span>
+          </button>
+          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLogout?.(); }}>
+            <span className="mi mi-logout" aria-hidden />
+            <span style={{ color: "#ef4444" }}>로그아웃</span>
+          </button>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 /* ===== 문자 수신번호 후보 ===== */
 function pickSmsNumber(row) {
   const cand = [
@@ -280,7 +344,8 @@ export default function MoveoutListMobile({ employeeId, userId }) {
 
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptRow, setReceiptRow] = useState(null);
-  const receiptRef = useRef(null);
+
+  const receiptRef = useRef(null); // ✅ 중복 선언 금지: 여기 한 군데만 유지
 
   const PAGE_SIZE = 8;
   const [page, setPage] = useState(1);
@@ -356,6 +421,17 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   const goNext = () => { if (page < totalPages) { setPage(p => p + 1); scrollTopSmooth(); } };
 
   const handleAdd = () => navigate("/mobile/form");
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/login", { replace: true });
+    } catch (e) {
+      console.error(e);
+      alert("로그아웃 중 오류가 발생했습니다.");
+    }
+  };
+
   const handleEdit = (row) => navigate(`/mobile/form?id=${row.id}`);
   const handleDeleteRow = async (row) => {
     if (!row?.id) return;
@@ -381,7 +457,6 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   const ensureReceiptDataUrl = async () => {
     const node = receiptRef.current;
     if (!node) throw new Error("Receipt not ready");
-    // 한 프레임 대기(레이아웃 안정화)
     await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));
     return htmlToImage.toJpeg(node, { backgroundColor:"#fff", quality:0.95, pixelRatio:2 });
   };
@@ -413,7 +488,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
     }
   };
 
-  /* ===== 전송: 갤러리 저장 + 캐시에 전송본 저장 + 문자앱 열기(번호 자동/본문 없음/이미지 첨부) ===== */
+  /* ===== 전송: 갤러리 저장 + 캐시에 전송본 저장 + 문자앱 열기 ===== */
   const shareReceipt = async () => {
     try {
       const to = pickSmsNumber(receiptRow);
@@ -426,29 +501,22 @@ export default function MoveoutListMobile({ employeeId, userId }) {
       const dataUrl = await ensureReceiptDataUrl();
 
       if (isHybrid()) {
-        // 1) 갤러리에 저장 (사용자가 갤러리에서도 확인 가능)
         await saveReceiptToGalleryHybrid(dataUrl, baseName);
-
-        // 2) 전송용 파일(캐시)에 저장
         const { fileUriNative } = await saveReceiptForMmsHybrid(dataUrl, baseName);
-
-        // 3) 네이티브 MMS 컴포저 호출 (본문 텍스트는 전달하지 않음 → 자동 문구 방지)
         try {
           await openMmsComposer({ phone: to, fileUriNative, mimeType: "image/jpeg" });
         } catch (err) {
           console.error("MmsComposer failed:", err);
-          // 플러그인 실패 시에도 본문 없이 번호만 자동 입력
           window.location.href = `sms:${to}`;
         }
         return;
       }
 
-      // (웹 폴백) 파일 공유 시도 - 본문 텍스트 제공 안 함
       const file = new File([dataURLToBlob(dataUrl)], `${baseName}.jpg`, { type:"image/jpeg" });
       if (navigator.canShare && navigator.canShare({ files:[file] })) {
         await navigator.share({ files:[file], title: "" }); // text 미전달
       } else if (navigator.share) {
-        await navigator.share({ title: "" }); // text 미전달
+        await navigator.share({ title: "" });
       } else {
         const w = window.open(dataUrl, "_blank");
         if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
@@ -464,10 +532,9 @@ export default function MoveoutListMobile({ employeeId, userId }) {
       {/* 상단 */}
       <div className="mo-topbar">
         <PageTitle>이사정산 조회</PageTitle>
-        <button className="top-action top-action--purple" onClick={handleAdd}>
-          <span className="top-icon">＋</span>
-          <span>등록</span>
-        </button>
+
+        {/* ✅ 우측 상단: 케밥 메뉴(등록/로그아웃) — CSS 네이밍과 일치 */}
+        <TopKebabMenu onRegister={handleAdd} onLogout={handleLogout} />
       </div>
 
       {/* 필터 */}
@@ -576,13 +643,33 @@ export default function MoveoutListMobile({ employeeId, userId }) {
         })}
       </div>
 
-      {/* 페이지네이션 */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "10px 12px" }}>
-        <button className="pill-btn light" onClick={goPrev} disabled={page <= 1} aria-label="이전 페이지">‹ 이전</button>
-        <div style={{ fontWeight: 900, fontSize: 13, color: "#334155", minWidth: 80, textAlign: "center" }}>
+      {/* ✅ 하단 페이지네이션 — CSS 네이밍과 통일 */}
+      <div className="mo-pager">
+        <button
+          className="pager-btn"
+          onClick={goPrev}
+          disabled={page <= 1}
+          aria-label="이전 페이지"
+          title="이전"
+        >
+          <span className="pager-ico pager-left" aria-hidden />
+          이전
+        </button>
+
+        <div className="pager-status" aria-live="polite" aria-atomic="true">
           {page} / {totalPages}
         </div>
-        <button className="pill-btn" onClick={goNext} disabled={page >= totalPages} aria-label="다음 페이지">다음 ›</button>
+
+        <button
+          className="pager-btn"
+          onClick={goNext}
+          disabled={page >= totalPages}
+          aria-label="다음 페이지"
+          title="다음"
+        >
+          다음
+          <span className="pager-ico pager-right" aria-hidden />
+        </button>
       </div>
 
       {/* 비고/사진 모달 */}
@@ -627,7 +714,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
               <button className="pill-btn danger" onClick={closeReceiptModal} style={{ fontSize:14, padding:"10px 14px", borderRadius:10, marginTop:2 }} aria-label="닫기">닫기</button>
             </div>
 
-            {/* 오프스크린 캡처 타깃: ReceiptTemplate을 래핑한 div에 ref를 직접 걸어 캡쳐 안정화 */}
+            {/* 오프스크린 캡처 타깃 */}
             <div style={{ position:"absolute", left:-99999, top:-99999 }}>
               <div id="receipt-capture" ref={receiptRef}>
                 <ReceiptTemplate

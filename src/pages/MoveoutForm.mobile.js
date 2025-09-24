@@ -15,11 +15,38 @@ import "./MoveoutForm.mobile.css";
 
 /* ===== 유틸 ===== */
 const onlyDigits = (s) => String(s ?? "").replace(/[^\d]/g, "");
-const toNum = (v) => (v === "" || v == null) ? 0 : (Number(onlyDigits(v)) || 0);
+
+/* ▶ 숫자 toNumber: 쉼표/문자 제거 + 부호 유지 (마이너스 허용) */
+const toNumSigned = (v) => {
+  if (v == null) return 0;
+  const raw = String(v).trim();
+  if (raw === "-" || raw === "") return 0;
+  const sign = raw.startsWith("-") ? -1 : 1;
+  const digits = raw.replace(/[^\d]/g, "");
+  const n = Number(digits || "0");
+  return sign * n;
+};
+
+/* ▶ 표시용: 부호 유지하면서 천단위 콤마 (입력 중간상태 '-' 보존) */
+const addCommasSigned = (input) => {
+  const s = String(input ?? "");
+  if (s.trim() === "-") return "-";
+  const sign = s.trim().startsWith("-") ? "-" : "";
+  const digits = s.replace(/[^\d]/g, "");
+  if (!digits) return sign ? "-" : "";
+  return sign + Number(digits).toLocaleString();
+};
+
+/* ▶ 기존 addCommas (양수만)도 내부에서 사용 */
 const addCommas = (n) => {
   const s = onlyDigits(n);
   if (!s) return "";
   return Number(s).toLocaleString();
+};
+/* ▶ 숫자 입력칸: 값이 0이면 빈칸("")을 반환 (수정모드 초기 표시용, 부호 고려) */
+const moneyOrEmpty = (v) => {
+  const n = Number(v);
+  return (v == null || n === 0) ? "" : addCommasSigned(v);
 };
 
 /* 전화번호: 010-1234-5678 */
@@ -46,23 +73,23 @@ export default function MoveoutFormMobile() {
 
   /* ===== 상태 ===== */
   const [moveDate, setMoveDate] = useState(null);
-  const [moveDateOpen, setMoveDateOpen] = useState(false); // ▼ 펼침 제어
+  const [moveDateOpen, setMoveDateOpen] = useState(false);
 
   const [villaName, setVillaName] = useState("");
   const [unitNumber, setUnitNumber] = useState("");
   const [phone, setPhone] = useState("");
 
-  // 금액(쉼표 문자열 상태 유지)
-  const [arrears, setArrears] = useState("");
-  const [currentMonth, setCurrentMonth] = useState("");
+  // 금액(부호 허용 콤마 문자열 상태 유지)
+  const [arrears, setArrears] = useState("");           // 미납관리비
+  const [currentMonth, setCurrentMonth] = useState(""); // 당월관리비
   const [electricity, setElectricity] = useState("");
   const [tvFee, setTvFee] = useState("");
   const [cleaningFee, setCleaningFee] = useState("");
 
-  // 지침/수도
+  // 지침/수도 (지침은 음수 입력 불허, 단가는 허용)
   const [currentReading, setCurrentReading] = useState("");
   const [previousReading, setPreviousReading] = useState("");
-  const [waterUnit, setWaterUnit] = useState("");
+  const [waterUnit, setWaterUnit] = useState(""); // 부호 허용(보정용)
 
   // 진행현황(커스텀 드롭다운)
   const [status, setStatus] = useState("정산대기");
@@ -72,12 +99,12 @@ export default function MoveoutFormMobile() {
 
   // 자동 계산 수도요금
   const waterFeeAuto = useMemo(() => {
-    const used = Math.max(0, toNum(currentReading) - toNum(previousReading));
-    return used * toNum(waterUnit);
+    const used = Math.max(0, Number(onlyDigits(currentReading)) - Number(onlyDigits(previousReading)));
+    return used * toNumSigned(waterUnit);
   }, [currentReading, previousReading, waterUnit]);
 
   // 추가내역
-  const [extras, setExtras] = useState([]); // {desc, amount:number}
+  const [extras, setExtras] = useState([]); // {desc, amount:number(부호가능)}
   const [xDesc, setXDesc] = useState("");
   const [xAmount, setXAmount] = useState("");
   const [editIndex, setEditIndex] = useState(null);
@@ -120,15 +147,16 @@ export default function MoveoutFormMobile() {
       setUnitNumber(d.unitNumber || "");
       setPhone(formatPhone(d.payerPhone || d.phone || ""));
 
-      setArrears(addCommas(d.arrears));
-      setCurrentMonth(addCommas(d.currentMonth));
-      setElectricity(addCommas(d.electricity));
-      setTvFee(addCommas(d.tvFee));
-      setCleaningFee(addCommas(d.cleaningFee));
+      // ▶ 값이 0이면 빈칸 표시 (부호 반영)
+      setArrears(moneyOrEmpty(d.arrears));
+      setCurrentMonth(moneyOrEmpty(d.currentMonth));
+      setElectricity(moneyOrEmpty(d.electricity));
+      setTvFee(moneyOrEmpty(d.tvFee));
+      setCleaningFee(moneyOrEmpty(d.cleaningFee));
 
-      setCurrentReading(onlyDigits(d.currentReading));
-      setPreviousReading(onlyDigits(d.previousReading));
-      setWaterUnit(addCommas(d.unitPrice));
+      setCurrentReading(d.currentReading ? onlyDigits(d.currentReading) : "");
+      setPreviousReading(d.previousReading ? onlyDigits(d.previousReading) : "");
+      setWaterUnit(d.unitPrice != null ? addCommasSigned(d.unitPrice) : "");
 
       setStatus(d.status || "정산대기");
 
@@ -148,19 +176,19 @@ export default function MoveoutFormMobile() {
     return () => { alive = false; };
   }, [id]);
 
-  /* ===== 합계 ===== */
+  /* ===== 합계 (부호 반영) ===== */
   const extrasSum = useMemo(
     () => extras.reduce((a, x) => a + (Number(x.amount) || 0), 0),
     [extras]
   );
   const totalAmount = useMemo(
     () =>
-      toNum(arrears) +
-      toNum(currentMonth) +
-      toNum(electricity) +
+      toNumSigned(arrears) +
+      toNumSigned(currentMonth) +
+      toNumSigned(electricity) +
       waterFeeAuto +
-      toNum(tvFee) +
-      toNum(cleaningFee) +
+      toNumSigned(tvFee) +
+      toNumSigned(cleaningFee) +
       extrasSum,
     [arrears, currentMonth, electricity, waterFeeAuto, tvFee, cleaningFee, extrasSum]
   );
@@ -202,12 +230,12 @@ export default function MoveoutFormMobile() {
   const prevPhoto = () => photos.length && setPhotoIdx((p) => (p - 1 + photos.length) % photos.length);
   const nextPhoto = () => photos.length && setPhotoIdx((p) => (p + 1) % photos.length);
 
-  /* ===== 추가내역: 엔터로 추가/수정 ===== */
+  /* ===== 추가내역: 엔터로 추가/수정 (부호 허용) ===== */
   const resetExtraInputs = () => { setXDesc(""); setXAmount(""); setEditIndex(null); };
   const commitExtra = () => {
     const d = String(xDesc || "").trim();
-    const a = toNum(xAmount);
-    if (!d || !a) return false;
+    const a = toNumSigned(xAmount);
+    if (!d || a === 0) return false;
     if (editIndex == null) setExtras((arr) => [...arr, { desc: d, amount: a }]);
     else setExtras((arr) => arr.map((it, i) => (i === editIndex ? { desc: d, amount: a } : it)));
     return true;
@@ -223,7 +251,7 @@ export default function MoveoutFormMobile() {
     const item = extras[idx];
     setEditIndex(idx);
     setXDesc(item.desc);
-    setXAmount(addCommas(item.amount));
+    setXAmount(addCommasSigned(item.amount));
     setTimeout(() => focusNext(refXDesc), 0);
   };
   const onDeleteExtra = (idx) => {
@@ -269,17 +297,17 @@ export default function MoveoutFormMobile() {
       payerPhone: phone.trim(),
       phone: phone.trim(),
 
-      arrears: toNum(arrears),
-      currentMonth: toNum(currentMonth),
+      arrears: toNumSigned(arrears),
+      currentMonth: toNumSigned(currentMonth),
 
       currentReading: onlyDigits(currentReading),
       previousReading: onlyDigits(previousReading),
-      unitPrice: toNum(waterUnit),
+      unitPrice: toNumSigned(waterUnit),
       waterFee: waterFeeAuto,
 
-      electricity: toNum(electricity),
-      tvFee: toNum(tvFee),
-      cleaningFee: toNum(cleaningFee),
+      electricity: toNumSigned(electricity),
+      tvFee: toNumSigned(tvFee),
+      cleaningFee: toNumSigned(cleaningFee),
 
       extras: extras.map((x) => ({ desc: x.desc, amount: Number(x.amount) || 0 })),
       note,
@@ -309,18 +337,28 @@ export default function MoveoutFormMobile() {
     <div className="mf-page">
       {/* 상단 고정 헤더 */}
       <div className="mf-topbar">
-        <button className="mf-back" onClick={() => navigate(-1)} aria-label="돌아가기">
-          <svg className="ico" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+        {/* 좌측: 뒤로가기 */}
+        <button
+          className="btn-neo btn-neo--ghost btn-neo--sm"
+          onClick={() => navigate(-1)}
+          aria-label="돌아가기"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" className="btn-neo__ico">
             <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span className="label">돌아가기</span>
+          <span>뒤로가기</span>
         </button>
 
-        {/* 절대 중앙 타이틀 */}
+        {/* 중앙: 타이틀 (절대 중앙 고정) */}
         <div className="mf-title">{id ? "이사정산 수정" : "이사정산 등록"}</div>
 
-        <button className="mf-save mf-save--lg" onClick={onSave} disabled={saving}>
-          {saving ? "저장중…" : "저장"}
+        {/* 우측: 저장 (좁은 폭) */}
+        <button className="btn-neo btn-neo--primary btn-neo--sm" onClick={onSave} disabled={saving}>
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" className="btn-neo__ico">
+            <path d="M5 20h14V7l-3-3H5z" fill="none" stroke="currentColor" strokeWidth="1.8"/>
+            <path d="M7 20v-6h10v6M9 7h6v4H9z" fill="none" stroke="currentColor" strokeWidth="1.8"/>
+          </svg>
+          <span>{saving ? "저장중…" : "저장"}</span>
         </button>
       </div>
 
@@ -342,7 +380,6 @@ export default function MoveoutFormMobile() {
         <div className="mf-field">
           <label>이사날짜</label>
 
-          {/* 인풋처럼 보이는 컨트롤 (중복 문구 제거: 한 줄만 표시) */}
           <button
             type="button"
             className={`mf-date-control ${moveDate ? "has-value" : "is-placeholder"}`}
@@ -356,7 +393,6 @@ export default function MoveoutFormMobile() {
             <span className="chev" aria-hidden>▾</span>
           </button>
 
-          {/* 펼쳐지는 인라인 달력 */}
           {moveDateOpen && (
             <div id="move-date-calendar" className="mf-calendar" role="dialog" aria-label="달력">
               <DatePicker
@@ -365,27 +401,11 @@ export default function MoveoutFormMobile() {
                 inline
                 locale={ko}
                 monthsShown={1}
-                renderCustomHeader={({
-                  date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled
-                }) => (
+                renderCustomHeader={({ date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
                   <div className="cal-header">
-                    <button
-                      type="button"
-                      onClick={decreaseMonth}
-                      disabled={prevMonthButtonDisabled}
-                      className="nav-btn"
-                      aria-label="이전 달"
-                    >‹</button>
-                    <div className="cal-title">
-                      {format(date, "yyyy년 MM월")}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={increaseMonth}
-                      disabled={nextMonthButtonDisabled}
-                      className="nav-btn"
-                      aria-label="다음 달"
-                    >›</button>
+                    <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="nav-btn" aria-label="이전 달">‹</button>
+                    <div className="cal-title">{format(date, "yyyy년 MM월")}</div>
+                    <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="nav-btn" aria-label="다음 달">›</button>
                   </div>
                 )}
                 dayClassName={(d) => {
@@ -422,7 +442,7 @@ export default function MoveoutFormMobile() {
           </div>
         </div>
 
-        {/* 2: 미납관리비 · 당월관리비 */}
+        {/* 2: 미납관리비 · 당월관리비 (부호 허용) */}
         <div className="mf-grid2">
           <div className="mf-field">
             <label>미납관리비</label>
@@ -430,7 +450,7 @@ export default function MoveoutFormMobile() {
               ref={refArrears}
               className="mf-input"
               value={arrears}
-              onChange={(e)=>setArrears(addCommas(e.target.value))}
+              onChange={(e)=>setArrears(addCommasSigned(e.target.value))}
               inputMode="numeric"
               onKeyDown={(e)=>{ if(e.key==="Enter"){ e.preventDefault(); focusNext(refCurrentMonth); } }}
             />
@@ -441,14 +461,14 @@ export default function MoveoutFormMobile() {
               ref={refCurrentMonth}
               className="mf-input"
               value={currentMonth}
-              onChange={(e)=>setCurrentMonth(addCommas(e.target.value))}
+              onChange={(e)=>setCurrentMonth(addCommasSigned(e.target.value))}
               inputMode="numeric"
               onKeyDown={(e)=>{ if(e.key==="Enter"){ e.preventDefault(); focusNext(refCurrentReading); } }}
             />
           </div>
         </div>
 
-        {/* 3: 당월지침 · 전월지침 */}
+        {/* 3: 당월지침 · 전월지침 (음수 불가) */}
         <div className="mf-grid2">
           <div className="mf-field">
             <label>당월지침</label>
@@ -472,7 +492,7 @@ export default function MoveoutFormMobile() {
           </div>
         </div>
 
-        {/* 4: 수도요금(자동) · 수도단가 */}
+        {/* 4: 수도요금(자동) · 수도단가(부호 허용) */}
         <div className="mf-grid2">
           <div className="mf-field">
             <label>수도요금</label>
@@ -488,13 +508,13 @@ export default function MoveoutFormMobile() {
             <input
               className="mf-input"
               value={waterUnit}
-              onChange={(e)=>setWaterUnit(addCommas(e.target.value))}
+              onChange={(e)=>setWaterUnit(addCommasSigned(e.target.value))}
               inputMode="numeric"
             />
           </div>
         </div>
 
-        {/* 5: 전기요금 · TV수신료 */}
+        {/* 5: 전기요금 · TV수신료 (부호 허용) */}
         <div className="mf-grid2">
           <div className="mf-field">
             <label>전기요금</label>
@@ -502,7 +522,7 @@ export default function MoveoutFormMobile() {
               ref={refElectricity}
               className="mf-input"
               value={electricity}
-              onChange={(e)=>setElectricity(addCommas(e.target.value))}
+              onChange={(e)=>setElectricity(addCommasSigned(e.target.value))}
               inputMode="numeric"
               onKeyDown={(e)=>{ if(e.key==="Enter"){ e.preventDefault(); focusNext(refTvFee); } }}
             />
@@ -513,7 +533,7 @@ export default function MoveoutFormMobile() {
               ref={refTvFee}
               className="mf-input"
               value={tvFee}
-              onChange={(e)=>setTvFee(addCommas(e.target.value))}
+              onChange={(e)=>setTvFee(addCommasSigned(e.target.value))}
               inputMode="numeric"
               onKeyDown={(e)=>{ if(e.key==="Enter"){ e.preventDefault(); focusNext(refCleaningFee); } }}
             />
@@ -528,13 +548,13 @@ export default function MoveoutFormMobile() {
               ref={refCleaningFee}
               className="mf-input"
               value={cleaningFee}
-              onChange={(e)=>setCleaningFee(addCommas(e.target.value))}
+              onChange={(e)=>setCleaningFee(addCommasSigned(e.target.value))}
               inputMode="numeric"
               onKeyDown={(e)=>{ if(e.key==="Enter"){ e.preventDefault(); focusNext(refXDesc); } }}
             />
           </div>
 
-          {/* 진행현황 드롭다운 */}
+          {/* 진행현황 드롭다운 (입력창과 동일 폭/룩앤필) */}
           <div className="mf-field">
             <label>정산진행현황</label>
             <div
@@ -543,7 +563,7 @@ export default function MoveoutFormMobile() {
             >
               <button
                 type="button"
-                className="status-trigger"
+                className="status-trigger mf-input-like"
                 onClick={openStatusMenu}
               >
                 <span className="dot" style={{ background: statusDot(status) }} />
@@ -557,7 +577,7 @@ export default function MoveoutFormMobile() {
                   style={{
                     top: statusMenuPos.top,
                     left: statusMenuPos.left,
-                    minWidth: Math.max(180, statusMenuPos.width),
+                    width: statusMenuPos.width,
                     position: "fixed",
                   }}
                 >
@@ -603,7 +623,7 @@ export default function MoveoutFormMobile() {
                 ref={refXAmount}
                 className="mf-input"
                 value={xAmount}
-                onChange={(e)=>setXAmount(addCommas(e.target.value))}
+                onChange={(e)=>setXAmount(addCommasSigned(e.target.value))}
                 onKeyDown={onEnterXAmount}
                 inputMode="numeric"
               />
@@ -637,7 +657,11 @@ export default function MoveoutFormMobile() {
             <span>사진첨부</span>
           </label>
 
-          <button className="mf-action mf-action--note" type="button" onClick={()=>{ setNoteDraft(note); setNoteModalOpen(true); }}>
+          <button
+            className={`mf-action mf-action--note ${note && note.trim() ? "has" : ""}`}
+            type="button"
+            onClick={()=>{ setNoteDraft(note); setNoteModalOpen(true); }}
+          >
             <svg className="ico" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 4h12v14l-4-3H6z" fill="none" stroke="currentColor" strokeWidth="1.6"/>
             </svg>
@@ -664,7 +688,6 @@ export default function MoveoutFormMobile() {
           </div>
         )}
 
-        {/* 하단 고정바에 가리지 않도록 여백 */}
         <div style={{ height: 120 }} />
       </div>
 

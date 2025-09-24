@@ -9,6 +9,8 @@ import {
 } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
+import MobileLogin from "./pages/MobileLogin"; // ✅ 모바일 전용 로그인 추가
+
 import TrezoSidebar from "./components/TrezoSidebar";
 import MoveoutForm from "./MoveoutForm";
 import MoveoutList from "./pages/MoveoutList";
@@ -46,28 +48,50 @@ import MemoPage from "./pages/MemoPage";
 
 import "./App.css";
 
-function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }) {
+/* ✅ Firebase Auth 상태도 함께 인지해서 모바일 로그인과 동작 일치 */
+import { auth } from "./firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+
+function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, isAuthReady, authUser }) {
   const navigate = useNavigate();
-  const isLoggedIn = employeeId && userId;
+
+  // ✅ 앱 로컬 로그인(사번/아이디) OR Firebase Auth 중 하나라도 있으면 로그인 상태로 간주
+  const isLoggedInEffective = Boolean((employeeId && userId) || authUser);
+
+  if (!isAuthReady) {
+    // Firebase Auth 초기화 대기
+    return null;
+  }
 
   return (
     <Routes>
+      {/* 루트: 환경/로그인 상태별 분기 */}
       <Route
         path="/"
         element={
-          isLoggedIn
+          isLoggedInEffective
             ? <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
-            : <Navigate to="/login" replace />
+            : <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
         }
       />
 
-      {/* 로그인 */}
+      {/* PC 로그인 */}
       <Route
         path="/login"
         element={
-          isLoggedIn
+          isLoggedInEffective
             ? <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
-            : <LoginPage onLogin={onLogin} />
+            : (isMobile ? <Navigate to="/mobile/login" replace /> : <LoginPage onLogin={onLogin} />)
+        }
+      />
+
+      {/* ✅ 모바일 전용 로그인 */}
+      <Route
+        path="/mobile/login"
+        element={
+          isLoggedInEffective
+            ? <Navigate to="/mobile/list" replace />
+            : <MobileLogin /* onLogin={onLogin} 전달해도 무방 */ />
         }
       />
 
@@ -75,8 +99,8 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/main"
         element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
           ) : isMobile ? (
             <Navigate to="/mobile/list" replace />
           ) : (
@@ -94,8 +118,8 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/form"
         element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
           ) : (
             <MoveoutForm
               employeeId={employeeId}
@@ -111,8 +135,8 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/mobile/form"
         element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
+          !isLoggedInEffective ? (
+            <Navigate to="/mobile/login" replace />
           ) : (
             <MoveoutFormMobile employeeId={employeeId} userId={userId} />
           )
@@ -123,8 +147,8 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/mobile/list"
         element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
+          !isLoggedInEffective ? (
+            <Navigate to="/mobile/login" replace />
           ) : (
             <MoveoutListMobile employeeId={employeeId} userId={userId} />
           )
@@ -135,8 +159,8 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       <Route
         path="/list"
         element={
-          !isLoggedIn ? (
-            <Navigate to="/login" replace />
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
           ) : (
             <MoveoutList employeeId={employeeId} userId={userId} />
           )
@@ -146,87 +170,87 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
       {/* 영수증 발행 리스트 */}
       <Route
         path="/receipts"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <ReceiptIssuePage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ReceiptIssuePage />}
       />
 
       {/* 관리비회계 · 수입정리 */}
       <Route
         path="/accounting/income"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <IncomeImportPage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <IncomeImportPage />}
       />
 
       {/* 관리비회계 · 지출정리 */}
       <Route
         path="/accounting/expense"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <ExpensePage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ExpensePage />}
       />
 
       {/* 관리비회계 · 일마감 */}
       <Route
         path="/accounting/daily-close"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <DailyClosePage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <DailyClosePage />}
       />
 
       {/* 관리비회계 · 월마감 */}
       <Route
         path="/accounting/monthly-close"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <MonthlyClosePage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MonthlyClosePage />}
       />
 
       {/* ✅ 관리비회계 · 연간시트 (직접 URL 접근용) */}
       <Route
         path="/accounting/annual-sheet"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <AnnualSheetPage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <AnnualSheetPage />}
       />
 
       {/* 전기요금 추출 */}
       <Route
         path="/extract"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <MessageExtractor />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MessageExtractor />}
       />
 
       {/* 캘린더 */}
       <Route
         path="/calendar"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <CalendarPage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CalendarPage />}
       />
 
       {/* 부가서비스 */}
       <Route
         path="/papering"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <PaperingPage />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PaperingPage />}
       />
 
       {/* 메모 */}
       <Route
         path="/memo"
-        element={!isLoggedIn ? <Navigate to="/login" replace /> : <MemoPage userId={userId} />}
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MemoPage userId={userId} />}
       />
 
       {/* 기타 메뉴 */}
-      <Route path="/villa" element={!isLoggedIn ? <Navigate to="/login" replace /> : <VillaCodePage />} />
-      <Route path="/telco" element={!isLoggedIn ? <Navigate to="/login" replace /> : <TelcoPage />} />
-      <Route path="/elevator" element={!isLoggedIn ? <Navigate to="/login" replace /> : <ElevatorPage />} />
-      <Route path="/septic" element={!isLoggedIn ? <Navigate to="/login" replace /> : <SepticPage />} />
-      <Route path="/fire-safety" element={!isLoggedIn ? <Navigate to="/login" replace /> : <FireSafetyPage />} />
-      <Route path="/electric-safety" element={!isLoggedIn ? <Navigate to="/login" replace /> : <ElectricSafetyPage />} />
-      <Route path="/water" element={!isLoggedIn ? <Navigate to="/login" replace /> : <WaterPage />} />
-      <Route path="/public-electric" element={!isLoggedIn ? <Navigate to="/login" replace /> : <PublicElectricPage />} />
-      <Route path="/cleaning" element={!isLoggedIn ? <Navigate to="/login" replace /> : <CleaningPage />} />
-      <Route path="/cctv" element={!isLoggedIn ? <Navigate to="/login" replace /> : <CctvPage />} />
+      <Route path="/villa" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <VillaCodePage />} />
+      <Route path="/telco" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <TelcoPage />} />
+      <Route path="/elevator" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ElevatorPage />} />
+      <Route path="/septic" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <SepticPage />} />
+      <Route path="/fire-safety" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <FireSafetyPage />} />
+      <Route path="/electric-safety" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ElectricSafetyPage />} />
+      <Route path="/water" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <WaterPage />} />
+      <Route path="/public-electric" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PublicElectricPage />} />
+      <Route path="/cleaning" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CleaningPage />} />
+      <Route path="/cctv" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CctvPage />} />
 
       {/* 기초등록/사원 */}
-      <Route path="/basic/vendor-register" element={!isLoggedIn ? <Navigate to="/login" replace /> : <VendorRegisterPage />} />
-      <Route path="/employee" element={!isLoggedIn ? <Navigate to="/login" replace /> : <EmployeePage />} />
+      <Route path="/basic/vendor-register" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <VendorRegisterPage />} />
+      <Route path="/employee" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <EmployeePage />} />
 
       {/* 와일드카드 */}
       <Route
         path="*"
         element={
-          isLoggedIn ? (
+          isLoggedInEffective ? (
             <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
           )
         }
       />
@@ -236,10 +260,16 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout }
 
 function App() {
   const [isMobile, setIsMobile] = useState(false);
+
+  // 기존(사번/아이디 기반) 로컬 로그인 상태
   const [employeeId, setEmployeeId] = useState("");
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // ✅ Firebase Auth 상태
+  const [authUser, setAuthUser] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   const handleLogin = ({ id, employeeNo, name }) => {
     setUserId(id);
@@ -248,11 +278,13 @@ function App() {
     try { localStorage.setItem("autoLogin", JSON.stringify({ id, employeeNo, name })); } catch {}
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try { localStorage.removeItem("autoLogin"); } catch {}
     setUserId("");
     setEmployeeId("");
     setUserName("");
+    // ✅ 모바일(Firebase Auth) 로그아웃도 함께 시도 (실패해도 무시)
+    try { await signOut(auth); } catch {}
   };
 
   useEffect(() => {
@@ -266,6 +298,15 @@ function App() {
     setLoading(false);
   }, []);
 
+  // ✅ 모바일 로그인(Firebase Auth) 상태 감지
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setAuthUser(u || null);
+      setIsAuthReady(true);
+    });
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
@@ -273,7 +314,7 @@ function App() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  if (loading) return null;
+  if (loading || !isAuthReady) return null;
 
   return (
     <Router>
@@ -284,6 +325,8 @@ function App() {
         isMobile={isMobile}
         onLogin={handleLogin}
         onLogout={handleLogout}
+        isAuthReady={isAuthReady}
+        authUser={authUser}
       />
     </Router>
   );
