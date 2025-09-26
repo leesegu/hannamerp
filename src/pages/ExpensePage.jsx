@@ -60,7 +60,7 @@ async function readMonthJSON(monthKey) {
     return { meta, days };
   } catch (e) {
     const code = e?.code || "";
-    const msg = String(e?.message || "");
+       const msg = String(e?.message || "");
     const notFound =
       code === "storage/object-not-found" ||
       msg.includes("object-not-found") ||
@@ -637,28 +637,12 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
         </table>
       </div>
 
-      {/* 하단 버튼: 저장 오른쪽에 닫기 버튼, 저장 후 자동 닫기 */}
-      <div className="hg-footer">
-        <button
-          className="hg-btn save"
-          onClick={async () => {
-            try {
-              await onSaveDraft?.(draft);
-              // alert("출금보류 내역이 저장되었습니다."); // 필요 시 주석 해제
-              onClose?.(); // ✅ 저장 성공 시 자동 닫기
-            } catch (e) {
-              console.error(e);
-              alert("출금보류 저장 중 오류가 발생했습니다.");
-            }
-          }}
-          title="저장"
-        >
-          <i className="ri-save-3-line" /> 저장
-        </button>
-        <button className="hg-btn close" onClick={onClose} title="닫기">
-          <i className="ri-close-line" /> 닫기
-        </button>
-      </div>
+{/* 하단 버튼 */}
+<div className="hg-footer">
+  <button className="hg-btn close" onClick={onClose} title="닫기">
+    <i className="ri-close-line" /> 닫기
+  </button>
+</div>
     </div>
   );
 }
@@ -1090,14 +1074,14 @@ export default function ExpensePage() {
       />
 
       {/* 출금보류 모달: 바디 스크롤 + sticky 푸터 + 저장 시 자동 닫힘 */}
-      <Modal
-        open={holdOpen}
-        onClose={() => setHoldOpen(false)}
-        title="출금보류"
-        width={1200}
-        showCloseX={false}   // 상단 X는 숨김
-        className="xp-modal-hold"
-      >
+<Modal
+  open={holdOpen}
+  onClose={() => setHoldOpen(false)}
+  title="출금보류"
+  width={1200}
+  showCloseX={true}
+  className="xp-modal-hold"
+>
         <HoldTable
           initialRows={holdRows}
           onSendRow={(r) => receiveFromHold(r)}
@@ -1151,7 +1135,7 @@ function RowEditor({
 
   const onAmountChange = (e) => {
     const raw = e.target.value;
-    const num = toNumber(raw);
+       const num = toNumber(raw);
     const withComma = num ? num.toLocaleString() : "";
     onChange({ amount: withComma });
   };

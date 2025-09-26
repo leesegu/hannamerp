@@ -135,6 +135,31 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
 
   return (
     <div className="flex w-full h-screen">
+      {/* ✅ 사이드바 보라색 스크롤바 스타일 주입 */}
+      <style>{`
+        /* Firefox */
+        .sidebar-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #7B5CFF #EFEAFF; /* thumb, track */
+        }
+        /* Chromium/WebKit */
+        .sidebar-scroll::-webkit-scrollbar {
+          width: 10px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+          background: #EFEAFF;
+          border-radius: 10px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+          background: #7B5CFF;
+          border-radius: 10px;
+          border: 2px solid #EFEAFF;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+          background: #6645ff;
+        }
+      `}</style>
+
       {/* 사이드바 */}
       <aside className="w-60 h-full bg-white border-r border-gray-200 flex flex-col">
         <div
@@ -166,7 +191,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         </div>
 
         {/* 메뉴 */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        {/* ✅ 여기 스크롤 컨테이너에 sidebar-scroll 클래스를 추가 */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 sidebar-scroll">
           <nav className="space-y-2">
             {/* 빌라정보 */}
             <div>

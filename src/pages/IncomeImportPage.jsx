@@ -341,12 +341,16 @@ function selectStyle(name) {
 function Modal({
   open, title, children, onClose, onConfirm,
   confirmText = "확인", cancelText = "닫기",
-  mode = "confirm", primaryFirst = false, showClose = true, variant = "default"
+  mode = "confirm", primaryFirst = false, showClose = true, variant = "default",
+  /** ✅ 추가: 확인 버튼 색상 제어 (danger=빨강, primary=보라) */
+  confirmVariant = "danger",
 }) {
   if (!open) return null;
+  const confirmCls = `btn ${confirmVariant === "primary" ? "primary" : "danger"}`;
+  const sizeCls = variant === "large" ? "lg" : variant === "narrow" ? "sm" : "";
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className={`modal-card ${variant === "large" ? "lg" : ""}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal-card ${sizeCls}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div className="modal-title nowrap">{title}</div>
           {showClose ? <button className="modal-x" onClick={onClose}>×</button> : null}
@@ -356,13 +360,13 @@ function Modal({
           {mode === "confirm" ? (
             primaryFirst ? (
               <>
-                <button className="btn danger" onClick={onConfirm}>{confirmText}</button>
+                <button className={confirmCls} onClick={onConfirm}>{confirmText}</button>
                 <button className="btn" onClick={onClose}>{cancelText}</button>
               </>
             ) : (
               <>
                 <button className="btn" onClick={onClose}>{cancelText}</button>
-                <button className="btn danger" onClick={onConfirm}>{confirmText}</button>
+                <button className={confirmCls} onClick={onConfirm}>{confirmText}</button>
               </>
             )
           ) : (
@@ -461,7 +465,8 @@ export default function IncomeImportPage() {
   const [editMode, setEditMode] = useState(false);
 
   const pageSizeOptions = [50, 100, 300, 500];
-  const [pageSize, setPageSize] = useState(50);
+  /** ✅ 기본 페이지 사이즈 100 */
+  const [pageSize, setPageSize] = useState(100);
   const [page, setPage] = useState(1);
 
   const [incomeCategories, setIncomeCategories] = useState([]);
@@ -502,8 +507,9 @@ export default function IncomeImportPage() {
   const [dTo,   setDTo]   = useState(today.d);
 
   const clampRange = useCallback((nyF, nmF, ndF, nyT, nmT, ndT) => {
-    const start = ymdToDate(nyF, nmF - 1, ndF);
-    const end = ymdToDate(nyT, nmT - 1, ndT);
+    // NOTE: ymdToDate는 month-1을 내부에서 처리하므로 여기서는 그대로 전달
+    const start = ymdToDate(nyF, nmF, ndF);
+    const end = ymdToDate(nyT, nmT, ndT);
     if (start > end) return [nyF, nmF, ndF, nyF, nmF, ndF];
     return [nyF, nmF, ndF, nyT, nmT, ndT];
   }, []);
@@ -676,7 +682,7 @@ export default function IncomeImportPage() {
     if (!store[mk]) store[mk] = { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
 
     const prevObj = store[mk].items[id] || cur;
-    const nextObj = { ...prevObj, ...patch };
+    const nextObj = { ...prevObj, ...patch }; // ✅ 문법 오류 수정 (const 누락)
 
     if (nextObj.record != null) nextObj.record = trimField(nextObj.record);
     if (nextObj.memo != null)   nextObj.memo   = trimField(nextObj.memo);
@@ -1281,7 +1287,7 @@ export default function IncomeImportPage() {
           <select
             className="page-size"
             value={pageSize}
-            onChange={(e) => { const v = Number(e.target.value) || 50; setPageSize(v); setPage(1); }}
+            onChange={(e) => { const v = Number(e.target.value) || 100; setPageSize(v); setPage(1); }}
           >
             {pageSizeOptions.map((n) => (<option key={n} value={n}>{n}/페이지</option>))}
           </select>
@@ -1648,16 +1654,26 @@ export default function IncomeImportPage() {
         onConfirm={saveAdd}
         primaryFirst
         showClose={false}
+        /** ✅ 변경: 더 좁은 모달 */
+        variant="narrow"
+        /** ✅ 변경: 확인 버튼 보라색 */
+        confirmVariant="primary"
       >
         <div className="add-form">
           <div className="add-row">
             <label>거래일</label>
-            <input
-              type="date"
-              className="edit-input"
-              value={addForm.date}
-              onChange={(e) => changeAdd("date", e.target.value)}
-            />
+<input
+  type="date"
+  className="edit-input date-input"
+  value={addForm.date}
+  onChange={(e) => changeAdd("date", e.target.value)}
+  onMouseDown={(e) => {
+    // 기본 포커스/클릭 동작을 잠시 막고 사용자 제스처 안에서 픽커를 직접 열기
+    e.preventDefault();
+    try { e.currentTarget.showPicker?.(); } catch {}
+  }}
+/>
+
           </div>
           <div className="add-row">
             <label>구분</label>

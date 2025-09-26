@@ -117,8 +117,8 @@ const FlagDots = ({ first, exclude }) => {
   );
   return (
     <span style={wrap}>
-      {first && dot("#8b5cf6", "1차정산")}
-      {exclude && dot("#f59e0b", "보증금제외")}
+      {first && dot("#3b9904ff", "1차정산")}
+      {exclude && dot("#f70303ff", "보증금제외")}
     </span>
   );
 };

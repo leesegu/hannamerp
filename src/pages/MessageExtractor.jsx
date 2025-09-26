@@ -1,5 +1,8 @@
 // src/pages/MessageExtractor.jsx
 import React, { useMemo, useState, useEffect } from "react";
+/* ✅ Firestore에 직접 저장하도록 추가 */
+import { db } from "../firebase";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 /**
  * 전기요금 추출 — 스크롤/폰트 업그레이드 & 설명 제거 버전 (요구사항 보강)
@@ -28,56 +31,125 @@ export default function MessageExtractor() {
     [rows]
   );
 
-  const sendToExpenseHold = (r) => {
-    const payload = {
-      내용: r.주소 || "",
-      금액: toNumber(r.금액),
-      은행: r.은행 || "",
-      계좌번호: r.계좌번호 || "",
-      납부마감일: r.납부마감일 || "",
-      원문일자: r.일자 || "",
-    };
+  /** ===== 출금보류 연동(저장/중복 검사) ===== */
+  const HOLD_DOC = doc(db, "acct_expense_hold", "current");
+  const LS_HOLD_KEY = "ExpensePage:HOLD:v1";
+
+  const normalizeForCompare = (x) => {
+    const desc = String(x?.desc ?? x?.내용 ?? "").trim();
+    const bank = String(x?.bank ?? x?.은행 ?? "").trim();
+    const accountNo = cleanAccount(x?.accountNo ?? x?.계좌번호 ?? "");
+    const amount = toNumber(x?.amount ?? x?.금액 ?? 0);
+    return { desc, bank, accountNo, amount };
+  };
+
+  const fetchHoldRows = async () => {
     try {
-      window.dispatchEvent(
-        new CustomEvent("expense-hold:add", { detail: payload })
-      );
-    } catch {}
+      const snap = await getDoc(HOLD_DOC);
+      const rows = Array.isArray(snap.data()?.rows) ? snap.data().rows : [];
+      return rows;
+    } catch {
+      return [];
+    }
+  };
+
+  const saveHoldRows = async (newRows) => {
+    await setDoc(
+      HOLD_DOC,
+      { rows: newRows, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
     try {
-      window.postMessage({ type: "EXPENSE_HOLD_ADD", row: payload }, "*");
+      localStorage.setItem(LS_HOLD_KEY, JSON.stringify(newRows));
     } catch {}
   };
 
-  const handleSendRow = (row, idx) => {
-    sendToExpenseHold(row);
-    setRows((prev) => prev.filter((_, i) => i !== idx));
+  const existsDuplicate = (existingRows, candidate) => {
+    const want = normalizeForCompare(candidate);
+    return existingRows.some((h) => {
+      const got = normalizeForCompare(h);
+      return (
+        got.desc === want.desc &&
+        got.bank === want.bank &&
+        got.accountNo === want.accountNo &&
+        got.amount === want.amount
+      );
+    });
+  };
+
+  /** 전송 payload 생성 (요청한 필드 매핑 적용) */
+  const buildHoldPayload = (r) => {
+    const desc = r.주소 || ""; // 내용
+    const bank = r.은행 || "";
+    const accountNo = cleanAccount(r.계좌번호 || "");
+    const amount = toNumber(r.금액);
+    const noteParts = [];
+    if (r.일자) noteParts.push(`일자:${r.일자}`);
+    if (r.납부마감일) noteParts.push(`납부마감일:${r.납부마감일}`);
+    const note = noteParts.join(" / ");
+
+    // HoldTable 컬럼과 일치하는 키(영문) + 호환(한글) 동시 포함
+    return {
+      type: "",          // 기본 비움
+      desc,              // 내용
+      bank,              // 은행
+      accountNo,         // 계좌번호
+      amount: amount ? amount.toLocaleString() : "", // 입력 필드용 콤마 표기
+      note,              // 비고(일자/납부마감일)
+      // 호환(기존 이벤트 핸들러 대비)
+      내용: desc,
+      은행: bank,
+      계좌번호: accountNo,
+      금액: amount,
+      비고: note,
+    };
+  };
+
+  /** 단건 전송 → Firestore에 즉시 반영 (중복 차단) */
+  const handleSendRow = async (row, idx) => {
+    const payload = buildHoldPayload(row);
+    const current = await fetchHoldRows();
+    if (existsDuplicate(current, payload)) {
+      alert("이미 같은 내용이 있습니다. (주소·은행·금액·계좌번호 모두 동일)");
+      return;
+    }
+    const updated = [...current, payload];
+    await saveHoldRows(updated);     // ✅ Firestore + LocalStorage 저장
+    setRows((prev) => prev.filter((_, i) => i !== idx)); // ✅ 미리보기에서 제거
+  };
+
+  /** 전체 보내기 → Firestore에 일괄 반영 (중복 차단) */
+  const handleSendAll = async () => {
+    if (!rows.length) return;
+    const current = await fetchHoldRows();
+
+    const toAdd = [];
+    let skipped = 0;
+    for (const r of rows) {
+      const payload = buildHoldPayload(r);
+      if (existsDuplicate(current.concat(toAdd), payload)) {
+        skipped++;
+      } else {
+        toAdd.push(payload);
+      }
+    }
+
+    if (!toAdd.length) {
+      alert("보낼 항목이 없습니다. (모두 중복으로 판단)");
+      return;
+    }
+
+    const updated = [...current, ...toAdd];
+    await saveHoldRows(updated);     // ✅ Firestore + LocalStorage 저장
+    // 전송된 항목 제거(중복으로 스킵된 것만 남김)
+    setRows((prev) =>
+      prev.filter((r) => existsDuplicate(updated, buildHoldPayload(r)))
+    );
+    if (skipped > 0) alert(`중복으로 전송되지 않은 항목: ${skipped}건`);
   };
 
   const handleDeleteRow = (idx) => {
     setRows((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleSendAll = () => {
-    if (!rows.length) return;
-    const batch = rows.map((r) => ({
-      내용: r.주소 || "",
-      금액: toNumber(r.금액),
-      은행: r.은행 || "",
-      계좌번호: r.계좌번호 || "",
-      납부마감일: r.납부마감일 || "",
-      원문일자: r.일자 || "",
-    }));
-    try {
-      window.dispatchEvent(
-        new CustomEvent("expense-hold:add-batch", { detail: batch })
-      );
-    } catch {}
-    try {
-      window.postMessage(
-        { type: "EXPENSE_HOLD_ADD_BATCH", rows: batch },
-        "*"
-      );
-    } catch {}
-    setRows([]);
   };
 
   // 커스텀 스크롤바(옅은 퍼플)
@@ -106,7 +178,7 @@ export default function MessageExtractor() {
             전기요금 추출
           </div>
 
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50/80 px-3 py-1 whitespace-nowrap">
               <span className="text-[12px] font-semibold text-violet-700 whitespace-nowrap">
                 당월이사정산요금 합계
@@ -319,7 +391,7 @@ function parseOne(block) {
     address = `${address} 인수인계`.trim();
   }
 
-  // 부가 태그/계약번호는 주소 뒤에 ' · '로 묶지 않도록 유지(요청형식과 충돌 방지)
+  // 부가 태그/계약번호는 주소 뒤에 ' · '로 묶지 않도록 유지
 
   let amount =
     matchFirst(text, /(?:^|[\n\r])\s*[□-]?\s*정산요금\s*[:：]?\s*([\d,]+)\s*원/) ||
@@ -346,7 +418,7 @@ function parseOne(block) {
 
   if (account && contractNo) {
     const d = digits(contractNo);
-    if (d && digits(account) === d) account = ""; // 계약번호와 동일하면 계좌번호로 보지 않음
+    if (d && digits(account) === d) account = ""; // 계약번호 동일 → 계좌로 보지 않음
   }
 
   account = account ? cleanAccount(account) : "";
@@ -384,7 +456,7 @@ function extractDongLotPreferred(raw) {
   g = R(/\(([가-힣A-Za-z0-9\s.-]*동\s+[0-9-]+)\)\s+(\d{1,4}\s*호)/);
   if (g) return `${g[0]} ${g[1]}`.trim();
 
-  // C: 동번지) 숫자 건물명  (호 없이 숫자+건물명)
+  // C: 동번지) 숫자 건물명
   g = R(/\(([가-힣A-Za-z0-9\s.-]*동\s+[0-9-]+)\)\s+(\d{1,4})\s+([가-힣A-Za-z0-9.-]+)\b/);
   if (g) return `${g[0]} ${g[1]} ${g[2]}`.trim();
 
@@ -393,9 +465,6 @@ function extractDongLotPreferred(raw) {
 
 /* ---------- 지정/납부 계좌 라인 파싱 (보강 포인트) ---------- */
 function extractDesignatedAccount(text) {
-  // '지정계좌' 또는 '납부계좌' 패턴 지원
-  // 예: "납부계좌 : 우리은행 02216867718634"
-  //     "지정계좌: 농협 123-456-7890"
   const re =
     /(지정계좌|납부계좌)\s*[:：]?\s*(?:([^\s\n]*)\s*은행)?\s*([0-9]{10,20}|[0-9][0-9-\s]{5,})/;
   const m = String(text || "").match(re);
@@ -467,18 +536,14 @@ function inlineAddressLine(raw) {
   return "";
 }
 
-/* ✅ 주소 후처리: 은행 제거 + 연속 중복 토큰/호수 중복 제거 */
+/* ✅ 주소 후처리 */
 function dedupeAddress(addr) {
   let a = (addr || "").trim();
   if (!a) return "";
 
-  // 주소에 끼어든 "○○은행" 제거
   a = a.replace(/\b[가-힣A-Za-z]*은행\b/g, "").replace(/\s{2,}/g, " ").trim();
-
-  // "(무엇 201호 201호)" 같은 '호' 반복을 단일로 축약
   a = a.replace(/(\S+?\s*\d{1,4}\s*호)(?:\s+\1)+/g, "$1");
 
-  // 연속 중복 단어 토큰 제거
   const tokens = a.split(/\s+/);
   const out = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -488,7 +553,6 @@ function dedupeAddress(addr) {
   }
   a = out.join(" ").replace(/\s{2,}/g, " ").trim();
 
-  // 괄호 정리
   a = a.replace(/\s*\)+$/g, ")").replace(/\(\s*\)/g, "").trim();
   return a;
 }
@@ -498,9 +562,9 @@ function sumBreakdown(text) {
   const pick = (re) => toNumber(matchFirst(text, re));
   const a = pick(/당월이사정산요금\s*[:：]?\s*([\d,]+)\s*원/);
   const b = pick(/직전월요금\s*[:：]?\s*([\d,]+)\s*원/);
-  const c = pick(/미납요금\s*[:：]?\s*([\d,]+)\s*원/);
-  const d = pick(/착오수납(?:금액)?\s*[:：]?\s*([\d,]+)\s*원/);
-  const e = pick(/분납(?:청구)?금액\s*[:：]?\s*([\d,]+)\s*원/);
+  const c = pick(/미납요금\s*[:：]?\s*([\д,]+)\s*원/);
+  const d = pick(/착오수납(?:금액)?\s*[:：]?\s*([\д,]+)\s*원/);
+  const e = pick(/분납(?:청구)?금액\s*[:：]?\s*([\д,]+)\s*원/);
   const sum = a + b + c + d + e;
   return sum > 0 ? String(sum) : "";
 }

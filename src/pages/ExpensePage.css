@@ -62,6 +62,14 @@
 
 /* ===== 출금보류 모달 전용 ===== */
 .xp-modal.xp-modal-hold{width:1200px!important}
+/* ✅ 출금보류 모달 내부 스크롤을 퍼플로 */
+.xp-modal.xp-modal-hold .xp-modal-body{
+  scrollbar-color:#a78bfa #f5f3ff; /* Firefox */
+}
+.xp-modal.xp-modal-hold .xp-modal-body::-webkit-scrollbar{width:10px;height:10px}
+.xp-modal.xp-modal-hold .xp-modal-body::-webkit-scrollbar-track{background:#f5f3ff;border-radius:10px}
+.xp-modal.xp-modal-hold .xp-modal-body::-webkit-scrollbar-thumb{background:#a78bfa;border-radius:10px;border:2px solid #f5f3ff}
+.xp-modal.xp-modal-hold .xp-modal-body::-webkit-scrollbar-thumb:hover{background:#8f79f3}
 /* 바디는 overflow:auto 이므로 sticky 푸터가 항상 보임 */
 
 /* ===== 출금보류 - 엑셀 스타일 (hold-new / hg-*) ===== */
@@ -73,15 +81,16 @@
 .hg-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:0;border-radius:8px;cursor:pointer;font-weight:800;font-size:12px;color:#fff;box-shadow:0 6px 12px rgba(0,0,0,.10),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .08s ease,box-shadow .18s ease,filter .12s ease}
 .hg-btn:hover{transform:translateY(-1px);box-shadow:0 10px 18px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.45)}
 .hg-btn.add{background:linear-gradient(135deg,#34d399 0%,#059669 100%)}
-.hg-btn.save{background:linear-gradient(135deg,#60a5fa 0%,#2563eb 100%)}
 .hg-btn.close{background:linear-gradient(135deg,#94a3b8 0%,#475569 100%)}
 .hg-btn.send{background:linear-gradient(135deg,#a78bfa 0%,#7c3aed 100%);white-space:nowrap}
 
 /* 표 래퍼(내부 스크롤) */
 .hg-wrap{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+/* ✅ 이미 퍼플 스크롤이 적용되어 있으나 hover 가시성 보강 */
 .hg-wrap::-webkit-scrollbar{width:10px}
 .hg-wrap::-webkit-scrollbar-thumb{background:#a78bfa;border-radius:8px;border:2px solid #f5f3ff}
 .hg-wrap::-webkit-scrollbar-track{background:#f5f3ff;border-radius:8px}
+.hg-wrap::-webkit-scrollbar-thumb:hover{background:#8f79f3}
 .hg-wrap{scrollbar-color:#a78bfa #f5f3ff;scrollbar-width:thin}
 
 /* 테이블 */

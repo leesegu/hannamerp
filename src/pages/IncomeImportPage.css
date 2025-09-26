@@ -49,6 +49,10 @@ IncomeImportPage.css
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity:.5; cursor:not-allowed; }
 
+/* 아이콘+라벨 보조 */
+.btn .ico{ display:inline-flex; align-items:center; }
+.btn .btn-label{ white-space:nowrap; }
+
 /* 버튼 변형 */
 .btn.excel{
   border:none; color:#fff; font-weight:700;
@@ -64,6 +68,18 @@ IncomeImportPage.css
   border:none; color:#fff; font-weight:700;
   background: linear-gradient(135deg,#00b4d8,#0077b6);
   border-radius:12px;
+}
+
+/* ✅ 확인 버튼(보라) — Modal confirmVariant="primary" 대응 */
+.btn.primary{
+  border:none; color:#fff; font-weight:800;
+  background: linear-gradient(135deg, #7b66ff, #5b46f0);
+  border-radius:12px;
+  box-shadow: 0 6px 18px rgba(109,94,252,.25);
+}
+.btn.primary:hover{
+  box-shadow: 0 8px 22px rgba(109,94,252,.35);
+  filter: brightness(1.02);
 }
 
 /* 삭제모드 버튼 - 켜짐(위험 톤, 진한 레드) */
@@ -87,14 +103,14 @@ IncomeImportPage.css
   position:absolute; left:10px; top:50%; transform:translateY(-50%);
   width:14px; height:14px;
   /* 아이콘: 휴지통(어두운 레드) */
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='%23b4232c'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0 0 1 14.7 23H9.3a3 3 0 0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0 0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='%23b4232c'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0 0 1 14.7 23H9.3a3 3 0  0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0 0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
 }
 /* 켜짐(위험)일 때는 아이콘을 흰색으로 */
 .toolbar .btn.danger[title^="삭제모드"]{
   color:#fff; border-color:transparent;
 }
 .toolbar .btn.danger[title^="삭제모드"]::before{
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='white'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0 0 1 14.7 23H9.3a3 3 0 0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0 0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='white'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0  0 1 14.7 23H9.3a3 3 0  0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0  0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
 }
 
 .search { height:30px; min-width:200px; padding:0 10px; border:1px solid var(--line-strong); border-radius:10px; outline:none; font-size:12px; background:#fff; }
@@ -273,6 +289,8 @@ IncomeImportPage.css
 /* 모달 */
 .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index:50; }
 .modal-card{ width:min(680px, 92vw); background:#fff; border-radius:14px; border:1px solid #ececf2; box-shadow:0 10px 40px rgba(0,0,0,.15); overflow:hidden; }
+/* ✅ 좁은 모달(항목추가 전용): variant="narrow" → class="sm" */
+.modal-card.sm{ width:min(460px, 94vw); }  /* 가로 사이즈 축소 */
 .modal-card.lg{ width:min(1080px, 96vw); }
 .modal-head{ padding:10px 12px; border-bottom:1px solid #f2f2f7; display:flex; align-items:center; justify-content:space-between; }
 .modal-title{ font-weight:700; color:#333; font-size:14px; }
@@ -280,6 +298,13 @@ IncomeImportPage.css
 .modal-body.scrollable{ padding:12px; color:#333; font-size:13px; max-height:70vh; overflow:auto; }
 .modal-foot{ padding:10px 12px; border-top:1px solid #f2f2f7; display:flex; gap:8px; justify-content:flex-end; }
 .dup-list{ margin:8px 0 0 18px; }
+
+/* 모달 닫기(X) 버튼(호환용) */
+.modal-x{
+  border:none; background:transparent; font-size:18px; line-height:1;
+  width:28px; height:28px; border-radius:8px; cursor:pointer; color:#6b7280;
+}
+.modal-x:hover{ background:#f3f4f6; color:#111827; }
 
 /* 미확인 리스트 */
 .unconf-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
@@ -303,3 +328,10 @@ label.del-all{ display:inline-flex; align-items:center; gap:6px; margin-left:8px
 label.del-all input{ width:14px; height:14px; cursor:pointer; }
 label.del-all .del-all-lbl{ font-size:11px; color:#4b3fd1; }
 label.del-all:hover .del-all-lbl{ text-decoration: underline; }
+
+/* 오류 메시지(호환용) */
+.error{
+  white-space:pre-wrap; padding:8px 10px; border-radius:10px;
+  background:#fff0f0; color:#b4232c; border:1px solid #f9c2c8;
+  font-size:12px;
+}
