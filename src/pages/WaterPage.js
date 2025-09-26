@@ -1,5 +1,5 @@
 // src/pages/WaterPage.js
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { db } from "../firebase";
 import { collection, query, where, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import DataTable from "../components/DataTable";
@@ -27,7 +27,7 @@ function CopyableCell({ value }) {
       }
     } catch {}
 
-    // 클립보드 복사 (HTTPS면 Clipboard API, 아니면 execCommand 폴백)
+    // 클립보드 복사
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
@@ -103,6 +103,69 @@ export default function WaterPage() {
     setSelectedVilla(null);
   };
 
+  // ========= ✅ 구 필터 =========
+  const districtOptions = useMemo(() => {
+    const set = new Set(villas.map((v) => (v.district ?? "").trim()).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [villas]);
+
+  const [districtFilter, setDistrictFilter] = useState(""); // ""=전체
+
+  const filteredVillas = useMemo(() => {
+    return villas.filter((v) => {
+      const d = (v.district ?? "").trim();
+      return districtFilter ? d === districtFilter : true;
+    });
+  }, [villas, districtFilter]);
+
+  useEffect(() => {
+    if (districtFilter && !districtOptions.includes(districtFilter)) {
+      setDistrictFilter("");
+    }
+  }, [districtOptions, districtFilter]);
+
+  // 필터 버튼 스타일
+  const btn = {
+    padding: "8px 12px",
+    borderRadius: "10px",
+    border: "1px solid #ddd",
+    background: "#fff",
+    cursor: "pointer",
+    fontSize: 13,
+    lineHeight: 1.1,
+  };
+  const btnActive = {
+    ...btn,
+    background: "#7B5CFF",
+    color: "#fff",
+    borderColor: "#6a4cf0",
+  };
+
+  // 좌측 컨트롤 (구 필터 버튼)
+  const leftControls = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={() => setDistrictFilter("")}
+        style={districtFilter === "" ? btnActive : btn}
+        title="전체"
+      >
+        전체
+      </button>
+      {districtOptions.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setDistrictFilter(opt)}
+          style={districtFilter === opt ? btnActive : btn}
+          title={`${opt}만 보기`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+
   const columns = [
     { label: "코드번호", key: "code" },
     { label: "빌라명", key: "name" },
@@ -135,11 +198,22 @@ export default function WaterPage() {
 
       <DataTable
         columns={columns}
-        data={villas}
+        data={filteredVillas}
         onEdit={handleEdit}
         enableExcel={true}
         excelFields={excelFields}
-        searchableKeys={["code", "name", "district", "address", "water", "waterNumber", "waterOwner", "waterNote"]}
+        searchableKeys={[
+          "code",
+          "name",
+          "district",
+          "address",
+          "water",
+          "waterNumber",
+          "waterOwner",
+          "waterNote",
+        ]}
+        /** ✅ 검색창과 같은 행(좌측)에 구 필터 버튼 배치 */
+        leftControls={leftControls}
       />
 
       <GenericEditModal

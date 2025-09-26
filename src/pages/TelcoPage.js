@@ -192,6 +192,20 @@ export default function TelcoPage() {
   useEffect(() => { if (telcoFilter && !telcoOptions.includes(telcoFilter)) setTelcoFilter(""); }, [telcoOptions, telcoFilter]);
   useEffect(() => { if (ownerFilter && !ownerOptions.includes(ownerFilter)) setOwnerFilter(""); }, [ownerOptions, ownerFilter]);
 
+  /** ================== ✅ 필터 적용 합계(회선수/금액) ================== */
+  const { totalLines, totalAmount } = useMemo(() => {
+    let lines = 0;
+    let amount = 0;
+    for (const v of filteredVillas) {
+      const lc = Number(String(v.telcoLineCount ?? "").replace(/[^\d-]/g, ""));
+      if (Number.isFinite(lc)) lines += lc;
+
+      const amt = Number(String(v.telcoAmount ?? "").replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(amt)) amount += amt;
+    }
+    return { totalLines: lines, totalAmount: amount };
+  }, [filteredVillas]);
+
   /** ================= 테이블 컬럼/엑셀 필드 ================= */
   const columns = [
     { label: "코드번호", key: "code" },
@@ -237,8 +251,25 @@ export default function TelcoPage() {
   const groupInline = { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" };
   const divider = { width: 1, height: 18, background: "#e6e6ef", display: "inline-block", margin: "0 6px" };
 
+  /** ================== ✅ 합계 배지 스타일(폰트 ↓, 줄바꿈 방지 강화) ================== */
+  const badgeWrap = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    background: "#f6f3ff",
+    border: "1px solid #e5dcff",
+    borderRadius: 10,
+    padding: "6px 10px",        // 살짝 컴팩트
+    fontSize: 12,               // ↓ 폰트 축소
+    fontWeight: 700,
+    color: "#5b40cc",
+    whiteSpace: "nowrap",       // 줄바꿈 방지
+    flexShrink: 0,              // 줄바꿈 대신 축소 금지
+    minWidth: "max-content",    // 내부 내용이 한 줄로 유지되도록
+  };
+
   const leftControls = (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", width: "100%" }}>
       {/* 통신사 버튼들 */}
       <div style={groupInline}>
         <button type="button" onClick={() => setTelcoFilter("")} style={telcoFilter === "" ? btnActive : btn} title="통신사 전체">전체</button>
@@ -273,6 +304,16 @@ export default function TelcoPage() {
         >
           하이라이트 해제
         </button>
+      </div>
+
+      {/* 오른쪽으로 밀어내는 스페이서 */}
+      <div style={{ flex: 1 }} />
+
+      {/* ✅ 합계 표시 (검색창 바로 왼쪽 / 절대 줄바꿈 금지) */}
+      <div style={badgeWrap} title="현재 필터에 해당하는 총 회선수와 총 금액">
+        <span>회선수: {totalLines.toLocaleString()}</span>
+        <span style={{ width: 1, height: 14, background: "#e5dcff", display: "inline-block" }} />
+        <span>금액: {totalAmount.toLocaleString()}원</span>
       </div>
     </div>
   );

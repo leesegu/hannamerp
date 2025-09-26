@@ -120,7 +120,7 @@ export default function FireSafetyPage() {
     { label: "소방안전", key: "fireSafety" },
     { label: "금액", key: "fireSafetyAmount", format: formatAmount },
     { label: "안전관리자", key: "fireSafetyManager" },
-    { label: "교육일자", key: "fireSafetyTrainingDate", format: formatDateYYMMDD }, // ⬅️ 빈값이면 빈칸
+    { label: "교육일자", key: "fireSafetyTrainingDate", format: formatDateYYMMDD },
     { label: "비고", key: "fireSafetyNote" },
   ];
 
@@ -158,7 +158,17 @@ export default function FireSafetyPage() {
     if (safetyFilter && !safetyOptions.includes(safetyFilter)) setSafetyFilter("");
   }, [safetyOptions, safetyFilter]);
 
-  // 좌측 버튼들
+  // ===== ✅ 필터 결과 총 금액 =====
+  const totalAmount = useMemo(() => {
+    let amount = 0;
+    for (const v of filteredVillas) {
+      const n = Number(String(v.fireSafetyAmount ?? "").replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(n)) amount += n;
+    }
+    return amount;
+  }, [filteredVillas]);
+
+  // 좌측 버튼들 + 금액 배지
   const btn = {
     padding: "8px 12px",
     borderRadius: "10px",
@@ -170,8 +180,23 @@ export default function FireSafetyPage() {
   };
   const btnActive = { ...btn, background: "#7B5CFF", color: "#fff", borderColor: "#6a4cf0" };
 
+  const badgeWrap = {
+    display: "inline-flex",
+    alignItems: "center",
+    background: "#f6f3ff",
+    border: "1px solid #e5dcff",
+    borderRadius: 10,
+    padding: "6px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#5b40cc",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    minWidth: "max-content",
+  };
+
   const leftControls = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
       <button
         type="button"
         onClick={() => setSafetyFilter("")}
@@ -191,6 +216,14 @@ export default function FireSafetyPage() {
           {opt}
         </button>
       ))}
+
+      {/* 오른쪽으로 밀어내기 */}
+      <div style={{ flex: 1 }} />
+
+      {/* ✅ 총 금액 배지 (검색창 바로 왼쪽) */}
+      <div style={badgeWrap} title="현재 필터에 해당하는 총 금액">
+        총 금액: {totalAmount.toLocaleString()}원
+      </div>
     </div>
   );
 
@@ -211,7 +244,7 @@ export default function FireSafetyPage() {
         /** ✅ 포커스 적용 */
         focusId={focusVilla}
         rowIdKey="id"
-        /** ✅ 검색창과 같은 행(좌측)에 필터 버튼 배치 */
+        /** ✅ 검색창과 같은 행(좌측) — 필터 버튼 + 총 금액 배지 */
         leftControls={leftControls}
       />
 

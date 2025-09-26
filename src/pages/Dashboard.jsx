@@ -169,39 +169,20 @@ function getVillaName(obj) {
   }
   return "-";
 }
-/* 🔸 나머지주소: 주소로 대체(fallback)하지 않음 — 값이 없으면 빈 문자열 반환 */
 function getRestAddress(obj) {
-  const candidates = [
-    "restAddress",
-    "addressRest",
-    "addr2",
-    "address2",
-    "detailAddress",
-    "나머지주소",
-    "추가주소",
-  ];
+  const candidates = ["restAddress","addressRest","addr2","address2","detailAddress","나머지주소","추가주소"];
   for (const p of candidates) {
     const v = getByPath(obj, p);
     if (v) return String(v);
   }
-  return ""; // ← 주소로 대체하지 않음
+  return "";
 }
-/** 🔹 전체 주소 후보키 */
 function getFullAddress(obj) {
-  const candidates = [
-    "address",
-    "addr",
-    "fullAddress",
-    "address1",
-    "주소",
-    "buildingAddress",
-    "addr1",
-  ];
+  const candidates = ["address","addr","fullAddress","address1","주소","buildingAddress","addr1"];
   for (const p of candidates) {
     const v = getByPath(obj, p);
     if (v) return String(v);
   }
-  // 그래도 없으면 addressDetail이라도 제공
   const a2 = getByPath(obj, "addressDetail") || "";
   return String(a2 || "");
 }
@@ -213,17 +194,12 @@ const fmtComma = (n) => {
 };
 
 /* ===== 🔹 이사정산 총액 계산 유틸(입금확인 카드용) ===== */
-const toNum = (v) =>
-  v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0);
-
-const sumExtrasFromArray = (extras) =>
-  (extras || []).reduce((acc, it) => acc + (Number(it?.amount || 0) || 0), 0);
-
+const toNum = (v) => (v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0));
+const sumExtrasFromArray = (extras) => (extras || []).reduce((acc, it) => acc + (Number(it?.amount || 0) || 0), 0);
 const getExtraTotal = (x) => {
   const sx = Array.isArray(x.extras) ? sumExtrasFromArray(x.extras) : 0;
   return sx || toNum(x.extraAmount);
 };
-
 const sumMoveoutTotal = (x) =>
   toNum(x.arrears) +
   toNum(x.currentMonth) +
@@ -309,7 +285,6 @@ export default function Dashboard() {
           // 통신사: 과거/오늘/미래 모두(임박 범위)
           include = (isOverdue || isToday || diff > 0) && withinHorizon;
         } else if (UPCOMING_ONLY_KEYS.has(sec.key)) {
-          // 나머지 4개: 오늘 포함 미래만(과거 제외) + 임박 범위
           include = (diff >= 0) && withinHorizon;
         }
 
@@ -329,7 +304,6 @@ export default function Dashboard() {
 
       // 정렬
       if (sec.key === "telco") {
-        // 예정(가까운 순) → 오늘 → 지난 항목(가까운 과거 순)
         items.sort((a, b) => {
           if (a.isOverdue !== b.isOverdue) return a.isOverdue ? 1 : -1;
           if (!a.isOverdue && !b.isOverdue) {
@@ -348,7 +322,7 @@ export default function Dashboard() {
       let summary = null;
       if (sec.key === "telco") {
         const overdueCount = items.filter((x) => x.isOverdue).length;
-        const upcomingCount = items.length - overdueCount; // 오늘 포함
+        const upcomingCount = items.length - overdueCount;
         const totalCount = items.length;
         summary = `지남 ${overdueCount} · 예정 ${upcomingCount} · 총 ${totalCount}건`;
       }
@@ -360,7 +334,6 @@ export default function Dashboard() {
   /** 하단 섹션(업무 컬렉션) */
   const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // ✅ ‘1차정산’ & ‘보증금제외’ 체크 여부 (배지 표시에만 사용)
   const isFirstAndExclude = (m) => {
     const firstOk = truthyByPaths(m, [
       "firstSettlement", "firstSettle", "first", "isFirstSettlement", "firstCheck", "정산1차", "flags.firstSettlement",
@@ -371,22 +344,19 @@ export default function Dashboard() {
     return firstOk && excludeOk;
   };
 
-  // ✅ 이사정산대기: 상태=정산대기 + (이전 날짜 포함) … moveDate ≤ 오늘
   const sectionMoveoutWait = useMemo(() => {
     return moveouts
       .filter((m) => {
         const prog = (m.progress || m.status || "").trim();
         if (prog !== "정산대기") return false;
-
         const d = toDateSafe(m.moveDate ?? m.movedate);
-        if (!d) return true; // 날짜 없으면 일단 포함
+        if (!d) return true;
         const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        return d0.getTime() <= today0.getTime(); // 과거 + 오늘 포함
+        return d0.getTime() <= today0.getTime();
       })
       .sort((a, b) => String(a.villaName).localeCompare(String(b.villaName)));
   }, [moveouts]);
 
-  // ✅ 이사정산 입금확인: 상태=입금대기 (전체 날짜) + 합계 계산
   const sectionMoveoutDeposit = useMemo(() => {
     const items = moveouts
       .filter((m) => (m.progress || m.status || "").trim() === "입금대기")
@@ -395,44 +365,39 @@ export default function Dashboard() {
     return { items, sum };
   }, [moveouts]);
 
-  // 입주청소 접수확인: **미접수** 인 모든 날짜
   const sectionCleaningUnconfirmed = useMemo(() => {
     return cleanings
       .filter((c) => (c.progress || c.status || "").trim() === "미접수")
       .sort((a, b) => String(a.createdAt || 0) - String(b.createdAt || 0));
   }, [cleanings]);
 
-  // ✅ 미수금: 영수증발행에서 ‘입금날짜’가 없는 모든 건 + 합계
   const sectionReceivables = useMemo(() => {
     const items = receipts
       .filter((r) => !getDepositDate(r))
       .map((r) => ({
         id: r.id,
         villaName: getVillaName(r),
-        restAddr: getRestAddress(r),        // 나머지주소(없으면 빈 문자열)
-        fullAddr: getFullAddress(r),        // 전체 주소
+        restAddr: getRestAddress(r),
+        fullAddr: getFullAddress(r),
         amount: getAmount(r),
-        issueDate: toDateSafe(r.issueDate ?? r.issuedAt ?? r.date), // 정렬용(표시는 안함)
+        issueDate: toDateSafe(r.issueDate ?? r.issuedAt ?? r.date),
       }))
       .sort((a, b) => {
         const ad = a.issueDate ? a.issueDate.getTime() : 0;
         const bd = b.issueDate ? b.issueDate.getTime() : 0;
-        return bd - ad; // 최신일자 우선
+        return bd - ad;
       });
     const sum = items.reduce((acc, r) => acc + (r.amount || 0), 0);
     return { items, sum };
   }, [receipts]);
 
-  /** D-Day 텍스트/색상 규칙 */
-  const ddTextTelco = (diff) =>
-    diff < 0 ? `D+${Math.abs(diff)}` : diff === 0 ? "D-Day" : `D-${diff}`;
+  const ddTextTelco = (diff) => (diff < 0 ? `D+${Math.abs(diff)}` : diff === 0 ? "D-Day" : `D-${diff}`);
   const ddClassTelco = (diff) =>
     diff === 0 ? "dash-dd dash-dd--day" : diff < 0 ? "dash-dd dash-dd--plus" : "dash-dd dash-dd--minus";
-
   const ddTextDefault = (diff) => (diff === 0 ? "D-Day" : `D-${diff}`);
   const ddClassDefault = (diff) => (diff === 0 ? "dash-dd dash-dd--day" : "dash-dd dash-dd--minus");
 
-  /** 항목 클릭 이동 */
+  /** 상단 항목 클릭(빌라기반) → 빌라정보로 */
   const onItemClick = (secKey, villaId) => {
     const map = {
       telco: { go: "빌라정보", sub: "통신사" },
@@ -445,6 +410,18 @@ export default function Dashboard() {
     if (!m) return;
     const url = `/main?go=${encodeURIComponent(m.go)}&sub=${encodeURIComponent(m.sub)}&villa=${encodeURIComponent(villaId)}`;
     navigate(url);
+  };
+
+  /** ✅ 하단 공통 이동 유틸 (필터는 건드리지 않고, '빌라명'으로만 이동/하이라이트) */
+  const goHighlight = ({ go, sub, villa /* tab, row 사용 안 함 */ }) => {
+    // ✅ 라우터 키 보정: "이사정산" → "이사정산 조회"
+    const effectiveGo = go === "이사정산" ? "이사정산 조회" : go;
+    const params = new URLSearchParams({
+      ...(effectiveGo ? { go: effectiveGo } : {}),
+      ...(sub ? { sub } : {}),
+      ...(villa ? { villa } : {}),
+    });
+    navigate(`/main?${params.toString()}`);
   };
 
   /** ✅ 기준 드롭다운(커스텀 메뉴) */
@@ -541,8 +518,8 @@ export default function Dashboard() {
     </div>
   );
 
-  /** 하단 카드 (헤더: 제목 → 금액 → 건 순) */
-  const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null }) => (
+  /** 하단 카드 (헤더: 제목 → 금액 → 건 순) — onRowClick 추가 */
+  const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null, onRowClick }) => (
     <div className="dash-card">
       <div
         className={
@@ -556,7 +533,12 @@ export default function Dashboard() {
       </div>
       <ul className="dash-list">
         {items.map((it) => (
-          <li key={it.id} className="dash-list__item" style={{ cursor: "default" }}>
+          <li
+            key={it.id}
+            className={`dash-list__item ${onRowClick ? "dash-list__item--clickable" : ""}`}
+            onClick={onRowClick ? () => onRowClick(it) : undefined}
+            title={onRowClick ? "클릭하여 해당 페이지로 이동" : undefined}
+          >
             {renderRow(it)}
           </li>
         ))}
@@ -604,6 +586,9 @@ export default function Dashboard() {
           title="이사정산대기"
           items={sectionMoveoutWait}
           tone="amber"
+          onRowClick={(m) => {
+            goHighlight({ go: "이사정산 조회", villa: m.villaName || "" }); // ✅ 이동 키 고정
+          }}
           renderRow={(m) => {
             const showBadges = isFirstAndExclude(m);
             return (
@@ -637,6 +622,9 @@ export default function Dashboard() {
           items={sectionMoveoutDeposit.items}
           tone="blue"
           amountText={`${fmtComma(sectionMoveoutDeposit.sum)}원`}
+          onRowClick={(m) => {
+            goHighlight({ go: "이사정산 조회", villa: m.villaName || "" }); // ✅ 이동 키 고정
+          }}
           renderRow={(m) => {
             const showBadges = isFirstAndExclude(m);
             const total = sumMoveoutTotal(m); // 총 이사정산금액
@@ -667,6 +655,9 @@ export default function Dashboard() {
         <BottomCard
           title="입주청소 접수확인"
           items={sectionCleaningUnconfirmed}
+          onRowClick={(c) => {
+            navigate(`/main?go=${encodeURIComponent("입주청소")}&row=${encodeURIComponent(c.id)}`);
+          }}
           renderRow={(c) => (
             <div className="flex items-center justify-between gap-3 w-full">
               <div className="min-w-0">
@@ -683,14 +674,15 @@ export default function Dashboard() {
           title="미수금"
           items={sectionReceivables.items}
           amountText={`${fmtComma(sectionReceivables.sum)}원`}
+          onRowClick={(r) => {
+            navigate(`/main?go=${encodeURIComponent("영수증발행")}&row=${encodeURIComponent(r.id)}`);
+          }}
           renderRow={(r) => (
             <div className="flex items-center justify-between gap-3 w-full">
               <div className="min-w-0">
-                {/* 윗줄: 빌라명 + (정확한) 나머지주소 */}
                 <div className="title">
                   {r.villaName}{r.restAddr ? ` ${r.restAddr}` : ""}
                 </div>
-                {/* 아랫줄: 전체 주소 */}
                 <div className="sub">
                   {r.fullAddr || "-"}
                 </div>

@@ -9,7 +9,7 @@ import {
   onSnapshot,
   updateDoc,
   doc,
-  deleteField,          // ⬅️ 추가: 필드 삭제용
+  deleteField,          // ⬅️ 필드 삭제용
 } from "firebase/firestore";
 import DataTable from "../components/DataTable";
 import GenericEditModal from "../components/GenericEditModal";
@@ -92,7 +92,7 @@ export default function ElevatorPage() {
 
     // ✅ 검사신청: 비우면 실제 필드 삭제, 값 있으면 포맷
     if (data.inspectionApply === "" || data.inspectionApply == null) {
-      data.inspectionApply = deleteField();          // ⬅️ 핵심: Firestore에서 해당 필드 삭제
+      data.inspectionApply = deleteField();          // ⬅️ Firestore에서 해당 필드 삭제
     } else {
       data.inspectionApply = formatDateYYMMDD(data.inspectionApply);
     }
@@ -130,7 +130,7 @@ export default function ElevatorPage() {
     { label: "안전관리자", key: "safetyManager",    format: formatDateYYMMDD },
     { label: "정기신청",   key: "regularApply",     format: formatDateYYMMDD },
     { label: "정기만료",   key: "regularExpire",    format: formatDateYYMMDD },
-    { label: "검사신청",   key: "inspectionApply",  format: formatDateYYMMDD }, // ⬅️ 빈값이면 빈칸
+    { label: "검사신청",   key: "inspectionApply",  format: formatDateYYMMDD },
     { label: "보험사",     key: "insuranceCompany" },
     { label: "계약일",     key: "contractStart",    format: formatDateYYMMDD },
     { label: "계약만기",   key: "contractEnd",      format: formatDateYYMMDD },
@@ -168,6 +168,16 @@ export default function ElevatorPage() {
     }
   }, [elevatorOptions, elevatorFilter]);
 
+  // ====== ✅ 필터 결과 총 금액 계산 (TelcoPage와 동일 컨셉) ======
+  const totalAmount = useMemo(() => {
+    let amount = 0;
+    for (const v of filteredVillas) {
+      const n = Number(String(v.elevatorAmount ?? "").replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(n)) amount += n;
+    }
+    return amount;
+  }, [filteredVillas]);
+
   // ====== 상단 버튼 (검색창과 같은 행의 좌측) ======
   const btn = {
     padding: "8px 12px",
@@ -180,8 +190,25 @@ export default function ElevatorPage() {
   };
   const btnActive = { ...btn, background: "#7B5CFF", color: "#fff", borderColor: "#6a4cf0" };
 
+  // ✅ 합계 배지 스타일 (TelcoPage와 동일 톤, 줄바꿈 방지)
+  const badgeWrap = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    background: "#f6f3ff",
+    border: "1px solid #e5dcff",
+    borderRadius: 10,
+    padding: "6px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#5b40cc",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    minWidth: "max-content",
+  };
+
   const leftControls = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
       <button
         type="button"
         onClick={() => setElevatorFilter("")}
@@ -201,6 +228,14 @@ export default function ElevatorPage() {
           {opt}
         </button>
       ))}
+
+      {/* 오른쪽으로 밀어내기 */}
+      <div style={{ flex: 1 }} />
+
+      {/* ✅ 필터 결과 총 금액 배지 (검색창 바로 왼쪽) */}
+      <div style={badgeWrap} title="현재 필터에 해당하는 총 금액">
+        <span>총 금액: {totalAmount.toLocaleString()}원</span>
+      </div>
     </div>
   );
 

@@ -100,6 +100,9 @@
 .dash-list__item:hover { background: var(--dash-purple-50); }
 .dash-list__item:active { background: var(--dash-purple-100); transform: translateY(0.5px); }
 
+/* 클릭 가능 변형(하단 패널 라인 전용) */
+.dash-list__item--clickable { cursor: pointer; }
+
 /* 텍스트 통일 */
 .title {
   font-weight: 600;

@@ -1,3 +1,4 @@
+/* src/pages/MoveoutList.mobile.css */
 /* ===============================
    MoveoutList.mobile.css (refined)
    - 부드러운 컬러 팔레트
@@ -7,6 +8,7 @@
 
 /* 팔레트 & 토큰 */
 :root {
+  color-scheme: light; /* iOS 다크테마 강제 반전 방지 */
   --bg: #f7f8fb;
   --card: #ffffff;
   --muted: #6b7280;
@@ -45,6 +47,7 @@
 
 /* 전역 */
 html, body, #root { min-height: 100%; height: auto; overflow: auto; background: var(--bg); }
+img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 페이지 컨테이너 */

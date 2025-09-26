@@ -1,4 +1,3 @@
-// src/pages/MoveoutList.mobile.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -11,8 +10,8 @@ import PageTitle from "../components/PageTitle";
 import ReceiptTemplate from "../components/ReceiptTemplate";
 import "./MoveoutList.mobile.css";
 
-/* ✅ 로그아웃용 (Firebase Auth) */
-import { signOut } from "firebase/auth";
+/* ✅ Auth */
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 
 /* =========================
@@ -256,7 +255,7 @@ function FilterSelect({ value, onChange }) {
   );
 }
 
-/* ===== 상단 계정/메뉴 (등록 · 로그아웃) — CSS와 클래스명 일치 ===== */
+/* ===== 상단 계정/메뉴 (등록 · 로그아웃) ===== */
 function TopKebabMenu({ onRegister, onLogout }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -329,7 +328,7 @@ function pickSmsNumber(row) {
   return cand ? String(cand).replace(/[^\d+]/g, "") : "";
 }
 
-export default function MoveoutListMobile({ employeeId, userId }) {
+export default function MoveoutListMobile() {
   const navigate = useNavigate();
 
   const [rows, setRows] = useState([]);
@@ -345,19 +344,40 @@ export default function MoveoutListMobile({ employeeId, userId }) {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptRow, setReceiptRow] = useState(null);
 
-  const receiptRef = useRef(null); // ✅ 중복 선언 금지: 여기 한 군데만 유지
-
+  const receiptRef = useRef(null);
   const PAGE_SIZE = 8;
   const [page, setPage] = useState(1);
-
   const listRef = useRef(null);
 
+  /* ✅ 모바일 인증 가드 + 인증 후 구독 */
   useEffect(() => {
-    const q = query(collection(db, "moveouts"), orderBy("moveDate", "desc"));
-    return onSnapshot(q, (snap) => {
-      setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    let unsubFs = null;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // 인증이 없으면 로그인으로
+        navigate("/login", { replace: true });
+        // 기존 구독 해제
+        if (unsubFs) { unsubFs(); unsubFs = null; }
+        return;
+      }
+      // 인증되면 Firestore 구독
+      const qy = query(collection(db, "moveouts"), orderBy("moveDate", "desc"));
+      unsubFs = onSnapshot(
+        qy,
+        (snap) => {
+          setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        },
+        (err) => {
+          console.error("moveouts subscribe error:", err);
+        }
+      );
     });
-  }, []);
+
+    return () => {
+      if (unsubFs) unsubFs();
+      if (typeof unsubAuth === "function") unsubAuth();
+    };
+  }, [navigate]);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -426,6 +446,8 @@ export default function MoveoutListMobile({ employeeId, userId }) {
     try {
       await signOut(auth);
       navigate("/login", { replace: true });
+      // 필요시 PWA 캐시갱신:
+      // window.location.reload();
     } catch (e) {
       console.error(e);
       alert("로그아웃 중 오류가 발생했습니다.");
@@ -532,8 +554,6 @@ export default function MoveoutListMobile({ employeeId, userId }) {
       {/* 상단 */}
       <div className="mo-topbar">
         <PageTitle>이사정산 조회</PageTitle>
-
-        {/* ✅ 우측 상단: 케밥 메뉴(등록/로그아웃) — CSS 네이밍과 일치 */}
         <TopKebabMenu onRegister={handleAdd} onLogout={handleLogout} />
       </div>
 
@@ -643,7 +663,7 @@ export default function MoveoutListMobile({ employeeId, userId }) {
         })}
       </div>
 
-      {/* ✅ 하단 페이지네이션 — CSS 네이밍과 통일 */}
+      {/* 하단 페이지네이션 */}
       <div className="mo-pager">
         <button
           className="pager-btn"

@@ -1,6 +1,6 @@
 // src/pages/MoveoutList.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection, onSnapshot, query, orderBy,
@@ -13,7 +13,7 @@ import { jsPDF } from "jspdf";
 import DataTable from "../components/DataTable";
 import PageTitle from "../components/PageTitle";
 import ReceiptTemplate from "../components/ReceiptTemplate";
-import MoveoutForm from "../MoveoutForm"; // ✅ 등록/수정 공용 모달로 사용
+import MoveoutForm from "../MoveoutForm";
 
 const storage = getStorage();
 
@@ -76,17 +76,13 @@ const IconBtn = ({ active = true, type, title, onClick }) => {
   );
 };
 
-/* ✅ 진행현황 색상 규칙 (조회페이지 전용)
-   - 정산대기: 회색
-   - 입금대기: 빨간색
-   - 정산완료: 녹색
-*/
+/* 진행현황 점 색상 */
 const StatusCell = ({ value }) => {
   const v = String(value || "").trim();
-  let color = "#9CA3AF";               // 정산대기(회색)
-  if (v === "입금대기") color = "#EF4444"; // 빨간색
-  if (v === "정산완료") color = "#10B981"; // 녹색
-  if (v === "정산대기") color = "#9CA3AF"; // 회색(명시)
+  let color = "#9CA3AF";
+  if (v === "입금대기") color = "#EF4444";
+  if (v === "정산완료") color = "#10B981";
+  if (v === "정산대기") color = "#9CA3AF";
   const dot = (
     <span
       aria-hidden
@@ -104,7 +100,6 @@ const StatusCell = ({ value }) => {
   return <span>{dot}{v || "-"}</span>;
 };
 
-/* ✅ 아주 은은한 플래그 점(툴팁 제공) */
 const FlagDots = ({ first, exclude }) => {
   const wrap = { display: "inline-flex", gap: 4, marginLeft: 6, verticalAlign: "middle" };
   const dot = (bg, title) => (
@@ -128,35 +123,49 @@ const FlagDots = ({ first, exclude }) => {
   );
 };
 
-/* ---------- 메인 컴포넌트 ---------- */
+/* 빌라명 정규화(공백/대소문자 무시) */
+const normVilla = (s) => String(s ?? "")
+  .trim()
+  .replace(/\s+/g, " ")
+  .toLowerCase();
+
+/* ---------- 메인 ---------- */
 export default function MoveoutList({ employeeId, userId, isMobile }) {
   const navigate = useNavigate();
+  const { search } = useLocation();
+
+  // 대시보드가 넘겨준 쿼리 파라미터
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const paramRowId = params.get("row") || ""; // 백워드 호환
+  const paramVillaRaw = params.get("villa") || params.get("villaName") || "";
+  const paramVilla = normVilla(paramVillaRaw);
 
   const [rows, setRows] = useState([]);
 
-  // ✅ 공용 폼 모달 상태
+  // 공용 폼 모달
   const [formOpen, setFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState("create"); // "create" | "edit"
-  const [currentItem, setCurrentItem] = useState(null); // 편집 시 행 데이터
+  const [formMode, setFormMode] = useState("create");
+  const [currentItem, setCurrentItem] = useState(null);
 
-  // 미니뷰어 & 영수증 미리보기
+  // 미니뷰어 & 영수증
   const [miniOpen, setMiniOpen] = useState(false);
   const [miniType, setMiniType] = useState(null);
   const [miniRow, setMiniRow] = useState(null);
   const [miniPhotoIdx, setMiniPhotoIdx] = useState(0);
 
-  // 🔍 원본 이미지 확대 뷰
   const [fullImageOpen, setFullImageOpen] = useState(false);
   const [fullImageSrc, setFullImageSrc] = useState("");
 
+  // 진행현황 필터(요청: 대시보드 클릭해도 변경하지 않음)
   const [statusFilter, setStatusFilter] = useState("ALL");
 
+  // 🔹 영수증 미리보기 상태 (⚠️ 여기 "한 번만" 선언)
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptRow, setReceiptRow] = useState(null);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState("");
   const receiptRef = useRef(null);
 
-  // 데이터 구독
+  /* 데이터 구독 */
   useEffect(() => {
     const q = query(collection(db, "moveouts"), orderBy("moveDate", "desc"));
     return onSnapshot(q, (snap) => {
@@ -164,7 +173,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     });
   }, []);
 
-  // 필터/합계/정렬
+  /* 필터 */
   const rowsForFilter = useMemo(() => (
     statusFilter === "ALL" ? rows : rows.filter((r) => String(r.status || "") === statusFilter)
   ), [rows, statusFilter]);
@@ -176,8 +185,8 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       .reduce((acc, r) => acc + toNum(sumTotal(r)), 0);
   }, [rows, statusFilter]);
 
-  // ✅ 정렬: 오늘 우선, 그 외 최신순
-  const displayRows = useMemo(() => {
+  /* 정렬 */
+  const sortedRows = useMemo(() => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
 
@@ -194,8 +203,8 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(r.moveDate || "")) ? String(r.moveDate) : "0000-00-00";
       const ymdNum = parseInt(ymd.replace(/-/g, ""), 10) || 0;
 
-      const rank = ymd === todayStr ? 0 : 1; // 0=오늘, 1=그 외
-      const inv = String(99999999 - ymdNum).padStart(8, "0"); // 날짜 내림차순
+      const rank = ymd === todayStr ? 0 : 1;
+      const inv = String(99999999 - ymdNum).padStart(8, "0");
       const sortCombo = `${rank}-${inv}`;
 
       return {
@@ -219,14 +228,43 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     return mapped;
   }, [rowsForFilter]);
 
-  // 테이블 컬럼
+  /* ✅ DataTable의 focusId: (빌라명 → 문서ID) 또는 row=id(백워드) */
+  const focusId = useMemo(() => {
+    if (paramVilla) {
+      const found = sortedRows.find(r => normVilla(r.villaName) === paramVilla);
+      if (found) return found.id;
+    }
+    if (paramRowId) {
+      const found = sortedRows.find(r => r.id === paramRowId);
+      if (found) return found.id;
+    }
+    return "";
+  }, [sortedRows, paramVilla, paramRowId]);
+
+  /* ✅ 표시 배열: 포커스 대상이 항상 보이도록 맨 위로 올림 */
+  const displayRows = useMemo(() => {
+    if (!sortedRows.length || !focusId) return sortedRows;
+    const idx = sortedRows.findIndex(r => r.id === focusId);
+    if (idx > -1) {
+      const target = sortedRows[idx];
+      return [target, ...sortedRows.slice(0, idx), ...sortedRows.slice(idx + 1)];
+    }
+    return sortedRows;
+  }, [sortedRows, focusId]);
+
+  /* 컬럼 (tr 내에 마커 심기: focusId 탐색 보조용) */
   const columns = [
     { label: "이사날짜", key: "moveDate" },
     {
       label: "빌라명",
       key: "villaName",
       render: (row) => (
-        <span style={{ display:"inline-flex", alignItems:"center" }}>
+        <span style={{ display:"inline-flex", alignItems:"center", position:"relative" }}>
+          <span
+            data-row-id={row.id}
+            aria-hidden
+            style={{ position:"absolute", inset:0, width:0, height:0, overflow:"hidden" }}
+          />
           {row.villaName}
           <FlagDots first={!!row.firstSettlement} exclude={!!row.excludeDeposit} />
         </span>
@@ -255,11 +293,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
             active={true}
             type="extras"
             title="추가내역 보기"
-            onClick={() => {
-              setMiniRow(row);
-              setMiniType("extras");
-              setMiniOpen(true);
-            }}
+            onClick={() => { setMiniRow(row); setMiniType("extras"); setMiniOpen(true); }}
           />
         );
       },
@@ -275,12 +309,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
             active={true}
             type="photo"
             title="사진 보기"
-            onClick={() => {
-              setMiniRow(row);
-              setMiniType("photos");
-              setMiniPhotoIdx(0);
-              setMiniOpen(true);
-            }}
+            onClick={() => { setMiniRow(row); setMiniType("photos"); setMiniPhotoIdx(0); setMiniOpen(true); }}
           />
         );
       },
@@ -296,11 +325,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
             active={true}
             type="note"
             title="비고 보기"
-            onClick={() => {
-              setMiniRow(row);
-              setMiniType("note");
-              setMiniOpen(true);
-            }}
+            onClick={() => { setMiniRow(row); setMiniType("note"); setMiniOpen(true); }}
           />
         );
       },
@@ -319,50 +344,30 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     },
   ];
 
-  // ✅ 등록/수정: MoveoutForm 공용 모달로
+  /* 폼/삭제/영수증 함수들 */
   const openForm = ({ mode, item = null }) => {
     setFormMode(mode);
     setCurrentItem(item);
     setFormOpen(true);
   };
-
   const handleAdd = () => {
-    if (isMobile) {
-      navigate("/mobile/form");
-      return;
-    }
+    if (isMobile) { navigate("/mobile/form"); return; }
     openForm({ mode: "create" });
   };
+  const handleEdit = (row) => openForm({ mode: "edit", item: row });
 
-  const handleEdit = (row) => {
-    openForm({ mode: "edit", item: row });
-  };
-
-  // ✅ 삭제: 연동 여부 확인 후 선택 삭제 (캘린더와 동일 규칙)
   const handleDeleteRow = async (row) => {
     if (!row?.id) return;
-
     try {
-      // moveInCleanings에서 이 moveout과 연동된 문서가 있는지 확인
-      const clQ = query(
-        collection(db, "moveInCleanings"),
-        where("sourceMoveoutId", "==", row.id)
-      );
+      const clQ = query(collection(db, "moveInCleanings"), where("sourceMoveoutId", "==", row.id));
       const clSnap = await getDocs(clQ);
 
       if (!clSnap.empty) {
-        // 연동됨: 둘 다 삭제 or 이사정산만 삭제 선택
         const both = window.confirm(
-          "이 항목은 입주청소와 연동되어 있습니다.\n" +
-          "두 데이터(이사정산 + 입주청소)를 모두 삭제하시겠습니까?\n\n" +
-          "[확인] 둘 다 삭제 / [취소] 다음 단계로"
+          "이 항목은 입주청소와 연동되어 있습니다.\n두 데이터(이사정산 + 입주청소)를 모두 삭제하시겠습니까?\n\n[확인] 둘 다 삭제 / [취소] 다음 단계로"
         );
         if (both) {
-          // 입주청소 연동 문서 모두 삭제
-          await Promise.all(
-            clSnap.docs.map((d) => deleteDoc(doc(db, "moveInCleanings", d.id)))
-          );
-          // 이사정산 삭제
+          await Promise.all(clSnap.docs.map((d) => deleteDoc(doc(db, "moveInCleanings", d.id))));
           await deleteDoc(doc(db, "moveouts", row.id));
           return;
         }
@@ -372,7 +377,6 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         return;
       }
 
-      // 연동 안됨: 기존 확인 후 삭제
       if (!window.confirm("해당 이사정산 내역을 삭제할까요?")) return;
       await deleteDoc(doc(db, "moveouts", row.id));
     } catch (e) {
@@ -381,26 +385,19 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     }
   };
 
-  const openReceiptPreview = async (row) => {
-    setReceiptRow(row);
-    setReceiptOpen(true);
-  };
+  const openReceiptPreview = async (row) => { setReceiptRow(row); setReceiptOpen(true); };
 
-  // 영수증 JPG/PDF 저장
-  const downloadReceipt = async (format /* 'jpg' | 'pdf' */) => {
+  const downloadReceipt = async (format) => {
     if (!receiptRef.current || !receiptRow) return;
-
     try {
       const dataUrl = await htmlToImage.toJpeg(receiptRef.current, {
         backgroundColor: "#ffffff",
         quality: 0.95,
         pixelRatio: 2,
       });
-
       const base = `${String(receiptRow.moveDate || "").replace(/-/g, "")}${String(
         receiptRow.villaName || ""
       )}${String(receiptRow.unitNumber || "")}`.replace(/[\\/:*?"<>|]/g, "");
-
       if (format === "jpg") {
         const a = document.createElement("a");
         a.href = dataUrl;
@@ -415,9 +412,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         const usableWidth = pageWidth - margin * 2;
         const imgWidth = usableWidth;
         const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
         const scale = imgHeight > pageHeight - margin * 2 ? (pageHeight - margin * 2) / imgHeight : 1;
-
         pdf.addImage(dataUrl, "JPEG", margin, margin, imgWidth * scale, imgHeight * scale);
         pdf.save(`${base}.pdf`);
       }
@@ -427,7 +422,6 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     }
   };
 
-  // 영수증 미리보기 이미지 생성
   useEffect(() => {
     const run = async () => {
       if (!receiptOpen || !receiptRow) return;
@@ -454,14 +448,13 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     const n = miniRow.photos.length;
     setMiniPhotoIdx((p) => (p + dir + n) % n);
   };
-
   const closeReceiptPreview = async () => {
     setReceiptPreviewUrl("");
     setReceiptRow(null);
     setReceiptOpen(false);
   };
 
-  // 좌측 필터/합계 칩
+  /* 좌측 컨트롤 */
   const leftControls = (
     <>
       <select
@@ -504,6 +497,28 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
 
   return (
     <div className="page-wrapper">
+      {/* ✅ 통신사 페이지와 완전 동일 톤의 노란 하이라이트 */}
+      <style>{`
+        @keyframes pulseGlow {
+          0%   { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.55); }
+          70%  { box-shadow: 0 0 0 12px rgba(255, 235, 59, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0); }
+        }
+        tr.is-highlighted--yellow,
+        tr.is-highlighted--yellow > td,
+        tr.is-highlighted--yellow > th {
+          background: rgba(255, 235, 59, 0.6) !important; /* 행 전체 칠하기 */
+        }
+        .is-highlighted--yellow {
+          animation: pulseGlow 1.4s ease-out 2;
+          transition: background .3s ease;
+        }
+        /* div 기반 셀에도 강제 */
+        .is-highlighted--yellow-cell {
+          background: rgba(255, 235, 59, 0.6) !important;
+        }
+      `}</style>
+
       <PageTitle>이사정산 조회</PageTitle>
 
       <DataTable
@@ -517,6 +532,11 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         enableExcel={false}
         sortKey="__sortCombo"
         sortOrder="asc"
+
+        /* ✅ TelcoPage와 동일: 자동 점프용 */
+        focusId={focusId}
+        rowIdKey="id"
+
         leftControls={leftControls}
       />
 
@@ -653,7 +673,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         >
           <div
             style={{
-              width: "min(640px, 95vw)",       // 600 본문 + 좌우 패딩 여유
+              width: "min(640px, 95vw)",
               maxHeight: "90vh",
               background:"#fff",
               borderRadius:10,
@@ -680,22 +700,13 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
             >
               <strong>영수증 미리보기</strong>
               <div style={{ display:"flex", gap:8 }}>
-                <button
-                  className="save-btn"
-                  onClick={(e) => { e.stopPropagation(); downloadReceipt("jpg"); }}
-                >
+                <button className="save-btn" onClick={(e) => { e.stopPropagation(); downloadReceipt("jpg"); }}>
                   JPG 저장
                 </button>
-                <button
-                  className="save-btn"
-                  onClick={(e) => { e.stopPropagation(); downloadReceipt("pdf"); }}
-                >
+                <button className="save-btn" onClick={(e) => { e.stopPropagation(); downloadReceipt("pdf"); }}>
                   PDF 저장
                 </button>
-                <button
-                  className="close-btn"
-                  onClick={(e) => { e.stopPropagation(); closeReceiptPreview(); }}
-                >
+                <button className="close-btn" onClick={(e) => { e.stopPropagation(); closeReceiptPreview(); }}>
                   닫기
                 </button>
               </div>
@@ -703,22 +714,21 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
 
             <div style={{ padding:16, overflowY:"auto" }}>
               <div style={{ textAlign:"center", marginBottom:12 }}>
-                {receiptPreviewUrl
-                  ? (
-                    <img
-                      src={receiptPreviewUrl}
-                      alt="영수증 미리보기"
-                      style={{
-                        width: 600,
-                        maxWidth: "calc(95vw - 40px)",
-                        height: "auto",
-                        border: "1px solid #eee",
-                        borderRadius: 8
-                      }}
-                    />
-                  ) : (
-                    <div style={{ padding:20, color:"#888" }}>미리보기를 준비 중...</div>
-                  )}
+                {receiptPreviewUrl ? (
+                  <img
+                    src={receiptPreviewUrl}
+                    alt="영수증 미리보기"
+                    style={{
+                      width: 600,
+                      maxWidth: "calc(95vw - 40px)",
+                      height: "auto",
+                      border: "1px solid #eee",
+                      borderRadius: 8
+                    }}
+                  />
+                ) : (
+                  <div style={{ padding:20, color:"#888" }}>미리보기를 준비 중...</div>
+                )}
               </div>
             </div>
 

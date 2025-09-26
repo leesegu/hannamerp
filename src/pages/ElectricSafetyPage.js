@@ -76,6 +76,16 @@ export default function ElectricSafetyPage() {
     }
   }, [safetyOptions, safetyFilter]);
 
+  // ✅ 필터 결과 총 금액
+  const totalAmount = useMemo(() => {
+    let amount = 0;
+    for (const v of filteredVillas) {
+      const n = Number(String(v.electricSafetyAmount ?? "").replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(n)) amount += n;
+    }
+    return amount;
+  }, [filteredVillas]);
+
   // 테이블 컬럼
   const columns = [
     { label: "코드번호", key: "code" },
@@ -102,7 +112,7 @@ export default function ElectricSafetyPage() {
     { label: "비고", key: "electricSafetyNote" },
   ];
 
-  // ===== 상단 버튼(검색창과 같은 행, 좌측 끝) — 다른 페이지와 동일한 느낌 =====
+  // ===== 상단 버튼(검색창과 같은 행, 좌측 끝) + 총 금액 배지 =====
   const btn = {
     padding: "8px 12px",
     borderRadius: "10px",
@@ -114,8 +124,24 @@ export default function ElectricSafetyPage() {
   };
   const btnActive = { ...btn, background: "#7B5CFF", color: "#fff", borderColor: "#6a4cf0" };
 
+  // 배지 스타일 (다른 페이지와 동일 톤)
+  const badgeWrap = {
+    display: "inline-flex",
+    alignItems: "center",
+    background: "#f6f3ff",
+    border: "1px solid #e5dcff",
+    borderRadius: 10,
+    padding: "6px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#5b40cc",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    minWidth: "max-content",
+  };
+
   const leftControls = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
       <button
         type="button"
         onClick={() => setSafetyFilter("")}
@@ -132,9 +158,17 @@ export default function ElectricSafetyPage() {
           style={safetyFilter === opt ? btnActive : btn}
           title={`${opt}만 보기`}
         >
-        {opt}
+          {opt}
         </button>
       ))}
+
+      {/* 오른쪽으로 밀어내기 */}
+      <div style={{ flex: 1 }} />
+
+      {/* ✅ 총 금액 배지 (검색창 바로 왼쪽) */}
+      <div style={badgeWrap} title="현재 필터에 해당하는 총 금액">
+        총 금액: {totalAmount.toLocaleString()}원
+      </div>
     </div>
   );
 
@@ -151,7 +185,7 @@ export default function ElectricSafetyPage() {
         searchableKeys={[
           "code", "name", "district", "address", "electricSafety", "electricSafetyNote"
         ]}
-        /** ⬇️ 검색창과 같은 행의 '좌측' 슬롯에 필터 버튼 배치 */
+        /** ⬇️ 검색창과 같은 행의 '좌측' 슬롯에 필터 버튼 + 총 금액 배지 배치 */
         leftControls={leftControls}
       />
 

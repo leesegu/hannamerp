@@ -1,152 +1,248 @@
-/* ============== 밝은 라이트 + 고가독 보라톤 ============== */
+/* src/pages/MonthlyClosePage.css */
+
+/* ===== Light Prism UI ===== */
 :root{
-  --bg: #f7f6ff;
-  --card: #ffffff;
-  --border: #ebe6ff;
-  --ink: #2d2940;
-  --muted: #7a73a6;
-  --brand: #6a58ff;
-  --brand-2: #a68bff;
-  --good: #169a63;
-  --bad: #e15050;
-  --shadow: 0 12px 30px rgba(106, 88, 255, 0.10), 0 2px 10px rgba(0,0,0,.04);
+  --ink:#1c2240; --muted:#6b75a1;
+  --bg:#f7f9ff; --card:#ffffff; --line:#e6e9f5;
+  --p1:#7b5cff; --p2:#4fb7ff; --p3:#ff8bd5; --p4:#2ad69f;
+  --good:#10a778; --bad:#e74c5c;
+  --shadow-lg:0 20px 40px rgba(33,48,120,.10);
+  --shadow-md:0 8px 20px rgba(33,48,120,.08);
+  --pane-h: 700px;
+  --scroll-thumb:#dcd4ff; --scroll-track:#f5f2ff;
+
+  --blue-strong:#1d4ed8;
 }
 
-*{ box-sizing: border-box; }
+*{ box-sizing:border-box; }
 html,body,#root{ height:100%; }
-body{ color:var(--ink); background:var(--bg); }
-
-/* 컨테이너 */
-.mc2-wrap{
-  display:flex; flex-direction:column; min-height:100%;
-  gap:14px; padding:18px;
+body{
+  margin:0; overflow:hidden; color:var(--ink);
   background:
-    radial-gradient(1100px 500px at -15% -20%, #efeaff 0%, transparent 60%),
-    radial-gradient(800px 400px at 120% -10%, #f7e9ff 0%, transparent 65%),
+    radial-gradient(900px 480px at -10% -10%, #eef1ff 0%, transparent 60%),
+    radial-gradient(900px 480px at 110% -10%, #fbefff 0%, transparent 60%),
     var(--bg);
   font-family: ui-sans-serif, system-ui, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", Arial;
+  font-size:14px;
 }
 
-/* 헤더 */
-.mc2-header{
-  background: var(--card); border:1px solid var(--border); border-radius:18px; box-shadow: var(--shadow);
-  padding:14px 16px; display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:10;
+/* 공통 스크롤 */
+.scroll-soft, .mc4-table-wrap, .monthly-wrap{
+  scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
-.mc2-title{
-  display:flex; align-items:center; gap:8px; font-weight:900; color:#4d3eea; letter-spacing:.2px;
-}
-.mc2-title i{ font-size:20px; }
+.scroll-soft::-webkit-scrollbar, .mc4-table-wrap::-webkit-scrollbar, .monthly-wrap::-webkit-scrollbar{ height:10px; width:10px; }
+.scroll-soft::-webkit-scrollbar-track, .mc4-table-wrap::-webkit-scrollbar-track, .monthly-wrap::-webkit-scrollbar-track{ background:var(--scroll-track); border-radius:10px; }
+.scroll-soft::-webkit-scrollbar-thumb, .mc4-table-wrap::-webkit-scrollbar-thumb, .monthly-wrap::-webkit-scrollbar-thumb{ background:var(--scroll-thumb); border-radius:10px; }
 
-.mc2-controls{ margin-left:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.mc2-month{ display:flex; align-items:center; gap:8px; color:var(--muted); font-weight:700; }
-.mc2-month input{
-  appearance:none; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--ink);
-  outline:none;
+/* 상단 헤더 — 애니메이션 제거, 정적 그라디언트 강화 */
+.mc4-wrap{ height:100%; display:flex; flex-direction:column; gap:16px; padding:16px 18px; overflow:hidden; }
+.mc4-header.fancy{
+  position:relative; overflow:visible;
+  border:1px solid var(--line); border-radius:18px; box-shadow: var(--shadow-md);
+  padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex:0 0 auto;
+  z-index:120;
 }
-.mc2-tabs{ display:flex; gap:6px; }
-.mc2-tab{
-  padding:8px 14px; border-radius:999px; border:1px solid var(--border); background:#fff;
-  color:#5c4ef7; font-weight:800; cursor:pointer; transition:.15s transform, .15s box-shadow;
-}
-.mc2-tab.is-on{ background:linear-gradient(90deg,#b7a5ff,#8b75ff); color:#fff; border-color:#b7a5ff; box-shadow:0 7px 18px rgba(106,88,255,.25); }
-.mc2-tab:hover{ transform: translateY(-1px); }
-
-.mc2-search{
-  position:relative; display:flex; align-items:center; gap:8px; border:1px solid var(--border); background:#fff; border-radius:10px; padding:6px 10px;
-}
-.mc2-search i{ color:#867bcc; }
-.mc2-search input{
-  border:none; outline:none; width:220px; font-size:14px; color:var(--ink); background:transparent;
-}
-.mc2-search .mc2-clear{
-  border:none; background:transparent; cursor:pointer; color:#9a90dc; font-size:18px;
+.mc4-header.static-gradient{
+  background:
+    radial-gradient(1200px 220px at -10% 0%, rgba(123,92,255,.20), transparent 60%),
+    radial-gradient(1200px 220px at 110% 100%, rgba(79,183,255,.20), transparent 60%),
+    radial-gradient(900px 240px at 50% 100%, rgba(255,139,213,.20), transparent 60%),
+    linear-gradient(120deg, #ffffff 0%, #faf8ff 100%);
 }
 
-/* 카드 */
-.mc2-cards{
-  display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:12px;
-}
-.mc2-card{
-  background:#fff; border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow);
-  padding:14px 16px; position:relative; overflow:hidden;
-}
-.mc2-card::after{
-  content:""; position:absolute; right:-40px; top:-40px; width:150px; height:150px; border-radius:50%;
-  background: radial-gradient(circle at 30% 30%, rgba(166,139,255,.45), rgba(106,88,255,.20), transparent 70%);
-  filter: blur(6px);
-}
-.mc2-card-label{ font-size:12px; color:#6f67a8; font-weight:900; letter-spacing:.25px; }
-.mc2-card-value{ margin-top:6px; font-weight:900; font-size:22px; color:var(--ink); }
-.mc2-card-value.inc{ color:#18905f; }
-.mc2-card-value.exp{ color:#d84b4b; }
-.mc2-card.good .mc2-card-value{ color:#18905f; }
-.mc2-card.bad .mc2-card-value{ color:#d84b4b; }
+.mc4-title{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; font-weight:900; color:#321fff; font-size:20px; letter-spacing:.25px; text-shadow:0 1px 0 #fff; }
+.mc4-title i{ font-size:22px; }
+.mc4-controls{ position:relative; z-index:1; display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-left:auto; }
 
-/* 본문 2컬럼 */
-.mc2-body{
-  display:grid; grid-template-columns: 480px 1fr; gap:14px;
-}
-.mc2-left, .mc2-right{ min-height:420px; }
+/* ▶ 수입/지출 버튼 사이 간격 (축소) */
+.mc4-tabs{ display:flex; gap:10px; }
 
-.mc2-box{
-  background:#fff; border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow); padding:12px;
-  display:flex; flex-direction:column; gap:10px; min-height:0;
+/* MonthPicker */
+.mp-wrap{ position:relative; z-index:150; }
+.mp-trigger{
+  display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 12px; border-radius:10px;
+  border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:800; cursor:pointer;
+  transition:.12s transform, .12s box-shadow, .12s border-color; font-size:13px;
 }
-.mc2-box-title{
-  font-weight:900; color:#4d3eea; display:flex; align-items:center; gap:8px;
-}
-.mc2-sub{ color:#8a83b7; font-weight:700; margin-left:6px; }
+.mp-trigger:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.mp-trigger .caret{ margin-left:2px; color:#8b95c7; }
 
-/* 테이블 공통 */
-.mc2-table-wrap{ overflow:auto; border-radius:12px; border:1px solid var(--border); }
-.mc2-table{ width:100%; border-collapse: collapse; background:#fff; }
-.mc2-table thead th{
-  position:sticky; top:0; z-index:1; background:linear-gradient(0deg,#f7f5ff,#ffffff 70%); color:#4b3d86;
-  text-align:left; font-weight:900; font-size:13px; border-bottom:1px solid var(--border);
-  padding:10px 12px;
+.mp-pop{
+  position:absolute; right:0; top:40px; width:320px; border-radius:14px;
+  background:#fff; border:1px solid var(--line); box-shadow: var(--shadow-lg); padding:10px; z-index:200;
+  transform-origin: 100% 0%;
+  animation: mpIn .12s ease-out;
 }
-.mc2-table tfoot td{
-  position:sticky; bottom:0; background:linear-gradient(180deg,#f7f5ff,#ffffff 70%); font-weight:900; border-top:1px solid var(--border);
-  padding:10px 12px;
-}
-.mc2-table td{
-  border-bottom:1px solid #f3efff; padding:10px 12px; font-size:14px;
-}
-.mc2-table .num{ text-align:right; font-variant-numeric: tabular-nums; }
-.mc2-table tbody tr:hover{ background:#faf8ff; }
-.mc2-table tbody tr.is-picked{ background: rgba(138, 114, 255, .12); border-left:3px solid var(--brand); }
-.mc2-table .cat{ font-weight:800; color:#3c2e88; display:flex; align-items:center; gap:8px; }
-.mc2-table .cat .dot{ width:8px; height:8px; border-radius:50%; background:#8b75ff; box-shadow:0 0 0 3px rgba(139,117,255,.15); }
-.mc2-table .memo{ color:#8078ab; }
-.mc2-table .empty{ text-align:center; color:#9a90c7; padding:18px 8px; }
+@keyframes mpIn{ 0%{ opacity:0; transform: scale(.98); } 100%{ opacity:1; transform: scale(1); } }
 
-/* 선택 해제 칩 */
-.mc2-chip-clear{
-  align-self:flex-start; margin-top:6px;
-  border:1px dashed var(--border); background:#fff; color:#5c4ef7; font-weight:800; border-radius:999px; padding:6px 10px; cursor:pointer;
+/* ───────── 달력 팝오버 상단: 년도 중앙, 전/내년도 버튼 위치 조금 아래 ───────── */
+.mp-head.grid{
+  position:relative;
+  padding-top:2px;
+  padding-bottom:8px;
+  min-height:34px;
+}
+.mp-head .yr{
+  text-align:center;
+  font-weight:900;
+  color:#2e2a7b;
+  font-size:20px;
+}
+.mp-head .nav{
+  position:absolute;
+  top:15px;                       /* ▼ 버튼 약간 아래로 */
+  width:34px; height:34px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  background:#fff;
+  color:#4b3fe7;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+}
+.mp-head .nav.nav-prev{ left:0; }  /* 좌측: 전년도 */
+.mp-head .nav.nav-next{ right:0; } /* 우측: 내년도 */
+
+.mp-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.mm{
+  height:44px; border-radius:10px; border:1px solid #eceffd; background:linear-gradient(0deg,#ffffff,#f7f8ff);
+  color:#2a236e; font-weight:900; cursor:pointer; transition:.12s transform, .12s box-shadow, .12s border-color, .12s background; font-size:13px;
+}
+.mm:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); border-color:#dfe5ff; }
+.mm.is-picked{ border-color:transparent; background:linear-gradient(90deg, var(--p1), var(--p2)); color:#fff; box-shadow: var(--shadow-lg); }
+.mp-foot{ display:flex; justify-content:space-between; margin-top:10px; }
+.mp-today{ display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px; border:1px solid #dff4ea; background:#f0fff8; color:#0a8f64; font-weight:900; font-size:12px; }
+.mp-close{ padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:800; font-size:12px; }
+
+/* 탭/검색 */
+.mc4-tab{ display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 12px; border-radius:999px; border:1px solid var(--line); background:#fff; color:#4b3fe7; font-weight:900; cursor:pointer; transition:.12s transform, .12s box-shadow, .12s background; font-size:13px; }
+.mc4-tab:hover{ transform:translateY(-1px); box-shadow:var(--shadow-md); }
+.mc4-tab.is-on{ background:linear-gradient(90deg, var(--p1), var(--p2)); color:#fff; border-color:transparent; box-shadow:var(--shadow-lg); }
+.mc4-search{ display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:#fff; border-radius:10px; padding:6px 10px; transition: border-color .12s, box-shadow .12s; }
+.mc4-search i{ color:#7B5CFF; }
+.mc4-search:focus-within{ border-color:#8d7bff; box-shadow:0 0 0 3px rgba(141,123,255,.18); }
+.mc4-search input{ border:none; outline:none; width:200px; font-size:13px; color:var(--ink); background:transparent; }
+.mc4-search.gap-left{ margin-left:22px; }
+
+/* KPI */
+.mc4-kpis.tight{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; flex:0 0 auto; }
+.mc4-kpi.glam{
+  position:relative; overflow:hidden; border-radius:16px; padding:12px 14px 10px 14px;
+  background:linear-gradient(135deg,#ffffff 0%,#faf8ff 100%); border:1px solid var(--line); box-shadow:var(--shadow-md); min-height:96px;
+}
+.mc4-kpi .kpi-label.big{ position:absolute; top:10px; left:12px; display:flex; align-items:center; gap:8px; font-size:15px; color:#3c35a8; font-weight:900; letter-spacing:.3px; text-shadow:0 1px 0 #fff; }
+.mc4-kpi .kpi-value.giant{ position:absolute; right:14px; bottom:10px; font-weight:900; font-size:32px; color:#11153b; text-shadow:0 1px 0 #fff; }
+.income-blue{ color: var(--blue-strong) !important; }
+.mc4-kpi.exp .kpi-value{ color:#e55361; }
+.mc4-kpi.good .kpi-value{ color:#0c9c6c; }
+.mc4-kpi.bad .kpi-value{ color:#e55361; }
+
+/* 본문 3열 */
+.mc4-body.mc4-3col.equal{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; min-height:0; flex:1 1 auto; }
+.mc4-pane{ min-height:0; }
+.mc4-box{ height:var(--pane-h); background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow-md); padding:10px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:10; }
+
+/* 월마감 데이터 테이블 (좌측 패널을 동일 높이로) */
+.monthly-wrap{ border:1px solid var(--line); border-radius:12px; background:#fff; overflow:auto; }
+.monthly-wrap.tall{ height: calc(var(--pane-h) - 60px); } /* ▶ 항목별/일자별과 동일 높이 */
+.monthly-table{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+
+/* ───────── 표 헤더 중앙 정렬(기본) ───────── */
+.monthly-table thead th{
+  position:sticky; top:0; z-index:1;
+  background:linear-gradient(0deg,#f1efff,#ffffff 70%);
+  color:#3b348b;
+  text-align:center;
+  font-weight:900; font-size:12px;
+  border-bottom:1px solid var(--line);
+  padding:8px 10px;
+}
+.mc4-table thead th{
+  position:sticky; top:0; z-index:1;
+  background: linear-gradient(0deg, #f3f2ff, #ffffff 70%);
+  color:#3b348b;
+  text-align:center;
+  font-weight:900; font-size:12px;
+  border-bottom:1px solid var(--line);
+  padding:8px 10px;
 }
 
-/* overlay */
-.mc2-overlay{
-  position:fixed; inset:0; background:rgba(255,255,255,.5); backdrop-filter: blur(2px);
-  display:flex; align-items:center; justify-content:center; z-index:50;
-}
-.mc2-overlay.error{ background:rgba(255, 236, 236, .65); }
-.mc2-loader{
-  background:#fff; border:1px solid var(--border); border-radius:14px; box-shadow: var(--shadow);
-  padding:16px 18px; font-weight:800; color:#4f3fe6; display:flex; align-items:center; gap:10px;
-}
-.mc2-loader .spinner{
-  width:18px; height:18px; border-radius:50%; border:3px solid #d8d3ff; border-top-color:#6a58ff; display:inline-block;
-  animation: mc2spin .9s linear infinite;
-}
-@keyframes mc2spin { to { transform: rotate(1turn); } }
+/* ───────── 요청: 특정 제목만 좌측 정렬 ───────── */
+/* 좌측 표: 월 */
+.monthly-table thead th:first-child{ text-align:left; }
 
-/* 반응형 */
-@media (max-width: 1100px){
-  .mc2-body{ grid-template-columns: 1fr; }
+/* 중앙 표: 지출 탭일 때만(대분류가 존재) 좌측 정렬 — :has() 사용 */
+.mc4-pane:nth-child(2) .mc4-table:has(.row-big) thead th:first-child{ text-align:left; }
+
+/* 우측 표: '대분류'만 좌측 정렬 (두 번째 헤더이며 .num이 아님) */
+.mc4-pane:nth-child(3) .mc4-table.sticky thead th:first-child {
+  text-align: left;
 }
-@media (max-width: 820px){
-  .mc2-cards{ grid-template-columns: 1fr; }
-  .mc2-search input{ width: 160px; }
+.mc4-pane:nth-child(3) .mc4-table.sticky thead th:nth-child(2):not(.num){ text-align:left; }
+
+.monthly-table td{ border-bottom:1px solid #f0f2fa; padding:6px 10px; color:var(--ink); }
+.monthly-table .mono{ font-variant-numeric: tabular-nums; }
+.monthly-table tr.is-current td{ background:#f7f5ff; }
+
+/* ▶ 게이지 위 금액(검정) — 폰트 축소 + 굵지 않음 + 짧아도 표시 */
+.bar-cell{ height:22px; position:relative; overflow:visible; }
+.bar-cell .bar{
+  position:relative;
+  height:22px; border-radius:11px; display:flex; align-items:center; padding:0 8px;
+  background:#f3f5fd; border:1px solid #e9ecf7;
+  overflow:visible;
 }
+.bar-cell .bar.blue{ background:#3a86ff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35); }
+.bar-cell .bar.pink{ background:#ff6b88; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35); }
+.bar-cell .bar .val.onbar{
+  position:absolute; top:50%; transform:translateY(-50%);
+  left:8px; white-space:nowrap;
+  color:#111;
+  font-weight:400;               /* 굵지 않게 */
+  font-size:11px;                /* 조금 축소 */
+  letter-spacing:.1px;
+  pointer-events:none;
+}
+
+/* 표 래퍼/표 공통 */
+.mc4-table-wrap{ border:1px solid var(--line); border-radius:12px; background:#fff; overflow:auto; }
+.mc4-table-wrap.tall{ height: calc(var(--pane-h) - 60px); }
+.mc4-table{ width:100%; border-collapse: collapse; background:#fff; font-size:13px; }
+.mc4-table td{ border-bottom:1px solid #f0f2fa; padding:8px 10px; color:var(--ink); }
+.mc4-table .num{ text-align:right; font-variant-numeric: tabular-nums; }
+.mc4-table .empty{ text-align:center; color:#9aa0c8; padding:14px 8px; }
+.mc4-table.compact td{ padding:8px 10px; }
+.mc4-table tbody tr:hover{ background:#fafaff; }
+.mc4-table .cat{ font-weight:800; color:#2a236e; display:flex; align-items:center; gap:8px; }
+.mc4-table .cat .dot{ width:8px; height:8px; border-radius:50%; background:#7b5cff; box-shadow:0 0 0 4px rgba(123,92,255,.15); }
+.mc4-table .cat .dot.small{ width:6px; height:6px; box-shadow:0 0 0 3px rgba(123,92,255,.12); }
+.mc4-table tbody tr.is-picked{ background:#f2f0ff; box-shadow: inset 3px 0 0 var(--p1); }
+
+/* 비율바 */
+.bar{ position:relative; height:12px; border-radius:999px; overflow:hidden; background:#f3f5fd; border:1px solid #e9ecf7; }
+.bar.bar-tall{ height:16px; }
+.bar-fill{ height:100%; background: linear-gradient(90deg, var(--p1), var(--p2), var(--p3)); transition: width .25s ease; }
+.bar-txt{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#3b348b; }
+
+/* 지출 아코디언 */
+.row-big{ background:#fbfaff; cursor:pointer; }
+.row-big:hover{ background:#f6f3ff; }
+.row-sub .subindent{ padding-left:26px; display:flex; align-items:center; gap:8px; }
+.accordion{ width:16px; height:16px; border-radius:4px; margin-right:8px; background:#fff; border:1px solid var(--line); position:relative; flex-shrink:0; }
+.accordion::before, .accordion::after{ content:""; position:absolute; background:#6f6cc0; }
+.accordion::before{ width:8px; height:2px; top:7px; left:4px; }
+.accordion::after{ width:2px; height:8px; top:4px; left:7px; transition: transform .15s; }
+.accordion.open::after{ transform: scaleY(0); }
+
+/* 날짜 섹션 */
+.date-row .date-cell{ font-weight:900; color:#2e2a7b; }
+
+/* 로딩/토스트 */
+.mc4-loading{ display:grid; gap:12px; }
+.sk-cards{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
+.sk-card{ height:86px; border-radius:12px; background: linear-gradient(90deg, #f3f5ff, #ffffff, #f3f5ff); background-size: 200% 100%; animation: sk 1.2s infinite; border:1px solid var(--line); box-shadow: var(--shadow-md); }
+.sk-panels{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+.sk-panel{ height:var(--pane-h); border-radius:12px; background: linear-gradient(90deg, #f3f5ff, #ffffff, #f3f5ff); background-size: 200% 100%; animation: sk 1.2s infinite; border:1px solid var(--line); box-shadow: var(--shadow-md); }
+@keyframes sk{ 0%{ background-position: 0% 0; } 100%{ background-position: 200% 0; } }
+
+.mc4-toast{ position:fixed; bottom:14px; right:14px; z-index:300; display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#111827; color:#fff; font-weight:900; border:1px solid #0b1220; box-shadow: var(--shadow-lg); }
+.mc4-toast.error{ background:#8b1d2e; border-color:#f3c0c7; }
