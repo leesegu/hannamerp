@@ -42,6 +42,8 @@ import MonthlyClosePage from "./pages/MonthlyClosePage";
 import AnnualSheetPage from "./pages/AnnualSheetPage";
 
 import MessageExtractor from "./pages/MessageExtractor";
+/* ✅ 공용전기 계산 라우트 추가 */
+import PublicElectricCalcPage from "./pages/PublicElectricCalcPage";
 import CalendarPage from "./pages/CalendarPage";
 import PaperingPage from "./pages/PaperingPage";
 import MemoPage from "./pages/MemoPage";
@@ -207,6 +209,12 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/extract"
         element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MessageExtractor />}
+      />
+
+      {/* ✅ 공용전기 계산 (직접 URL 접근용 라우트 추가) */}
+      <Route
+        path="/public-electric-calc"
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PublicElectricCalcPage />}
       />
 
       {/* 캘린더 */}

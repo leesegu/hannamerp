@@ -1,0 +1,167 @@
+/* src/pages/PublicElectricCalcPage.css */
+
+/* ===== 라이트 테마 베이스 ===== */
+.pe-page.light {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background:
+    radial-gradient(1200px 600px at -10% -10%, rgba(125, 106, 255, .08), transparent),
+    radial-gradient(1200px 600px at 110% -10%, rgba(236, 72, 153, .08), transparent),
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  min-height: 100%;
+  box-sizing: border-box;
+  color: #0f172a;
+}
+
+/* ===== 툴바 ===== */
+.pe-toolbar {
+  display: grid;
+  grid-template-columns: 1fr max-content;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(900px 300px at -10% -10%, rgba(125, 106, 255, .12), transparent),
+    radial-gradient(900px 300px at 110% -10%, rgba(236, 72, 153, .10), transparent),
+    #ffffff;
+  box-shadow:
+    0 10px 30px rgba(15, 23, 42, .06),
+    inset 0 0 0 1px rgba(2, 6, 23, .04);
+}
+.pe-toolbar.fancy { border: 1px solid rgba(2, 6, 23, .06); }
+
+.pe-left { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.pe-right { display: flex; align-items: center; gap: 12px; }
+
+/* ===== 버튼 & 드롭다운 ===== */
+.pe-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(2, 6, 23, .08);
+  border-radius: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #0f172a;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(2, 6, 23, .06);
+  transition: transform .08s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.pe-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(2, 6, 23, .08); }
+.pe-btn:active { transform: translateY(0); opacity: .95; }
+
+/* ⛔ 업로드 버튼 애니메이션 제거용 */
+.pe-btn.gradient { 
+  color: #fff; border: 0;
+  background-image: linear-gradient(90deg, #7c3aed, #4f46e5, #06b6d4);
+  background-size: 100% 100%;
+  animation: none;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, .25);
+}
+
+.pe-btn.outline { background: #fff; color: #334155; }
+.pe-btn.outline.active { border-color: #7b5cff; box-shadow: 0 0 0 3px rgba(123, 92, 255, .18); }
+
+/* ✅ 수정 버튼 컬러 강조 */
+.edit-colored { 
+  background: #eef2ff; 
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+.edit-colored.active {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+.pe-btn.danger { background: #fff1f2; color: #b91c1c; border-color: #fecdd3; }
+
+.pe-actions { display: inline-grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 8px; }
+
+.pe-select-wrap { display: grid; gap: 6px; }
+.pe-select-wrap label { font-size: 12px; color: #475569; }
+
+.pe-select {
+  height: 40px; border-radius: 12px; border: 1px solid rgba(2, 6, 23, .12);
+  padding: 0 12px; background: #ffffff; color: #0f172a; outline: none; font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(2, 6, 23, .02);
+}
+.pe-select:focus { border-color: rgba(99, 102, 241, .5); box-shadow: 0 0 0 3px rgba(99, 102, 241, .2); }
+
+.pe-select.method.danger {
+  background: #fff5f5; border-color: #fecaca; color: #b91c1c; font-weight: 900;
+}
+
+/* ===== 요약 배지 ===== */
+.pe-badges { display: inline-grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 8px; }
+.pe-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 14px; border-radius: 999px;
+  background: #ffffff; color: #334155; border: 1px solid rgba(2, 6, 23, .08);
+  box-shadow: inset 0 0 0 1px rgba(2, 6, 23, .02); font-size: 13px;
+}
+.pe-badge b { font-weight: 900; color: #0f172a; padding-left: 4px; }
+
+/* ===== 테이블 카드 ===== */
+.pe-grid { display: grid; }
+.pe-table-card {
+  background:
+    radial-gradient(1200px 500px at -10% 0%, rgba(99, 102, 241, .08), transparent),
+    radial-gradient(1000px 500px at 110% 10%, rgba(236, 72, 153, .07), transparent),
+    #ffffff;
+  border-radius: 18px; border: 1px solid rgba(2, 6, 23, .08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .06), inset 0 0 0 1px rgba(2, 6, 23, .02);
+  overflow: hidden;
+}
+.pe-table-scroll { overflow: auto; max-height: calc(100vh - 240px); }
+
+/* ===== 테이블 ===== */
+.pe-table {
+  width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1140px; color: #0f172a;
+}
+.pe-table thead th {
+  position: sticky; top: 0; z-index: 2; text-align: center; height: 42px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(2, 6, 23, .08); font-weight: 900; letter-spacing: .2px;
+}
+.pe-table tbody td { height: 46px; border-bottom: 1px dashed rgba(2, 6, 23, .08); padding: 0 10px; }
+.pe-table td.c { text-align: center; }
+.pe-table td.l { text-align: left; }
+.pe-table td.r { text-align: right; }
+.pe-table td.muted { color: #94a3b8; }
+.pe-table tbody tr:hover td { background: rgba(59, 130, 246, .06); }
+
+/* ===== 빌라 표시 ===== */
+.pe-villa { display: grid; line-height: 1.22; }
+.pe-villa-name { font-weight: 900; color: #0f172a; }
+.pe-villa-cust { font-size: 12px; color: #6366f1; }
+.pe-villa-cust.empty { color: #dc2626; }
+
+/* ===== 입력 ===== */
+.pe-input {
+  width: 100%; height: 36px; border-radius: 10px; border: 1px solid rgba(2, 6, 23, .12);
+  padding: 0 10px; background: #ffffff; color: #0f172a; outline: none; font-weight: 700;
+}
+.pe-input:focus { border-color: rgba(99, 102, 241, .5); box-shadow: 0 0 0 3px rgba(99, 102, 241, .2); }
+.pe-input.num { text-align: right; }
+
+.pe-money-edit { display: grid; grid-template-columns: 1fr max-content; align-items: center; gap: 8px; }
+.pe-money-edit .unit { font-size: 12px; color: #64748b; opacity: .9; }
+
+/* ===== 강조/상태 ===== */
+.strong { font-weight: 900; color: #0f172a; }
+
+/* ✅ 차액 +값 연녹색(더 옅게) */
+td.pos { color: #baecb8; font-weight: 900; }
+td.neg { color: #dc2626; font-weight: 900; }
+
+/* ✅ 청구요금 비어있을 때 붉은 배경 */
+.cell-required { background: #fef2f2; }
+
+/* ✅ 부과요금 파란색 */
+.assessed-blue { color: #014ef3; font-weight: 900; }

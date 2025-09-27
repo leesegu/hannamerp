@@ -30,6 +30,8 @@ import AnnualSheetPage from "../pages/AnnualSheetPage";
 
 /* 전기요금 추출(문자) */
 import MessageExtractor from "../pages/MessageExtractor";
+/* 공용전기 계산 (✅ 추가) */
+import PublicElectricCalcPage from "../pages/PublicElectricCalcPage";
 /* 캘린더 */
 import CalendarPage from "../pages/CalendarPage";
 /* 부가서비스 · 도배 */
@@ -91,7 +93,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   const location = useLocation();
 
   const [activeContent, setActiveContent] = useState(null);
-  const [openMenu, setOpenMenu] = useState(""); // ✅ 오류 원인 제거(앞의 'the:' 삭제)
+  const [openMenu, setOpenMenu] = useState("");
   const [activeMenu, setActiveMenu] = useState("");
 
   const handleNavigate = (component, menuKey) => {
@@ -191,7 +193,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
         </div>
 
         {/* 메뉴 */}
-        {/* ✅ 여기 스크롤 컨테이너에 sidebar-scroll 클래스를 추가 */}
         <div className="flex-1 overflow-y-auto px-4 py-4 sidebar-scroll">
           <nav className="space-y-2">
             {/* 빌라정보 */}
@@ -284,7 +285,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "addon" && (
                 <SidebarSubmenu
-                  items={["입주청소", "도배", "전기요금 추출"]}
+                  /* ✅ "공용전기 계산"을 전기요금 추출 바로 아래에 추가 */
+                  items={["입주청소", "도배", "전기요금 추출", "공용전기 계산"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
@@ -292,6 +294,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                       입주청소: <MoveInCleaningPage />,
                       도배: <PaperingPage />,
                       "전기요금 추출": <MessageExtractor />,
+                      /* ✅ 매핑 추가 */
+                      "공용전기 계산": <PublicElectricCalcPage />,
                     };
                     handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
                   }}
@@ -336,7 +340,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                       return;
                     }
                     if (item === "연간시트") {
-                      handleNavigate(<AnnualSheetPage />, item); // ✅ 연간시트 연결
+                      handleNavigate(<AnnualSheetPage />, item);
                       return;
                     }
                     handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
