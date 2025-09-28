@@ -84,7 +84,7 @@ export default function MemoPage({ userId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 외부 스크롤 **강제 차단** (회색 스크롤 제거)
+  // 외부 스크롤 **강제 차단**
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -97,10 +97,8 @@ export default function MemoPage({ userId }) {
     html.style.overflowY = "hidden";
     body.style.overflowY = "hidden";
     if (root) root.style.overflowY = "hidden";
-    // Firefox 전역 스크롤바 숨김
     html.style.scrollbarWidth = "none";
 
-    // WebKit 전역 숨김용 스타일 주입
     const STYLE_ID = "memo-no-page-scroll";
     if (!document.getElementById(STYLE_ID)) {
       const s = document.createElement("style");
@@ -207,186 +205,190 @@ export default function MemoPage({ userId }) {
     }
   };
 
-  // 전역/스크롤 스타일 (보라 thin-scroll 유지 + 외부 스크롤 숨김)
+  // 전역/스크롤 스타일
   const InlineStyle = () => (
     <style>{`
-      /* 페이지 자체 스크롤 제거 + 바운스 방지 */
       html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
-
-      /* 최상단 래퍼에서 바깥 스크롤 완전 차단 */
       .page-no-scroll { overflow: clip; }
-
-      /* thin-scroll만 보이도록, 그 외 스크롤바는 숨김 */
       .page-no-scroll :not(.thin-scroll) { scrollbar-width: none; }
       .page-no-scroll :not(.thin-scroll)::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
-
-      /* 보라색 얇은 스크롤(유지) */
-      .thin-scroll {
-        scrollbar-width: thin;
-        scrollbar-color: #a78bfa rgba(167, 139, 250, .18);
-      }
+      .thin-scroll { scrollbar-width: thin; scrollbar-color: #a78bfa rgba(167, 139, 250, .18); }
       .thin-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
       .thin-scroll::-webkit-scrollbar-track { background: rgba(167,139,250,.18); border-radius: 999px; }
       .thin-scroll::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 999px; }
       .thin-scroll::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
-
       .lift:hover { transform: translateY(-1px); }
     `}</style>
   );
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col page-no-scroll">
-      <InlineStyle />
+    <>
+      {/* ✅ 부모 레이아웃 범위 안에서만 차지하도록 fixed 제거 */}
+      <div
+        className="w-full h-full overflow-hidden grid place-items-center page-no-scroll"
+        style={{ scrollbarGutter: "stable both-edges" }}
+      >
+        <InlineStyle />
 
-      {/* 본문 */}
-      <main className="flex-1 overflow-hidden">
-        <div className="max-w-[1400px] mx-auto px-4 pt-2 pb-4">
-          <div className="min-h-0" style={{ height: `calc(100vh - ${PANEL_OFFSET_PX}px)` }}>
-            <div className="grid grid-cols-[360px,1fr] gap-4 h-full min-h-0">
-              {/* 좌측 패널 */}
-              <aside className="h-full min-h-0 bg-white rounded-2xl border border-gray-300 shadow-sm grid grid-rows-[auto,auto,1fr]">
-                <div className="flex items-center justify-between px-3 py-3 border-b border-gray-300">
-                  <div className="text-sm font-semibold">모든 노트</div>
-                  <button
-                    onClick={newMemo}
-                    className="h-9 px-3 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
-                    title="새 메모 추가"
-                  >
-                    새 메모
-                  </button>
-                </div>
-
-                <div className="px-3 py-2 border-b border-gray-300">
-                  <input
-                    className="w-full h-10 px-3 rounded-lg border border-gray-300 outline-none bg-gray-50 focus:bg-white"
-                    placeholder="메모 검색"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                  />
-                </div>
-
-                <div className="overflow-auto thin-scroll px-3 py-3 min-h-0">
-                  {loading && <div className="text-gray-400 text-sm py-6">불러오는 중…</div>}
-                  {!loading && filtered.length === 0 && (
-                    <div className="text-gray-400 text-sm py-6">메모가 없습니다.</div>
-                  )}
-                  <div className="space-y-2">
-                    {filtered.map((m) => {
-                      const active = selectedId === m.id;
-                      const color = m.color || COLORS[0];
-                      const bgSoft = hexToRgba(color, 0.16);
-                      const bgHover = hexToRgba(color, 0.24);
-                      const textDark = isLight(color) ? "text-gray-900" : "text-gray-900";
-                      return (
-                        <button
-                          key={m.id}
-                          className={`w-full text-left rounded-xl border border-gray-300 transition lift ${
-                            active ? "ring-2 ring-indigo-300" : ""
-                          }`}
-                          style={{ background: bgSoft }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = bgHover)}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = bgSoft)}
-                          onClick={() => {
-                            setSelectedId(m.id);
-                            setForm({
-                              title: s(m.title),
-                              content: s(m.content),
-                              color,
-                              pinned: !!m.pinned,
-                            });
-                          }}
-                        >
-                          <div className="px-3 py-3">
-                            <div className={`flex items-center justify-between gap-3 ${textDark}`}>
-                              <div className="font-medium line-clamp-1 flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-                                {s(m.title) || "(제목 없음)"}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="text-xs text-gray-700/80">
-                                  {fmtDateKR(m.updatedAt || m.createdAt)}
-                                </div>
-                                {m.pinned && (
-                                  <i className="ri-pushpin-2-fill text-[16px] text-purple-500/80" title="고정" />
-                                )}
-                              </div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-800/80 line-clamp-2">
-                              {s(m.content) ? s(m.content) : "내용 없음"}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+        {/* 본문 */}
+        <main className="w-full">
+          {/* 확장된 전체 가로폭(1600px) + 중앙정렬 */}
+          <div className="max-w-[1600px] w-full mx-auto px-4">
+            <div className="min-h-0" style={{ height: `calc(100vh - ${PANEL_OFFSET_PX}px)` }}>
+              {/* 좌측 패널 폭 440px */}
+              <div className="grid grid-cols-[440px,1fr] gap-4 h-full min-h-0">
+                {/* 좌측 패널 */}
+                <aside className="h-full min-h-0 bg-white rounded-2xl border border-gray-300 shadow-sm grid grid-rows-[auto,auto,1fr]">
+                  <div className="flex items-center justify-between px-3 py-3 border-b border-gray-300">
+                    <div className="text-sm font-semibold">모든 노트</div>
+                    <button
+                      onClick={newMemo}
+                      className="h-9 px-3 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
+                      title="새 메모 추가"
+                    >
+                      새 메모
+                    </button>
                   </div>
-                </div>
-              </aside>
 
-              {/* 우측 에디터 */}
-              <section className="h-full min-h-0 bg-white rounded-2xl border border-gray-300 shadow-sm grid grid-rows-[auto,1fr,auto]">
-                <div className="p-4 border-b border-gray-300">
-                  <div className="flex items-center gap-3">
+                  <div className="px-3 py-2 border-b border-gray-300">
                     <input
-                      className="flex-none w-[520px] h-11 px-3 rounded-lg border border-gray-300 outline-none"
-                      placeholder="제목을 입력하세요"
-                      value={form.title}
-                      onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg border border-gray-300 outline-none bg-gray-50 focus:bg-white"
+                      placeholder="메모 검색"
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
                     />
+                  </div>
 
-                    <div className="ml-auto flex items-center gap-2">
-                      {COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setForm((p) => ({ ...p, color: c }))}
-                          className="w-6 h-6 rounded-full border border-gray-300"
-                          style={{ background: c, boxShadow: form.color === c ? "0 0 0 2px rgba(99,102,241,.4)" : "none" }}
-                          title="노트 색상"
-                        />
-                      ))}
-
-                      <button
-                        onClick={togglePin}
-                        className={`h-10 px-3 rounded-lg border border-gray-300 ${
-                          form.pinned ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-white"
-                        }`}
-                        title="상단 고정"
-                      >
-                        <i className={form.pinned ? "ri-pushpin-2-fill" : "ri-pushpin-2-line"} />
-                      </button>
+                  <div className="overflow-auto thin-scroll px-3 py-3 min-h-0">
+                    {loading && <div className="text-gray-400 text-sm py-6">불러오는 중…</div>}
+                    {!loading && filtered.length === 0 && (
+                      <div className="text-gray-400 text-sm py-6">메모가 없습니다.</div>
+                    )}
+                    <div className="space-y-2">
+                      {filtered.map((m) => {
+                        const active = selectedId === m.id;
+                        const color = m.color || COLORS[0];
+                        const bgSoft = hexToRgba(color, 0.16);
+                        const bgHover = hexToRgba(color, 0.24);
+                        const textDark = isLight(color) ? "text-gray-900" : "text-gray-900";
+                        return (
+                          <button
+                            key={m.id}
+                            className={`w-full text-left rounded-xl border border-gray-300 transition lift ${
+                              active ? "ring-2 ring-indigo-300" : ""
+                            }`}
+                            style={{ background: bgSoft }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = bgHover)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = bgSoft)}
+                            onClick={() => {
+                              setSelectedId(m.id);
+                              setForm({
+                                title: s(m.title),
+                                content: s(m.content),
+                                color,
+                                pinned: !!m.pinned,
+                              });
+                            }}
+                          >
+                            <div className="px-3 py-3">
+                              <div className={`flex items-center justify-between gap-3 ${textDark}`}>
+                                <div className="font-medium line-clamp-1 flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+                                  {s(m.title) || "(제목 없음)"}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-xs text-gray-700/80">
+                                    {fmtDateKR(m.updatedAt || m.createdAt)}
+                                  </div>
+                                  {m.pinned && (
+                                    <i className="ri-pushpin-2-fill text-[16px] text-purple-500/80" title="고정" />
+                                  )}
+                                </div>
+                              </div>
+                              <div className="mt-2 text-xs text-gray-800/80 line-clamp-2">
+                                {s(m.content) ? s(m.content) : "내용 없음"}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
+                </aside>
 
-                <div className="p-4 min-h-0 overflow-hidden">
-                  <textarea
-                    className="w-full h-full overflow-auto thin-scroll px-3 py-2 rounded-lg border border-gray-300 outline-none text-[14px]"
-                    style={{ resize: "none" }}
-                    placeholder="메모 내용을 입력하세요"
-                    value={form.content}
-                    onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
-                  />
-                </div>
+                {/* 우측 에디터 */}
+                <section className="h-full min-h-0 bg-white rounded-2xl border border-gray-300 shadow-sm grid grid-rows-[auto,1fr,auto]">
+                  <div className="p-4 border-b border-gray-300">
+                    <div className="flex items-center gap-3">
+                      {/* 제목 입력 폭 640px */}
+                      <input
+                        className="flex-none w-[640px] h-11 px-3 rounded-lg border border-gray-300 outline-none"
+                        placeholder="제목을 입력하세요"
+                        value={form.title}
+                        onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                      />
 
-                <div className="p-4 border-t border-gray-300 flex justify-end gap-2">
-                  {selectedId && (
-                    <button onClick={remove} className="h-10 px-4 rounded-lg border border-gray-300 text-red-600 hover:bg-red-50">
-                      삭제
+                      <div className="ml-auto flex items-center gap-2">
+                        {COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setForm((p) => ({ ...p, color: c }))}
+                            className="w-6 h-6 rounded-full border border-gray-300"
+                            style={{
+                              background: c,
+                              boxShadow: form.color === c ? "0 0 0 2px rgba(99,102,241,.4)" : "none",
+                            }}
+                            title="노트 색상"
+                          />
+                        ))}
+
+                        <button
+                          onClick={togglePin}
+                          className={`h-10 px-3 rounded-lg border border-gray-300 ${
+                            form.pinned ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-white"
+                          }`}
+                          title="상단 고정"
+                        >
+                          <i className={form.pinned ? "ri-pushpin-2-fill" : "ri-pushpin-2-line"} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 min-h-0 overflow-hidden">
+                    <textarea
+                      className="w-full h-full overflow-auto thin-scroll px-3 py-2 rounded-lg border border-gray-300 outline-none text-[14px]"
+                      style={{ resize: "none" }}
+                      placeholder="메모 내용을 입력하세요"
+                      value={form.content}
+                      onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="p-4 border-t border-gray-300 flex justify-end gap-2">
+                    {selectedId && (
+                      <button
+                        onClick={remove}
+                        className="h-10 px-4 rounded-lg border border-gray-300 text-red-600 hover:bg-red-50"
+                      >
+                        삭제
+                      </button>
+                    )}
+                    <button
+                      onClick={save}
+                      disabled={saving}
+                      className="h-10 px-5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {saving ? "저장 중..." : selectedId ? "수정" : "추가"}
                     </button>
-                  )}
-                  <button
-                    onClick={save}
-                    disabled={saving}
-                    className="h-10 px-5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
-                  >
-                    {saving ? "저장 중..." : selectedId ? "수정" : "추가"}
-                  </button>
-                </div>
-              </section>
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </>
   );
 }

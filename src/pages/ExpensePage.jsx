@@ -47,6 +47,21 @@ const getWeekdayLabel = (ymd) => {
   return `(${weekdayKo[d.getDay()]})`;
 };
 const ymdToMonthKey = (ymd) => s(ymd).slice(0, 7);
+const ymdToDate = (ymd) => {
+  const [y, m, d] = (ymd || "").split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+};
+const toYMD = (d) => {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
+const absDaysBetween = (ymdA, ymdB) => {
+  const a = ymdToDate(ymdA);
+  const b = ymdToDate(ymdB);
+  return Math.abs((a - b) / 86400000);
+};
 
 /** ====== Storage JSON 유틸 ====== */
 async function readMonthJSON(monthKey) {
@@ -60,7 +75,7 @@ async function readMonthJSON(monthKey) {
     return { meta, days };
   } catch (e) {
     const code = e?.code || "";
-       const msg = String(e?.message || "");
+    const msg = String(e?.message || "");
     const notFound =
       code === "storage/object-not-found" ||
       msg.includes("object-not-found") ||
@@ -116,7 +131,7 @@ const normalizeRow = (r) => ({
 const isValidForSave = (r) => !!(r.mainId || r.mainName) && !!r.subName && !!r.outMethod;
 
 /** ====== 공통 모달 ====== */
-function Modal({ open, onClose, title, children, width = 720, showCloseX = true, className = "" }) {
+function Modal({ open, onClose, title, children, width = 720, showCloseX = true, className = "", rightExtras = null }) {
   if (!open) return null;
   return (
     <div
@@ -128,11 +143,14 @@ function Modal({ open, onClose, title, children, width = 720, showCloseX = true,
       <div className={`xp-modal ${className}`} style={{ width }}>
         <div className="xp-modal-head">
           <div className="xp-modal-title">{title}</div>
-          {showCloseX && (
-            <button className="xp-modal-close" onClick={onClose} title="닫기">
-              <i className="ri-close-line" />
-            </button>
-          )}
+          <div className="xp-modal-head-right">
+            {rightExtras}
+            {showCloseX && (
+              <button className="xp-modal-close" onClick={onClose} title="닫기">
+                <i className="ri-close-line" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="xp-modal-body">{children}</div>
       </div>
@@ -141,16 +159,6 @@ function Modal({ open, onClose, title, children, width = 720, showCloseX = true,
 }
 
 /** ====== 커스텀 달력 ====== */
-function ymdToDate(ymd) {
-  const [y, m, d] = (ymd || "").split("-").map((x) => parseInt(x, 10));
-  if (!y || !m || !d) return new Date();
-  return new Date(y, m - 1, d);
-}
-function toYMD(d) {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
 function getMonthMatrix(year, month) {
   const first = new Date(year, month, 1);
   const startWeekday = first.getDay();
@@ -180,7 +188,13 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
     });
 
   return (
-    <Modal open={open} onClose={onClose} title={titleText} width={380}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={titleText}
+      width={380}
+      /* ✅ 요청: 오늘 버튼 제거 → rightExtras 미제공 */
+    >
       <div className="cal-wrap">
         <div className="cal-top">
           <button className="cal-nav" onClick={() => go(-1)} title="이전 달">
@@ -456,10 +470,6 @@ const PaidCombo = forwardRef(function PaidCombo({ value, onPick, disabled = fals
 
 /** =======================================================================
  *  출금보류 모달
- *  - Firestore 실시간 동기화(onSnapshot)
- *  - 입력 변경 시 자동 저장(디바운스)
- *  - 보내기/삭제 시 즉시 저장
- *  - 저장 클릭 시 자동 닫기
  * ======================================================================= */
 function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
   const [draft, setDraft] = useState(() =>
@@ -637,12 +647,12 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
         </table>
       </div>
 
-{/* 하단 버튼 */}
-<div className="hg-footer">
-  <button className="hg-btn close" onClick={onClose} title="닫기">
-    <i className="ri-close-line" /> 닫기
-  </button>
-</div>
+      {/* 하단 버튼 */}
+      <div className="hg-footer">
+        <button className="hg-btn close" onClick={onClose} title="닫기">
+          <i className="ri-close-line" /> 닫기
+        </button>
+      </div>
     </div>
   );
 }
@@ -686,6 +696,13 @@ export default function ExpensePage() {
     } catch {}
     return [];
   });
+
+  // ✅ 검색 관련 상태
+  const [searchQ, setSearchQ] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchHits, setSearchHits] = useState([]); // [{ ymd, rowIdx, fields }]
+  const [hitIdx, setHitIdx] = useState(-1);
+  const [highlight, setHighlight] = useState(null); // { ymd, rowIdx, fields, q }
 
   // ✅ Firestore 실시간 구독: acct_expense_hold/current
   useEffect(() => {
@@ -874,6 +891,8 @@ export default function ExpensePage() {
       if (hasAnyContent(rows)) {
         await saveToStorageAuto(date, rows);
       }
+      // 하이라이트는 날짜 전환 시 일단 비움(다음 단계에서 다시 설정)
+      setHighlight(null);
       await performLoadForDate(targetYMD, { setDateAfter: true });
     } catch (e) {
       console.error(e);
@@ -926,8 +945,7 @@ export default function ExpensePage() {
 
   useEffect(() => {
     performLoadForDate(date);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line
 
   const onRefresh = async () => {
     const ok = window.confirm("새로고침하면 현재 지출 입력 내용이 모두 삭제되고 오늘 날짜로 이동합니다. 계속할까요?");
@@ -967,11 +985,147 @@ export default function ExpensePage() {
     });
   };
 
+  /** =========================
+   *  🔎 검색(해당 연도 전역) - 자동검색 + Enter로 다음
+   * ========================= */
+  const tableWrapRef = useRef(null);
+  const lastSearchQRef = useRef("");
+  const debounceTimerRef = useRef(null);
+
+  const findRowMatchedFields = (row, qLower) => {
+    const fields = [];
+    const check = (val) => String(val ?? "").toLowerCase().includes(qLower);
+    if (check(row.mainName)) fields.push("mainName");
+    if (check(row.subName)) fields.push("subName");
+    if (check(row.desc)) fields.push("desc");
+    if (check(row.inAccount)) fields.push("inAccount");
+    if (check(row.outMethod)) fields.push("outMethod");
+    if (check(row.note)) fields.push("note");
+    if (qLower && /\d/.test(qLower)) {
+      if (String(row.amount ?? "").replace(/,/g, "").includes(qLower.replace(/\D/g, ""))) {
+        fields.push("amount");
+      }
+    }
+    return fields;
+  };
+
+  const runYearSearch = async (q, baseYMD) => {
+    const year = String(baseYMD).slice(0, 4);
+    const qLower = q.toLowerCase();
+    const mkList = Array.from({ length: 12 }, (_, i) => `${year}-${pad2(i + 1)}`);
+
+    const monthPromises = mkList.map(async (mk) => {
+      try {
+        const { days } = await readMonthJSON(mk);
+        return days || {};
+      } catch {
+        return {};
+      }
+    });
+
+    const monthsDays = await Promise.all(monthPromises);
+    const hits = [];
+    const today = todayYMD();
+
+    monthsDays.forEach((days) => {
+      const dayKeys = Object.keys(days);
+      for (const ymd of dayKeys) {
+        if (!String(ymd).startsWith(`${year}-`)) continue;
+        const pack = days[ymd];
+        const rlist = Array.isArray(pack?.rows) ? pack.rows : [];
+        rlist.forEach((row, idx) => {
+          const fields = findRowMatchedFields(row, qLower);
+          if (fields.length) {
+            hits.push({ ymd, rowIdx: idx, fields, dist: absDaysBetween(ymd, today) });
+          }
+        });
+      }
+    });
+
+    hits.sort((a, b) => (a.dist - b.dist) || (a.ymd.localeCompare(b.ymd)) || (a.rowIdx - b.rowIdx));
+    return hits;
+  };
+
+  const goToHit = async (idx) => {
+    if (!searchHits.length) return;
+    const nextIdx = (idx + searchHits.length) % searchHits.length;
+    const hit = searchHits[nextIdx];
+    setHitIdx(nextIdx);
+    await switchDate(hit.ymd);
+    setHighlight({ ymd: hit.ymd, rowIdx: hit.rowIdx, fields: hit.fields, q: searchQ });
+  };
+
+  useEffect(() => {
+    if (!highlight) return;
+    if (highlight.ymd !== date) return;
+    const wrap = tableWrapRef.current;
+    if (!wrap) return;
+    const rowEl = wrap.querySelector(`tbody tr:nth-child(${highlight.rowIdx + 1})`);
+    if (rowEl?.scrollIntoView) {
+      rowEl.scrollIntoView({ block: "center" });
+    }
+  }, [highlight, date]);
+
+  useEffect(() => {
+    const onDoc = () => setHighlight(null);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    const q = s(searchQ);
+    if (!q) {
+      setSearchHits([]);
+      setHitIdx(-1);
+      setHighlight(null);
+      return;
+    }
+    debounceTimerRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const hits = await runYearSearch(q, todayYMD());
+        setSearchHits(hits);
+        lastSearchQRef.current = q;
+        if (hits.length) {
+          setHitIdx(0);
+          await goToHit(0);
+        } else {
+          setHitIdx(-1);
+          setHighlight(null);
+        }
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [searchQ]); // eslint-disable-line
+
+  const onSearchKeyDown = async (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (searchHits.length) {
+      await goToHit(hitIdx + 1);
+    }
+  };
+
+  const onClickTodayQuick = async () => {
+    const today = todayYMD();
+    await switchDate(today);
+  };
+
+  // ✅ 항상 표시될 카운터 텍스트
+  const counterText = `${Math.max(0, hitIdx + 1)}/${searchHits.length || 0}`;
+
   return (
     <div className="xp-page">
       {/* 상단 바 */}
       <div className="xp-top slim fancy">
         <div className="xp-actions">
+          {/* 좌측 액션들 */}
           <button className="xp-btn xp-refresh small pad-s" onClick={onRefresh} title="새로고침">
             <i className="ri-refresh-line" /> 새로고침
           </button>
@@ -985,45 +1139,69 @@ export default function ExpensePage() {
           >
             <i className="ri-delete-bin-6-line" /> {deleteMode ? "삭제모드 해제" : "삭제"}
           </button>
-        </div>
 
-        {/* 우측 패널 */}
-        <div className="xp-side fancy-panel narrow mini" onClick={() => document.activeElement?.blur()}>
+          {/* 🔎 검색창 - ✅ 삭제 버튼 오른쪽으로 이동 & 항상 카운트 표시 */}
           <div
-            className="xp-side-row xp-side-date scale-095"
-            onClick={() => setDateModalOpen(true)}
-            role="button"
-            title="날짜 선택"
+            className={`xp-search ${searching ? "is-loading" : ""}`}
+            onMouseDown={(e)=>e.stopPropagation()}
+            onClick={(e)=>e.stopPropagation()}
           >
-            <div className="xp-side-label">지출일자</div>
-            <div className="xp-date-wrap">
-              <div className="xp-date-display">
-                <span className="xp-date-text">{date}</span>
-                <button
-                  className="xp-date-open"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDateModalOpen(true);
-                  }}
-                  title="달력 열기"
-                >
-                  <i className="ri-calendar-2-line" />
-                </button>
-              </div>
-              <span className="xp-weekday">{getWeekdayLabel(date)}</span>
+            <i className="ri-search-line xp-search-icon" />
+            <input
+              className="xp-input xp-search-input"
+              placeholder=""
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+              title="검색"
+            />
+            <div className={`xp-search-status ${searchHits.length > 0 ? "ok" : ""}`} title="결과 수">
+              {/* 로딩 아이콘은 필요 시만 보이게 하되, 카운트는 항상 보임 */}
+              {searching && <i className="ri-loader-4-line xp-spin" />}
+              <span>{counterText}</span>
             </div>
           </div>
+        </div>
 
-          <div className="xp-side-row xp-side-sum scale-095">
-            <div className="xp-side-label">합계</div>
-            <div className="xp-side-krw">₩</div>
-            <div className="xp-side-val">{fmtComma(total) || "-"}</div>
+        {/* 우측: 지출일자 패널 */}
+        <div className="xp-right-tools" onClick={() => document.activeElement?.blur()}>
+          <div
+            className="xp-side fancy-panel narrow mini"
+            role="button"
+            title="날짜 선택"
+            onClick={() => setDateModalOpen(true)}
+          >
+            <div className="xp-side-row xp-side-date scale-095">
+              <div className="xp-side-label">지출일자</div>
+              <div className="xp-date-wrap">
+                <div className="xp-date-display">
+                  <span className="xp-date-text">{date}</span>
+                  <button
+                    className="xp-date-open"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDateModalOpen(true);
+                    }}
+                    title="달력 열기"
+                  >
+                    <i className="ri-calendar-2-line" />
+                  </button>
+                </div>
+                <span className="xp-weekday">{getWeekdayLabel(date)}</span>
+              </div>
+            </div>
+
+            <div className="xp-side-row xp-side-sum scale-095">
+              <div className="xp-side-label">합계</div>
+              <div className="xp-side-krw">₩</div>
+              <div className="xp-side-val">{fmtComma(total) || "-"}</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* 테이블 */}
-      <div className="xp-table-wrap scrollable">
+      <div className="xp-table-wrap scrollable" ref={tableWrapRef}>
         <table className="xp-table">
           <thead>
             <tr>
@@ -1052,6 +1230,11 @@ export default function ExpensePage() {
                 openNextRowMain={() => openNextRowMain(i)}
                 deleteMode={deleteMode}
                 onDeleteRow={() => clearRow(i)}
+                hit={
+                  highlight && highlight.ymd === date && highlight.rowIdx === i
+                    ? { fields: new Set(highlight.fields || []) }
+                    : null
+                }
               />
             ))}
           </tbody>
@@ -1059,8 +1242,12 @@ export default function ExpensePage() {
       </div>
 
       <div className="xp-bottom-actions">
-        <button className="xp-add-rows" onClick={() => addRows(10)}>
+        {/* ✅ 배경 스타일 개선 */}
+        <button className="xp-add-rows xp-add-rows-pretty" onClick={() => addRows(10)}>
           + 10줄 더 추가
+        </button>
+        <button className="xp-add-rows xp-today-inline xp-today-pretty" onClick={onClickTodayQuick} title="오늘로 이동">
+          오늘
         </button>
       </div>
 
@@ -1073,15 +1260,14 @@ export default function ExpensePage() {
         onClose={() => setDateModalOpen(false)}
       />
 
-      {/* 출금보류 모달: 바디 스크롤 + sticky 푸터 + 저장 시 자동 닫힘 */}
-<Modal
-  open={holdOpen}
-  onClose={() => setHoldOpen(false)}
-  title="출금보류"
-  width={1200}
-  showCloseX={true}
-  className="xp-modal-hold"
->
+      <Modal
+        open={holdOpen}
+        onClose={() => setHoldOpen(false)}
+        title="출금보류"
+        width={1200}
+        showCloseX={true}
+        className="xp-modal-hold"
+      >
         <HoldTable
           initialRows={holdRows}
           onSendRow={(r) => receiveFromHold(r)}
@@ -1114,6 +1300,7 @@ function RowEditor({
   openNextRowMain,
   deleteMode,
   onDeleteRow,
+  hit, // { fields: Set<string> } | null
 }) {
   const mainRef = useRef(null);
   const subRef = useRef(null);
@@ -1135,12 +1322,13 @@ function RowEditor({
 
   const onAmountChange = (e) => {
     const raw = e.target.value;
-       const num = toNumber(raw);
+    const num = toNumber(raw);
     const withComma = num ? num.toLocaleString() : "";
     onChange({ amount: withComma });
   };
 
   const isPaidDone = row.paid === "출금완료";
+  const hitHas = (f) => !!(hit && hit.fields && hit.fields.has(f));
 
   return (
     <tr className={isPaidDone ? "xp-tr-paid" : ""}>
@@ -1153,7 +1341,7 @@ function RowEditor({
         {row.no}
       </td>
 
-      <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
+      <td className={`${isPaidDone ? "xp-td-dim-dark" : ""} ${hitHas("mainName") ? "xp-hit" : ""}`}>
         <SimpleCombo
           ref={mainRef}
           value={row.mainName}
@@ -1166,7 +1354,7 @@ function RowEditor({
         />
       </td>
 
-      <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
+      <td className={`${isPaidDone ? "xp-td-dim-dark" : ""} ${hitHas("subName") ? "xp-hit" : ""}`}>
         <SimpleCombo
           ref={subRef}
           value={row.subName}
@@ -1180,7 +1368,7 @@ function RowEditor({
         />
       </td>
 
-      <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
+      <td className={`${isPaidDone ? "xp-td-dim-dark" : ""} ${hitHas("desc") ? "xp-hit" : ""}`}>
         <input
           ref={descRef}
           className="xp-input"
@@ -1192,7 +1380,7 @@ function RowEditor({
         />
       </td>
 
-      <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
+      <td className={`${isPaidDone ? "xp-td-dim-dark" : ""} ${hitHas("amount") ? "xp-hit" : ""}`}>
         <input
           ref={amtRef}
           className="xp-input xp-amt"
@@ -1208,7 +1396,7 @@ function RowEditor({
         />
       </td>
 
-      <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
+      <td className={`${isPaidDone ? "xp-td-dim-dark" : ""} ${hitHas("inAccount") ? "xp-hit" : ""}`}>
         <AccountCombo
           ref={inAccRef}
           value={row.inAccount}
@@ -1222,7 +1410,7 @@ function RowEditor({
         />
       </td>
 
-      <td className={isPaidDone ? "xp-td-dim-dark" : ""}>
+      <td className={`${isPaidDone ? "xp-td-dim-dark" : ""} ${hitHas("outMethod") ? "xp-hit" : ""}`}>
         <SimpleCombo
           ref={outRef}
           value={row.outMethod}
@@ -1248,7 +1436,7 @@ function RowEditor({
         />
       </td>
 
-      <td>
+      <td className={`${hitHas("note") ? "xp-hit" : ""}`}>
         <input
           ref={noteRef}
           className="xp-input"
