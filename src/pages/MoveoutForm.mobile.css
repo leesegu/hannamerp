@@ -6,7 +6,11 @@
   position:sticky;top:0;z-index:10;
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   background:radial-gradient(1200px 200px at 50% -40%,rgba(124,58,237,.16),transparent 70%), #ffffff;
-  border-bottom:1px solid #eef2f7;height:58px;padding:0 12px
+  /* ▼▼▼ 변경: safe-area 상단 여백 반영 + 높이 보정(겹침 방지) ▼▼▼ */
+  box-sizing:border-box;
+  padding: calc(env(safe-area-inset-top, 0px)) 12px 0 12px;
+  height: calc(58px + env(safe-area-inset-top, 0px));
+  border-bottom:1px solid #eef2f7;
 }
 
 /* ✨ 신규 네온 버튼 */
@@ -39,7 +43,11 @@
   font-weight:900;color:#0f172a;font-size:16px;letter-spacing:.2px;pointer-events:none
 }
 
-.mf-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}
+/* ▼▼▼ 추가: 하단 고정 합계바 및 제스처바에 내용이 가리지 않도록 패딩 보강 ▼▼▼ */
+.mf-body{
+  flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); /* 합계바 높이 여유 + 안전영역 */
+}
 
 /* 폼 공통 */
 .mf-field{display:grid;gap:6px;margin-bottom:12px}

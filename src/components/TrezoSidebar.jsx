@@ -28,6 +28,9 @@ import DailyClosePage from "../pages/DailyClosePage";
 import MonthlyClosePage from "../pages/MonthlyClosePage";
 import AnnualSheetPage from "../pages/AnnualSheetPage";
 
+/* ✅ 대금결제 관리 (확실히 .jsx 명시) */
+import PaymentSettlementPage from "../pages/PaymentSettlementPage.jsx";
+
 /* 전기요금 추출(문자) */
 import MessageExtractor from "../pages/MessageExtractor";
 /* 공용전기 계산 (✅ 추가) */
@@ -112,7 +115,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const go = params.get("go");
-    const sub = params.get("sub");
+       const sub = params.get("sub");
 
     // 빌라정보 하위
     if (go === "빌라정보" && sub) {
@@ -319,7 +322,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
               />
               {openMenu === "accounting" && (
                 <SidebarSubmenu
-                  items={["수입정리", "지출정리", "일마감", "월마감", "연간시트"]}
+                  items={["수입정리", "지출정리", "대금결제 관리", "일마감", "월마감", "연간시트"]}
                   activeMenu={activeMenu}
                   onClick={(item) => {
                     setActiveMenu(item);
@@ -329,6 +332,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout }) => {
                     }
                     if (item === "지출정리") {
                       handleNavigate(<ExpensePage />, item);
+                      return;
+                    }
+                    if (item === "대금결제 관리") {
+                      handleNavigate(<PaymentSettlementPage />, item);
                       return;
                     }
                     if (item === "일마감") {

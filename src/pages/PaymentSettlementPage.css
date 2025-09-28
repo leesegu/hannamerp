@@ -1,0 +1,175 @@
+/* src/pages/PaymentSettlementPage.css */
+/* ===== Light Glam Tokens ===== */
+:root{
+  --bg:#f7f8fb;
+  --card:#ffffff;
+  --muted:#5b6a86;
+  --border:#e6ecf3;
+  --text:#0f1a2a;
+
+  --primary:#7a5af8;
+  --primary-2:#6c4cf3;
+  --accent:#2dd4bf;
+  --danger:#ef4444;
+  --warn:#f59e0b;
+
+  --glass:rgba(255,255,255,.6);
+  --shadow:0 10px 24px rgba(16,24,40,.08);
+  --ring:0 0 0 4px rgba(122,90,248,.18);
+}
+
+.psp.wrap.light{background:var(--bg); color:var(--text); min-height:100vh; padding:20px}
+
+/* ⬇ 테스트 배너(하이라이트) */
+.psp-banner{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:12px; margin-bottom:12px;
+  border:1px solid #ffe6c7; background:#fff7ed; color:#7a4b00; font-weight:700;
+}
+.psp-banner.warn i{color:var(--warn)}
+
+/* ===== Hero (single line) ===== */
+.psp-hero{display:grid; grid-template-columns:auto 1fr; align-items:center; gap:12px; margin-bottom:12px}
+.psp-hero.single-line .title{display:flex; align-items:center; gap:10px}
+.title i{font-size:24px; color:var(--primary)}
+.title h1{margin:0; font-size:22px; font-weight:900}
+
+.hero-controls{
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
+}
+.metrics.inline{display:flex; gap:8px; margin-left:8px}
+.chip{display:flex; align-items:center; gap:6px; font-weight:700;
+  padding:8px 10px; border-radius:999px; background:#eef2ff; color:#334155; border:1px solid #dfe6fd}
+.chip.warn{background:#fff7ed; border-color:#ffe6c7}
+
+/* ===== Inputs / Selects ===== */
+.input, .select, .search{
+  background:#fff; border:1px solid var(--border); border-radius:12px;
+  padding:10px 12px; outline:none; color:var(--text);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.input:focus, .select:focus, .search:focus{box-shadow:var(--ring); border-color:#d6d0ff}
+
+.select.with-icon, .select.like-input.with-icon{display:flex; align-items:center; gap:8px}
+.select.bare{border:none; background:transparent; padding:6px 8px}
+
+.search-wrap{position:relative; width:200px}
+.search-wrap i{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:18px}
+.search{padding-left:34px}
+
+/* Buttons */
+.btn{
+  display:flex; align-items:center; gap:8px;
+  border:1px solid var(--border); border-radius:12px; padding:10px 14px;
+  background:#fff; cursor:pointer; box-shadow:var(--shadow);
+}
+.btn.glam{background:linear-gradient(135deg, var(--primary), var(--primary-2)); color:#fff; border:none}
+.btn.pale{background:linear-gradient(135deg, #e9fff9, #ffffff); color:#0b7b6d}
+.btn.ghost{background:transparent}
+.btn:hover{filter:brightness(1.02)}
+.btn.tiny{padding:8px 12px; border-radius:10px}
+
+/* ===== Cards/Table ===== */
+.card{background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow)}
+.psp-list{padding:12px}
+.table-scroll{overflow:auto; border-radius:12px; border:1px solid var(--border)}
+.table{width:100%; border-collapse:separate; border-spacing:0; min-width:1080px}
+.table thead th{
+  position:sticky; top:0; z-index:2; background:#f4f6fb; color:#475569;
+  font-weight:800; padding:12px; border-bottom:1px solid var(--border);
+}
+.table tbody td{padding:12px; border-bottom:1px solid #f0f3f8; background:#fff}
+.table .ar{text-align:right}
+.table .em{font-weight:800}
+.table .muted{color:var(--muted)}
+.table .strong{font-weight:800}
+.table .danger{color:#b91c1c}
+.table .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.table .empty{text-align:center; color:var(--muted); padding:28px 0}
+
+/* ⬇ 줄바꿈 금지 테이블(달표 전용) */
+.table.nowrap th, .table.nowrap td{ white-space: nowrap; }
+
+/* ===== Custom Month Picker ===== */
+.mp-wrap{position:relative}
+.select.like-input{min-width:170px}
+.select.like-input .caret{margin-left:auto; transition:transform .15s}
+.select.like-input .caret.open{transform:rotate(180deg)}
+.mp-panel{
+  position:absolute; top:44px; right:0; background:#fff; border:1px solid var(--border);
+  border-radius:14px; box-shadow:var(--shadow); padding:10px; z-index:30; width:320px;
+}
+.mp-head{display:flex; align-items:center; gap:8px; padding:6px 6px 10px 6px; border-bottom:1px dashed var(--border)}
+.mp-head i{color:var(--primary)}
+.mp-grid{display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; padding-top:10px}
+.mp-cell{
+  padding:10px 0; border-radius:10px; border:1px solid var(--border); background:#fff;
+  cursor:pointer; font-weight:700;
+}
+.mp-cell:hover{background:#f5f7ff}
+.mp-cell.now{background:#efeaff; border-color:#dacfff; color:#5b4ef6}
+
+/* ===== Modal (glam) ===== */
+.psp-modal-backdrop{position:fixed; inset:0; background:rgba(15,23,42,.35); display:grid; place-items:center; z-index:60}
+.psp-modal.glam{
+  width:94vw; max-height:90vh; overflow:auto; background:#fff; border:1px solid var(--border);
+  border-radius:18px; box-shadow:0 18px 48px rgba(0,0,0,.16);
+}
+.psp-modal-head{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border)}
+.psp-modal-head .headline{display:flex; align-items:center; gap:10px}
+.psp-modal-head .headline i{color:var(--primary)}
+.psp-modal-head h3{margin:0; font-size:18px; font-weight:900}
+.icon-btn{width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer}
+
+.psp-modal-body{padding:16px}
+.psp-modal-foot{padding:14px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px}
+
+/* ⬇ 모달 푸터 버튼 가로 정렬 고정(줄바꿈 방지) */
+.foot-actions{display:flex; gap:10px; flex-wrap:nowrap}
+
+.btn-eq{
+  min-width:140px; display:flex; align-items:center; justify-content:center; gap:8px;
+  padding:10px 14px; border-radius:12px; cursor:pointer;
+  border:1px solid var(--border); background:#fff;
+}
+.btn-eq.primary{background:linear-gradient(135deg, var(--primary), var(--primary-2)); color:#fff; border:none}
+.btn-eq.ghost{background:#fff}
+
+/* Register / Manage layout */
+.reg-grid{display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px}
+.reg-grid .wide{grid-column:span 2}
+.reg-grid label{display:grid; gap:6px; font-size:12px; color:var(--muted)}
+.input{min-width:0}
+.input-mini{padding:8px 10px; border-radius:10px}
+
+.mgr-grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
+.mgr-card{border:1px solid var(--border); border-radius:14px; padding:12px; background:#fff}
+.mgr-card header{font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.mgr-card header em{color:#64748b; font-style:normal}
+.mgr-card .row.add{display:flex; gap:8px; align-items:center; margin-bottom:10px}
+.mgr-input{flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px}
+.btn-primary.mini{padding:8px 12px; border-radius:10px; background:linear-gradient(135deg, var(--primary), var(--primary-2)); color:#fff; border:none}
+.pill-list{display:flex; flex-wrap:wrap; gap:8px}
+.pill{display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px; background:#f5f7fd; border:1px solid var(--border); cursor:pointer}
+.pill.active{background:#efeaff; border-color:#dacfff}
+.pill .x{width:20px; height:20px; display:grid; place-items:center; background:transparent; border:none; cursor:pointer; color:#6b7280}
+.mgr-card .empty{color:var(--muted); padding:10px 0}
+
+/* Sites Viewer */
+.sites-viewer .sites-controls{display:flex; gap:10px; margin-bottom:10px; align-items:center}
+
+/* ⬇ 달표(모달) 테이블: 충분한 가로폭 확보로 가로 스크롤 방지 */
+.sites-viewer .table{ min-width: 1680px; }
+
+/* sticky first col (modal table) */
+.sticky-first thead th:first-child,
+.sticky-first tbody td:first-child{position:sticky; left:0; background:#f4f6fb}
+
+/* Highlight */
+.highlight-lite{background:rgba(122,90,248,.08)}
+
+/* ===== Responsive ===== */
+@media (max-width: 1280px){
+  .reg-grid{grid-template-columns:1fr}
+  .mgr-grid{grid-template-columns:1fr}
+}

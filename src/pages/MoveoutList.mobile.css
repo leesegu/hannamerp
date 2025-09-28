@@ -1,4 +1,3 @@
-/* src/pages/MoveoutList.mobile.css */
 /* ===============================
    MoveoutList.mobile.css (refined)
    - 부드러운 컬러 팔레트
@@ -38,6 +37,19 @@
   --shadow-sm: 0 3px 12px rgba(2,6,23,0.06);
   --shadow-md: 0 8px 24px rgba(2,6,23,0.08);
   --shadow-lg: 0 16px 40px rgba(2,6,23,0.12);
+
+  /* ▼ 추가: 액션 버튼 파스텔 팔레트 */
+  --note-bg: #eef2ff;      /* indigo-50 */
+  --note-bd: #c7d2fe;      /* indigo-200 */
+  --note-tx: #3730a3;      /* indigo-800 */
+
+  --photos-bg: #ecfeff;    /* cyan-50 */
+  --photos-bd: #a5f3fc;    /* cyan-200 */
+  --photos-tx: #155e75;    /* cyan-800 */
+
+  --receipt-bg: #fff7ed;   /* orange-50 */
+  --receipt-bd: #fed7aa;   /* orange-200 */
+  --receipt-tx: #9a3412;   /* orange-800 */
 }
 
 /* 모션 최소화 대응 */
@@ -66,7 +78,8 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
   margin-bottom: 10px;
   position: sticky; top: 0; z-index: 5;
   background: var(--bg);
-  padding: 4px 0 6px;
+  /* ⬇️ 변경: 상단 safe-area 반영 (기존 4px → calc(4px + safe-area)) */
+  padding: calc(4px + env(safe-area-inset-top)) 0 6px;
 }
 
 /* (구) 등록 버튼 스타일 - 필요 시 재사용 가능
@@ -85,28 +98,28 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
 .top-action .top-icon { font-size: 18px; line-height: 1; }
 */
 
-/* ✅ 우측 상단 메뉴(등록/로그아웃) */
+/* ✅ 우측 상단 메뉴(등록/로그아웃) — 더 화려한 배경 */
 .mo-topmenu { position: relative; display: inline-block; }
 .mo-menu-trigger {
   display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px;
   border-radius: 12px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 50%, #e0e7ff 100%);
+  border: 1px solid rgba(99,102,241,.35);
+  box-shadow: 0 6px 18px rgba(99,102,241,.18), inset 0 0 0 1px rgba(255,255,255,.6);
   cursor: pointer;
-  transition: box-shadow .15s ease, transform .12s ease, border-color .15s ease;
+  transition: box-shadow .15s ease, transform .12s ease, border-color .15s ease, filter .15s ease;
 }
+.mo-menu-trigger:hover { box-shadow: 0 10px 26px rgba(99,102,241,.26); filter: brightness(1.03); }
 .mo-menu-trigger:active { transform: translateY(1px); }
-.mo-menu-trigger:hover { box-shadow: var(--shadow-md); }
 .mo-menu-trigger .dots {
-  width: 16px; height: 16px; opacity: .86;
+  width: 16px; height: 16px; opacity: .9;
   background-repeat: no-repeat; background-size: 16px 16px;
-  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%236b7280'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%235b21b6'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E");
 }
 .mo-topmenu.open .mo-menu-trigger {
   border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px var(--primary-ring);
+  box-shadow: 0 0 0 3px var(--primary-ring), 0 6px 18px rgba(99,102,241,.18);
 }
 
 /* 메뉴 패널 (포탈/고정 위치) */
@@ -217,7 +230,19 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
   overflow: visible;
   transition: box-shadow .2s ease, transform .12s ease, border-color .12s ease;
 }
-.card.opened { box-shadow: var(--shadow-md); border-color: var(--border); }
+/* ✅ 변경: 펼쳐진 카드 전체 테두리 강조 (보라색 링 + 보더 색상) */
+.card.opened {
+  box-shadow: 0 0 0 2px var(--primary-500), var(--shadow-md);
+  border-color: var(--primary-500);
+}
+
+/* ⬇️ 기존: 바디만 강조하던 링 → 전체 카드 강조로 변경됨에 따라 링 제거 (요청사항 반영) */
+.card.opened .card-body {
+  /* 기존 border 유지하면서 겉 테두리만 강조 */
+  /* box-shadow: 0 0 0 2px var(--primary-500);  보라색 링 제거 */
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
 
 /* 카드 헤더 */
 .card-head {
@@ -372,19 +397,27 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
   color: var(--text);
 }
 
-/* 개별 아이콘 버튼 */
+/* 개별 아이콘 버튼 — 옅은 배경(요청 반영) */
 .i-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 40px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--soft-2);
   color: var(--text); font-weight: 800; font-size: 13px;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow .15s, transform .12s, background .12s;
+  transition: box-shadow .15s, transform .12s, background .12s, filter .12s;
 }
 .i-btn:hover { background: var(--soft); box-shadow: var(--shadow-md); }
 .i-btn:active { transform: translateY(1px); }
 .i-btn .i { font-size: 16px; }
 .i-btn.disabled { opacity: .45; pointer-events: none; cursor: default; }
+
+/* ▼ 액션별 파스텔 배경 */
+.i-btn.note    { background: var(--note-bg);    border-color: var(--note-bd);    color: var(--note-tx); }
+.i-btn.photos  { background: var(--photos-bg);  border-color: var(--photos-bd);  color: var(--photos-tx); }
+.i-btn.receipt { background: var(--receipt-bg); border-color: var(--receipt-bd); color: var(--receipt-tx); }
+.i-btn.note:hover    { filter: brightness(1.02); }
+.i-btn.photos:hover  { filter: brightness(1.02); }
+.i-btn.receipt:hover { filter: brightness(1.02); }
 
 /* 모달 공통 */
 .overlay {
@@ -429,6 +462,27 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
 /* 영수증 모달 버튼 정렬 + 비고/사진 닫기 버튼 공용 */
 .actions.center { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 12px; }
 
+/* ✅ 영수증 모달 버튼 전용 테마(요청 반영) */
+.receipt-actions .pill-btn {
+  background: linear-gradient(135deg, #6c4cf3 0%, #7a5af8 100%);
+  border-color: #6c4cf3;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(122,90,248,.28);
+}
+.receipt-actions .pill-btn:hover { filter: brightness(1.03); }
+.receipt-actions .pill-btn.light {
+  background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%);
+  border-color: #14b8a6;
+  color: #073b3a;
+  box-shadow: 0 10px 28px rgba(20,184,166,.22);
+}
+.receipt-actions .pill-btn.danger {
+  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  border-color: #ef4444;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(239,68,68,.24);
+}
+
 /* ===============================
    ✅ 하단 페이지네이션 바 (모바일 전용)
    - 안전 영역 고려
@@ -442,19 +496,20 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
 }
 .pager-btn {
   height: 40px; border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
+  border: 1px solid rgba(122,90,248,.25);
+  background: linear-gradient(135deg, #f2efff 0%, #e9e5ff 100%);
+  color: #3b3b66;
   font-weight: 900; font-size: 13px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 6px 18px rgba(122,90,248,.18);
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  transition: box-shadow .15s ease, transform .12s ease, background .12s ease;
+  transition: box-shadow .15s ease, transform .12s ease, background .12s ease, filter .12s ease;
 }
-.pager-btn:hover { background: var(--soft-2); box-shadow: var(--shadow-md); }
+.pager-btn:hover { filter: brightness(1.03); box-shadow: 0 10px 24px rgba(122,90,248,.24); }
 .pager-btn:active { transform: translateY(1px); }
 .pager-btn:disabled {
   opacity: .45; cursor: default; transform: none;
-  background: var(--card); box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, #f6f5ff 0%, #f3f1ff 100%);
+  box-shadow: var(--shadow-sm);
 }
 .pager-status {
   min-width: 96px;
@@ -477,4 +532,13 @@ img { max-width: 100%; height: auto; } /* 모바일 이미지 안전 대응 */
 }
 .pager-right {
   background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%231f2937' d='M8.59 16.59L10 18l6-6l-6-6l-1.41 1.41L13.17 12z'/%3E%3C/svg%3E");
+}
+
+/* ===============================
+   ✅ 추가: 안전영역(safe-area) 보정 (모달)
+   - 모달이 상태바/홈인디케이터에 붙지 않도록 여백
+================================= */
+.overlay .modal {
+  margin-top: env(safe-area-inset-top);
+  margin-bottom: env(safe-area-inset-bottom);
 }

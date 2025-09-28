@@ -328,6 +328,10 @@ function pickSmsNumber(row) {
   return cand ? String(cand).replace(/[^\d+]/g, "") : "";
 }
 
+/* ✅ 복귀 시 위치·펼침 상태 복원용 키 */
+const SS_KEY_ID = "mo.keepId";
+const SS_KEY_SCROLL = "mo.scrollTop";
+
 export default function MoveoutListMobile() {
   const navigate = useNavigate();
 
@@ -440,6 +444,60 @@ export default function MoveoutListMobile() {
   const goPrev = () => { if (page > 1) { setPage(p => p - 1); scrollTopSmooth(); } };
   const goNext = () => { if (page < totalPages) { setPage(p => p + 1); scrollTopSmooth(); } };
 
+  /* ✅ 목록 위치/펼침 복원 도우미 */
+  const restoredRef = useRef(false);
+  const saveListScrollState = (rowId) => {
+    try {
+      if (rowId) sessionStorage.setItem(SS_KEY_ID, rowId);
+      if (listRef.current) sessionStorage.setItem(SS_KEY_SCROLL, String(listRef.current.scrollTop || 0));
+    } catch {}
+  };
+  const clearListScrollState = () => {
+    try {
+      sessionStorage.removeItem(SS_KEY_ID);
+      sessionStorage.removeItem(SS_KEY_SCROLL);
+    } catch {}
+  };
+
+  // 🔁 rows/filter/paging 계산 완료 후 1회만 복원
+  useEffect(() => {
+    if (restoredRef.current) return;
+    const keepId = sessionStorage.getItem(SS_KEY_ID);
+    if (!keepId || displayRows.length === 0) return;
+
+    const idx = displayRows.findIndex(r => r.id === keepId);
+    if (idx === -1) {
+      clearListScrollState();
+      restoredRef.current = true;
+      return;
+    }
+
+    const targetPage = Math.floor(idx / PAGE_SIZE) + 1;
+    if (page !== targetPage) {
+      setPage(targetPage);
+      return; // 페이지 세팅 후 다음 렌더에서 이어서 처리
+    }
+
+    // 페이지가 맞으면 펼치고 스크롤 복원
+    setOpenId(keepId);
+    const saved = Number(sessionStorage.getItem(SS_KEY_SCROLL) || NaN);
+    setTimeout(() => {
+      try {
+        if (Number.isFinite(saved) && listRef.current) {
+          listRef.current.scrollTo({ top: saved, behavior: "auto" });
+        } else if (listRef.current) {
+          const el = listRef.current.querySelector(`.card[data-id="${keepId}"]`);
+          if (el) {
+            const relTop = el.offsetTop - 8;
+            listRef.current.scrollTo({ top: relTop, behavior: "auto" });
+          }
+        }
+      } catch {}
+      restoredRef.current = true;
+      clearListScrollState();
+    }, 0);
+  }, [displayRows, page, PAGE_SIZE]);
+
   const handleAdd = () => navigate("/mobile/form");
 
   const handleLogout = async () => {
@@ -454,7 +512,12 @@ export default function MoveoutListMobile() {
     }
   };
 
-  const handleEdit = (row) => navigate(`/mobile/form?id=${row.id}`);
+  const handleEdit = (row) => {
+    // ✅ 복귀용 상태 저장(카드ID + 스크롤)
+    saveListScrollState(row?.id);
+    navigate(`/mobile/form?id=${row.id}`);
+  };
+
   const handleDeleteRow = async (row) => {
     if (!row?.id) return;
     if (!window.confirm("해당 이사정산 내역을 삭제할까요?")) return;
@@ -467,7 +530,8 @@ export default function MoveoutListMobile() {
     catch(e){ console.error(e); alert("진행현황 변경 중 오류가 발생했습니다."); }
   };
 
-  const openCenter = (row, type) => { setCenterRow(row); setCenterType(type); setPhotoIdx(0); setCenterOpen(true); };
+  const [centerRowStateHack, setCenterRowStateHack] = useState(0); // 원본 유지
+  const openCenter = (row, type) => { setCenterRow(row); setCenterType(type); setPhotoIdx(0); setCenterOpen(true); setCenterRowStateHack(x=>x+1); };
   const openReceiptModal = (row) => { setReceiptRow(row); setReceiptModalOpen(true); };
   const closeReceiptModal = () => { setReceiptRow(null); setReceiptModalOpen(false); };
 
@@ -499,14 +563,16 @@ export default function MoveoutListMobile() {
       if (isHybrid()) {
         await saveReceiptToGalleryHybrid(dataUrl, baseName);
         alert("갤러리(HannamReceipts)에 저장되었습니다.");
-        return;
+      } else {
+        const a = document.createElement("a");
+        a.href = dataUrl; a.download = `${baseName}.jpg`; a.click();
       }
-
-      const a = document.createElement("a");
-      a.href = dataUrl; a.download = `${baseName}.jpg`; a.click();
     } catch(e){
       console.error(e);
       alert("영수증 저장 중 오류가 발생했습니다.");
+    } finally {
+      // ✅ 저장 버튼 클릭 후 모달 자동 닫기
+      closeReceiptModal();
     }
   };
 
@@ -531,21 +597,23 @@ export default function MoveoutListMobile() {
           console.error("MmsComposer failed:", err);
           window.location.href = `sms:${to}`;
         }
-        return;
-      }
-
-      const file = new File([dataURLToBlob(dataUrl)], `${baseName}.jpg`, { type:"image/jpeg" });
-      if (navigator.canShare && navigator.canShare({ files:[file] })) {
-        await navigator.share({ files:[file], title: "" }); // text 미전달
-      } else if (navigator.share) {
-        await navigator.share({ title: "" });
       } else {
-        const w = window.open(dataUrl, "_blank");
-        if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
+        const file = new File([dataURLToBlob(dataUrl)], `${baseName}.jpg`, { type:"image/jpeg" });
+        if (navigator.canShare && navigator.canShare({ files:[file] })) {
+          await navigator.share({ files:[file], title: "" }); // text 미전달
+        } else if (navigator.share) {
+          await navigator.share({ title: "" });
+        } else {
+          const w = window.open(dataUrl, "_blank");
+          if (!w) alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.");
+        }
       }
     } catch (e) {
       console.error(e);
       alert("영수증 전송 중 오류가 발생했습니다.");
+    } finally {
+      // ✅ 전송 버튼 클릭 후 모달 자동 닫기
+      closeReceiptModal();
     }
   };
 
@@ -576,7 +644,7 @@ export default function MoveoutListMobile() {
           const hasPhotos = Array.isArray(row.photos) && row.photos.filter(Boolean).length > 0;
 
           return (
-            <div className={`card ${opened ? "opened" : ""}`} key={row.id}>
+            <div className={`card ${opened ? "opened" : ""}`} key={row.id} data-id={row.id}>
               <div className="card-head" onClick={()=>toggleOpen(row.id)}>
                 <div className="head-line">
                   <div className="head-left"><span className="emoji">📅</span><span className="date">{row.moveDate || "-"}</span></div>
@@ -631,7 +699,7 @@ export default function MoveoutListMobile() {
                   <div className="actions-fixed">
                     <div className="act-row top">
                       <button
-                        className={`i-btn ${hasNote ? "" : "disabled"}`}
+                        className={`i-btn note ${hasNote ? "" : "disabled"}`}
                         onClick={() => hasNote && (setCenterRow(row), setCenterType("note"), setPhotoIdx(0), setCenterOpen(true))}
                         disabled={!hasNote}
                         title={hasNote ? "비고 보기" : "비고 없음"}
@@ -639,14 +707,14 @@ export default function MoveoutListMobile() {
                         <span className="i">📝</span><span className="t">{hasNote ? "내용있음" : "내용없음"}</span>
                       </button>
                       <button
-                        className={`i-btn ${hasPhotos ? "" : "disabled"}`}
+                        className={`i-btn photos ${hasPhotos ? "" : "disabled"}`}
                         onClick={() => hasPhotos && (setCenterRow(row), setCenterType("photos"), setPhotoIdx(0), setCenterOpen(true))}
                         disabled={!hasPhotos}
                         title={hasPhotos ? "사진 보기" : "사진 없음"}
                       >
                         <span className="i">🖼️</span><span className="t">{hasPhotos ? "사진있음" : "사진없음"}</span>
                       </button>
-                      <button className="i-btn" onClick={() => openReceiptModal(row)} title="영수증 저장/전송">
+                      <button className="i-btn receipt" onClick={() => openReceiptModal(row)} title="영수증 저장/전송">
                         <span className="i">🧾</span><span className="t">영수증</span>
                       </button>
                     </div>
@@ -722,7 +790,7 @@ export default function MoveoutListMobile() {
       {receiptModalOpen && receiptRow && (
         <div className="overlay center" onClick={closeReceiptModal}>
           <div className="modal" onClick={(e)=>e.stopPropagation()}>
-            <div className="actions center" style={{ display:"flex", flexDirection:"column", gap:14, padding:"24px 20px" }}>
+            <div className="actions center receipt-actions" style={{ display:"flex", flexDirection:"column", gap:14, padding:"24px 20px" }}>
               <button className="pill-btn" onClick={saveReceipt} style={{ fontSize:16, fontWeight:700, padding:"16px 18px", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", gap:10 }} aria-label="영수증 저장">
                 <span role="img" aria-hidden="true">💾</span>
                 <span>영수증저장</span>

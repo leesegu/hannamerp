@@ -41,6 +41,9 @@ import MonthlyClosePage from "./pages/MonthlyClosePage";
 /* ✅ 연간시트 추가 (직접 URL 진입용 라우트) */
 import AnnualSheetPage from "./pages/AnnualSheetPage";
 
+/* ✅ 대금결제 관리 */
+import PaymentSettlementPage from "./pages/PaymentSettlementPage.jsx";
+
 import MessageExtractor from "./pages/MessageExtractor";
 /* ✅ 공용전기 계산 라우트 추가 */
 import PublicElectricCalcPage from "./pages/PublicElectricCalcPage";
@@ -185,6 +188,12 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/accounting/expense"
         element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ExpensePage />}
+      />
+
+      {/* ✅ 관리비회계 · 대금결제 관리 */}
+      <Route
+        path="/accounting/payment-settlement"
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PaymentSettlementPage />}
       />
 
       {/* 관리비회계 · 일마감 */}
