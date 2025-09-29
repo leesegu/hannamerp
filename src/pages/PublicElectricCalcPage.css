@@ -15,6 +15,27 @@
   color: #0f172a;
 }
 
+/* ===== 스크롤바(전역 통일: 공용전기 고객번호 색 #6366f1) ===== */
+.pe-page.light,
+.pe-table-scroll,
+.pe-modal-body {
+  scrollbar-width: thin;               /* Firefox */
+  scrollbar-color: #6366f1 #e5e7eb;    /* thumb, track */
+}
+.pe-page.light::-webkit-scrollbar,
+.pe-table-scroll::-webkit-scrollbar,
+.pe-modal-body::-webkit-scrollbar { height: 10px; width: 10px; }
+.pe-page.light::-webkit-scrollbar-thumb,
+.pe-table-scroll::-webkit-scrollbar-thumb,
+.pe-modal-body::-webkit-scrollbar-thumb {
+  background: #6366f1;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+}
+.pe-page.light::-webkit-scrollbar-track,
+.pe-table-scroll::-webkit-scrollbar-track,
+.pe-modal-body::-webkit-scrollbar-track { background: #e5e7eb; }
+
 /* ===== 툴바 ===== */
 .pe-toolbar {
   display: grid;
@@ -56,7 +77,7 @@
 .pe-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(2, 6, 23, .08); }
 .pe-btn:active { transform: translateY(0); opacity: .95; }
 
-/* ⛔ 업로드 버튼 애니메이션 제거용 */
+/* 업로드/저장용 그라디언트 */
 .pe-btn.gradient { 
   color: #fff; border: 0;
   background-image: linear-gradient(90deg, #7c3aed, #4f46e5, #06b6d4);
@@ -65,21 +86,35 @@
   box-shadow: 0 8px 20px rgba(99, 102, 241, .25);
 }
 
-.pe-btn.outline { background: #fff; color: #334155; }
-.pe-btn.outline.active { border-color: #7b5cff; box-shadow: 0 0 0 3px rgba(123, 92, 255, .18); }
-
-/* ✅ 수정 버튼 컬러 강조 */
-.edit-colored { 
-  background: #eef2ff; 
-  color: #3730a3;
+/* (변경) 부과설정 버튼: 덜 눈부신 인디고 톤 다운 */
+.pe-btn.accent-muted {
+  color: #1e1b4b;
   border-color: #c7d2fe;
-}
-.edit-colored.active {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
+  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, .15), inset 0 0 0 1px rgba(79, 70, 229, .10);
 }
 
-.pe-btn.danger { background: #fff1f2; color: #b91c1c; border-color: #fecdd3; }
+/* (변경) 수정 버튼: 밝은 회색 톤, 두꺼운 외곽광 제거 */
+.pe-btn.edit-soft {
+  background: #018cff;
+  color: #ffffff;
+  border: 1px solid #e5e7eb;   /* 다른 버튼과 동일 두께 */
+  box-shadow: 0 3px 10px rgba(2, 6, 23, .04);
+}
+.pe-btn.edit-soft.active {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  box-shadow: 0 4px 12px rgba(2, 6, 23, .06);
+}
+
+/* (유지) 삭제 버튼 예쁜 스타일 */
+.pe-btn.danger.pretty {
+  color: #fff;
+  border: 0;
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  box-shadow: 0 8px 18px rgba(220, 38, 38, .25);
+}
+.pe-btn.danger.pretty:hover { box-shadow: 0 10px 22px rgba(220, 38, 38, .3); transform: translateY(-1px); }
 
 .pe-actions { display: inline-grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 8px; }
 
@@ -136,8 +171,32 @@
 .pe-table td.muted { color: #94a3b8; }
 .pe-table tbody tr:hover td { background: rgba(59, 130, 246, .06); }
 
+/* 행 제외(부과안함) — 더 진한 회색 */
+.row-excluded td {
+  background: #e5e7eb !important;
+  color: #6b7280;
+}
+.row-excluded .pe-input,
+.row-excluded .pe-select {
+  background: #e5e7eb;
+  color: #6b7280;
+  border-color: #d1d5db;
+  pointer-events: none;
+}
+.pe-tag-excluded {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #6b7280;
+  background: #d1d5db;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 /* ===== 빌라 표시 ===== */
 .pe-villa { display: grid; line-height: 1.22; }
+.pe-villa-line { display: inline-flex; align-items: center; gap: 6px; }
 .pe-villa-name { font-weight: 900; color: #0f172a; }
 .pe-villa-cust { font-size: 12px; color: #6366f1; }
 .pe-villa-cust.empty { color: #dc2626; }
@@ -156,8 +215,8 @@
 /* ===== 강조/상태 ===== */
 .strong { font-weight: 900; color: #0f172a; }
 
-/* ✅ 차액 +값 연녹색(더 옅게) */
-td.pos { color: #baecb8; font-weight: 900; }
+/* ✅ 차액 +값 */
+td.pos { color: #22c55e; font-weight: 900; }
 td.neg { color: #dc2626; font-weight: 900; }
 
 /* ✅ 청구요금 비어있을 때 붉은 배경 */
@@ -165,3 +224,67 @@ td.neg { color: #dc2626; font-weight: 900; }
 
 /* ✅ 부과요금 파란색 */
 .assessed-blue { color: #014ef3; font-weight: 900; }
+
+/* ===== 모달 ===== */
+.pe-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(2, 6, 23, .4);
+  display: grid; place-items: center;
+  z-index: 1000;
+}
+.pe-modal {
+  width: min(900px, 92vw);
+  max-height: 82vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(2, 6, 23, .3);
+  display: grid; grid-template-rows: max-content 1fr max-content;
+  overflow: hidden;
+  border: 1px solid rgba(2, 6, 23, .08);
+}
+.pe-modal-header {
+  position: sticky; top: 0; z-index: 5; /* 제목헤더 최상단 */
+  padding: 14px 16px;
+  background: #ffffff; /* 불투명 */
+  border-bottom: 1px solid rgba(2, 6, 23, .12);
+  box-shadow: 0 2px 8px rgba(2, 6, 23, .06);
+}
+.pe-modal-header h3 { margin: 0; font-size: 16px; font-weight: 900; color: #0f172a; }
+
+.pe-modal-body {
+  padding: 12px;
+  overflow: auto; /* 스크롤 컨테이너 */
+}
+
+.pe-modal-table {
+  width: 100%;
+  border-collapse: separate; border-spacing: 0;
+  min-width: 640px;
+}
+.pe-modal-table thead th {
+  position: sticky; top: 0; z-index: 4; /* 제목헤더 아래, 목록 위 */
+  height: 40px; text-align: center;
+  background: #f8fafc; /* 불투명 */
+  border-bottom: 1px solid rgba(2, 6, 23, .1);
+  font-weight: 900;
+}
+.pe-modal-table tbody td {
+  height: 44px; border-bottom: 1px dashed rgba(2, 6, 23, .08); padding: 0 10px;
+}
+.pe-modal-table td.c { text-align: center; }
+.pe-modal-table td.l { text-align: left; }
+
+.pe-modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px;
+  border-top: 1px solid rgba(2, 6, 23, .08);
+  background: #ffffff;
+}
+
+/* 미묘한 회색 버튼 */
+.pe-btn.subtle {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+  box-shadow: none;
+}

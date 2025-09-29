@@ -51,6 +51,9 @@ import CalendarPage from "./pages/CalendarPage";
 import PaperingPage from "./pages/PaperingPage";
 import MemoPage from "./pages/MemoPage";
 
+/* ✅ 추가: 모바일 전용 캘린더 라우트에 사용할 컴포넌트 import */
+import MobileCalendarPage from "./pages/MobileCalendarPage";
+
 import "./App.css";
 
 /* ✅ Firebase Auth 상태도 함께 인지해서 모바일 로그인과 동작 일치 */
@@ -156,6 +159,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
             <Navigate to="/mobile/login" replace />
           ) : (
             <MoveoutListMobile employeeId={employeeId} userId={userId} />
+          )
+        }
+      />
+
+      {/* ✅ 모바일 전용 캘린더 */}
+      <Route
+        path="/calendar-mobile"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate to="/mobile/login" replace />
+          ) : (
+            <MobileCalendarPage />
           )
         }
       />
