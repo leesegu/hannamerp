@@ -240,3 +240,12 @@
   padding: 0;
 }
 .status-cell:hover { background: #f9fafb; }
+
+/* ===============================
+   🔍 검색결과 하이라이트 (내용만 강조)
+   ===============================*/
+.event-pill.search-hit {
+  border: 2px solid #f59e0b !important;     /* 진한 노랑 테두리 */
+  box-shadow: 0 0 0 2px rgba(245,158,11,.35);/* 은은한 글로우 */
+  border-radius: 6px;
+}

@@ -790,7 +790,7 @@ function EventPill({ event, highlight, onOpenPopover, onDoubleClick, onDragStart
       onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(); }}
       onDragOver={(e) => onDragOver(e, event)}
       onDrop={(e) => onDropBefore(e, event)}
-      className={`event-pill ${colorClass} ${highlight ? "event-pill--hl" : ""}`}
+      className={`event-pill ${colorClass} ${highlight ? "search-hit event-pill--hl" : ""}`}
       title={title}
     >
       <div className="pill-row">
