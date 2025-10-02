@@ -15,6 +15,8 @@ import {
 } from "firebase/firestore";
 
 import { getStorage, ref as sRef, uploadBytes, getBytes } from "firebase/storage";
+/* ✅ 캡쳐용 */
+import * as htmlToImage from "html-to-image";
 
 /** ====== 상수/공통 ====== */
 const INITIAL_ROWS = 20;
@@ -193,7 +195,6 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
       onClose={onClose}
       title={titleText}
       width={380}
-      /* ✅ 요청: 오늘 버튼 제거 → rightExtras 미제공 */
     >
       <div className="cal-wrap">
         <div className="cal-top">
@@ -237,6 +238,7 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
     </Modal>
   );
 }
+
 
 /** ====== 간단 콤보/검색 콤보/출금확인 콤보 ====== */
 const SimpleCombo = forwardRef(function SimpleCombo(
@@ -659,6 +661,9 @@ function HoldTable({ initialRows, onSaveDraft, onClose, onSendRow }) {
 
 /** ====== 메인 컴포넌트 ====== */
 export default function ExpensePage() {
+  /* ✅ 캡쳐용 ref */
+  const pageRef = useRef(null);
+
   const [date, setDate] = useState(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -696,6 +701,9 @@ export default function ExpensePage() {
     } catch {}
     return [];
   });
+
+  // 출금현황 모달
+  const [outModalOpen, setOutModalOpen] = useState(false);
 
   // ✅ 검색 관련 상태
   const [searchQ, setSearchQ] = useState("");
@@ -756,7 +764,7 @@ export default function ExpensePage() {
       try {
         const qsPay = await getDocs(collection(db, "acct_payment_methods"));
         const pays = qsPay.docs
-          .map((d) => ({ id: d.id, ...(d.data() || {}) }))
+          .map((d) => ({ id: d.id, ...(d.data() || {}) })) // ✅ 문법 수정 반영
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           .map((x) => ({ id: x.id, name: x.name || x.title || "" }));
         setPayMethods(pays);
@@ -766,13 +774,15 @@ export default function ExpensePage() {
 
       try {
         const qsVen = await getDocs(collection(db, "vendorsAll"));
-        const v = qsVen.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })).map((x) => ({
-          id: x.id,
-          vendor: String(x.vendor || ""),
-          bank: String(x.bank || ""),
-          accountName: String(x.accountName || ""),
-          accountNo: String(x.accountNo || ""),
-        }));
+        const v = qsVen.docs
+          .map((d) => ({ id: d.id, ...(d.data() || {}) }))
+          .map((x) => ({
+            id: x.id,
+            vendor: String(x.vendor || ""),
+            bank: String(x.bank || ""),
+            accountName: String(x.accountName || ""),
+            accountNo: String(x.accountNo || ""),
+          }));
         setVendors(v);
       } catch {
         setVendors([]);
@@ -781,6 +791,41 @@ export default function ExpensePage() {
   }, []);
 
   const total = useMemo(() => rows.reduce((acc, r) => acc + toNumber(r.amount), 0), [rows]);
+
+  /** ▼▼▼ 출금확인 · 출금계좌별 집계 (대기/완료/합계) ▼▼▼ */
+  const outBreak = useMemo(() => {
+    const map = new Map();
+    let totalPending = 0;
+    let totalDone = 0;
+
+    (rows || []).forEach((r) => {
+      const acc = s(r.outMethod);
+      const amt = toNumber(r.amount);
+      if (!acc || !amt) return;
+      const isDone = s(r.paid) === "출금완료";
+
+      const cur = map.get(acc) || { account: acc, pending: 0, done: 0 };
+      if (isDone) {
+        cur.done += amt;
+        totalDone += amt;
+      } else {
+        cur.pending += amt;
+        totalPending += amt;
+      }
+      map.set(acc, cur);
+    });
+
+    const items = Array.from(map.values())
+      .map((it) => ({ ...it, sum: it.pending + it.done }))
+      .sort((a, b) => a.account.localeCompare(b.account));
+
+    return {
+      items,
+      totalPending,
+      totalDone,
+      totalSum: totalPending + totalDone,
+    };
+  }, [rows]);
 
   const persistLocal = (nextDate, nextRows) => {
     try {
@@ -825,7 +870,7 @@ export default function ExpensePage() {
 
   useEffect(() => {
     persistLocal(date, rows);
-  }, [date]);
+  }, [date]); // date 변경 시 현 로컬 상태 보존
 
   /** ===== 저장(자동) ===== */
   async function saveToStorageAuto(theDate, theRows) {
@@ -891,7 +936,7 @@ export default function ExpensePage() {
       if (hasAnyContent(rows)) {
         await saveToStorageAuto(date, rows);
       }
-      // 하이라이트는 날짜 전환 시 일단 비움(다음 단계에서 다시 설정)
+      // 하이라이트 초기화
       setHighlight(null);
       await performLoadForDate(targetYMD, { setDateAfter: true });
     } catch (e) {
@@ -1120,18 +1165,121 @@ export default function ExpensePage() {
   // ✅ 항상 표시될 카운터 텍스트
   const counterText = `${Math.max(0, hitIdx + 1)}/${searchHits.length || 0}`;
 
+  /** ✅ 전체 페이지 캡쳐 (스크롤 포함) */
+  const onCapturePage = async () => {
+    try {
+      const target = pageRef.current;
+      if (!target) return;
+
+      // 1) 클론을 만들어 화면 밖에 렌더
+      const clone = target.cloneNode(true);
+      const container = document.createElement("div");
+      container.style.position = "fixed";
+      container.style.left = "-99999px";
+      container.style.top = "-99999px";
+      container.style.width = `${target.scrollWidth}px`;
+      container.style.background = "#fff";
+      container.appendChild(clone);
+      document.body.appendChild(container);
+
+      // 2) 스크롤 영역(테이블 등) 확장
+      clone.querySelectorAll(".scrollable").forEach((el) => {
+        el.style.maxHeight = "none";
+        el.style.overflow = "visible";
+      });
+
+      // 3) 이미지 생성 (고해상도)
+      const dataUrl = await htmlToImage.toPng(clone, {
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        width: Math.max(clone.scrollWidth, clone.clientWidth),
+        height: Math.max(clone.scrollHeight, clone.clientHeight),
+      });
+
+      // 4) 다운로드
+      const a = document.createElement("a");
+      const ts = new Date();
+      const tsLabel = `${ts.getFullYear()}${pad2(ts.getMonth() + 1)}${pad2(ts.getDate())}_${pad2(ts.getHours())}${pad2(ts.getMinutes())}${pad2(ts.getSeconds())}`;
+      a.href = dataUrl;
+      a.download = `Expense_${tsLabel}.png`;
+      a.click();
+
+      // 5) 정리
+      document.body.removeChild(container);
+    } catch (e) {
+      console.error(e);
+      alert("캡쳐 생성 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
-    <div className="xp-page">
-      {/* 상단 바 */}
-      <div className="xp-top slim fancy">
-        <div className="xp-actions">
-          {/* 좌측 액션들 */}
-          <button className="xp-btn xp-refresh small pad-s" onClick={onRefresh} title="새로고침">
+    <div className="xp-page" ref={pageRef}>
+      {/* 상단 바 — 요청 순서대로 한 줄 정렬 */}
+      <div className="xp-top slim fancy" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="xp-actions" style={{ overflow: "visible", flexWrap: "nowrap" }}>
+          {/* 1) 10줄 추가 */}
+          <button
+            className="xp-btn xp-load small pad-s"
+            onClick={() => addRows(10)}
+            title="10줄 추가"
+          >
+            <i className="ri-add-line" /> 10줄 추가
+          </button>
+
+          {/* 2) 새로고침 */}
+          <button
+            className="xp-btn xp-refresh small pad-s"
+            onClick={onRefresh}
+            title="새로고침"
+          >
             <i className="ri-refresh-line" /> 새로고침
           </button>
-          <button className="xp-btn xp-hold small pad-s" onClick={() => setHoldOpen(true)} title="출금보류">
+
+          {/* 3) 출금보류 */}
+          <button
+            className="xp-btn xp-hold small pad-s"
+            onClick={() => setHoldOpen(true)}
+            title="출금보류"
+          >
             <i className="ri-pause-circle-line" /> 출금보류
           </button>
+
+          {/* 4) 출금현황 */}
+          <button
+            className="xp-btn xp-save small pad-s"
+            onClick={() => setOutModalOpen(true)}
+            title="출금현황"
+          >
+            <i className="ri-pie-chart-line" /> 출금현황
+          </button>
+
+          {/* 5) 캡쳐 */}
+          <button
+            className="xp-btn"
+            onClick={onCapturePage}
+            title="현재 페이지 캡쳐/저장"
+            style={{
+              height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
+              background: "linear-gradient(135deg,#06b6d4 0%,#0ea5e9 100%)",
+            }}
+          >
+            <i className="ri-camera-3-line" /> 캡쳐
+          </button>
+
+          {/* 6) 오늘 */}
+          <button
+            className="xp-btn"
+            onClick={onClickTodayQuick}
+            title="오늘로 이동"
+            style={{
+              height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
+              background: "linear-gradient(135deg,#22c55e 0%,#16a34a 100%)",
+            }}
+          >
+            <i className="ri-calendar-event-line" /> 오늘
+          </button>
+
+          {/* 7) 삭제 */}
           <button
             className={`xp-btn xp-delete small pad-s ${deleteMode ? "on" : ""}`}
             onClick={() => setDeleteMode((v) => !v)}
@@ -1140,11 +1288,12 @@ export default function ExpensePage() {
             <i className="ri-delete-bin-6-line" /> {deleteMode ? "삭제모드 해제" : "삭제"}
           </button>
 
-          {/* 🔎 검색창 - ✅ 삭제 버튼 오른쪽으로 이동 & 항상 카운트 표시 */}
+          {/* 8) 검색창 */}
           <div
             className={`xp-search ${searching ? "is-loading" : ""}`}
             onMouseDown={(e)=>e.stopPropagation()}
             onClick={(e)=>e.stopPropagation()}
+            style={{ marginLeft: 6, marginRight: 6 }}
           >
             <i className="ri-search-line xp-search-icon" />
             <input
@@ -1156,25 +1305,35 @@ export default function ExpensePage() {
               title="검색"
             />
             <div className={`xp-search-status ${searchHits.length > 0 ? "ok" : ""}`} title="결과 수">
-              {/* 로딩 아이콘은 필요 시만 보이게 하되, 카운트는 항상 보임 */}
               {searching && <i className="ri-loader-4-line xp-spin" />}
               <span>{counterText}</span>
             </div>
           </div>
-        </div>
 
-        {/* 우측: 지출일자 패널 */}
-        <div className="xp-right-tools" onClick={() => document.activeElement?.blur()}>
+          {/* 9) 지출일자/합계 패널 — 더 작게 */}
           <div
             className="xp-side fancy-panel narrow mini"
             role="button"
             title="날짜 선택"
             onClick={() => setDateModalOpen(true)}
+            style={{
+              width: 440,          // 520 → 440 (가로 더 축소)
+              padding: 8,          // 10 → 8
+              gap: 8,              // 10 → 8
+            }}
           >
-            <div className="xp-side-row xp-side-date scale-095">
+            <div
+              className="xp-side-row xp-side-date"
+              style={{
+                transform: "scale(0.85)", // 0.9 → 0.85
+                transformOrigin: "right center",
+                padding: "4px 8px",
+                minWidth: 200
+              }}
+            >
               <div className="xp-side-label">지출일자</div>
               <div className="xp-date-wrap">
-                <div className="xp-date-display">
+                <div className="xp-date-display" style={{ height: 30, padding: "0 30px 0 10px" }}>
                   <span className="xp-date-text">{date}</span>
                   <button
                     className="xp-date-open"
@@ -1183,6 +1342,7 @@ export default function ExpensePage() {
                       setDateModalOpen(true);
                     }}
                     title="달력 열기"
+                    style={{ right: 6, fontSize: 17 }}
                   >
                     <i className="ri-calendar-2-line" />
                   </button>
@@ -1191,16 +1351,139 @@ export default function ExpensePage() {
               </div>
             </div>
 
-            <div className="xp-side-row xp-side-sum scale-095">
+            <div
+              className="xp-side-row xp-side-sum"
+              style={{
+                transform: "scale(0.85)",
+                transformOrigin: "right center",
+                padding: "6px 10px",
+                minWidth: 200
+              }}
+            >
               <div className="xp-side-label">합계</div>
               <div className="xp-side-krw">₩</div>
-              <div className="xp-side-val">{fmtComma(total) || "-"}</div>
+              <div className="xp-side-val" style={{ fontSize: 16 }}>{fmtComma(total) || "-"}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 테이블 */}
+      {/* 출금현황 모달 — 가로폭 축소 + 합계 칩/컬럼 추가 */}
+      <Modal
+        open={outModalOpen}
+        onClose={() => setOutModalOpen(false)}
+        title="출금현황"
+        width={640}  // 760 → 640
+      >
+        {/* 헤더 리치 영역 */}
+        <div
+          style={{
+            borderRadius: 16,
+            padding: "12px",
+            background: "linear-gradient(135deg,#f5f3ff 0%,#e0e7ff 50%,#ffe4e6 100%)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,.6)",
+            marginBottom: 10,
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="ri-pie-chart-2-line" style={{ fontSize: 22, color: "#6d28d9" }} />
+            <div style={{ fontWeight: 900, color: "#312e81" }}>요약</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{
+              padding: "6px 10px", borderRadius: 999,
+              background: "linear-gradient(135deg,#dbeafe,#e9d5ff)",
+              fontWeight: 800, color: "#1e3a8a", fontSize: 12,
+            }}>
+              대기 합계&nbsp;<span style={{ color: "#7c3aed" }}>₩{fmtComma(outBreak.totalPending)}</span>
+            </div>
+            <div style={{
+              padding: "6px 10px", borderRadius: 999,
+              background: "linear-gradient(135deg,#dcfce7,#bbf7d0)",
+              fontWeight: 800, color: "#064e3b", fontSize: 12,
+            }}>
+              완료 합계&nbsp;<span style={{ color: "#047857" }}>₩{fmtComma(outBreak.totalDone)}</span>
+            </div>
+            <div style={{
+              padding: "6px 10px", borderRadius: 999,
+              background: "linear-gradient(135deg,#fee2e2,#fecaca)",
+              fontWeight: 800, color: "#7f1d1d", fontSize: 12,
+            }}>
+              출금합계&nbsp;<span style={{ color: "#b91c1c" }}>₩{fmtComma(outBreak.totalSum)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 테이블 */}
+        <div
+          className="xp-out-table"
+          role="table"
+          style={{ borderRadius: 14, overflow: "hidden" }}
+        >
+          <div
+            className="xp-out-row xp-out-row-head"
+            role="row"
+            style={{
+              background: "linear-gradient(180deg,#ede9fe,#e0e7ff)",
+              color: "#3730a3",
+              fontWeight: 900,
+              borderBottom: "1px solid #e9d5ff",
+              display: "grid",
+              gridTemplateColumns: "1fr 120px 120px 120px", // 계좌 / 대기 / 완료 / 합계
+              gap: 8,
+              alignItems: "center",
+              padding: "6px 10px",
+            }}
+          >
+            <div role="columnheader">출금계좌</div>
+            <div role="columnheader" style={{ textAlign: "right" }}>출금대기</div>
+            <div role="columnheader" style={{ textAlign: "right" }}>출금완료</div>
+            <div role="columnheader" style={{ textAlign: "right" }}>합계</div>
+          </div>
+
+          {(outBreak.items.length === 0) ? (
+            <div className="xp-out-empty">표시할 항목이 없습니다.</div>
+          ) : (
+            outBreak.items.map((it, idx) => (
+              <div
+                role="row"
+                key={it.account}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 120px 120px 120px",
+                  gap: 8,
+                  alignItems: "center",
+                  padding: "6px 10px",
+                  borderTop: "1px solid #f3f4f6",
+                  background: idx % 2 === 0 ? "#ffffff" : "#fbfdff",
+                }}
+              >
+                <div role="cell" title={it.account} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {it.account}
+                </div>
+                <div role="cell" style={{ textAlign: "right", fontWeight: 800 }}>₩{fmtComma(it.pending)}</div>
+                <div role="cell" style={{ textAlign: "right", fontWeight: 800 }}>₩{fmtComma(it.done)}</div>
+                <div role="cell" style={{ textAlign: "right", fontWeight: 900 }}>₩{fmtComma(it.sum)}</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 푸터 그라데이션 라인 */}
+        <div style={{
+          marginTop: 12,
+          height: 8,
+          borderRadius: 999,
+          background: "linear-gradient(90deg,#a78bfa,#60a5fa,#f472b6)",
+          opacity: .6,
+        }} />
+      </Modal>
+
+      {/* 메인 테이블 */}
       <div className="xp-table-wrap scrollable" ref={tableWrapRef}>
         <table className="xp-table">
           <thead>
@@ -1241,17 +1524,9 @@ export default function ExpensePage() {
         </table>
       </div>
 
-      <div className="xp-bottom-actions">
-        {/* ✅ 배경 스타일 개선 */}
-        <button className="xp-add-rows xp-add-rows-pretty" onClick={() => addRows(10)}>
-          + 10줄 더 추가
-        </button>
-        <button className="xp-add-rows xp-today-inline xp-today-pretty" onClick={onClickTodayQuick} title="오늘로 이동">
-          오늘
-        </button>
-      </div>
+      {/* ▼▼▼ 하단 +10줄/오늘 버튼은 상단으로 이동하여 제거했습니다 ▼▼▼ */}
 
-      {/* 모달들 */}
+      {/* 달력 모달 */}
       <CalendarModal
         open={dateModalOpen}
         defaultDate={date}
@@ -1260,6 +1535,7 @@ export default function ExpensePage() {
         onClose={() => setDateModalOpen(false)}
       />
 
+      {/* 출금보류 모달 */}
       <Modal
         open={holdOpen}
         onClose={() => setHoldOpen(false)}
