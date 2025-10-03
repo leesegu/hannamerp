@@ -1,17 +1,40 @@
 /* src/pages/ExpensePage.css */
 
 /* ===== 공통 레이아웃/버튼 등 ===== */
+:root{
+  /* ▼ 테이블 높이 계산용 변수 (20칸 표시용) */
+  --xp-row-h: 37px;  /* 행 높이 (기존 38px → 살짝 축소) */
+  --xp-head-h: 38px; /* 헤더 높이 (유지) */
+
+  /* ★ 툴바(상단 버튼/패널 줄) 고정 높이 */
+  --xp-toolbar-h: 44px; /* 필요 시 42~46px에서 조정 */
+}
+
 .xp-page{display:flex;flex-direction:column;gap:10px;padding:10px 12px;background:#fff;height:100%;box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;overflow:hidden}
 .xp-top{display:grid;grid-template-columns:1fr max-content;gap:12px;align-items:stretch;position:relative;z-index:2;overflow:visible}
 .xp-top.slim{grid-template-columns:1fr max-content}
 .xp-top.fancy{margin-bottom:2px}
-.xp-actions{display:inline-grid;grid-auto-flow:column;grid-auto-columns:max-content;gap:10px;align-items:center;justify-content:start}
+.xp-actions{
+  display:inline-grid;grid-auto-flow:column;grid-auto-columns:max-content;gap:10px;align-items:center;justify-content:start;
+  /* ▼ 패널 고정 기준이 될 컨테이너 기준점 */
+  position:relative;
+
+  /* ★ 툴바 줄 높이를 고정 → 버튼 텍스트 길어져도 전체 줄 높이 변화 없음 */
+  height:var(--xp-toolbar-h);
+  /* 필요 시 세로 중앙 정렬 유지 */
+  align-items:center;
+}
 
 /* 오른쪽 도구 영역 */
 .xp-right-tools{display:flex;align-items:stretch;gap:12px}
 
 /* 버튼 */
-.xp-btn{display:inline-flex;align-items:center;gap:10px;height:42px;padding:0 18px;border:0;cursor:pointer;border-radius:14px;color:#fff;font-weight:900;font-size:15px;letter-spacing:.2px;position:relative;box-shadow:0 8px 18px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .08s ease,box-shadow .18s ease,filter .12s ease}
+.xp-btn{
+  display:inline-flex;align-items:center;gap:10px;height:42px;padding:0 18px;border:0;cursor:pointer;border-radius:14px;color:#fff;font-weight:900;font-size:15px;letter-spacing:.2px;position:relative;box-shadow:0 8px 18px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .08s ease,box-shadow .18s ease,filter .12s ease;
+
+  /* ★ 버튼 글자 줄바꿈 방지: 길어져도 한 줄 유지 (툴바 높이 미변) */
+  white-space:nowrap;
+}
 .xp-btn.small{height:34px;padding:0 12px;border-radius:12px;gap:8px;font-size:13px}
 .xp-btn i{font-size:18px;line-height:1}
 .xp-btn:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.45)}
@@ -25,28 +48,45 @@
 .xp-refresh{background:linear-gradient(135deg,#94a3b8 0%,#64748b 100%)}
 .xp-close{background:linear-gradient(135deg,#94a3b8 0%,#475569 100%)}
 
-/* ===== 지출일자 패널 (가로 확장/1열 유지) ===== */
+/* ===== 지출일자/합계 패널 (가로 확장/1열 유지) ===== */
 .xp-side{
   display:flex;flex-direction:row;align-items:flex-start;gap:14px;
   flex-wrap:nowrap; /* 줄바꿈 금지 */
-  width:1040px;     /* 680px → 1040px */
+  width:1040px;     /* 기본: 1040px */
   padding:16px;     /* 14px → 16px */
-  /* 기존 margin-right 제거 */
   border-radius:20px;
   background:rgba(255,255,255,.66);backdrop-filter:blur(12px);
   box-shadow:0 14px 34px rgba(0,0,0,.16);border:2px solid transparent;
   background-clip:padding-box,border-box;
   background-image:linear-gradient(180deg,rgba(255,255,255,.88),rgba(245,243,255,.78)),linear-gradient(135deg,#a78bfa,#ec4899,#60a5fa)
 }
-/* ▼ 패널 전체를 라인의 우측 끝으로 이동 (하단 테이블 우측과 끝선 맞춤) */
-.xp-actions .xp-side{margin-left:auto;margin-right:0}
+/* ▼ 패널을 컨테이너(.xp-actions) 기준으로 '현재 위치'에서 우측 고정 */
+.xp-actions .xp-side{
+  position:absolute; right:0; top:50%; transform:translateY(-50%);
+  margin:0; justify-self:auto;
+}
+
+/* ★ 우측 패널 ‘겉 테두리’만 더 얇게(내부 박스 크기 유지) — 우선순위 고정 */
+.xp-actions .xp-side{padding-top:4px !important;padding-bottom:4px !important;}
+.xp-actions .xp-side.mini{padding-top:2px !important;padding-bottom:2px !important;}
+
+/* ★ (선택) 내부 한 줄의 라인 높이만 살짝 타이트 → 체감 높이 -2~3px */
+.xp-actions .xp-side .xp-side-row{ line-height:1.15; }
 
 /* ▼ 패널 내부는 줄바꿈 방지 */
 .xp-side, .xp-side *{white-space:nowrap}
 
+/* 기존 preset */
 .xp-side.narrow{width:960px}
-.xp-side.mini{padding:12px;gap:12px}
+/* ▼ 기본 미니 프리셋(전역) — 위의 .xp-actions 안 오버라이드가 우선 */
+.xp-side.mini{padding:8px 12px;gap:12px}
 .scale-095{transform:scale(.95);transform-origin:right center}
+
+/* ★ 툴바 좁은/미니 패널의 가로폭만 소폭 축소 (JSX 인라인 width 덮어쓰기) */
+.xp-actions .xp-side.narrow.mini{width:480px !important}
+
+/* ★ 검색창과 패널 사이 간격 더 주기 */
+.xp-actions .xp-search{margin-right:100px !important}
 
 /* 패널 내부 블록 */
 .xp-side-row{display:flex;align-items:center;gap:10px;padding:0;border:0;font-size:14px;min-width:0}
@@ -89,15 +129,31 @@
 
 /* ===== 메인 테이블 ===== */
 .xp-table-wrap{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff}
-/* ▼ 뷰포트 기준으로 내부 스크롤 높이를 계산하여 최대로 아래로 내림(외부 스크롤 방지) */
+
+/* ▼ 20칸(헤더 제외) 정확히 보이도록 내부 스크롤 높이 고정
+   = 헤더높이 + (행높이 * 20) + 보정(경계선 등) */
 .xp-table-wrap.scrollable{
-  max-height:calc(100vh - 220px); /* 상단 바/패널/여백을 감안한 오프셋(필요 시 200~260px 사이로 미세조정) */
+  max-height: calc(var(--xp-head-h) + (20 * var(--xp-row-h)) + 2px);
   overflow:auto;
 }
+
 .xp-table{width:100%;border-collapse:collapse;table-layout:fixed}
-.xp-table thead th{background:linear-gradient(180deg,#a78bfa 0%,#8b5cf6 100%);color:#fff;font-weight:800;font-size:13px;height:38px;border-right:1px solid rgba(255,255,255,.25)}
+
+/* ▼ 헤더/바디 높이 변수를 사용해 균일하게 맞춤 */
+.xp-table thead th{
+  background:linear-gradient(180deg,#a78bfa 0%,#8b5cf6 100%);
+  color:#fff;font-weight:800;font-size:13px;
+  height:var(--xp-head-h);
+  border-right:1px solid rgba(255,255,255,.25)
+}
 .xp-table thead th:last-child{border-right:0}
-.xp-table tbody td{border-top:1px solid #f3f4f6;border-right:1px solid #f3f4f6;height:38px;padding:4px;background:#fff;overflow:visible}
+
+.xp-table tbody td{
+  border-top:1px solid #f3f4f6;border-right:1px solid #f3f4f6;
+  height:var(--xp-row-h);              /* 38px → 34px */
+  padding:3px;                         /* 4px → 3px (아주 약간 축소) */
+  background:#fff;overflow:visible
+}
 .xp-table tbody td:last-child{border-right:0}
 
 /* ▼ 테이블 내부 스크롤바(옅은 퍼플 톤) */
@@ -113,8 +169,13 @@
 .xp-del-row-btn{position:absolute;top:2px;left:50%;transform:translateX(-50%);height:16px;line-height:16px;padding:0 6px;font-size:10px;border:0;border-radius:999px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f87171 0%,#dc2626 100%);box-shadow:0 4px 10px rgba(220,38,38,.25),inset 0 1px 0 rgba(255,255,255,.4);z-index:1}
 .xp-del-row-btn:hover{filter:brightness(1.05)}
 
-/* 인풋 */
-.xp-input,.xp-select{width:100%;height:28px;border:1px solid #d1d5db;border-radius:6px;padding:0 8px;font-size:13px;outline:none;background:#fff}
+/* 인풋 (세로칸 약간 축소에 맞춰 소폭 조정) */
+.xp-input,.xp-select{
+  width:100%;
+  height:26px;                 /* 28px → 26px */
+  border:1px solid #d1d5db;border-radius:6px;
+  padding:0 8px;font-size:13px;outline:none;background:#fff
+}
 .xp-input:focus,.xp-select:focus{border-color:#a78bfa;box-shadow:0 0 0 2px rgba(167,139,250,.25)}
 .xp-amt{text-align:right}
 
@@ -125,18 +186,6 @@
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-btn,
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .combo-input{text-decoration:line-through;background-color:#cbd5e1}
 .xp-tr-paid td:nth-child(n+2):nth-child(-n+8) .scombo-text{text-decoration:line-through}
-
-/* 하단 버튼 */
-.xp-bottom-actions{margin-top:8px;display:flex;justify-content:flex-end;gap:8px}
-.xp-add-rows{height:36px;border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:0 12px;cursor:pointer;font-weight:600}
-.xp-add-rows:hover{background:#f8fafc}
-
-/* 예쁘게(요청 반영) */
-.xp-add-rows-pretty{border:0!important;color:#fff;background:linear-gradient(135deg,#6ee7b7 0%,#10b981 100%);box-shadow:0 10px 22px rgba(16,185,129,.25), inset 0 1px 0 rgba(255,255,255,.35)}
-.xp-add-rows-pretty:hover{filter:brightness(1.03)}
-.xp-today-pretty{border:0!important;color:#fff;background:linear-gradient(135deg,#93c5fd 0%,#3b82f6 100%);box-shadow:0 10px 22px rgba(59,130,246,.25), inset 0 1px 0 rgba(255,255,255,.35)}
-.xp-today-pretty:hover{filter:brightness(1.03)}
-.xp-today-inline{border-style:dashed}
 
 /* ===== 검색 콤보/심플 콤보 ===== */
 .combo{position:relative}
@@ -245,7 +294,7 @@
   box-shadow:inset 0 1px 0 rgba(0,0,0,.02);
   transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
-.xp-search:hover{border-color:#bfc6d4}
+.xp-search:hover{border-color:#a78bfa}
 .xp-search:focus-within{border-color:#a78bfa;box-shadow:0 0 0 3px rgba(167,139,250,.22)}
 .xp-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:#6b7280;pointer-events:none}
 .xp-search-input{border:0;height:26px;outline:none;background:transparent;width:100%;font-size:13px}

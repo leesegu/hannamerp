@@ -250,17 +250,19 @@ const SimpleCombo = forwardRef(function SimpleCombo(
   const [focus, setFocus] = useState(false);
   const btnRef = useRef(null);
 
-  useImperativeHandle(ref, () => ({
-    open: () => !disabled && setOpen(true),
-    close: () => setOpen(false),
-    focus: () => {
-      if (disabled) return;
-      setFocus(true);
-      setOpen(true);
-      setTimeout(() => setFocus(false), 0);
-      btnRef.current?.focus();
-    },
-  }));
+  useImperativeHandle(ref, () => (
+    {
+      open: () => !disabled && setOpen(true),
+      close: () => setOpen(false),
+      focus: () => {
+        if (disabled) return;
+        setFocus(true);
+        setOpen(true);
+        setTimeout(() => setFocus(false), 0);
+        btnRef.current?.focus();
+      },
+    }
+  ));
 
   useEffect(() => {
     const onDoc = (e) => {
@@ -1310,30 +1312,32 @@ export default function ExpensePage() {
             </div>
           </div>
 
-          {/* 9) 지출일자/합계 패널 — 더 작게 */}
+          {/* 9) 지출일자/합계 패널 — 더 크게 + 오른쪽 정렬 고정 */}
           <div
             className="xp-side fancy-panel narrow mini"
             role="button"
             title="날짜 선택"
             onClick={() => setDateModalOpen(true)}
             style={{
-              width: 440,          // 520 → 440 (가로 더 축소)
-              padding: 8,          // 10 → 8
-              gap: 8,              // 10 → 8
+              width: 560,          // 440 → 560 (조금 더 크게)
+              padding: 10,         // 8 → 10
+              gap: 10,             // 8 → 10
+              marginLeft: "auto",  // 패널을 라인 우측 끝으로
+              marginRight: 0,      // 테이블 우측 끝과 시각적으로 맞춤
             }}
           >
             <div
               className="xp-side-row xp-side-date"
               style={{
-                transform: "scale(0.85)", // 0.9 → 0.85
+                transform: "scale(0.92)", // 0.85 → 0.92 (내부 콘텐츠 살짝 키움)
                 transformOrigin: "right center",
-                padding: "4px 8px",
-                minWidth: 200
+                padding: "4px 10px",
+                minWidth: 220
               }}
             >
               <div className="xp-side-label">지출일자</div>
               <div className="xp-date-wrap">
-                <div className="xp-date-display" style={{ height: 30, padding: "0 30px 0 10px" }}>
+                <div className="xp-date-display" style={{ height: 32, padding: "0 32px 0 12px" }}>
                   <span className="xp-date-text">{date}</span>
                   <button
                     className="xp-date-open"
@@ -1342,7 +1346,7 @@ export default function ExpensePage() {
                       setDateModalOpen(true);
                     }}
                     title="달력 열기"
-                    style={{ right: 6, fontSize: 17 }}
+                    style={{ right: 6, fontSize: 18 }}
                   >
                     <i className="ri-calendar-2-line" />
                   </button>
@@ -1354,15 +1358,15 @@ export default function ExpensePage() {
             <div
               className="xp-side-row xp-side-sum"
               style={{
-                transform: "scale(0.85)",
+                transform: "scale(0.92)", // 0.85 → 0.92
                 transformOrigin: "right center",
-                padding: "6px 10px",
-                minWidth: 200
+                padding: "8px 12px",
+                minWidth: 220
               }}
             >
               <div className="xp-side-label">합계</div>
               <div className="xp-side-krw">₩</div>
-              <div className="xp-side-val" style={{ fontSize: 16 }}>{fmtComma(total) || "-"}</div>
+              <div className="xp-side-val" style={{ fontSize: 18 }}>{fmtComma(total) || "-"}</div>
             </div>
           </div>
         </div>

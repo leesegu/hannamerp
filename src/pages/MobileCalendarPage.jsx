@@ -172,13 +172,24 @@ export default function MobileCalendarPage() {
     });
   }, []); // eslint-disable-line
 
-  /** 검색: Enter로 다음 결과로 이동(읽기전용) */
+  /** 검색 매치 하이라이트용 ID 집합 */
+  const [matchedIdSet, setMatchedIdSet] = useState(() => new Set());
+
+  /** 검색: Enter로 다음 결과로 이동(읽기전용) + 매치 하이라이트 */
   const [searchIndex, setSearchIndex] = useState(0);
   useEffect(() => {
     const q = queryText.trim();
     setSearchIndex(0);
-    if (!q) return;
+
+    // 매치 집합 갱신 (달력 시각적 표시용)
+    if (!q) {
+      setMatchedIdSet(new Set());
+      return;
+    }
     const matches = allMatches(events, q);
+    setMatchedIdSet(new Set(matches.map((m) => m.id)));
+
+    // 첫 매치 달/연도로 이동
     if (matches.length > 0) {
       const first = matches[0];
       setYear(first.y);
@@ -392,19 +403,22 @@ export default function MobileCalendarPage() {
                   {/* 이벤트 스택 */}
                   <div ref={setContentRef(key)} className="m-event-area">
                     <div className="m-event-stack">
-                      {cellEvents.map((ev) => (
-                        <div
-                          key={ev.id}
-                          data-evpill="1"
-                          className={`m-pill m-pill--${ev.statusKey || "sky"}`}
-                          title={`${(ev.villaName || "").trim()} ${(ev.unitNumber || "").trim()}   ${ev.amount}`}
-                        >
-                          <div className="m-pill-row">
-                            <span className="m-pill-villa">{`${ev.villaName || ""} ${ev.unitNumber || ""}`.trim()}</span>
-                            <span className="m-pill-amt">{ev.amount}</span>
+                      {cellEvents.map((ev) => {
+                        const isMatchHit = matchedIdSet.has(ev.id);
+                        return (
+                          <div
+                            key={ev.id}
+                            data-evpill="1"
+                            className={`m-pill m-pill--${ev.statusKey || "sky"} ${isMatchHit ? "is-match" : ""}`}
+                            title={`${(ev.villaName || "").trim()} ${(ev.unitNumber || "").trim()}   ${ev.amount}`}
+                          >
+                            <div className="m-pill-row">
+                              <span className="m-pill-villa">{`${ev.villaName || ""} ${ev.unitNumber || ""}`.trim()}</span>
+                              <span className="m-pill-amt">{ev.amount}</span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -442,18 +456,21 @@ export default function MobileCalendarPage() {
         >
           <div className="m-more-body">
             <div className="m-event-stack m-event-stack--overlay">
-              {moreOverlay.events.map((ev) => (
-                <div
-                  key={`ov-${ev.id}`}
-                  className={`m-pill m-pill--${ev.statusKey || "sky"}`}
-                  title={`${(ev.villaName || "").trim()} ${(ev.unitNumber || "").trim()}   ${ev.amount}`}
-                >
-                  <div className="m-pill-row">
-                    <span className="m-pill-villa">{`${ev.villaName || ""} ${ev.unitNumber || ""}`.trim()}</span>
-                    <span className="m-pill-amt">{ev.amount}</span>
+              {moreOverlay.events.map((ev) => {
+                const isMatchHit = matchedIdSet.has(ev.id);
+                return (
+                  <div
+                    key={`ov-${ev.id}`}
+                    className={`m-pill m-pill--${ev.statusKey || "sky"} ${isMatchHit ? "is-match" : ""}`}
+                    title={`${(ev.villaName || "").trim()} ${(ev.unitNumber || "").trim()}   ${ev.amount}`}
+                  >
+                    <div className="m-pill-row">
+                      <span className="m-pill-villa">{`${ev.villaName || ""} ${ev.unitNumber || ""}`.trim()}</span>
+                      <span className="m-pill-amt">{ev.amount}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

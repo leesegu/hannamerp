@@ -85,7 +85,7 @@
 /* 패널: 트리거 중앙 하단, 가로폭 살짝 축소 */
 .m-dd-panel{
   position:absolute; top:38px; left:50%; transform:translateX(-50%); z-index:20;
-  min-width: 120px; max-width: 200px; /* ⬅ 가로폭 줄임 (줄바꿈 없이 보이는 범위) */
+  min-width: 120px; max-width: 200px;
   border-radius:14px; padding:8px;
   background:
     radial-gradient(160px 60px at 10% -10%, rgba(99,102,241,.18), transparent 60%),
@@ -101,7 +101,7 @@
 .m-dd-grid{ grid-template-columns: repeat(4, minmax(56px, 1fr)); }
 /* 월 목록: 세로 스크롤 제거 */
 .m-dd-panel-inner.no-scroll{
-  max-height:none; overflow:visible;  /* ⬅ 월 패널은 스크롤 없이 모두 표시 */
+  max-height:none; overflow:visible;
 }
 
 .m-dd-item{
@@ -142,10 +142,10 @@
 
 /* 이벤트 (작고 선명) */
 .m-event-area{ position:absolute; left:0; right:0; bottom:0; top:20px; padding:4px; overflow:hidden; }
-.m-event-stack{ display:grid; grid-auto-rows:min-content; row-gap:3px; font-size:8px; }
+.m-event-stack{ display:grid; grid-auto-rows:min-content; row-gap:3px; font-size:7px; }
 .m-event-stack--overlay{ font-size:10px; }
 
-/* pill */
+/* pill (상태별 색상을 CSS 변수로도 고정해둠) */
 .m-pill{
   width:100%; border-radius:8px; border:1px solid transparent;
   color:#fff; padding:2px 6px; pointer-events:none;
@@ -154,14 +154,19 @@
 .m-pill-villa{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .m-pill-amt{ flex-shrink:0; }
 
-/* 색상 */
-.m-pill--sky{ background:#38bdf8; border-color:#38bdf8; }
-.m-pill--deepblue{ background:#1e3a8a; border-color:#1e3a8a; }
-.m-pill--darkgray{ background:#6b7280; border-color:#6b7280; }
-.m-pill--green{ background:#22c55e; border-color:#22c55e; }
-.m-pill--red{ background:#ef4444; border-color:#ef4444; }
-.m-pill--purple{ background:#8b5cf6; border-color:#8b5cf6; }
-.m-pill--amber{ background:#f59e0b; border-color:#f59e0b; }
+/* 색상 + 변수 */
+.m-pill--sky{    --pill-bg:#38bdf8; background:#38bdf8; border-color:#38bdf8; }
+.m-pill--deepblue{ --pill-bg:#1e3a8a; background:#1e3a8a; border-color:#1e3a8a; }
+.m-pill--darkgray{ --pill-bg:#6b7280; background:#6b7280; border-color:#6b7280; }
+.m-pill--green{  --pill-bg:#22c55e; background:#22c55e; border-color:#22c55e; }
+.m-pill--red{    --pill-bg:#ef4444; background:#ef4444; border-color:#ef4444; }
+.m-pill--purple{ --pill-bg:#8b5cf6; background:#8b5cf6; border-color:#8b5cf6; }
+.m-pill--amber{  --pill-bg:#f59e0b; background:#f59e0b; border-color:#f59e0b; }
+
+/* ✅ 검색 매치 하이라이트: 배경 유지 + 진한 보라 테두리 */
+.m-pill.is-match{
+  box-shadow: 0 0 0 2px #5b21b6, 0 0 0 4px rgba(91,33,150,.22);
+}
 
 /* 더보기 */
 .m-more-gradient{ position:absolute; left:0; right:0; bottom:0; padding:4px; background:linear-gradient(to top, rgba(255,255,255,.95), transparent); }
@@ -174,7 +179,7 @@
 .m-more-overlay{
   position:fixed; z-index:100; max-height:60vh; overflow:auto; overflow-x:hidden;
   background:#fff; border:1px solid #e5e7eb; border-radius:10px;
-  box-shadow:0 16px 48px rgba(0,0,0,.18);
+  box-shadow: 0 16px 48px rgba(0,0,0,.18);
 }
 .m-more-body{ padding:8px; overflow-x:hidden; }
 
@@ -190,15 +195,29 @@
 
 .m-bottom-item{ display:grid; row-gap:4px; }
 
-/* 하단 항목: 배경 반전 금지, 테두리 강조만 (색상은 그대로) */
+/* ===== 하단 항목: 달력과 동일 색을 '항상' 강제하고, 어떤 상태에서도 변하지 않게 ===== */
 .m-bottom-pill{
   pointer-events:auto; -webkit-tap-highlight-color:transparent;
-  /* 배경/글자색은 .m-pill 계열을 그대로 사용 (재정의하지 않음) */
-}
-.m-bottom-pill:active{ filter:none; }
-.m-bottom-pill.open{ box-shadow: inset 0 0 0 2px #6d28d9; }
+  appearance:none; -webkit-appearance:none;
+  border:none; outline:none; box-shadow:none;
 
-/* 펼침된 상세 */
+  /* ▼ 버튼 전역 규칙/UA 규칙을 이겨내기 위해 상태색을 변수로 강제 */
+  background: var(--pill-bg) !important;
+  color:#fff !important;                   /* 하단 항목의 폰트색은 항상 흰색 */
+}
+.m-bottom-pill:hover,
+.m-bottom-pill:active,
+.m-bottom-pill:focus,
+.m-bottom-pill:focus-visible,
+.m-bottom-pill.open{
+  border:none !important;
+  outline:none !important;
+  box-shadow:none !important;
+  background: var(--pill-bg) !important;   /* 클릭/포커스/활성화/펼침 모두 동일 배경 유지 */
+  color:#fff !important;                   /* 텍스트도 항상 흰색 */
+}
+
+/* 펼침된 상세(내용만 검정색) */
 .m-bottom-note{
   white-space:pre-wrap; line-height:1.6; font-size:12px; color:#111827;
   background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; padding:8px;

@@ -255,8 +255,8 @@ function FilterSelect({ value, onChange }) {
   );
 }
 
-/* ===== 상단 계정/메뉴 (등록 · 달력 · 로그아웃) ===== */
-function TopKebabMenu({ onRegister, onCalendar, onLogout }) {
+/* ===== 상단 계정/메뉴 (등록 · 달력 · 개인장부 · 로그아웃) ===== */
+function TopKebabMenu({ onRegister, onCalendar, onLedger, onLogout }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const trigRef = useRef(null);
@@ -306,10 +306,15 @@ function TopKebabMenu({ onRegister, onCalendar, onLogout }) {
             <span className="mi mi-add" aria-hidden />
             <span>등록</span>
           </button>
-          {/* ✅ 추가: 달력 버튼 */}
+          {/* ✅ 달력 */}
           <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onCalendar?.(); }}>
             <span className="mi mi-calendar" aria-hidden />
             <span>달력</span>
+          </button>
+          {/* ✅ 개인장부 (MobilePersonalLedgerPage) — 달력 아래에 배치 */}
+          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLedger?.(); }}>
+            <span className="mi mi-ledger" aria-hidden />
+            <span>개인장부</span>
           </button>
           <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLogout?.(); }}>
             <span className="mi mi-logout" aria-hidden />
@@ -627,10 +632,11 @@ export default function MoveoutListMobile() {
       {/* 상단 */}
       <div className="mo-topbar">
         <PageTitle>이사정산 조회</PageTitle>
-        {/* ✅ 달력 이동 핸들러 추가 */}
+        {/* ✅ 달력/개인장부 이동 핸들러 추가 */}
         <TopKebabMenu
           onRegister={handleAdd}
           onCalendar={() => navigate("/calendar-mobile")}
+          onLedger={() => navigate("/mobile/personal-ledger")}
           onLogout={handleLogout}
         />
       </div>
