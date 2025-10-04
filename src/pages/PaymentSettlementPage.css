@@ -1,4 +1,3 @@
-/* src/pages/PaymentSettlementPage.css */
 /* ===== Light Glam Tokens ===== */
 :root{
   --bg:#f7f8fb;
@@ -20,42 +19,41 @@
 
 .psp.wrap.light{background:var(--bg); color:var(--text); min-height:100vh; padding:20px}
 
-/* ⬇ 테스트 배너(하이라이트) */
-.psp-banner{
-  display:flex; align-items:center; gap:10px;
-  padding:10px 12px; border-radius:12px; margin-bottom:12px;
-  border:1px solid #ffe6c7; background:#fff7ed; color:#7a4b00; font-weight:700;
-}
-.psp-banner.warn i{color:var(--warn)}
-
-/* ===== Hero (single line) ===== */
+/* ===== Hero (sticky) ===== */
 .psp-hero{display:grid; grid-template-columns:auto 1fr; align-items:center; gap:12px; margin-bottom:12px}
 .psp-hero.single-line .title{display:flex; align-items:center; gap:10px}
+.psp-hero.sticky{position:sticky; top:0; z-index:40; background:var(--bg); padding:8px 0 10px; box-shadow:0 2px 0 rgba(0,0,0,.03)}
 .title i{font-size:24px; color:var(--primary)}
 .title h1{margin:0; font-size:22px; font-weight:900}
 
-.hero-controls{
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
-}
+.hero-controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;}
 .metrics.inline{display:flex; gap:8px; margin-left:8px}
-.chip{display:flex; align-items:center; gap:6px; font-weight:700;
-  padding:8px 10px; border-radius:999px; background:#eef2ff; color:#334155; border:1px solid #dfe6fd}
+.chip{display:flex; align-items:center; gap:6px; font-weight:700; padding:8px 10px; border-radius:999px; background:#eef2ff; color:#334155; border:1px solid #dfe6fd}
 .chip.warn{background:#fff7ed; border-color:#ffe6c7}
 
-/* ===== Inputs / Selects ===== */
+/* Inputs / Selects (사이즈 복구 + focus/open 느낌) */
 .input, .select, .search{
   background:#fff; border:1px solid var(--border); border-radius:12px;
-  padding:10px 12px; outline:none; color:var(--text);
-  transition: box-shadow .15s ease, border-color .15s ease;
+  padding:10px 12px; outline:none; color:#0f1a2a; transition: box-shadow .15s ease, border-color .15s ease;
 }
 .input:focus, .select:focus, .search:focus{box-shadow:var(--ring); border-color:#d6d0ff}
+.select{appearance:none; background-image:linear-gradient(45deg, transparent 50%, #9aa3b2 50%), linear-gradient(135deg, #9aa3b2 50%, transparent 50%); background-position:calc(100% - 18px) calc(50% - 4px), calc(100% - 12px) calc(50% - 4px); background-size:6px 6px,6px 6px; background-repeat:no-repeat;}
+.select.mini{padding:8px 10px; border-radius:10px}
+.select.bare{border:none; background:transparent; padding:6px 8px; background-image:none}
 
-.select.with-icon, .select.like-input.with-icon{display:flex; align-items:center; gap:8px}
-.select.bare{border:none; background:transparent; padding:6px 8px}
+/* "드롭다운 열림" 느낌(네이티브 한계로 focus로 대체) */
+.select:focus{box-shadow:0 8px 28px rgba(16,24,40,.12), var(--ring); border-color:#cfd7ff}
 
-.search-wrap{position:relative; width:200px}
-.search-wrap i{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:18px}
-.search{padding-left:34px}
+/* 검색 입력 (placeholder 제거됨) */
+.search-wrap{position:relative; width:240px}
+.search-wrap i{
+  position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:18px; pointer-events:none;
+}
+.search{padding:10px 12px 10px 44px; line-height:1.2; width:100%}
+
+/* MonthPicker 드롭다운 z-index 낮춤(모달 위로 나오지 않도록) */
+.mp-wrap{position:relative; z-index:auto}
+.mp-panel{z-index:5}
 
 /* Buttons */
 .btn{
@@ -67,64 +65,81 @@
 .btn.pale{background:linear-gradient(135deg, #e9fff9, #ffffff); color:#0b7b6d}
 .btn.ghost{background:transparent}
 .btn:hover{filter:brightness(1.02)}
-.btn.tiny{padding:8px 12px; border-radius:10px}
+.btn.tiny{padding:6px 10px; border-radius:10px; font-size:13px}
 
-/* ===== Cards/Table ===== */
+/* Cards/Table */
 .card{background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow)}
 .psp-list{padding:12px}
 .table-scroll{overflow:auto; border-radius:12px; border:1px solid var(--border)}
 .table{width:100%; border-collapse:separate; border-spacing:0; min-width:1080px}
 .table thead th{
   position:sticky; top:0; z-index:2; background:#f4f6fb; color:#475569;
-  font-weight:800; padding:12px; border-bottom:1px solid var(--border);
+  font-weight:800; padding:10px 10px; border-bottom:1px solid var(--border);  /* 헤더 세로폭 소폭 축소 */
 }
-.table tbody td{padding:12px; border-bottom:1px solid #f0f3f8; background:#fff}
+.table tbody td{padding:8px 8px; border-bottom:1px solid #f0f3f8; background:#fff} /* 내용 세로폭 더 축소 */
 .table .ar{text-align:right}
+.table .tc{text-align:center}
 .table .em{font-weight:800}
-.table .muted{color:var(--muted)}
+.table .muted{color:#6b7280}
 .table .strong{font-weight:800}
 .table .danger{color:#b91c1c}
 .table .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-.table .empty{text-align:center; color:var(--muted); padding:28px 0}
+.table .empty{text-align:center; color:#79839c; padding:22px 0}
 
-/* ⬇ 줄바꿈 금지 테이블(달표 전용) */
+.table.centered thead th{ text-align:center; }
+.table.centered tbody td{ text-align:center; }
+.table.centered .ar{ text-align:right; }
+.table.smalltext thead th, .table.smalltext tbody td{ font-size:13px; }
+
+/* 작업 아이콘 가로 배열 고정 */
+.row-actions{display:inline-flex; gap:6px; white-space:nowrap;}
+.icon-btn{width:36px; height:36px; display:grid; place-items:center; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer}
+.icon-btn.ghost{border:none}
+
+/* 줄바꿈 금지(달표 전용) */
 .table.nowrap th, .table.nowrap td{ white-space: nowrap; }
 
-/* ===== Custom Month Picker ===== */
-.mp-wrap{position:relative}
+/* 달표 테이블: 컴팩트 + 헤더 합계(헤더 칸 내부) */
+.table.compact thead th{ padding:8px 8px; }
+.table.compact tbody td{ padding:8px 8px; }
+.header-sum thead th.head-month { vertical-align:bottom; }
+.header-sum .head-month-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-height:36px; }
+.header-sum .head-month .mon{ line-height:1; font-weight:800; }
+.header-sum .head-month .mon-sum{ line-height:1; font-size:12px; color:#64748b; }
+.header-sum thead th{ border-bottom:1px solid var(--border); }
+.header-sum thead th.head-month{ /* 월 헤더 구분선 추가 없음 */ }
+
+/* Custom Month Picker */
 .select.like-input{min-width:170px}
 .select.like-input .caret{margin-left:auto; transition:transform .15s}
 .select.like-input .caret.open{transform:rotate(180deg)}
 .mp-panel{
   position:absolute; top:44px; right:0; background:#fff; border:1px solid var(--border);
-  border-radius:14px; box-shadow:var(--shadow); padding:10px; z-index:30; width:320px;
+  border-radius:14px; box-shadow:var(--shadow); padding:10px; width:320px;
 }
 .mp-head{display:flex; align-items:center; gap:8px; padding:6px 6px 10px 6px; border-bottom:1px dashed var(--border)}
-.mp-head i{color:var(--primary)}
-.mp-grid{display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; padding-top:10px}
-.mp-cell{
-  padding:10px 0; border-radius:10px; border:1px solid var(--border); background:#fff;
-  cursor:pointer; font-weight:700;
-}
-.mp-cell:hover{background:#f5f7ff}
-.mp-cell.now{background:#efeaff; border-color:#dacfff; color:#5b4ef6}
+.mp-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding-top:10px}
+.mp-cell{padding:10px 0; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; font-weight:700}
+.mp-cell.now{background:#efeaff; border-color:#dacfff}
 
-/* ===== Modal (glam) ===== */
+/* Modal */
 .psp-modal-backdrop{position:fixed; inset:0; background:rgba(15,23,42,.35); display:grid; place-items:center; z-index:60}
 .psp-modal.glam{
   width:94vw; max-height:90vh; overflow:auto; background:#fff; border:1px solid var(--border);
   border-radius:18px; box-shadow:0 18px 48px rgba(0,0,0,.16);
 }
-.psp-modal-head{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border)}
+.psp-modal-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border)}
 .psp-modal-head .headline{display:flex; align-items:center; gap:10px}
 .psp-modal-head .headline i{color:var(--primary)}
 .psp-modal-head h3{margin:0; font-size:18px; font-weight:900}
-.icon-btn{width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer}
+.head-extra{margin-left:auto; display:flex; align-items:center;}
 
-.psp-modal-body{padding:16px}
-.psp-modal-foot{padding:14px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px}
+/* 모달 바디/풋터 */
+.psp-modal-body{padding:14px}
+.psp-modal-foot{padding:12px 14px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px}
+.sticky-foot{position:sticky; bottom:0; background:#fff; z-index:5}
 
-/* ⬇ 모달 푸터 버튼 가로 정렬 고정(줄바꿈 방지) */
+/* 푸터 버튼 줄바꿈 방지 */
 .foot-actions{display:flex; gap:10px; flex-wrap:nowrap}
 
 .btn-eq{
@@ -138,37 +153,46 @@
 /* Register / Manage layout */
 .reg-grid{display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px}
 .reg-grid .wide{grid-column:span 2}
-.reg-grid label{display:grid; gap:6px; font-size:12px; color:var(--muted)}
+.reg-grid label{display:grid; gap:6px; font-size:12px; color:#667085}
 .input{min-width:0}
 .input-mini{padding:8px 10px; border-radius:10px}
+.input-mini.narrow{width:90px}
 
-.mgr-grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
-.mgr-card{border:1px solid var(--border); border-radius:14px; padding:12px; background:#fff}
-.mgr-card header{font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.mgr-grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:start}
+.mgr-card{border:1px solid var(--border); border-radius:14px; padding:12px; background:#fff; min-width:0}
+.mgr-card header{font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:10px; white-space:nowrap}
 .mgr-card header em{color:#64748b; font-style:normal}
 .mgr-card .row.add{display:flex; gap:8px; align-items:center; margin-bottom:10px}
-.mgr-input{flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px}
+.mgr-input{flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; min-width:0}
 .btn-primary.mini{padding:8px 12px; border-radius:10px; background:linear-gradient(135deg, var(--primary), var(--primary-2)); color:#fff; border:none}
 .pill-list{display:flex; flex-wrap:wrap; gap:8px}
 .pill{display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px; background:#f5f7fd; border:1px solid var(--border); cursor:pointer}
 .pill.active{background:#efeaff; border-color:#dacfff}
 .pill .x{width:20px; height:20px; display:grid; place-items:center; background:transparent; border:none; cursor:pointer; color:#6b7280}
-.mgr-card .empty{color:var(--muted); padding:10px 0}
+.mgr-card .empty{color:#79839c; padding:10px 0}
 
 /* Sites Viewer */
 .sites-viewer .sites-controls{display:flex; gap:10px; margin-bottom:10px; align-items:center}
-
-/* ⬇ 달표(모달) 테이블: 충분한 가로폭 확보로 가로 스크롤 방지 */
-.sites-viewer .table{ min-width: 1680px; }
-
-/* sticky first col (modal table) */
+.sites-viewer .table{ min-width: 1500px; } /* per-row 결제시작 칸 추가로 소폭 확대 */
 .sticky-first thead th:first-child,
 .sticky-first tbody td:first-child{position:sticky; left:0; background:#f4f6fb}
-
-/* Highlight */
 .highlight-lite{background:rgba(122,90,248,.08)}
 
-/* ===== Responsive ===== */
+/* 고급형 스위치 (달표추가) */
+.switch.luxe{--w:54px; --h:30px; --p:3px; display:inline-flex; align-items:center; gap:8px; font-weight:700; color:#475569;}
+.switch.luxe input{display:none}
+.switch.luxe .slider{
+  width:var(--w); height:var(--h); background:#e5e7eb; border-radius:999px; position:relative; transition:.2s ease; box-shadow:inset 0 1px 2px rgba(0,0,0,.12);
+}
+.switch.luxe .slider::after{
+  content:""; position:absolute; top:var(--p); left:var(--p);
+  width:calc(var(--h) - var(--p)*2); height:calc(var(--h) - var(--p)*2);
+  border-radius:999px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.2); transition:.2s ease;
+}
+.switch.luxe input:checked + .slider{background:linear-gradient(135deg, var(--primary), var(--primary-2));}
+.switch.luxe input:checked + .slider::after{ left:calc(var(--w) - var(--h) + var(--p)); }
+.switch.luxe .label{user-select:none}
+
 @media (max-width: 1280px){
   .reg-grid{grid-template-columns:1fr}
   .mgr-grid{grid-template-columns:1fr}
