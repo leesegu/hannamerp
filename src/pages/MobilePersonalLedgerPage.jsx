@@ -36,20 +36,37 @@ const TYPE_OPTIONS = [
   { key: "expense", label: "지출" },
 ];
 
+/* ===== ★ 낙관적 업데이트 유틸 (중복 없이 즉시 반영) ===== */
+const upsertById = (arr, item) => {
+  const i = arr.findIndex((v) => v.id === item.id);
+  if (i === -1) return [item, ...arr];
+  const next = arr.slice();
+  next[i] = { ...arr[i], ...item };
+  return next;
+};
+const removeById = (arr, id) => arr.filter((v) => v.id !== id);
+
 export default function MobilePersonalLedgerPage() {
   const navigate = useNavigate();
   const user = auth.currentUser;
   const uid = user?.uid || null;
 
-  // ===== 월/일 선택(달력 선택 시 갱신) =====
+  /* ★ auth 상태 구독 → 실시간 uid */
+  const [liveUid, setLiveUid] = useState(uid);
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => setLiveUid(u?.uid || null));
+    return () => unsub();
+  }, []);
+
+  // ===== 월/일 선택 =====
   const [monthKey, setMonthKey] = useState(ymStr());
-  const [date, setDate] = useState(todayStr()); // ✅ 이 날짜에 해당하는 항목만 리스트에 노출
+  const [date, setDate] = useState(todayStr());
 
   // ===== 입력 폼 =====
-  const [type, setType] = useState("expense"); // 기본: 지출
-  const [party, setParty] = useState(""); // 거래처/현장
-  const [title, setTitle] = useState(""); // 내용
-  const [amount, setAmount] = useState(""); // 문자열(콤마표시)
+  const [type, setType] = useState("expense");
+  const [party, setParty] = useState("");
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
 
   // ☑️ 수정 모드(ID 보관)
@@ -57,7 +74,6 @@ export default function MobilePersonalLedgerPage() {
 
   const amountNumber = useMemo(() => toNumber(amount), [amount]);
 
-  // ☑️ reset 시 선택한 날짜/월은 유지(즉시 반영 문제 해결)
   const resetForm = () => {
     setType("expense");
     setParty("");
@@ -67,9 +83,14 @@ export default function MobilePersonalLedgerPage() {
     setEditingId(null);
   };
 
-  // ☑️ 저장: 신규/수정 분기 + 스냅샷 즉시 반영(선택일/월 유지)
+  // ===== 실시간 데이터 상태 =====
+  const [rowsMonth, setRowsMonth] = useState([]); // 선택 월 전체(합계 카드용)
+  const [rowsDay, setRowsDay] = useState([]);     // 선택 일 리스트
+
+  // ☑️ 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화
   const onSubmit = async () => {
-    if (!uid) {
+    const uidUse = liveUid || uid;
+    if (!uidUse) {
       alert("로그인이 필요합니다.");
       return;
     }
@@ -78,41 +99,97 @@ export default function MobilePersonalLedgerPage() {
       return;
     }
     const data = {
-      type, // "income" | "expense"
-      date, // "YYYY-MM-DD"
+      type,
+      date,
       monthKey: date.slice(0, 7),
       title: title.trim() || (type === "income" ? "수입" : "지출"),
       party: party.trim(),
       amount: amountNumber,
       memo: memo.trim(),
       updatedAt: Date.now(),
-      uid,
+      uid: uidUse,
     };
 
     try {
       if (editingId) {
-        // 수정
-        await updateDoc(doc(db, "users", uid, "personal_ledger", editingId), data);
+        /* ★ 낙관적 업데이트 (수정) */
+        setRowsDay((prev) => upsertById(prev, { id: editingId, ...data }));
+        if (data.monthKey === monthKey) {
+          setRowsMonth((prev) => upsertById(prev, { id: editingId, ...data }));
+        }
+        await updateDoc(doc(db, "users", uidUse, "personal_ledger", editingId), data);
       } else {
-        // 신규
-        await addDoc(collection(db, "users", uid, "personal_ledger"), {
+        /* ★ 낙관적 업데이트 (신규) — 임시 ID */
+        const tempId = "__temp__" + Date.now();
+        const tempDoc = { id: tempId, createdAt: Date.now(), ...data };
+        if (date === data.date) setRowsDay((prev) => upsertById(prev, tempDoc));
+        if (data.monthKey === monthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
+
+        const ref = await addDoc(collection(db, "users", uidUse, "personal_ledger"), {
           ...data,
           createdAt: Date.now(),
         });
+
+        /* 스냅샷이 오면 실제 ID로 대체되지만, 혹시 늦어질 경우를 대비해 즉시 교체 */
+        setRowsDay((prev) =>
+          prev.map((r) => (r.id === tempId ? { ...r, id: ref.id } : r))
+        );
+        setRowsMonth((prev) =>
+          prev.map((r) => (r.id === tempId ? { ...r, id: ref.id } : r))
+        );
       }
-      resetForm(); // 폼만 리셋. date/monthKey 그대로 유지 → 리스트가 즉시 보임
-      // onSnapshot으로 즉시 반영됨
+
+      resetForm();
+
+      // 저장 후 리스트 쪽으로 자연 스크롤
+      requestAnimationFrame(() => {
+        const list = document.querySelector(".mplg .mplg-list");
+        if (list) list.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
     } catch (err) {
       console.error(err);
       alert("저장 중 오류가 발생했습니다.");
     }
   };
 
-  // ===== 월별 내역(합계 카드용) 구독 =====
-  const [rowsMonth, setRowsMonth] = useState([]);
+  const onDelete = async (id) => {
+    const uidUse = liveUid || uid;
+    if (!uidUse || !id) return;
+    const ok = window.confirm("삭제하시겠습니까?");
+    if (!ok) return;
+    try {
+      /* ★ 낙관적 업데이트 (삭제) */
+      setRowsDay((prev) => removeById(prev, id));
+      setRowsMonth((prev) => removeById(prev, id));
+
+      await deleteDoc(doc(db, "users", uidUse, "personal_ledger", id));
+
+      if (editingId === id) resetForm();
+    } catch (err) {
+      console.error(err);
+      alert("삭제 중 오류가 발생했습니다.");
+    }
+  };
+
+  // ☑️ 수정 버튼: 폼으로 로드
+  const onEditLoad = (r) => {
+    setEditingId(r.id);
+    setType(r.type || "expense");
+    setDate(r.date);
+    setParty(r.party || "");
+    setTitle(r.title || "");
+    setAmount(r.amount ? comma(r.amount) : "");
+    setMemo(r.memo || "");
+    const mk = (r.date || "").slice(0, 7);
+    if (mk && mk !== monthKey) setMonthKey(mk);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ===== 월별 내역(합계 카드용) 실시간 구독 =====
   useEffect(() => {
-    if (!uid) return;
-    const ref = collection(db, "users", uid, "personal_ledger");
+    const uidUse = liveUid || uid;
+    if (!uidUse) return;
+    const ref = collection(db, "users", uidUse, "personal_ledger");
     const q = query(
       ref,
       where("monthKey", "==", monthKey),
@@ -125,13 +202,13 @@ export default function MobilePersonalLedgerPage() {
       setRowsMonth(list);
     });
     return () => unsub();
-  }, [uid, monthKey]);
+  }, [liveUid, uid, monthKey]);
 
-  // ===== 일별 내역(리스트용) 구독 — ✅ 선택한 'date'만 표시 =====
-  const [rowsDay, setRowsDay] = useState([]);
+  // ===== 일별 내역(리스트용) 실시간 구독 =====
   useEffect(() => {
-    if (!uid || !date) return;
-    const ref = collection(db, "users", uid, "personal_ledger");
+    const uidUse = liveUid || uid;
+    if (!uidUse || !date) return;
+    const ref = collection(db, "users", uidUse, "personal_ledger");
     const q = query(
       ref,
       where("date", "==", date),
@@ -143,7 +220,7 @@ export default function MobilePersonalLedgerPage() {
       setRowsDay(list);
     });
     return () => unsub();
-  }, [uid, date]);
+  }, [liveUid, uid, date]);
 
   // ===== 월 합계(상단 카드) =====
   const { incomeSum, expenseSum, diff } = useMemo(() => {
@@ -156,39 +233,10 @@ export default function MobilePersonalLedgerPage() {
     return { incomeSum: inc, expenseSum: exp, diff: inc - exp };
   }, [rowsMonth]);
 
-  const onDelete = async (id) => {
-    if (!uid || !id) return;
-    const ok = window.confirm("삭제하시겠습니까?");
-    if (!ok) return;
-    try {
-      await deleteDoc(doc(db, "users", uid, "personal_ledger", id));
-      // onSnapshot으로 즉시 반영됨
-      if (editingId === id) resetForm();
-    } catch (err) {
-      console.error(err);
-      alert("삭제 중 오류가 발생했습니다.");
-    }
-  };
-
-  // ☑️ 수정 버튼: 폼으로 로드
-  const onEditLoad = (r) => {
-    setEditingId(r.id);
-    setType(r.type || "expense");
-    setDate(r.date); // 선택일과 동일해야 리스트 유지
-    setParty(r.party || "");
-    setTitle(r.title || "");
-    setAmount(r.amount ? comma(r.amount) : "");
-    setMemo(r.memo || "");
-    const mk = (r.date || "").slice(0, 7);
-    if (mk && mk !== monthKey) setMonthKey(mk);
-    // 스크롤 상단으로
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   // ===== 커스텀 달력 =====
   const [calOpen, setCalOpen] = useState(false);
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
-  const [calMonth, setCalMonth] = useState(() => new Date().getMonth()); // 0~11
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const dateInputRef = useRef(null);
 
   const openCalendar = () => {
@@ -200,7 +248,7 @@ export default function MobilePersonalLedgerPage() {
   const closeCalendar = () => setCalOpen(false);
 
   const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-  const firstDayOfMonth = (y, m) => new Date(y, m, 1).getDay(); // 0=Sun
+  const firstDayOfMonth = (y, m) => new Date(y, m, 1).getDay();
   const prevMonth = () => {
     const m = calMonth - 1;
     if (m < 0) {
@@ -225,24 +273,24 @@ export default function MobilePersonalLedgerPage() {
     setCalOpen(false);
   };
 
-  // ===== 연간 요약 모달 =====
+  // ===== 요약(연간) =====
   const [yearOpen, setYearOpen] = useState(false);
   const [year, setYear] = useState(() => new Date().getFullYear());
-  const [yearRows, setYearRows] = useState([]); // 해당 연도 모든 데이터
+  const [yearRows, setYearRows] = useState([]);
   const [loadingYear, setLoadingYear] = useState(false);
 
   useEffect(() => {
-    if (!uid || !yearOpen) return;
+    const uidUse = liveUid || uid;
+    if (!uidUse || !yearOpen) return;
     setLoadingYear(true);
-    const ref = collection(db, "users", uid, "personal_ledger");
-    // monthKey가 문자열 "YYYY-MM" 이므로 범위 쿼리 사용
+    const ref = collection(db, "users", uidUse, "personal_ledger");
     const start = `${year}-01`;
     const end = `${year}-12`;
     const q = query(
       ref,
       orderBy("monthKey"),
       startAt(start),
-      endAt(end + "\uf8ff") // 안전한 상한
+      endAt(end + "\uf8ff")
     );
     const unsub = onSnapshot(q, (snap) => {
       const list = [];
@@ -251,10 +299,9 @@ export default function MobilePersonalLedgerPage() {
       setLoadingYear(false);
     });
     return () => unsub();
-  }, [uid, yearOpen, year]);
+  }, [liveUid, uid, yearOpen, year]);
 
   const monthlyAgg = useMemo(() => {
-    // 1~12월 집계
     const base = Array.from({ length: 12 }, (_, i) => ({
       m: i + 1,
       income: 0,
@@ -272,7 +319,40 @@ export default function MobilePersonalLedgerPage() {
     return base;
   }, [yearRows]);
 
-  // ===== UI =====
+  /* 월 클릭 시 일자별 집계 펼침 */
+  const [expandedMonth, setExpandedMonth] = useState(null);
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
+  const yearsList = useMemo(
+    () => Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i),
+    []
+  );
+
+  const dailyAggByMonth = useMemo(() => {
+    const map = {};
+    for (let i = 1; i <= 12; i++) map[i] = [];
+    const bucket = {};
+    yearRows.forEach((r) => {
+      const mk = r.monthKey;
+      if (!mk) return;
+      const mm = Number(String(mk).slice(5, 7));
+      if (!mm) return;
+      const key = r.date || `${mk}-01`;
+      if (!bucket[key]) bucket[key] = { date: key, income: 0, expense: 0, diff: 0 };
+      if (r.type === "income") bucket[key].income += r.amount || 0;
+      else bucket[key].expense += r.amount || 0;
+    });
+    Object.values(bucket).forEach((d) => {
+      d.diff = d.income - d.expense;
+      const mm = Number(String(d.date).slice(5, 7));
+      if (!map[mm]) map[mm] = [];
+      map[mm].push(d);
+    });
+    for (let i = 1; i <= 12; i++) {
+      map[i].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    }
+    return map;
+  }, [yearRows]);
+
   return (
     <div className="mplg">
       {/* 상단 헤더 */}
@@ -290,15 +370,15 @@ export default function MobilePersonalLedgerPage() {
           <span className="back-text">뒤로가기</span>
         </button>
 
-        {/* ☑️ 다이아 아이콘 제거 + 중앙 정렬 텍스트만 */}
+        {/* 중앙 타이틀 */}
         <div className="mplg-title">
           <span>개인 장부</span>
         </div>
 
-        {/* 우측 상단 연간 요약 버튼 */}
+        {/* 우측 상단 요약 버튼 */}
         <div className="top-right">
-          <button className="year-btn" onClick={() => setYearOpen(true)} aria-label="연간 요약">
-            연간 요약
+          <button className="year-btn" onClick={() => setYearOpen(true)} aria-label="요약">
+            요약
           </button>
         </div>
       </div>
@@ -307,15 +387,15 @@ export default function MobilePersonalLedgerPage() {
       <div className="mplg-cards">
         <div className="mplg-card income">
           <div className="label">월 수입</div>
-          <div className="value">{comma(incomeSum)}원</div>
+          <div className="value nowrap small">{comma(incomeSum)}원</div>
         </div>
         <div className="mplg-card expense">
           <div className="label">월 지출</div>
-          <div className="value">{comma(expenseSum)}원</div>
+          <div className="value nowrap small">{comma(expenseSum)}원</div>
         </div>
         <div className={`mplg-card diff ${diff >= 0 ? "pos" : "neg"}`}>
           <div className="label">월 차액</div>
-          <div className="value">{comma(diff)}원</div>
+          <div className="value nowrap small">{comma(diff)}원</div>
         </div>
       </div>
 
@@ -333,7 +413,7 @@ export default function MobilePersonalLedgerPage() {
           ))}
         </div>
 
-        {/* 날짜: 어디를 눌러도 달력이 열리도록 */}
+        {/* 날짜(클릭으로 달력 오픈) */}
         <div
           className="row row-calendar"
           onClick={openCalendar}
@@ -342,7 +422,6 @@ export default function MobilePersonalLedgerPage() {
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && openCalendar()}
         >
           <label>날짜</label>
-          {/* 실제 값은 input에 유지하되 화면상은 프리뷰로 표시 */}
           <input
             ref={dateInputRef}
             type="date"
@@ -357,33 +436,20 @@ export default function MobilePersonalLedgerPage() {
           />
           <div className="date-display">
             {date || "-"}
-            <span className="date-caret" aria-hidden>
-              ▾
-            </span>
+            <span className="date-caret" aria-hidden>▾</span>
           </div>
         </div>
 
-        {/* 거래처/현장 — ☑️ 설명(placeholder) 제거 */}
         <div className="row">
           <label>거래처/현장</label>
-          <input
-            value={party}
-            onChange={(e) => setParty(e.target.value)}
-            className="inp"
-          />
+          <input value={party} onChange={(e) => setParty(e.target.value)} className="inp" />
         </div>
 
-        {/* 내용 — ☑️ 설명(placeholder) 제거 */}
         <div className="row">
           <label>내용</label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="inp"
-          />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className="inp" />
         </div>
 
-        {/* 금액 */}
         <div className="row">
           <label>금액</label>
           <input
@@ -399,7 +465,6 @@ export default function MobilePersonalLedgerPage() {
           />
         </div>
 
-        {/* 메모 */}
         <div className="row">
           <label>메모</label>
           <textarea
@@ -421,22 +486,20 @@ export default function MobilePersonalLedgerPage() {
         </div>
       </div>
 
-      {/* 내역 리스트 — ☑️ 레이아웃 변경 & 수정 버튼 추가 & 삭제 버튼 크기 축소/동일폭 */}
+      {/* 내역 리스트 */}
       <div className="mplg-list">
         {rowsDay.length === 0 ? (
           <div className="empty">선택한 날짜의 내역이 없습니다.</div>
         ) : (
           rowsDay.map((r) => (
             <div key={r.id} className={`item compact ${r.type} ${editingId === r.id ? "editing" : ""}`}>
-              {/* 1행: 수입/지출 태그 / 날짜 ..... 금액 */}
               <div className="line1 alt">
                 <div className="l1-left">
                   <span className="ty">{r.type === "income" ? "수입" : "지출"}</span>
                   <span className="date">{r.date}</span>
                 </div>
-                <div className="l1-right amt">{comma(r.amount || 0)}원</div>
+                <div className="l1-right amt nowrap">{comma(r.amount || 0)}원</div>
               </div>
-              {/* 2행: 거래처/현장, 내용 ..... 수정/삭제 */}
               <div className="line2 alt">
                 <div className="l2-left">
                   <span className="party-strong">{r.party || "-"}</span>
@@ -444,12 +507,8 @@ export default function MobilePersonalLedgerPage() {
                   <span className="title">{r.title || "-"}</span>
                 </div>
                 <div className="l2-right">
-                  <button className="mini-btn edit" onClick={() => onEditLoad(r)} aria-label="수정">
-                    수정
-                  </button>
-                  <button className="mini-btn del" onClick={() => onDelete(r.id)} aria-label="삭제">
-                    삭제
-                  </button>
+                  <button className="mini-btn edit" onClick={() => onEditLoad(r)} aria-label="수정">수정</button>
+                  <button className="mini-btn del" onClick={() => onDelete(r.id)} aria-label="삭제">삭제</button>
                 </div>
               </div>
             </div>
@@ -457,7 +516,6 @@ export default function MobilePersonalLedgerPage() {
         )}
       </div>
 
-      {/* 하단 여백 */}
       <div style={{ height: 40 }} />
 
       {/* 커스텀 달력 모달 */}
@@ -465,21 +523,13 @@ export default function MobilePersonalLedgerPage() {
         <div className="cal-overlay" onClick={closeCalendar}>
           <div className="cal" onClick={(e) => e.stopPropagation()}>
             <div className="cal-header">
-              <button className="nav prev" onClick={prevMonth} aria-label="이전 달">
-                ‹
-              </button>
-              <div className="ym">
-                {calYear}.{pad2(calMonth + 1)}
-              </div>
-              <button className="nav next" onClick={nextMonth} aria-label="다음 달">
-                ›
-              </button>
+              <button className="nav prev" onClick={prevMonth} aria-label="이전 달">‹</button>
+              <div className="ym">{calYear}.{pad2(calMonth + 1)}</div>
+              <button className="nav next" onClick={nextMonth} aria-label="다음 달">›</button>
             </div>
             <div className="cal-grid">
               {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
-                <div key={d} className="wd">
-                  {d}
-                </div>
+                <div key={d} className="wd">{d}</div>
               ))}
               {Array.from({ length: firstDayOfMonth(calYear, calMonth) }).map((_, i) => (
                 <div key={`emp-${i}`} className="emp" />
@@ -500,9 +550,7 @@ export default function MobilePersonalLedgerPage() {
               })}
             </div>
             <div className="cal-actions">
-              <button className="pill close" onClick={closeCalendar}>
-                닫기
-              </button>
+              <button className="pill close" onClick={closeCalendar}>닫기</button>
               <button
                 className="pill today"
                 onClick={() => {
@@ -523,62 +571,131 @@ export default function MobilePersonalLedgerPage() {
         </div>
       )}
 
-      {/* 연간 요약 모달 */}
+      {/* 요약 모달 */}
       {yearOpen && (
         <div className="year-overlay" onClick={() => setYearOpen(false)}>
           <div className="year-modal" onClick={(e) => e.stopPropagation()}>
-            {/* ☑️ 헤더: '연간 요약'(흰색) / 연도 드롭다운(상단, 가로 축소) / X 정렬 */}
+            {/* 헤더: 제목 '요약' + 커스텀 드롭다운 + X */}
             <div className="year-head trio">
-              <div className="title white">연간 요약</div>
-              <select
-                className="year-select year-select-small"
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                aria-label="연도 선택"
-                title="연도"
-              >
-                {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map(
-                  (y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  )
-                )}
-              </select>
-              <button className="x" onClick={() => setYearOpen(false)} aria-label="닫기">
-                ✕
-              </button>
+              <div className="title white">요약</div>
+
+              <div className="year-head-controls">
+                {/* 접근성용 실제 select (시각적으로 숨김) */}
+                <select
+                  className="sr-only"
+                  value={year}
+                  onChange={(e) => {
+                    setExpandedMonth(null);
+                    setYear(Number(e.target.value));
+                  }}
+                  aria-label="연도 선택(숨김)"
+                  title="연도"
+                >
+                  {yearsList.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+
+                {/* 커스텀 드롭다운 */}
+                <div className="year-dd" data-open={yearMenuOpen ? "1" : "0"}>
+                  <button
+                    type="button"
+                    className="year-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={yearMenuOpen}
+                    onClick={() => setYearMenuOpen((v) => !v)}
+                  >
+                    <span className="year-trigger-label">{year}</span>
+                    <span className="caret">▾</span>
+                  </button>
+
+                  {yearMenuOpen && (
+                    <div className="year-menu" role="listbox" tabIndex={-1}>
+                      {yearsList.map((y) => (
+                        <button
+                          key={y}
+                          role="option"
+                          aria-selected={y === year}
+                          className={`year-option ${y === year ? "sel" : ""}`}
+                          onClick={() => {
+                            setExpandedMonth(null);
+                            setYear(y);
+                            setYearMenuOpen(false);
+                          }}
+                        >
+                          <span className="opt-year">{y}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button className="x square" onClick={() => setYearOpen(false)} aria-label="닫기">✕</button>
+              </div>
             </div>
 
-            {/* (기존 연도 레이블/컨트롤 영역 제거됨) */}
+            {/* 본문(스크롤 영역) */}
+            <div className="year-body">
+              <div className="year-table">
+                <div className="y-row y-head">
+                  <div>월</div>
+                  <div>수입</div>
+                  <div>지출</div>
+                  <div>차액</div>
+                </div>
 
-            <div className="year-table">
-              <div className="y-row y-head">
-                <div>월</div>
-                <div>수입</div>
-                <div>지출</div>
-                <div>차액</div>
+                {loadingYear ? (
+                  <div className="loading">불러오는 중…</div>
+                ) : (
+                  monthlyAgg.map((m) => {
+                    const isOpen = expandedMonth === m.m;
+                    return (
+                      <React.Fragment key={m.m}>
+                        <button
+                          className={`y-row y-month clickable ${isOpen ? "open" : ""}`}
+                          onClick={() => setExpandedMonth(isOpen ? null : m.m)}
+                          aria-expanded={isOpen}
+                          aria-controls={`m-${m.m}-days`}
+                        >
+                          <div>{m.m}월</div>
+                          <div className="pos nowrap">{comma(m.income)}원</div>
+                          <div className="neg nowrap">{comma(m.expense)}원</div>
+                          <div className={`diff ${m.diff >= 0 ? "pos" : "neg"} nowrap`}>{comma(m.diff)}원</div>
+                        </button>
+
+                        {isOpen && (
+                          <div id={`m-${m.m}-days`} className="y-days">
+                            <div className="y-days-head">
+                              <div>일자</div>
+                              <div>수입</div>
+                              <div>지출</div>
+                              <div>차액</div>
+                            </div>
+                            {dailyAggByMonth[m.m].length === 0 ? (
+                              <div className="y-days-empty">해당 월 데이터가 없습니다.</div>
+                            ) : (
+                              dailyAggByMonth[m.m].map((d) => (
+                                <div className="y-days-row nowrap-rows small-rows" key={d.date}>
+                                  <div className="nowrap">{d.date}</div>
+                                  <div className="pos nowrap">{comma(d.income)}원</div>
+                                  <div className="neg nowrap">{comma(d.expense)}원</div>
+                                  <div className={`diff ${d.diff >= 0 ? "pos" : "neg"} nowrap`}>
+                                    {comma(d.diff)}원
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
               </div>
-              {loadingYear ? (
-                <div className="loading">불러오는 중…</div>
-              ) : (
-                monthlyAgg.map((m) => (
-                  <div className="y-row" key={m.m}>
-                    <div>{m.m}월</div>
-                    <div className="pos">{comma(m.income)}원</div>
-                    <div className="neg">{comma(m.expense)}원</div>
-                    <div className={`diff ${m.diff >= 0 ? "pos" : "neg"}`}>
-                      {comma(m.diff)}원
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
 
             <div className="year-foot">
-              <button className="pill close" onClick={() => setYearOpen(false)}>
-                닫기
-              </button>
+              <button className="pill close" onClick={() => setYearOpen(false)}>닫기</button>
             </div>
           </div>
         </div>

@@ -1,7 +1,5 @@
 /* =========================================
    MobilePersonalLedgerPage.css (scoped)
-   - 전역 오염 방지: 모든 규칙을 .mplg 하위로 스코프
-   - 요청사항 반영: 타이틀, 연간요약 헤더, 버튼 폰트크기, 리스트 레이아웃, 세로 스크롤
 ========================================= */
 
 .mplg {
@@ -9,27 +7,30 @@
   --bg-2: #111826;
   --card: rgba(255,255,255,0.06);
   --line: rgba(255,255,255,0.12);
-  --ink: #eef1ff; /* ☑️ 약간 더 밝게 */
+  --ink: #eef1ff;
 
-  --primary: #7b5cff;       /* 보라 네온 */
-  --primary-2: #00e6ff;     /* 아쿠아 네온 */
+  --primary: #7b5cff;
+  --primary-2: #00e6ff;
   --green: #28e6a6;
   --red: #ff6b81;
-  --muted: #a9b3d6; /* ☑️ 가독성 향상 */
+  --muted: #a9b3d6;
 
   color: var(--ink);
   background: linear-gradient(180deg, #0a0f1e 0%, #0e1430 40%, #0c0f15 100%);
   min-height: 100vh;
+
+  /* 스크롤 보강 */
+  height: 100dvh;
   padding: 14px 12px 24px;
   box-sizing: border-box;
   overflow-x: hidden;
-  overflow-y: auto; /* ☑️ 세로 스크롤 */
+  overflow-y: auto;
 }
 
 /* 헤더 */
 .mplg .mplg-top {
   display: grid;
-  grid-template-columns: max-content 1fr max-content; /* back / title / right */
+  grid-template-columns: max-content 1fr max-content;
   gap: 10px;
   align-items: center;
   margin-bottom: 10px;
@@ -48,14 +49,13 @@
 .mplg .back-btn .back-icon { font-weight: 900; font-size: 14px; line-height: 1; }
 .mplg .back-btn .back-text { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
 
-/* ☑️ 고급스러운 룩 추가 */
 .mplg .back-btn.luxe{
   background: linear-gradient(90deg, rgba(123,92,255,.25), rgba(0,230,255,.25));
   border-color: rgba(255,255,255,.35);
   box-shadow: 0 6px 16px rgba(123,92,255,.25), inset 0 1px 0 rgba(255,255,255,.2);
 }
 
-/* ☑️ 타이틀: 중앙 정렬 + 아이콘 제거(구조상 중앙 유지) */
+/* 타이틀 */
 .mplg .mplg-title {
   display: inline-grid;
   grid-auto-flow: column;
@@ -67,7 +67,7 @@
   justify-self: center;
 }
 
-/* 우측 상단 */
+/* 우측 상단 버튼 */
 .mplg .top-right { display: grid; }
 .mplg .year-btn{
   padding: 8px 12px;
@@ -98,17 +98,15 @@
   color: var(--muted);
   margin-bottom: 8px;
 }
-.mplg .mplg-card .value {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 0.2px;
-}
+.mplg .mplg-card .value { font-size: 14px; font-weight: 800; letter-spacing: .2px; }
+.mplg .mplg-card .value.nowrap{ white-space: nowrap; }
+.mplg .mplg-card .value.small{ font-size: 14px; }
 .mplg .mplg-card.income { outline: 2px solid rgba(40,230,166,.18); }
 .mplg .mplg-card.expense { outline: 2px solid rgba(255,107,129,.18); }
 .mplg .mplg-card.diff.pos { outline: 2px solid rgba(123,92,255,.22); }
 .mplg .mplg-card.diff.neg { outline: 2px solid rgba(255,107,129,.22); }
 
-/* 입력 폼 */
+/* 폼 */
 .mplg .mplg-form {
   border-radius: 18px;
   border: 1px solid var(--line);
@@ -118,7 +116,6 @@
   padding: 12px;
   margin-bottom: 14px;
 }
-
 .mplg .seg {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -133,23 +130,15 @@
   padding: 10px 0;
   font-weight: 700;
   text-align: center;
-  font-size: 16px; /* ☑️ 수입/지출 버튼 폰트 크기 +1 */
+  font-size: 16px;
 }
 .mplg .seg-btn.on {
   background: linear-gradient(90deg, rgba(123,92,255,.35), rgba(0,230,255,.35));
   border-color: rgba(255,255,255,0.35);
   box-shadow: 0 6px 16px rgba(123,92,255,.25);
 }
-
-.mplg .row {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.mplg .row label {
-  font-size: 12px;
-  color: #c9cffb;
-}
+.mplg .row { display: grid; gap: 6px; margin-bottom: 10px; }
+.mplg .row label { font-size: 12px; color: #c9cffb; }
 .mplg .inp {
   width: 100%;
   box-sizing: border-box;
@@ -162,321 +151,200 @@
   text-align: left;
 }
 .mplg .inp::placeholder { color: #97a1cc; }
-.mplg .inp.amt { font-weight: 800; letter-spacing: 0.2px; }
+.mplg .inp.amt { font-weight: 800; letter-spacing: .2px; }
 
-/* 날짜 행: 어디를 눌러도 열리도록 */
+/* 날짜 */
 .mplg .row-calendar { cursor: pointer; }
-.mplg .row-calendar .date-hidden {
-  position: absolute !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  width: 0; height: 0;
-}
-.mplg .row-calendar .date-display {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: space-between;
-  align-items: center;
+.mplg .row-calendar .date-hidden{ position:absolute!important; opacity:0!important; pointer-events:none!important; width:0; height:0; }
+.mplg .row-calendar .date-display{
+  display: grid; grid-auto-flow: column;
+  justify-content: space-between; align-items: center;
   background: rgba(0,0,0,0.2);
-  border: 1px solid var(--line);
-  color: var(--ink);
-  border-radius: 12px;
-  padding: 12px 12px;
-  font-size: 15px;
+  border: 1px solid var(--line); color: var(--ink);
+  border-radius: 12px; padding: 12px 12px; font-size: 15px;
 }
-.mplg .row-calendar .date-display .date-caret { opacity: .9; }
+.mplg .row-calendar .date-display .date-caret{ opacity:.9; }
 
-/* 액션 버튼 — ☑️ 동일 사이즈 + 중앙정렬 + 세로 사이즈 확대 */
-.mplg .actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 8px;
-}
+/* 액션 */
+.mplg .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .mplg .btn {
-  display: grid;           /* 중앙 정렬 */
-  place-items: center;     /* ☑️ 가운데 정렬 */
-  min-height: 48px;        /* ☑️ 세로 사이즈 확대 */
-  padding: 12px 12px;
-  border-radius: 12px;
+  display: grid; place-items: center; min-height: 48px;
+  padding: 12px 12px; border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.06);
-  color: var(--ink);
-  font-weight: 800;
-  text-align: center;
-  font-size: 16px; /* ☑️ 저장/초기화 버튼 폰트 크기 +1 */
+  background: rgba(255,255,255,0.06); color: var(--ink);
+  font-weight: 800; text-align: center; font-size: 16px;
 }
-.mplg .btn.save {
-  background: linear-gradient(90deg, #7b5cff, #00e6ff);
-  border: none;
-  color: #0c0f15;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
-}
-.mplg .btn.reset {
-  border: 1px solid rgba(255,255,255,0.45);
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-  color: #dfe4ff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
-}
+.mplg .btn.save{ background: linear-gradient(90deg, #7b5cff, #00e6ff); border: none; color:#0c0f15; text-shadow:0 1px 0 rgba(255,255,255,.25); }
+.mplg .btn.reset{ border: 1px solid rgba(255,255,255,.45); background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); color:#dfe4ff; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
 
-/* 리스트(2줄 압축) — 기본 */
-.mplg .mplg-list {
-  display: grid;
-  gap: 8px;
-}
-.mplg .empty {
-  text-align: center;
-  color: #c3caf0;
-  padding: 20px 0;
-}
+/* 리스트 */
+.mplg .mplg-list { display: grid; gap: 8px; padding-bottom: 80px; }
+.mplg .empty { text-align: center; color: #c3caf0; padding: 20px 0; }
 .mplg .item {
-  display: grid;
-  grid-template-rows: auto auto;
-  gap: 6px;
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--line);
+  display: grid; grid-template-rows: auto auto; gap: 6px;
+  padding: 12px; border-radius: 16px; background: rgba(255,255,255,0.06); border: 1px solid var(--line);
 }
-.mplg .item.compact{
-  padding: 10px;          /* ☑️ 더 작게 */
-  border-radius: 14px;
-  background: rgba(255,255,255,0.08);
+.mplg .item.compact{ padding: 10px; border-radius: 14px; background: rgba(255,255,255,0.08); }
+.mplg .item .line1, .mplg .item .line2{
+  display: grid; grid-template-columns: 1fr max-content; align-items: center; gap: 8px;
 }
+.mplg .item .l1-left{ display:inline-flex; gap:8px; align-items:center; min-width:0; }
+.mplg .item .ty{
+  font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 999px; text-align: center; border: 1px solid var(--line);
+}
+.mplg .item.income .ty{ background: rgba(40,230,166,.25); color:#06281f; border-color: rgba(40,230,166,.5); }
+.mplg .item.expense .ty{ background: rgba(255,107,129,.28); color:#3a0c13; border-color: rgba(255,107,129,.5); }
+.mplg .item .amt{ font-weight: 900; letter-spacing:.2px; color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.35); }
+.mplg .item .amt.nowrap{ white-space: nowrap; }
+.mplg .item.income .amt{ color:#6ef0c6; }
+.mplg .item.expense .amt{ color:#ff9aa8; }
+.mplg .item .line1 .date{ color:#d1d6ff; font-size:12px; }
 
-/* 기존 라인 레이아웃 */
-.mplg .item .line1,
-.mplg .item .line2 {
-  display: grid;
-  grid-template-columns: 1fr max-content;
-  align-items: center;
-  gap: 8px;
-}
+.mplg .item .l2-left{ display:inline-flex; align-items:baseline; gap:6px; min-width:0; }
+.mplg .item .party-strong{ color:#e9ecff; font-weight:800; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mplg .item .comma{ color:#bfc6f5; opacity:.9; }
+.mplg .item .title{ font-weight:700; color:#f7f8ff; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-/* ☑️ 새 레이아웃 변형 (alt): 
-   1행 = [수입/지출 태그 + 날짜] ... [금액]
-   2행 = [거래처/현장, 내용] ... [수정/삭제] */
-.mplg .item .line1.alt,
-.mplg .item .line2.alt {
-  grid-template-columns: 1fr max-content;
+.mplg .item .l2-right{ display:inline-grid; grid-auto-flow:column; gap:6px; }
+.mplg .mini-btn{
+  padding: 6px 10px; font-size: 12px; line-height:1; border-radius: 999px;
+  border: 1px solid var(--line); background: rgba(255,255,255,.10); color:#e9ecff; min-width:54px; text-align:center; font-weight:800;
 }
+.mplg .mini-btn.edit{ border-color: rgba(123,92,255,.55); background: rgba(123,92,255,.18); }
+.mplg .mini-btn.del{ border-color: rgba(255,107,129,.55); background: rgba(255,107,129,.18); color:#ffe6ea; }
 
-.mplg .item .l1-left {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  min-width: 0;
-}
-.mplg .item .ty {
-  font-size: 11px;
-  font-weight: 900;
-  padding: 2px 8px;
-  border-radius: 999px;
-  text-align: center;
-  border: 1px solid var(--line);
-}
-.mplg .item.income .ty {
-  background: rgba(40,230,166,.25);
-  color: #06281f;
-  border-color: rgba(40,230,166,.5);
-}
-.mplg .item.expense .ty {
-  background: rgba(255,107,129,.28);
-  color: #3a0c13;
-  border-color: rgba(255,107,129,.5);
-}
-.mplg .item .amt {
-  font-weight: 900; letter-spacing: 0.2px;
-  color: #fff;
-  text-shadow: 0 1px 0 rgba(0,0,0,.35);
-}
-.mplg .item.income .amt { color: #6ef0c6; }
-.mplg .item.expense .amt { color: #ff9aa8; }
+.mplg .item.editing{ outline: 2px solid rgba(123,92,255,.5); }
+.mplg .item .mid .memo{ display:none!important; }
+.mplg .item .right .quick{ display:none!important; }
 
-.mplg .item .line1 .date { color: #d1d6ff; font-size: 12px; }
-
-/* 2행 좌측: "거래처/현장, 내용" */
-.mplg .item .l2-left {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-.mplg .item .party-strong {
-  color: #e9ecff;
-  font-weight: 800;
-  max-width: 50%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.mplg .item .comma { color: #bfc6f5; opacity: .9; }
-.mplg .item .title {
-  font-weight: 700;
-  color: #f7f8ff;
-  max-width: 50%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* 2행 우측: 수정/삭제 (동일 폭의 미니 버튼) */
-.mplg .item .l2-right {
-  display: inline-grid;
-  grid-auto-flow: column;
-  gap: 6px;
-}
-.mplg .mini-btn {
-  padding: 6px 10px;
-  font-size: 12px;
-  line-height: 1;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,.10);
-  color: #e9ecff;
-  min-width: 54px;         /* ☑️ 수정/삭제 동일 사이즈 */
-  text-align: center;
-  font-weight: 800;
-}
-.mplg .mini-btn.edit {
-  border-color: rgba(123,92,255,.55);
-  background: rgba(123,92,255,.18);
-}
-.mplg .mini-btn.del {
-  border-color: rgba(255,107,129,.55);
-  background: rgba(255,107,129,.18);
-  color: #ffe6ea;
-}
-
-/* 강조: 편집중 항목 테두리 */
-.mplg .item.editing {
-  outline: 2px solid rgba(123,92,255,.5);
-}
-
-/* 메모 / 퀵버튼은 2줄 유지 위해 숨김(기본 유지) */
-.mplg .item .mid .memo { display: none !important; }
-.mplg .item .right .quick { display: none !important; }
-
-/* 커스텀 달력 */
-.mplg .cal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
-  display: grid; place-items: center;
-  z-index: 9999;
-}
-.mplg .cal {
-  width: min(92vw, 360px);
-  border-radius: 16px;
-  border: 1px solid var(--line);
+/* 달력 모달 */
+.mplg .cal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.5); display:grid; place-items:center; z-index:9999; }
+.mplg .cal{
+  width: min(92vw, 360px); border-radius: 16px; border:1px solid var(--line);
   background: radial-gradient(130% 130% at 0% 0%, rgba(123,92,255,.18), transparent 50%),
               radial-gradient(130% 130% at 100% 0%, rgba(0,230,255,.14), transparent 55%),
               rgba(20,22,35,0.95);
   box-shadow: 0 12px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
   padding: 12px;
 }
-.mplg .cal-header {
-  display: grid; grid-template-columns: 32px 1fr 32px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.mplg .cal-header .ym {
-  text-align: center; font-weight: 900; letter-spacing: .4px;
-}
-.mplg .cal-header .nav {
-  width: 32px; height: 32px; border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,.06); color: var(--ink);
-}
-.mplg .cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-}
-.mplg .cal-grid .wd {
-  text-align: center; font-size: 12px; color: #b8c0e6;
-}
-.mplg .cal-grid .emp { visibility: hidden; }
-.mplg .cal-grid .day {
-  height: 40px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.06);
-  color: var(--ink);
-  border-radius: 10px;
-}
-.mplg .cal-grid .day.sel {
-  background: linear-gradient(90deg, rgba(123,92,255,.35), rgba(0,230,255,.35));
-  border-color: rgba(255,255,255,.5);
-  font-weight: 900;
-}
-.mplg .cal-actions {
-  display: grid; grid-auto-flow: column; gap: 8px;
-  margin-top: 10px; justify-content: end;
-}
-.mplg .cal-actions .pill {
-  padding: 8px 12px; border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,.06); color: var(--ink);
-}
-.mplg .cal-actions .today {
-  background: linear-gradient(90deg, #7b5cff, #00e6ff);
-  border: none; color: #0c0f15; font-weight: 800;
-}
+.mplg .cal-header{ display:grid; grid-template-columns:32px 1fr 32px; align-items:center; margin-bottom:8px; }
+.mplg .cal-header .ym{ text-align:center; font-weight:900; letter-spacing:.4px; }
+.mplg .cal-header .nav{ width:32px; height:32px; border-radius:10px; border:1px solid var(--line); background: rgba(255,255,255,.06); color:var(--ink); }
+.mplg .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+.mplg .cal-grid .wd{ text-align:center; font-size:12px; color:#b8c0e6; }
+.mplg .cal-grid .emp{ visibility:hidden; }
+.mplg .cal-grid .day{ height:40px; border:1px solid var(--line); background: rgba(255,255,255,0.06); color:var(--ink); border-radius:10px; }
+.mplg .cal-grid .day.sel{ background: linear-gradient(90deg, rgba(123,92,255,.35), rgba(0,230,255,.35)); border-color: rgba(255,255,255,.5); font-weight:900; }
+.mplg .cal-actions{ display:grid; grid-auto-flow:column; gap:8px; margin-top:10px; justify-content:end; }
+.mplg .cal-actions .pill{ padding:8px 12px; border-radius: 999px; border:1px solid var(--line); background: rgba(255,255,255,.06); color:var(--ink); }
+.mplg .cal-actions .today{ background: linear-gradient(90deg, #7b5cff, #00e6ff); border:none; color:#0c0f15; font-weight:800; }
 
-/* ☑️ 연간 요약 모달 */
-.mplg .year-overlay{
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.55);
-  display: grid; place-items: center;
-  z-index: 10000;
-}
+/* 요약 모달 */
+.mplg .year-overlay{ position:fixed; inset:0; background: rgba(0,0,0,.55); display:grid; place-items:center; z-index:10000; }
 .mplg .year-modal{
-  width: min(94vw, 520px);
-  border-radius: 16px;
-  border: 1px solid var(--line);
+  width: min(94vw, 520px); max-height: 90vh; overflow:hidden;
+  border-radius: 16px; border:1px solid var(--line);
   background: radial-gradient(120% 120% at 0% 0%, rgba(123,92,255,.18), transparent 50%),
               radial-gradient(120% 120% at 100% 0%, rgba(0,230,255,.14), transparent 55%),
               rgba(20,22,35,.98);
   box-shadow: 0 12px 36px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.1);
   padding: 12px;
 }
-/* ☑️ 헤더 3분할: 제목(좌) / 연도 셀렉트(중앙) / X(우) */
 .mplg .year-head.trio{
-  display: grid;
-  grid-template-columns: 1fr max-content max-content;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  display:grid; grid-template-columns: 1fr max-content; align-items:center; gap:8px; margin-bottom:8px;
 }
-.mplg .year-head .title{ font-size: 16px; font-weight: 900; letter-spacing: .3px; }
-.mplg .year-head .title.white{ color:#fff; } /* ☑️ 제목 흰색 */
-.mplg .year-head .x{
-  width: 32px; height: 32px; border-radius: 10px;
-  border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--ink);
-}
-.mplg .year-select{
-  width: 100%; padding: 10px 12px; border-radius: 10px;
-  background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line);
-}
-.mplg .year-select-small{
-  width: 110px;  /* ☑️ 가로 사이즈 축소 */
-  padding: 8px 10px;
+.mplg .year-head .title{ font-size:16px; font-weight:900; letter-spacing:.3px; }
+.mplg .year-head .title.white{ color:#fff; }
+
+.mplg .year-head .year-head-controls{
+  display:grid; grid-auto-flow: column; align-items:center; gap:10px; /* 드롭다운과 X 간격 */
 }
 
-/* (이전) .year-controls 블록은 제거되었으므로 스타일 유지 불필요 */
+/* 접근성용 숨김 select */
+.mplg .sr-only{
+  position:absolute !important; width:1px !important; height:1px !important;
+  padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important;
+}
+
+/* 커스텀 드롭다운 */
+.mplg .year-dd{ position:relative; }
+.mplg .year-trigger{
+  height:40px; min-width:110px;
+  display:inline-flex; align-items:center; justify-content:space-between;
+  padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,.35);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04)),
+    radial-gradient(120% 120% at 0% 0%, rgba(123,92,255,.25), transparent 55%),
+    rgba(255,255,255,.04);
+  color:var(--ink); font-weight:800;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 6px 16px rgba(123,92,255,.25);
+}
+.mplg .year-trigger .year-trigger-label{ line-height:1; }
+.mplg .year-trigger .caret{ opacity:.9; }
+
+.mplg .year-menu{
+  position:absolute; top:calc(100% + 6px); right:0; z-index:10;
+  width:160px; max-height: 280px; overflow:auto;
+  border-radius:12px; border:1px solid rgba(255,255,255,.35);
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(123,92,255,.18), transparent 55%),
+    rgba(20,22,35,.99);
+  box-shadow: 0 12px 36px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.1);
+  backdrop-filter: blur(8px);
+}
+.mplg .year-option{
+  width:100%; text-align:left;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 12px; border:0; background:transparent; color:#e9ecff; font-weight:700;
+}
+.mplg .year-option:hover{ background: rgba(255,255,255,.06); }
+.mplg .year-option.sel{
+  background: linear-gradient(90deg, rgba(123,92,255,.25), rgba(0,230,255,.25));
+  color:#0c0f15; text-shadow: 0 1px 0 rgba(255,255,255,.25);
+  font-weight:900;
+}
+
+.mplg .year-head .x.square{
+  width:40px; height:40px; border-radius:10px;
+  border:1px solid var(--line); background: rgba(255,255,255,.06);
+  color:var(--ink); display:grid; place-items:center;
+}
+
+.mplg .year-body{
+  overflow-y:auto;
+  max-height: calc(90vh - 12px - 46px - 48px); /* 전체-패딩-헤더-푸터 근사치 */
+  padding-right:4px; scrollbar-gutter: stable;
+}
 
 /* 표 */
-.mplg .year-table{
-  display: grid; gap: 6px; margin-top: 6px;
-}
+.mplg .year-table{ display:grid; gap:6px; margin-top:6px; }
 .mplg .y-row{
-  display: grid; grid-template-columns: 60px 1fr 1fr 1fr; gap: 8px;
-  padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line);
-  background: rgba(255,255,255,.05);
+  display:grid; grid-template-columns: 60px 1fr 1fr 1fr; gap:8px;
+  padding:8px 10px; border-radius:12px; border:1px solid var(--line); background: rgba(255,255,255,.05);
 }
-.mplg .y-row.y-head{
-  background: rgba(255,255,255,.1); font-weight: 900;
-}
-.mplg .y-row .pos{ color:#6ef0c6; font-weight: 800; }
-.mplg .y-row .neg{ color:#ff9aa8; font-weight: 800; }
+.mplg .y-row.y-head{ background: rgba(255,255,255,.1); font-weight:900; }
+.mplg .y-row .pos{ color:#6ef0c6; font-weight:800; }
+.mplg .y-row .neg{ color:#ff9aa8; font-weight:800; }
 .mplg .y-row .diff.pos{ color:#a89cff; }
 .mplg .y-row .diff.neg{ color:#ffb0bc; }
-.mplg .loading{ text-align:center; color:#d9ddff; padding:8px 0; }
-.mplg .year-foot{
-  display:grid; justify-content:end; margin-top:10px;
+.mplg .y-row.y-month{ cursor:pointer; }
+.mplg .y-row .nowrap{ white-space: nowrap; }
+
+/* 월 상세(일자별) — 줄바꿈 방지 + 작은 폰트 */
+.mplg .y-days{
+  display:grid; gap:4px; margin:6px 0 10px 0;
+  padding:8px; border-radius:12px; border:1px dashed rgba(255,255,255,.25); background: rgba(255,255,255,.03);
 }
+.mplg .y-days-head,
+.mplg .y-days-row{
+  display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px;
+  padding:6px 8px; border-radius:8px; border:1px solid var(--line); background: rgba(255,255,255,.04);
+}
+.mplg .y-days-head{ font-weight:900; background: rgba(255,255,255,.08); }
+.mplg .y-days-empty{ color:#d9ddff; text-align:center; padding:6px 0; }
+
+.mplg .nowrap-rows > *{ white-space: nowrap; } /* 펼친 내용 줄바꿈 방지 */
+.mplg .small-rows{ font-size: 13px; }           /* 펼친 내용 소형 폰트 */
+
+.mplg .loading{ text-align:center; color:#d9ddff; padding:8px 0; }
+.mplg .year-foot{ display:grid; justify-content:end; margin-top:10px; }
