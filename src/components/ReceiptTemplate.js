@@ -206,7 +206,7 @@ export default function ReceiptTemplate({
           justify-content: center;
           align-items: center;
           gap: 8px;
-          font-size: 13px;
+          font-size: 15px;
           font-weight: 1000;
           color: ${C.sub};
         }

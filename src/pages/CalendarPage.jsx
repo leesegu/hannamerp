@@ -16,6 +16,12 @@ import {
  * - 진행현황 드롭다운 펼침 시 팝오버 스크롤 안생김(overflow: visible)
  * - ✅ 같은 날짜에서 임의 위치로 재정렬 (앞/중간/마지막) + _order 평균값/리넘버링
  * - ✅ "가려진 항목 더보기"는 오버레이로 펼침 (오버레이 항목 사이즈/폰트 = 달력과 동일)
+ *
+ * 추가 수정(요청 반영):
+ * - ✅ "가려진 항목 더보기" 버튼을 토글로 동작: 펼친 상태에서 다시 클릭하면 접힘
+ * - ✅ 오버레이 하단 잘림 방지: 아래쪽에서도 잘리지 않도록 화면 하단에 고정 배치(조건부) + 컨테이너 overflow:auto
+ * - ✅ 오버레이의 X 버튼으로도 닫기 가능
+ * - ✅ (이번 요청) 팝오버의 제목 헤더('항목 보기' 타이틀 및 X 버튼) 제거
  */
 
 const STATUS_COLORS = [
@@ -95,7 +101,10 @@ export default function CalendarPage() {
 
   // 가려진 항목 오버레이 상태
   const [moreOverlay, setMoreOverlay] = useState({
-    open: false, key: null, x: 0, y: 0, w: 0, events: []
+    open: false, key: null, x: 0, y: 0, w: 0, events: [],
+    // ▼ 추가 필드(요청 반영)
+    useBottom: false, // true면 bottom 고정 배치
+    b: 0,             // bottom 값(px)
   });
 
   const updateOverflowForKey = (key, el = contentRefs.current[key]) => {
@@ -440,16 +449,36 @@ export default function CalendarPage() {
     if (!el) return;
     const rect = el.getBoundingClientRect();
 
-    setMoreOverlay({
-      open: true,
-      key,
-      x: rect.left,
-      y: rect.bottom + 4,
-      w: rect.width,
-      events: cellEvents,
-    });
+    // ▼ 아래 공간이 협소하면 화면 하단에 고정 배치(useBottom)로 전환 (잘림 방지)
+    const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+    const belowSpace = viewportH - rect.bottom - 8; // 버튼 아래 여유
+    const needBottomPin = belowSpace < 200; // 임계치(200px)보다 좁으면 하단 고정
+
+    if (needBottomPin) {
+      setMoreOverlay({
+        open: true,
+        key,
+        x: rect.left,
+        y: 0,
+        w: rect.width,
+        events: cellEvents,
+        useBottom: true,
+        b: 8, // 화면 하단에서 8px 띄움
+      });
+    } else {
+      setMoreOverlay({
+        open: true,
+        key,
+        x: rect.left,
+        y: rect.bottom + 4,
+        w: rect.width,
+        events: cellEvents,
+        useBottom: false,
+        b: 0,
+      });
+    }
   };
-  const closeMoreOverlay = () => setMoreOverlay({ open: false, key: null, x: 0, y: 0, w: 0, events: [] });
+  const closeMoreOverlay = () => setMoreOverlay({ open: false, key: null, x: 0, y: 0, w: 0, events: [], useBottom: false, b: 0 });
 
   useEffect(() => {
     if (!moreOverlay.open) return;
@@ -571,7 +600,12 @@ export default function CalendarPage() {
                       title="가려진 항목 펼치기"
                       onClick={(evt) => {
                         evt.stopPropagation();
-                        openMoreOverlay(key, cell, cellEvents);
+                        // ▼ 토글 동작: 같은 셀에서 다시 클릭 시 접기
+                        if (moreOverlay.open && moreOverlay.key === key) {
+                          closeMoreOverlay();
+                        } else {
+                          openMoreOverlay(key, cell, cellEvents);
+                        }
                       }}
                     >
                       가려진 항목 {ov.hiddenBelow}건 더보기
@@ -596,12 +630,16 @@ export default function CalendarPage() {
               className="popover"
               style={{ left: `${popover.x}px`, top: `${popover.y}px` }}
             >
+              {/* ▼▼▼ (요청사항) 팝오버 헤더 영역 제거 ▼▼▼ */}
+              {/*
               <div className="popover-head">
                 <div className="popover-title">항목 보기</div>
                 <div className="popover-actions">
-                  <button className="btn-x" onClick={closePopover} title="닫기">✕</button>
+                  <button className="btn-x" title="닫기">✕</button>
                 </div>
               </div>
+              */}
+              {/* ▲▲▲ (요청사항) 팝오버 헤더 영역 제거 ▲▲▲ */}
 
               <div className="popover-body">
                 <div className="two-col">
@@ -632,10 +670,16 @@ export default function CalendarPage() {
         <div
           id="calendar-more-overlay"
           className="more-overlay"
-          style={{ left: moreOverlay.x, top: moreOverlay.y, width: moreOverlay.w }}
+          style={{
+            left: moreOverlay.x,
+            width: moreOverlay.w,
+            ...(moreOverlay.useBottom ? { bottom: moreOverlay.b } : { top: moreOverlay.y }),
+            position: "fixed",
+          }}
         >
           <div className="more-overlay-head">
             <div className="more-overlay-title">가려진 항목</div>
+            {/* ✅ 이번 요청: X 버튼으로 닫기 가능 */}
             <button className="btn-x" onClick={closeMoreOverlay} title="닫기">✕</button>
           </div>
 

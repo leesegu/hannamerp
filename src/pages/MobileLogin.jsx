@@ -1,77 +1,16 @@
 // src/pages/MobileLogin.jsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { db, auth } from "../firebase";
-import {
-  collection, getDocs, limit, query, where,
-} from "firebase/firestore";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signInAnonymously,
-} from "firebase/auth";
+import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { loginWithIdEmpNoPassword } from "../auth/authLogin"; // ✅ PC와 동일한 인증 유틸 사용
 import "./MobileLogin.css";
 
-/** ✅ 로그인 후 이동 경로 (라우터와 일치) */
+/** 로그인 후 이동 경로 */
 const MOBILE_HOME_ROUTE = "/mobile/list";
 
 /** 유틸 */
 const s = (v) => String(v ?? "").trim();
-
-/** Firestore users에서 id 또는 employeeNo로 이메일 매핑 (id 우선) */
-async function fetchEmail({ id, employeeNo }) {
-  const idClean = s(id);
-  const empClean = s(employeeNo);
-
-  if (idClean) {
-    const q1 = query(collection(db, "users"), where("id", "==", idClean), limit(1));
-    const r1 = await getDocs(q1);
-    if (!r1.empty) {
-      const d = r1.docs[0].data();
-      if (s(d.email)) return s(d.email);
-    }
-  }
-  if (empClean) {
-    const q2 = query(collection(db, "users"), where("employeeNo", "==", empClean), limit(1));
-    const r2 = await getDocs(q2);
-    if (!r2.empty) {
-      const d = r2.docs[0].data();
-      if (s(d.email)) return s(d.email);
-    }
-  }
-  return null;
-}
-
-/**
- * 권한 문제까지 처리하는 매핑 유틸:
- * - 일반 조회 → permission-denied면 익명 로그인 시도 → 재조회
- * - 익명 로그인 꺼져 있으면 명확한 에러코드 반환
- */
-async function resolveEmailWithAutoAuth(inputs) {
-  try {
-    return await fetchEmail(inputs);
-  } catch (e) {
-    if (e?.code === "permission-denied") {
-      // 익명 로그인으로 임시 인증을 받아 rules 통과 시도
-      try {
-        await signInAnonymously(auth);
-        return await fetchEmail(inputs);
-      } catch (e2) {
-        // 익명 로그인 비활성 또는 여전히 권한 문제
-        if (e2?.code === "auth/operation-not-allowed") {
-          const err = new Error("익명 로그인이 비활성화되어 있어 사용자 매핑을 불러올 수 없습니다.");
-          err.code = "lookup-anon-disabled";
-          throw err;
-        }
-        const err = new Error("사용자 매핑 조회 권한이 없습니다.");
-        err.code = "lookup-permission-denied";
-        throw err;
-      }
-    }
-    // 그 외 Firestore 에러
-    throw e;
-  }
-}
 
 export default function MobileLogin() {
   const navigate = useNavigate();
@@ -88,13 +27,10 @@ export default function MobileLogin() {
   const pwRef = useRef(null);
   const submitRef = useRef(null);
 
-  // 이미 로그인 상태면 바로 이동
+  // 이미 로그인되어 있으면 바로 이동
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (u && !u.isAnonymous) {
-        // 익명 세션이면 아직 진짜 로그인 아님
-        navigate(MOBILE_HOME_ROUTE, { replace: true });
-      }
+      if (u) navigate(MOBILE_HOME_ROUTE, { replace: true });
     });
     return unsub;
   }, [navigate]);
@@ -105,14 +41,11 @@ export default function MobileLogin() {
     return hasKey && !!s(password) && !isBusy;
   }, [userId, employeeNo, password, isBusy]);
 
-  /** ✅ Enter로 다음 입력, 마지막에서는 제출 */
+  /** Enter 이동/제출 */
   const onEnterGoNext = useCallback((e, nextRef, { submit } = {}) => {
     if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
     e.preventDefault();
-    if (submit) {
-      submitRef.current?.click();
-      return;
-    }
+    if (submit) { submitRef.current?.click(); return; }
     nextRef?.current?.focus();
   }, []);
 
@@ -127,42 +60,25 @@ export default function MobileLogin() {
     setErr("");
     setIsBusy(true);
     try {
-      // 이메일 매핑 (권한까지 처리)
-      const email = await resolveEmailWithAutoAuth({ id: userId, employeeNo });
-      if (!email) {
-        setErr("사용자 정보를 찾을 수 없습니다. 아이디/사번을 확인하세요.");
-        setIsBusy(false);
-        return;
-      }
-
-      // 이메일/비밀번호 로그인 (익명 세션은 자동 교체됨)
-      await signInWithEmailAndPassword(auth, email, password);
+      // ✅ PC와 동일한 공용 인증 로직 사용: 내부에서 아이디/사번 → 이메일 매핑 + Firebase Auth 로그인 처리
+      const { profile } = await loginWithIdEmpNoPassword({
+        id: userId,
+        employeeNo,
+        password,
+      });
 
       // 마지막 입력 저장
       localStorage.setItem("molog.lastId", s(userId));
       localStorage.setItem("molog.lastEmp", s(employeeNo));
 
+      // 필요시 profile 활용 가능 (이름/사번 등)
+      // console.log("mobile login profile:", profile);
+
       navigate(MOBILE_HOME_ROUTE, { replace: true });
     } catch (e2) {
-      console.error("[MobileLogin] signIn error:", e2?.code, e2?.message);
-
-      let msg = "로그인 중 오류가 발생했습니다.";
-      if (e2?.code === "auth/invalid-credential" || e2?.code === "auth/wrong-password") {
-        msg = "아이디/사번 또는 비밀번호가 일치하지 않습니다.";
-      } else if (e2?.code === "auth/user-not-found") {
-        msg = "해당 사용자를 찾을 수 없습니다.";
-      } else if (e2?.code === "auth/too-many-requests") {
-        msg = "잠시 후 다시 시도해주세요.";
-      } else if (e2?.code === "auth/network-request-failed") {
-        msg = "네트워크 오류입니다. 연결 상태를 확인하세요.";
-      } else if (e2?.code === "auth/invalid-email") {
-        msg = "계정 데이터가 올바르지 않습니다. 관리자에게 문의하세요.";
-      } else if (e2?.code === "lookup-anon-disabled") {
-        msg = "관리자: Firebase 콘솔에서 '익명 로그인'을 활성화하거나, Firestore 규칙을 조회 허용으로 조정하세요.";
-      } else if (e2?.code === "lookup-permission-denied" || e2?.code === "permission-denied") {
-        msg = "사용자 매핑 조회 권한이 없습니다. 관리자에게 권한을 확인 요청하세요.";
-      }
-      setErr(msg);
+      console.error("[MobileLogin] signIn error:", e2?.code || "", e2?.message || e2);
+      // 공용 함수에서 던지는 message를 그대로 노출(PC와 동일 UX)
+      setErr(e2?.message || "로그인 중 오류가 발생했습니다.");
     } finally {
       setIsBusy(false);
     }

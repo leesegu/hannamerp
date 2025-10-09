@@ -1,4 +1,3 @@
-// src/pages/PaymentSettlementPage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./PaymentSettlementPage.css";
 
@@ -48,10 +47,14 @@ function MonthPicker({ valueDate, onChange }) {
 
   return (
     <div className="mp-wrap" ref={ref}>
-      <button className="select like-input with-icon" onClick={() => setOpen(v=>!v)} aria-label="대상월 선택">
+      {/* ▼ 표시 텍스트 가운데 정렬, 화살표 없음, 폭 살짝 축소 */}
+      <button
+        className="select like-input month-trigger slim with-iconless center-text"
+        onClick={() => setOpen(v=>!v)}
+        aria-label="대상월 선택"
+      >
         <i className="ri-calendar-event-line"></i>
-        <span>{ymKey(valueDate)}</span>
-        <i className={`ri-arrow-down-s-line caret ${open ? "open" : ""}`}></i>
+        <span className="ym-label">{ymKey(valueDate)}</span>
       </button>
       {open && (
         <div className="mp-panel">
@@ -76,15 +79,26 @@ function MonthPicker({ valueDate, onChange }) {
   );
 }
 
-/* ───────── 공통 모달 ───────── */
-function Modal({ open, onClose, title, width = 980, children, footer, hideCloseIcon = false, headerExtra=null }) {
+/* ───────── 공통 모달 ─────────
+   - 요청 반영: fixedWidth 적용을 위해 style.width 지정 가능하도록 확장
+   - 요청 반영: showIcon(번개 아이콘 표시 여부), headCompact(헤더 세로 여백 축소) 지원
+*/
+function Modal({
+  open, onClose, title, width = 980, children, footer,
+  hideCloseIcon = false, headerExtra = null,
+  showIcon = true, headCompact = false
+}) {
   if (!open) return null;
   return (
     <div className="psp-modal-backdrop" onClick={onClose}>
-      <div className="psp-modal glam" style={{ maxWidth: width }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`psp-modal glam ${headCompact ? "head-compact" : ""}`}
+        style={{ maxWidth: width, width }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="psp-modal-head">
           <div className="headline">
-            <i className="ri-flashlight-line"></i>
+            {showIcon ? <i className="ri-flashlight-line"></i> : null}
             <h3>{title}</h3>
           </div>
           <div className="head-extra">{headerExtra}</div>
@@ -104,7 +118,6 @@ function Modal({ open, onClose, title, width = 980, children, footer, hideCloseI
 /* ───────── 옵션 관리 모달 ───────── */
 function ManageOptionsModal({ open, onClose, categories, setCategories, vendorNamesByCat, setVendorNamesByCat }) {
   const [catInput, setCatInput] = useState("");
-  // ⛔️ 오타 제거됨: 'thead'
   const [selectedCat, setSelectedCat] = useState(categories[0] || "");
   const [vendorInput, setVendorInput] = useState("");
 
@@ -203,7 +216,6 @@ function RegisterModal({
   open, onClose, onSubmit, categories, vendorNamesByCat,
   mode = "create", initial = null
 }) {
-  // 입력 순서 제어(Enter 이동)
   const inputsOrder = useRef([]);
   const setRef = (idx) => (el) => { inputsOrder.current[idx] = el; };
   const goNext = (idx) => {
@@ -217,7 +229,7 @@ function RegisterModal({
     bank: "",
     accountHolder: "",
     accountNo: "",
-    amount: "",            // ⬅ 금액(추가)
+    amount: "",
     note: "",
     cycle: "말일",
     addToSites: false,
@@ -238,15 +250,14 @@ function RegisterModal({
       bank: s(form.bank),
       accountHolder: s(form.accountHolder),
       accountNo: s(form.accountNo),
-      amount: numAmount,   // 저장 반영
+      amount: numAmount,
       note: s(form.note),
       cycle: form.cycle,
       addToSites: !!form.addToSites,
     });
-    onClose?.(); // 저장만 하고 닫기
+    onClose?.();
   };
 
-  // 달표추가 스위치(헤더 영역)
   const headerExtra = (
     <label className="switch luxe" title="달표추가">
       <input
@@ -267,12 +278,6 @@ function RegisterModal({
       width={760}
       hideCloseIcon
       headerExtra={headerExtra}
-      footer={
-        <div className="foot-actions">
-          <button className="btn-eq primary" onClick={submit}><i className="ri-save-3-line" /> 저장</button>
-          <button className="btn-eq ghost" onClick={onClose}><i className="ri-close-circle-line" /> 닫기</button>
-        </div>
-      }
     >
       <div className="reg-grid">
         <label>
@@ -309,7 +314,6 @@ function RegisterModal({
             onKeyDown={(e)=>e.key==="Enter"&&goNext(3)} />
         </label>
 
-        {/* ⬇ 계좌번호 옆에 금액 입력 */}
         <label>
           <span><i className="ri-hashtag"></i> 계좌번호</span>
           <input ref={setRef(4)} className="input" placeholder="예: 356-0000-000000" value={form.accountNo}
@@ -351,9 +355,8 @@ function SitesViewer({ targetDate, sites }) {
   const [cat, setCat] = useState("");
   const [vendor, setVendor] = useState("");
   const [editMode, setEditMode] = useState(false);
-  const [year, setYear] = useState(targetDate.getFullYear());   // 연도 드롭다운
+  const [year, setYear] = useState(targetDate.getFullYear());
 
-  // rows는 props 변경 시 동기화
   const [rows, setRows] = useState(() =>
     sites.map((s) => ({
       ...s,
@@ -369,7 +372,6 @@ function SitesViewer({ targetDate, sites }) {
     })));
   }, [sites]);
 
-  // 선택된 연도에 맞춰 "현재달" 결정
   const now = new Date();
   const currentMonthForYear = (year === now.getFullYear()) ? (now.getMonth() + 1) : 12;
   const m = currentMonthForYear;
@@ -377,17 +379,14 @@ function SitesViewer({ targetDate, sites }) {
   const cats = Array.from(new Set(rows.map((s) => s.category)));
   const vendors = Array.from(new Set(rows.filter((s) => !cat || s.category === cat).map((s) => s.vendorName)));
 
-  // 표시 조건: 구분/거래처 둘 다 선택된 경우만
   const list = (!cat || !vendor) ? [] : rows.filter((s) => s.category === cat && s.vendorName === vendor);
 
-  // 월별 합계(현재달까지만)
   const monthTotals = Array.from({ length: 12 }).map((_, i) => {
     const mm = i + 1;
     if (mm > m) return 0;
     return list.reduce((sum, r) => sum + Number(r.months?.[mm] || 0), 0);
   });
 
-  // 저장 헬퍼
   const saveRow = async (row) => {
     try {
       await updateDoc(doc(db, "paymentSites", row.id), {
@@ -401,7 +400,6 @@ function SitesViewer({ targetDate, sites }) {
     }
   };
 
-  // per-row 금액 수정 → startMonth부터 현재달까지 채우고 즉시 저장
   const setRowAmount = (id, val) => {
     const num = Number(String(val).replace(/[^\d]/g, "")) || 0;
     setRows((arr) =>
@@ -417,7 +415,6 @@ function SitesViewer({ targetDate, sites }) {
     );
   };
 
-  // per-row 결제시작(월) 변경 → 해당 행만 재계산/저장
   const setRowStartMonth = (id, smVal) => {
     const sm = Number(smVal);
     setRows((arr) =>
@@ -435,19 +432,19 @@ function SitesViewer({ targetDate, sites }) {
 
   return (
     <div className="sites-viewer">
-      {/* 상단 컨트롤: 연도만 + 금액수정 토글 (구분/거래처는 그대로) */}
+      {/* 상단 컨트롤 */}
       <div className="sites-controls">
-        <select className="select" value={cat} onChange={(e) => setCat(e.target.value)}>
+        <select className="select mini" value={cat} onChange={(e) => setCat(e.target.value)}>
           <option value=""></option>
           {cats.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
-        <select className="select" value={vendor} onChange={(e) => setVendor(e.target.value)}>
+        <select className="select mini" value={vendor} onChange={(e) => setVendor(e.target.value)}>
           <option value=""></option>
           {vendors.map((v) => <option key={v} value={v}>{v}</option>)}
         </select>
 
-        <select className="select" value={year} onChange={(e)=>setYear(Number(e.target.value))}>
+        <select className="select mini" value={year} onChange={(e)=>setYear(Number(e.target.value))}>
           {Array.from({length:5}).map((_,i)=>{
             const y = new Date().getFullYear()-2+i;
             return <option key={y} value={y}>{y}년</option>;
@@ -459,12 +456,12 @@ function SitesViewer({ targetDate, sites }) {
         </button>
       </div>
 
-      <div className="table-scroll">
-        {/* 헤더 아래 합계(월별) */}
-        <table className="table light sticky-first nowrap smalltext compact header-sum sites-centercols">
+      {/* ▼ 헤더는 고정, 내용만 스크롤 */}
+      <div className="table-scroll sites-scroll-fixed">
+        <table className="table light sticky-first nowrap header-sum sites-centercols sites-tiny more-tight">
           <thead>
             <tr>
-              <th>빌라명</th>
+              <th className="villa-col">빌라명</th>
               <th className="tc">구분</th>
               <th className="tc">거래처명</th>
               <th className="tc">결제시작</th>
@@ -486,12 +483,10 @@ function SitesViewer({ targetDate, sites }) {
           </thead>
           <tbody>
             {list.map((s) => (
-              <tr key={s.id}>
-                <td className="em">{s.villa}</td>
+              <tr key={s.id} className="fixed-row-height">
+                <td className="em villa-col">{s.villa}</td>
                 <td className="tc">{s.category}</td>
                 <td className="tc">{s.vendorName}</td>
-
-                {/* ⬇ per-row 결제시작(월) 드롭다운 (거래처명 오른쪽) */}
                 <td className="tc">
                   <select
                     className="select mini"
@@ -502,11 +497,10 @@ function SitesViewer({ targetDate, sites }) {
                     {Array.from({length:12}).map((_,i)=> <option key={i+1} value={i+1}>{i+1}월</option>)}
                   </select>
                 </td>
-
                 <td className="ar">
                   {editMode ? (
                     <input
-                      className="input input-mini narrow ar"
+                      className="input input-mini narrow ar sites-amount-input"
                       inputMode="numeric"
                       value={s.baseAmount || ""}
                       onChange={(e) => setRowAmount(s.id, e.target.value)}
@@ -520,7 +514,7 @@ function SitesViewer({ targetDate, sites }) {
                 {Array.from({ length: 12 }).map((_, i) => {
                   const mm = i + 1;
                   const val = s.months?.[mm] || 0;
-                  const show = mm <= m; // 현재달까지만 표시
+                  const show = mm <= m;
                   return (
                     <td key={mm} className={`ar ${mm === m ? "highlight-lite" : ""}`}>
                       {show ? (val ? `₩${toCurrency(val)}` : "-") : "-"}
@@ -530,7 +524,7 @@ function SitesViewer({ targetDate, sites }) {
               </tr>
             ))}
             {!list.length && (
-              <tr>
+              <tr className="fixed-row-height">
                 <td colSpan={17} className="empty">표시할 데이터가 없습니다.</td>
               </tr>
             )}
@@ -547,8 +541,8 @@ export default function PaymentSettlementPage() {
   const [cycleFilter, setCycleFilter] = useState("말일");
   const [search, setSearch] = useState("");
 
-  const [vendors, setVendors] = useState([]);     // Firestore 실시간
-  const [sites, setSites] = useState([]);         // Firestore 실시간
+  const [vendors, setVendors] = useState([]);
+  const [sites, setSites] = useState([]);
 
   const [categories, setCategories] = useState([]);
   const [vendorNamesByCat, setVendorNamesByCat] = useState({});
@@ -560,7 +554,6 @@ export default function PaymentSettlementPage() {
   const [openManage, setOpenManage] = useState(false);
   const [openSites, setOpenSites] = useState(false);
 
-  /* 구분 고정 + villas 로부터 거래처명 자동 로드 */
   useEffect(() => {
     const DEFAULT_CATS = ["승강기", "소방안전", "전기안전", "건물청소"];
     setCategories(DEFAULT_CATS);
@@ -568,7 +561,6 @@ export default function PaymentSettlementPage() {
     const unsubVillas = onSnapshot(collection(db, "villas"), (snap) => {
       const acc = { 승강기: [], 소방안전: [], 전기안전: [], 건물청소: [] };
       const docs = [];
-
       const pushIf = (cat, val) => { const t = s(val); if (t) acc[cat].push(t); };
 
       snap.docs.forEach((d) => {
@@ -627,7 +619,6 @@ export default function PaymentSettlementPage() {
     unpaidAcc: filteredRows.reduce((a, r) => a + Number(r.unpaidAcc || 0), 0),
   }), [filteredRows]);
 
-  /* 빌라명 추출 */
   const getVillaName = (v) =>
     v.villaName || v.name || v.buildingName || v.title || v.villa || v.codeName || v?.billa || "";
 
@@ -650,7 +641,6 @@ export default function PaymentSettlementPage() {
     return Array.from(new Set(names));
   };
 
-  /* 저장: Firestore 등록 */
   const handleCreate = async (item) => {
     const docRef = await addDoc(collection(db, "paymentVendors"), {
       ...item,
@@ -675,7 +665,6 @@ export default function PaymentSettlementPage() {
     }
   };
 
-  /* 수정: Firestore 업데이트 + (요청 시) 달표추가 */
   const handleUpdate = async (id, patch) => {
     await updateDoc(doc(db, "paymentVendors", id), {
       category: patch.category,
@@ -723,7 +712,12 @@ export default function PaymentSettlementPage() {
         <div className="hero-controls">
           <MonthPicker valueDate={targetDate} onChange={setTargetDate} />
 
-          <select className="select with-icon" value={cycleFilter} onChange={(e)=>setCycleFilter(e.target.value)}>
+          {/* ▼ 말일/10일: 폭 축소, 화살표 제거, 가운데 정렬 */}
+          <select
+            className="select cycle-narrow center-text"
+            value={cycleFilter}
+            onChange={(e)=>setCycleFilter(e.target.value)}
+          >
             <option value="말일">말일</option>
             <option value="10일">10일</option>
           </select>
@@ -759,10 +753,10 @@ export default function PaymentSettlementPage() {
         </div>
       </header>
 
-      {/* 리스트 */}
+      {/* 리스트: 헤더 그대로, 내용만 세로폭·폰트 축소 */}
       <section className="card light psp-list">
         <div className="table-scroll">
-          <table className="table light centered smalltext">
+          <table className="table light centered body-mini">
             <thead>
               <tr>
                 <th>구분</th>
@@ -771,9 +765,9 @@ export default function PaymentSettlementPage() {
                 <th>예금주</th>
                 <th>계좌번호</th>
                 <th className="ar">금액</th>
-                <th>비고</th>
+                <th className="tc">비고</th>
                 <th className="ar">미납누계</th>
-                <th className="ar">작업</th>
+                <th className="tc">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -787,7 +781,7 @@ export default function PaymentSettlementPage() {
                   <td className="ar strong">₩{toCurrency(r.amount)}</td>
                   <td className="muted">{r.note}</td>
                   <td className="ar danger">₩{toCurrency(r.unpaidAcc)}</td>
-                  <td className="ar">
+                  <td className="tc">
                     <span className="row-actions">
                       <button className="icon-btn ghost" title="수정"
                         onClick={()=>{ setEditTarget(r); setOpenRegister(true); }}>
@@ -852,12 +846,15 @@ export default function PaymentSettlementPage() {
         setVendorNamesByCat={setVendorNamesByCat}
       />
 
+      {/* ▼ 달표보기: 고정 폭 큰 창 + 상단 헤더 아이콘 제거 + 타이틀 변경 + 헤더 높이 축소 */}
       <Modal
         open={openSites}
         onClose={()=>setOpenSites(false)}
-        title="달표보기"
-        width={1600}
+        title="거래처별 달표"
+        width={1400}
         hideCloseIcon
+        showIcon={false}
+        headCompact={true}
         footer={
           <div className="foot-actions">
             <button className="btn-eq ghost" onClick={()=>setOpenSites(false)}>

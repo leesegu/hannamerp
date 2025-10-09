@@ -24,6 +24,7 @@ import { ko } from "date-fns/locale";
 import "remixicon/fonts/remixicon.css";
 
 import "./ReceiptIssuePage.css";
+import { useLocation } from "react-router-dom"; // ✅ 대시보드에서 넘긴 ?row= 파라미터 읽기
 
 /* ===== 유틸 ===== */
 const s = (v) => String(v ?? "").trim();
@@ -292,6 +293,11 @@ export default function ReceiptIssuePage() {
   const showTip = (content, e) => setTip({ show: true, x: e.clientX + 12, y: e.clientY + 12, content });
   const moveTip = (e) => setTip((t) => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
   const hideTip = () => setTip((t) => ({ ...t, show: false }));
+
+  // ✅ 대시보드 미수금 패널에서 넘어온 row 하이라이트용 파라미터
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const focusRowId = params.get("row") || ""; // DataTable의 focusId로 넘김
 
   function blankForm() {
     return {
@@ -641,6 +647,8 @@ export default function ReceiptIssuePage() {
               </div>
             </div>
           }
+          focusId={focusRowId}  // ✅ 대시보드에서 넘어온 특정 영수증 행을 하이라이트/스크롤
+          rowIdKey="id"         // ✅ focus용 키 지정 (이게 없어서 하이라이트가 안 보였음)
         />
 
         {editOpen && (
