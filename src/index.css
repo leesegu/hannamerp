@@ -3,6 +3,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ====== ✅ 전역 safe-area 추가 (상태바/홈 인디케이터 겹침 방지) ====== */
+:root {
+  --safe-top: max(env(safe-area-inset-top), 0px);
+  --safe-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
 /* ✅ 기존 스타일 보존 및 병합 */
 body {
   margin: 0;
@@ -12,6 +18,9 @@ body {
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* ✅ safe-area 패딩 (전역) */
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
 }
 
 code {
@@ -24,7 +33,16 @@ body,
   margin: 0;
   padding: 0;
   overflow-y: hidden;
+  /* ✅ 모바일 주소창/노치 대응: 동적 뷰포트 높이 */
+  height: 100dvh;
+  width: 100%;
+  background: #fff;
 }
+
+/* ✅ 필요 시 페이지에서 쓸 수 있는 유틸 (선택 사용) */
+.safe-top { padding-top: var(--safe-top); }
+.safe-bottom { padding-bottom: var(--safe-bottom); }
+.sticky-header { position: fixed; top: var(--safe-top); left: 0; right: 0; z-index: 10; }
 
 .main-layout {
   height: 100%;
