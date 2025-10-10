@@ -57,21 +57,17 @@ const DPInput = forwardRef(function DPInput(
 /** "선행 '-' 1개 + 숫자"만 허용한 문자열로 정규화 (타이핑 중간 상태 '-' 허용) */
 const normalizeSignedString = (raw) => {
   let s = String(raw ?? "");
-  // 숫자/하이픈 이외 제거
   s = s.replace(/[^\d-]/g, "");
   if (!s) return "";
-  // 선행 '-'만 남기고 나머지 '-' 제거
   const hasMinus = s[0] === "-";
   s = (hasMinus ? "-" : "") + s.replace(/-/g, "").replace(/^\-+/, "");
-  // 허용 패턴: "-" 또는 "-?\d+"
-  // 타이핑 중간의 단독 "-"도 허용
   return s;
 };
 
 /** 정수 파싱 (- 허용). 파싱 실패 시 0 */
 const parseSignedInt = (v) => {
   const norm = normalizeSignedString(v);
-  if (norm === "-" || norm === "") return 0; // 중간 상태는 0으로 계산
+  if (norm === "-" || norm === "") return 0;
   const n = parseInt(norm, 10);
   return Number.isFinite(n) ? n : 0;
 };
@@ -79,7 +75,7 @@ const parseSignedInt = (v) => {
 /** 콤마 포맷 (- 허용). 0이면 기존 UX 유지 위해 빈 문자열 반환 */
 const formatSignedComma = (v) => {
   const norm = normalizeSignedString(v);
-  if (norm === "-") return "-"; // 타이핑 중간 상태 보존
+  if (norm === "-") return "-";
   const n = parseInt(norm, 10);
   if (!Number.isFinite(n) || n === 0) return "";
   return n.toLocaleString();
@@ -118,11 +114,10 @@ export default function MoveoutForm({
   asModal,
   employeeId,
   userId,
-  /* 🔷 추가된 편집 모드 지원 props */
-  mode = "create",                // "create" | "edit"
-  initial = null,                 // 리스트 스키마 객체 (moveDate, villaName, ...)
-  docId = null,                   // 편집할 문서 ID
-  existingPhotos = [],            // 기존 사진 URL 배열
+  mode = "create",
+  initial = null,
+  docId = null,
+  existingPhotos = [],
 }) {
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -149,18 +144,17 @@ export default function MoveoutForm({
     note: "",
     total: "",
     status: "정산대기",
-    /* ✅ 추가: 체크박스 */
     firstSettlement: false,
     excludeDeposit: false,
   });
 
   /* ===== 추가내역 리스트 ===== */
-  const [extras, setExtras] = useState([]); // [{desc, amount:number}]
+  const [extras, setExtras] = useState([]);
   const [editIndex, setEditIndex] = useState(null);
 
-  /* ===== 사진(미리보기/업로드용 파일) ===== */
+  /* ===== 사진 ===== */
   const [photos, setPhotos] = useState([]);
-  const [photoFiles, setPhotoFiles] = useState([]); // 신규 업로드 File 배열
+  const [photoFiles, setPhotoFiles] = useState([]);
   const [photoIdx, setPhotoIdx] = useState(0);
   const photoInputRef = useRef(null);
   const blobUrlsRef = useRef([]);
@@ -195,7 +189,7 @@ export default function MoveoutForm({
     );
   }, [mode, initial]);
 
-  /* 🔹 편집 모드 최초 1회: 기존 사진 표시 */
+  /* 🔹 사진 초기화 */
   useEffect(() => {
     if (mode !== "edit") return;
     if (didInitPhotosRef.current) return;
@@ -317,10 +311,8 @@ export default function MoveoutForm({
     }
     if (id === "roomNumber") return;
 
-    // 콤마 포맷 필드(음수 지원)
     if (numberFieldsWithComma.includes(id)) {
       const norm = normalizeSignedString(value);
-      // 타이핑 중간 상태 '-' 보존
       if (norm === "-") {
         setForm((s) => ({ ...s, [id]: "-" }));
         return;
@@ -330,7 +322,6 @@ export default function MoveoutForm({
       return;
     }
 
-    // 숫자만(지침) 필드(음수 허용, 콤마 없음)
     if (numberOnlyFields.includes(id)) {
       const norm = normalizeSignedString(value);
       setForm((s) => ({ ...s, [id]: norm }));
@@ -389,13 +380,13 @@ export default function MoveoutForm({
     if (nextId) focusId(nextId);
   };
 
-  /* ===== 자동 계산(수도요금/총액) — 음수 반영 ===== */
+  /* ===== 자동 계산 ===== */
   useEffect(() => {
     const prev = parseSignedInt(form.waterPrev);
     const curr = parseSignedInt(form.waterCurr);
     const unit = parseSignedInt(form.waterUnit);
-    const usage = curr - prev;                // ⬅️ 음수 허용
-    const cost = usage * unit;                // ⬅️ 음수 결과 가능
+    const usage = curr - prev;
+    const cost = usage * unit;
     setForm((s2) => ({ ...s2, waterCost: formatSignedComma(cost) }));
   }, [form.waterPrev, form.waterCurr, form.waterUnit]);
 
@@ -403,16 +394,15 @@ export default function MoveoutForm({
     const baseKeys = ["arrears","currentFee","waterCost","electricity","tvFee","cleaning"];
     const base = baseKeys.reduce((sum, k) => sum + parseSignedInt(form[k]), 0);
     const extraSum = extras.reduce((sum, x) => sum + (x?.amount || 0), 0);
-    const total = base + extraSum;            // ⬅️ 음수 합산 허용
+    const total = base + extraSum;
     setForm((s2) => ({ ...s2, total: formatSignedComma(total) }));
   }, [form.arrears, form.currentFee, form.waterCost, form.electricity, form.tvFee, form.cleaning, extras]);
 
-  /* ===== 추가내역: 추가/수정/삭제 ===== */
+  /* ===== 추가내역 ===== */
   const addOrUpdateExtra = () => {
     const desc = s(form.extraDesc);
-    const amt = parseSignedInt(form.extraAmount); // ⬅️ 음수 허용
+    const amt = parseSignedInt(form.extraAmount);
     if (!desc || (form.extraAmount !== "-" && amt === 0 && normalizeSignedString(form.extraAmount) !== "0")) {
-      // 금액이 '-'만 입력된 중간 상태이거나 실질 입력이 없으면 취소
       if (!desc) return false;
       if (form.extraAmount === "-" || form.extraAmount === "") return false;
     }
@@ -431,11 +421,11 @@ export default function MoveoutForm({
     setForm((st) => ({
       ...st,
       extraDesc: it?.desc || "",
-      extraAmount: formatSignedComma(it?.amount ?? 0), // 음수 포함 포맷
+      extraAmount: formatSignedComma(it?.amount ?? 0),
     }));
     setEditIndex(index);
     setTimeout(() => extraDescRef.current?.focus?.(), 0);
-    };
+  };
   const deleteExtra = (index) => {
     setExtras((list) => list.filter((_, i) => i !== index));
     if (editIndex === index) {
@@ -448,7 +438,7 @@ export default function MoveoutForm({
   const [saving, setSaving] = useState(false);
 
   const buildPayloadForList = () => {
-    const moveDate = s(form.moveOutDate);               // yyyy-MM-dd
+    const moveDate = s(form.moveOutDate);
     const villaName = s(form.name);
     const unitNumber = s(form.roomNumber);
     const payerPhone = s(form.contact);
@@ -459,8 +449,8 @@ export default function MoveoutForm({
     const previousReading = parseSignedInt(form.waterPrev);
     const unitPrice = parseSignedInt(form.waterUnit);
 
-    const usage = currentReading - previousReading;     // ⬅️ 음수 허용
-    const waterFee = usage * unitPrice;                 // ⬅️ 음수 가능
+    const usage = currentReading - previousReading;
+    const waterFee = usage * unitPrice;
 
     const electricity = parseSignedInt(form.electricity);
     const tvFee = parseSignedInt(form.tvFee);
@@ -481,7 +471,11 @@ export default function MoveoutForm({
       moveDate,
       villaName,
       unitNumber,
+
+      // ✅ 스키마 정렬: 모바일과 동일하게 phone도 함께 저장
       payerPhone,
+      phone: payerPhone,
+
       arrears,
       currentMonth,
       currentReading,

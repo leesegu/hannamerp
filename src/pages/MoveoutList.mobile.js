@@ -287,55 +287,167 @@ function TopKebabMenu({ onRegister, onCalendar, onLedger, onLogout }) {
 
   return (
     <div className={`mo-topmenu ${open ? "open" : ""}`} ref={wrapRef}>
-      <button
-        type="button"
-        ref={trigRef}
-        className="mo-menu-trigger"
-        onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
-        aria-haspopup="true"
-        aria-expanded={open}
-        aria-label="메뉴 열기"
-        title="메뉴"
-      >
-        <span className="dots" />
-      </button>
+    <button
+      type="button"
+      ref={trigRef}
+      className="mo-menu-trigger"
+      onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
+      aria-haspopup="true"
+      aria-expanded={open}
+      aria-label="메뉴 열기"
+      title="메뉴"
+    >
+      <span className="dots" />
+    </button>
 
-      {open && ReactDOM.createPortal(
-        <div className="mo-menu-panel" style={{ top: pos.top, left: pos.left, width: pos.width }}>
-          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onRegister?.(); }}>
-            <span className="mi mi-add" aria-hidden />
-            <span>등록</span>
-          </button>
-          {/* ✅ 달력 */}
-          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onCalendar?.(); }}>
-            <span className="mi mi-calendar" aria-hidden />
-            <span>달력</span>
-          </button>
-          {/* ✅ 개인장부 (MobilePersonalLedgerPage) — 달력 아래에 배치 */}
-          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLedger?.(); }}>
-            <span className="mi mi-ledger" aria-hidden />
-            <span>개인장부</span>
-          </button>
-          <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLogout?.(); }}>
-            <span className="mi mi-logout" aria-hidden />
-            <span style={{ color: "#ef4444" }}>로그아웃</span>
-          </button>
-        </div>,
-        document.body
-      )}
-    </div>
+    {open && ReactDOM.createPortal(
+      <div className="mo-menu-panel" style={{ top: pos.top, left: pos.left, width: pos.width }}>
+        <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onRegister?.(); }}>
+          <span className="mi mi-add" aria-hidden />
+          <span>등록</span>
+        </button>
+        {/* ✅ 달력 */}
+        <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onCalendar?.(); }}>
+          <span className="mi mi-calendar" aria-hidden />
+          <span>달력</span>
+        </button>
+        {/* ✅ 개인장부 (MobilePersonalLedgerPage) — 달력 아래에 배치 */}
+        <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLedger?.(); }}>
+          <span className="mi mi-ledger" aria-hidden />
+          <span>개인장부</span>
+        </button>
+        <button type="button" className="mo-menu-item" onClick={() => { setOpen(false); onLogout?.(); }}>
+          <span className="mi mi-logout" aria-hidden />
+          <span style={{ color: "#ef4444" }}>로그아웃</span>
+        </button>
+      </div>,
+      document.body
+    )}
+  </div>
   );
 }
 
 /* ===== 문자 수신번호 후보 ===== */
+/* ▶ 유틸: 값 → 전화번호 정규화(숫자/문자/숫자형 모두 OK), 선두 '+' 허용 */
+function normalizePhone(v) {
+  if (v == null) return "";
+  const s = String(v);
+  const hasPlus = /^\s*\+/.test(s);
+  const digits = s.replace(/\D+/g, "");
+  if (!digits) return "";
+  return hasPlus ? ("+" + digits) : digits;
+}
+
+/* ▶ 유틸: 한국형 전화번호로 “그럴듯한지” 검증 (날짜/계좌 등 배제) */
+function isLikelyKoreanPhone(p) {
+  if (!p) return false;
+  const digitsOnly = p.replace(/\D/g, "");
+  // 일반적 길이: 9~12자리 (지역번호/휴대폰/내선 변형 포함)
+  const lenOk = digitsOnly.length >= 9 && digitsOnly.length <= 12;
+  const startOk = p.startsWith("+82") || p.startsWith("0");
+  return lenOk && startOk;
+}
+
+/* ▶ 재귀 탐색: 객체/배열 어디든 'phone/tel/mobile' 계열 키 또는 문자열 속 번호를 찾음
+   ⛔ 날짜/타임스탬프 등의 필드는 스킵 */
+function findPhoneDeep(input, depth = 0, keyHint = "") {
+  if (input == null || depth > 4) return "";
+
+  // 숫자/문자 값 자체가 번호인 경우
+  if (typeof input === "number" || typeof input === "string") {
+    const s = String(input);
+    // ISO 날짜 패턴이면 제외 (예: 2025-10-10)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+    // 타임스탬프 같은 8자리/14자리 등도 배제
+    if (/^\d{8}(\d{6})?$/.test(s)) return "";
+
+    const match = s.match(/(\+?\d[\d\s\-()]{6,}\d)/);
+    const cand = match ? match[1] : s;
+    const p = normalizePhone(cand);
+    return isLikelyKoreanPhone(p) ? p : "";
+  }
+
+  // 배열: 각 요소 재귀
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const p = findPhoneDeep(item, depth + 1);
+      if (p) return p;
+    }
+    return "";
+  }
+
+  // 객체
+  if (typeof input === "object") {
+    const EXCLUDE_KEYS = new Set([
+      "moveDate","moveOutDate","createdAt","updatedAt","created_at","updated_at",
+      "date","ymd","ym","timestamp","ts"
+    ]);
+
+    const PRIORITY_KEYS = [
+      "payerPhone", // ✅ PC가 저장하는 기본 키
+      "smsPhone","recipientPhone","phone","phoneNumber","tel","telephone",
+      "mobile","mobilePhone","tenantPhone","tenantTel",
+      "contactPhone","contactTel","managerPhone","managerTel",
+      "ownerPhone","landlordPhone","customerPhone",
+    ];
+
+    // 1) 우선키 직격
+    for (const k of PRIORITY_KEYS) {
+      if (k in input && input[k] != null) {
+        const p = findPhoneDeep(input[k], depth + 1, k);
+        if (p) return p;
+      }
+    }
+
+    // 2) 'contact/tenant/manager/owner/landlord/customer/recipient' 루트
+    const ROOTS = ["contact","tenant","manager","owner","landlord","customer","recipient"];
+    const LEAFS = ["phone","tel","mobile","phoneNumber","mobilePhone"];
+    for (const r of ROOTS) {
+      const node = input[r];
+      if (node && typeof node === "object") {
+        for (const l of LEAFS) {
+          if (node[l] != null) {
+            const p = findPhoneDeep(node[l], depth + 1, `${r}.${l}`);
+            if (p) return p;
+          }
+        }
+        const pNode = findPhoneDeep(node, depth + 1, r);
+        if (pNode) return pNode;
+      }
+    }
+
+    // 3) contacts/phones/mobiles 배열 패턴
+    const ARR_KEYS = ["contacts","phones","mobiles"];
+    for (const ak of ARR_KEYS) {
+      if (Array.isArray(input[ak])) {
+        const p = findPhoneDeep(input[ak], depth + 1, ak);
+        if (p) return p;
+      }
+    }
+
+    // 4) 일반 문자열 필드(note/memo/remarks/description 등)에서 번호 추출
+    const TEXT_KEYS = ["note","memo","remark","remarks","description","contact"];
+    for (const tk of TEXT_KEYS) {
+      if (input[tk] != null) {
+        const p = findPhoneDeep(input[tk], depth + 1, tk);
+        if (p) return p;
+      }
+    }
+
+    // 5) 기타 키 전체 순회 (제외키는 스킵)
+    for (const key of Object.keys(input)) {
+      if (EXCLUDE_KEYS.has(key) || PRIORITY_KEYS.includes(key) || ROOTS.includes(key) || ARR_KEYS.includes(key) || TEXT_KEYS.includes(key)) continue;
+      const p = findPhoneDeep(input[key], depth + 1, key);
+      if (p) return p;
+    }
+  }
+
+  return "";
+}
+
+/* ▶ 최종 엔트리 */
 function pickSmsNumber(row) {
-  const cand = [
-    row?.phone,
-    row?.tenantPhone,
-    row?.contactPhone,
-    row?.managerPhone,
-  ].find(v => v && String(v).trim().length >= 8);
-  return cand ? String(cand).replace(/[^\d+]/g, "") : "";
+  return findPhoneDeep(row);
 }
 
 /* ✅ 복귀 시 위치·펼침 상태 복원용 키 */
@@ -368,13 +480,10 @@ export default function MoveoutListMobile() {
     let unsubFs = null;
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        // 인증이 없으면 로그인으로
         navigate("/login", { replace: true });
-        // 기존 구독 해제
         if (unsubFs) { unsubFs(); unsubFs = null; }
         return;
       }
-      // 인증되면 Firestore 구독
       const qy = query(collection(db, "moveouts"), orderBy("moveDate", "desc"));
       unsubFs = onSnapshot(
         qy,
@@ -514,8 +623,6 @@ export default function MoveoutListMobile() {
     try {
       await signOut(auth);
       navigate("/login", { replace: true });
-      // 필요시 PWA 캐시갱신:
-      // window.location.reload();
     } catch (e) {
       console.error(e);
       alert("로그아웃 중 오류가 발생했습니다.");
@@ -581,7 +688,6 @@ export default function MoveoutListMobile() {
       console.error(e);
       alert("영수증 저장 중 오류가 발생했습니다.");
     } finally {
-      // ✅ 저장 버튼 클릭 후 모달 자동 닫기
       closeReceiptModal();
     }
   };
@@ -610,7 +716,7 @@ export default function MoveoutListMobile() {
       } else {
         const file = new File([dataURLToBlob(dataUrl)], `${baseName}.jpg`, { type:"image/jpeg" });
         if (navigator.canShare && navigator.canShare({ files:[file] })) {
-          await navigator.share({ files:[file], title: "" }); // text 미전달
+          await navigator.share({ files:[file], title: "" });
         } else if (navigator.share) {
           await navigator.share({ title: "" });
         } else {
@@ -622,7 +728,6 @@ export default function MoveoutListMobile() {
       console.error(e);
       alert("영수증 전송 중 오류가 발생했습니다.");
     } finally {
-      // ✅ 전송 버튼 클릭 후 모달 자동 닫기
       closeReceiptModal();
     }
   };
@@ -632,7 +737,6 @@ export default function MoveoutListMobile() {
       {/* 상단 */}
       <div className="mo-topbar">
         <PageTitle>이사정산 조회</PageTitle>
-        {/* ✅ 달력/개인장부 이동 핸들러 추가 */}
         <TopKebabMenu
           onRegister={handleAdd}
           onCalendar={() => navigate("/calendar-mobile")}

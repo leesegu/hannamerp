@@ -196,11 +196,15 @@ export default function MobilePersonalLedgerPage() {
       orderBy("date", "desc"),
       orderBy("createdAt", "desc")
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      setRowsMonth(list);
-    });
+    const unsub = onSnapshot(
+      q,
+      { includeMetadataChanges: true },            // ✅ 캐시 포함 즉시 반영
+      (snap) => {
+        const list = [];
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        setRowsMonth(list);
+      }
+    );
     return () => unsub();
   }, [liveUid, uid, monthKey]);
 
@@ -209,16 +213,25 @@ export default function MobilePersonalLedgerPage() {
     const uidUse = liveUid || uid;
     if (!uidUse || !date) return;
     const ref = collection(db, "users", uidUse, "personal_ledger");
+
+    // ✅ [수정] 복합 색인 없이도 동작하도록 orderBy 제거 → 클라이언트 정렬
     const q = query(
       ref,
-      where("date", "==", date),
-      orderBy("createdAt", "desc")
+      where("date", "==", date)
+      // (orderBy("createdAt","desc") 제거)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      setRowsDay(list);
-    });
+
+    const unsub = onSnapshot(
+      q,
+      { includeMetadataChanges: true },            // ✅ 캐시 포함 즉시 반영
+      (snap) => {
+        const list = [];
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        // ✅ 생성시각 기준 내림차순 정렬(필드 없으면 0)
+        list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        setRowsDay(list);
+      }
+    );
     return () => unsub();
   }, [liveUid, uid, date]);
 
@@ -292,12 +305,16 @@ export default function MobilePersonalLedgerPage() {
       startAt(start),
       endAt(end + "\uf8ff")
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      setYearRows(list);
-      setLoadingYear(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      { includeMetadataChanges: true },          // ✅ 캐시 포함 즉시 반영
+      (snap) => {
+        const list = [];
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        setYearRows(list);
+        setLoadingYear(false);
+      }
+    );
     return () => unsub();
   }, [liveUid, uid, yearOpen, year]);
 
@@ -665,18 +682,26 @@ export default function MobilePersonalLedgerPage() {
 
                         {isOpen && (
                           <div id={`m-${m.m}-days`} className="y-days">
+                            {/* =================================================================
+                                 ✅ [수정] 월별 상세 내역 헤더를 렌더링하지 않도록 주석 처리
+                                ================================================================= */}
+                            {/*
                             <div className="y-days-head">
                               <div>일자</div>
                               <div>수입</div>
                               <div>지출</div>
                               <div>차액</div>
                             </div>
+                            */}
                             {dailyAggByMonth[m.m].length === 0 ? (
                               <div className="y-days-empty">해당 월 데이터가 없습니다.</div>
                             ) : (
                               dailyAggByMonth[m.m].map((d) => (
                                 <div className="y-days-row nowrap-rows small-rows" key={d.date}>
-                                  <div className="nowrap">{d.date}</div>
+                                  {/* =================================================================
+                                       ✅ [수정] 일자 표시를 'YYYY-MM-DD'에서 'MM-DD'로 변경 (slice(5) 사용)
+                                      ================================================================= */}
+                                  <div className="nowrap">{d.date.slice(5)}</div>
                                   <div className="pos nowrap">{comma(d.income)}원</div>
                                   <div className="neg nowrap">{comma(d.expense)}원</div>
                                   <div className={`diff ${d.diff >= 0 ? "pos" : "neg"} nowrap`}>
