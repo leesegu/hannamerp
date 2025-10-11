@@ -499,6 +499,40 @@ export default function DataTable({
     return () => clearTimeout(t);
   }, [focusId, currentData, rowIdKey]);
 
+  // ========================= 마우스 휠로 페이지 전환 =========================
+  useEffect(() => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+
+    let last = 0;
+    const THROTTLE_MS = 350;
+
+    const onWheel = (e) => {
+      // 확대/축소(Ctrl+Wheel)나 가로 스크롤 중심 입력은 무시
+      if (e.ctrlKey) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
+      const now = Date.now();
+      if (now - last < THROTTLE_MS) return;
+      last = now;
+
+      // 페이지 전환 시 스크롤 동작은 막음
+      e.preventDefault();
+
+      if (e.deltaY > 0) {
+        setCurrentPage((p) => Math.min(p + 1, totalPages || 1));
+      } else if (e.deltaY < 0) {
+        setCurrentPage((p) => Math.max(p - 1, 1));
+      }
+    };
+
+    // scroll-table 영역에 마우스를 올렸을 때만 동작
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel, { passive: false });
+    };
+  }, [totalPages]);
+
   return (
     <div className="data-table-wrapper">
       {/* 상단 컨트롤 바 */}

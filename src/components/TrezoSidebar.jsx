@@ -40,6 +40,9 @@ import CalendarPage from "../pages/CalendarPage";
 import PaperingPage from "../pages/PaperingPage";
 import MemoPage from "../pages/MemoPage";
 
+/* ✅ 일정관리(신규) */
+import ScheduleManager from "../pages/ScheduleManager";
+
 /* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
@@ -281,7 +284,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
           </div>
         </div>
 
-        {/* ▼▼▼ 이하 메뉴/콘텐츠 – 변경 없음 ▼▼▼ */}
+        {/* ▼▼▼ 이하 메뉴/콘텐츠 – (요청 반영: 일정관리 추가, 회계 순서 조정) ▼▼▼ */}
         <div className="flex-1 overflow-y-auto px-3 py-3 sidebar-scroll">
           <nav className="space-y-0.5">
             <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
@@ -362,6 +365,19 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               />
             </div>
 
+            {/* ✅ 추가: 캘린더 아래 '일정관리' 메뉴 */}
+            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+              <SidebarItem
+                icon="ri-calendar-check-line"
+                label="일정관리"
+                onClick={() => {
+                  setOpenMenu("");
+                  handleNavigate(<ScheduleManager />, "일정관리");
+                }}
+                active={activeMenu === "일정관리"}
+              />
+            </div>
+
             <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
               <SidebarItem
                 icon="ri-tools-line"
@@ -412,8 +428,9 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               {openMenu === "accounting" && (
                 <>
                   <div className="hn-divider my-1.5" />
+                  {/* ✅ 순서 변경: 대금결제 관리 → 연간시트 아래로 이동 */}
                   <SidebarSubmenu
-                    items={["수입정리", "지출정리", "대금결제 관리", "일마감", "월마감", "연간시트"]}
+                    items={["수입정리", "지출정리", "일마감", "월마감", "연간시트", "대금결제 관리"]}
                     activeMenu={activeMenu}
                     onClick={(item) => {
                       setActiveMenu(item);
@@ -423,10 +440,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                       }
                       if (item === "지출정리") {
                         handleNavigate(<ExpensePage />, item);
-                        return;
-                      }
-                      if (item === "대금결제 관리") {
-                        handleNavigate(<PaymentSettlementPage />, item);
                         return;
                       }
                       if (item === "일마감") {
@@ -439,6 +452,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                       }
                       if (item === "연간시트") {
                         handleNavigate(<AnnualSheetPage />, item);
+                        return;
+                      }
+                      if (item === "대금결제 관리") {
+                        handleNavigate(<PaymentSettlementPage />, item);
                         return;
                       }
                       handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);

@@ -57,6 +57,9 @@ import MobileCalendarPage from "./pages/MobileCalendarPage";
 /* ✅ 추가: 모바일 전용 개인 장부 페이지 import */
 import MobilePersonalLedgerPage from "./pages/MobilePersonalLedgerPage";
 
+/* ✅ 추가: 일정관리(어제·오늘·내일 + 대형 달력) */
+import ScheduleManager from "./pages/ScheduleManager";
+
 import "./App.css";
 
 /* ✅ Firebase Auth 상태도 함께 인지해서 모바일 로그인과 동작 일치 */
@@ -260,6 +263,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/calendar"
         element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CalendarPage />}
+      />
+
+      {/* ✅ 일정관리(어제/오늘/내일 + 대형 달력 + 개인/공유 + 알람) */}
+      <Route
+        path="/schedule"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          ) : (
+            <ScheduleManager />
+          )
+        }
       />
 
       {/* 부가서비스 */}

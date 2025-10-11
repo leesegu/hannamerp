@@ -12,6 +12,13 @@
   background-color: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border-bottom: 2px solid #ddd3c5; /* 따뜻한 베이지 테두리 */
+
+  /* ▼ 가독성/선명도 강화 */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
 }
 
 /* ▼ 헤더를 보라색으로 변경 */
@@ -39,9 +46,11 @@
   padding: 5px 10px;
   text-align: center;
   font-size: 14px;
-  color: #333; /* 조금 더 진하게 */
+
+  /* ▼ 본문 텍스트를 더 선명하게 */
+  color: #1f2937;         /* 조금 더 진한 딥 그레이 */
+  font-weight: 500;       /* 너무 굵지 않게 선명도 향상 */
   border-bottom: 0.5px solid #ececec;
-  font-weight: 400;
   transition: none;
 }
 
