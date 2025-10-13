@@ -4,7 +4,15 @@ import "./PublicElectricCalcPage.css";
 import * as XLSX from "xlsx";
 import PageTitle from "../components/PageTitle";
 import { db } from "../firebase";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  /* ✅ 추가: 원격 실시간 저장용 */
+  doc,
+  writeBatch,
+} from "firebase/firestore";
 
 /** =========================================
  * 공용전기 계산 (라이트 테마, 10원 반올림/차액 공식/자동저장)
@@ -159,6 +167,27 @@ export default function PublicElectricCalcPage() {
   const [chargeModalOpen, setChargeModalOpen] = useState(false);
   const [chargeDraft, setChargeDraft] = useState({}); // { [id]: "부과" | "부과안함" }
 
+  /* ✅ 원격 실시간 값 구독(월별): peCalcs/{YYYYMM}/rows/{villaId or code} */
+  const [remoteMap, setRemoteMap] = useState({});
+  useEffect(() => {
+    const colRef = collection(db, "peCalcs", String(yyyymm), "rows");
+    const unsub = onSnapshot(colRef, (snap) => {
+      const m = {};
+      snap.forEach((d) => {
+        const v = d.data() || {};
+        m[d.id] = {
+          households: toInt(v.households),
+          billed: toInt(v.billed),
+          method: v.method === "계산안함" ? "계산안함" : "계산",
+          memo: v.memo || "",
+          charge: v.charge === "부과안함" ? "부과안함" : "부과",
+        };
+      });
+      setRemoteMap(m);
+    });
+    return () => unsub();
+  }, [yyyymm]);
+
   /* 저장/불러오기 */
   const loadSaved = (ym) => {
     try {
@@ -168,7 +197,10 @@ export default function PublicElectricCalcPage() {
       return null;
     }
   };
-  const saveRows = (ym, rows) => {
+
+  /* ✅ 로컬 + Firestore 동시 저장 (실시간 공유) */
+  const saveRows = async (ym, rows) => {
+    // 1) 로컬 유지 (오프라인 대비)
     try {
       const data = {};
       rows.forEach((r) => {
@@ -177,11 +209,35 @@ export default function PublicElectricCalcPage() {
           billed: toInt(r.billed),
           method: r.method,
           memo: r.memo || "",
-          charge: r.charge || "부과", // ⬅️ 부과설정 저장(월별에도 보관)
+          charge: r.charge || "부과",
         };
       });
       localStorage.setItem(SAVE_KEY(ym), JSON.stringify(data));
     } catch {}
+
+    // 2) Firestore 동기화 (문서키: 코드 우선, 없으면 id)
+    try {
+      const batch = writeBatch(db);
+      rows.forEach((r) => {
+        const docKey = r.code || r.id;               // ✅ 핵심 수정
+        const ref = doc(db, "peCalcs", String(ym), "rows", String(docKey));
+        batch.set(
+          ref,
+          {
+            households: toInt(r.households),
+            billed: toInt(r.billed),
+            method: r.method === "계산안함" ? "계산안함" : "계산",
+            memo: r.memo || "",
+            charge: r.charge === "부과안함" ? "부과안함" : "부과",
+            updatedAt: Date.now(),
+          },
+          { merge: true }
+        );
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error("Firestore 동기화 실패:", e);
+    }
   };
 
   /* 계산기 */
@@ -205,20 +261,26 @@ export default function PublicElectricCalcPage() {
     return { ...r, assessed, diff };
   };
 
-  /* 초기 행 구성 + 저장본/글로벌 병합 */
+  /* 초기 행 구성 + (원격 > 로컬 > 기본) 병합 */
   useEffect(() => {
     const saved = loadSaved(yyyymm) || {};
     const globalCharge = loadChargeGlobal(); // 전월/연도 무관 공통 부과설정
     const initial = villas.map((v) => {
       const pubNo = v.publicElectric || "";
       const savedRow = saved[v.id] || {};
-      const households = toInt(savedRow.households ?? v.baseHouseholds ?? 0);
-      const billed = toInt(savedRow.billed ?? 0);
-      const memo = savedRow.memo ?? "";
+      // ✅ 핵심 수정: 원격값을 code 또는 id 로 모두 조회
+      const remoteRow = remoteMap[v.id] || remoteMap[v.code] || {};
 
-      const charge = (globalCharge[v.id] ?? savedRow.charge) || "부과";
+      const households = toInt(
+        remoteRow.households ?? savedRow.households ?? v.baseHouseholds ?? 0
+      );
+      const billed = toInt(remoteRow.billed ?? savedRow.billed ?? 0);
+      const memo = (remoteRow.memo ?? savedRow.memo) ?? "";
+
+      const charge =
+        (remoteRow.charge ?? savedRow.charge ?? globalCharge[v.id]) || "부과";
       // (변경) pubNo 비숫자여도 기본 계산방법은 "계산"
-      const methodInit = savedRow.method || "계산";
+      const methodInit = (remoteRow.method ?? savedRow.method) || "계산";
 
       return recomputeRow({
         id: v.id,
@@ -238,11 +300,13 @@ export default function PublicElectricCalcPage() {
     setRows(initial);
     // 모달 편집초안 동기화
     setChargeDraft(Object.fromEntries(initial.map((r) => [r.id, r.charge || "부과"])));
-  }, [villas, yyyymm]);
+  }, [villas, yyyymm, remoteMap]);
 
-  /* rows 변경 시 자동 저장 */
+  /* ✅ rows 변경 시: 로컬 + Firestore 동시 저장 */
   useEffect(() => {
-    if (rows.length) saveRows(yyyymm, rows);
+    if (rows.length) {
+      saveRows(yyyymm, rows);
+    }
   }, [rows, yyyymm]);
 
   /* ===== 적용세대수 Enter → 다음 칸 포커스 ===== */
@@ -389,7 +453,7 @@ export default function PublicElectricCalcPage() {
     });
 
     setRows(updated);
-    saveRows(yyyymm, updated); // ✅ 업로드 직후 자동 저장
+    await saveRows(yyyymm, updated); // ✅ 업로드 직후 원격도 동기화
 
     window.alert(
       `엑셀 업로드 완료\n` +
@@ -410,7 +474,7 @@ export default function PublicElectricCalcPage() {
   }, [rows]);
 
   /* === 전체 삭제 === */
-  const onClearAll = () => {
+  const onClearAll = async () => {
     if (!rows.length) return;
     const ok = window.confirm(
       "모든 값을 비우고(적용세대수/청구/부과/차액) 계산방법과 부과설정은 유지합니다."
@@ -424,7 +488,7 @@ export default function PublicElectricCalcPage() {
       diff: "",
     }));
     setRows(cleared);
-    saveRows(yyyymm, cleared);
+    await saveRows(yyyymm, cleared); // ✅ 원격 동기화
   };
 
   const onToggleEditBilled = () => setEditBilled((v) => !v);
@@ -434,7 +498,7 @@ export default function PublicElectricCalcPage() {
     setChargeDraft(Object.fromEntries(rows.map((r) => [r.id, r.charge || "부과"])));
     setChargeModalOpen(true);
   };
-  const saveChargeModal = () => {
+  const saveChargeModal = async () => {
     // 상태 반영
     setRows((old) =>
       old.map((r) => {
@@ -444,11 +508,18 @@ export default function PublicElectricCalcPage() {
         return recomputeRow(next);
       })
     );
-    // 글로벌 저장
+    // 글로벌 저장(기본값)
     const global = loadChargeGlobal();
     const nextGlobal = { ...global, ...chargeDraft };
     saveChargeGlobal(nextGlobal);
     setChargeModalOpen(false);
+
+    // ✅ 원격에도 즉시 반영
+    const toWrite = rows.map((r) => ({
+      ...r,
+      charge: chargeDraft[r.id] || r.charge || "부과",
+    }));
+    await saveRows(yyyymm, toWrite);
   };
 
   return (

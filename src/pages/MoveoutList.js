@@ -280,7 +280,25 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     { label: "전기", key: "electricity" },
     { label: "TV수신료", key: "tvFee" },
     { label: "청소", key: "cleaningFee" },
-    { label: "총액", key: "totalAmount" },
+    /* ✅ 총액만 노란색 하이라이트 */
+    {
+      label: "총액",
+      key: "totalAmount",
+      render: (row) => (
+        <span
+          style={{
+            background: "rgba(255, 235, 59, 0.6)",
+            padding: "2px 8px",
+            borderRadius: 8,
+            fontWeight: 800,
+            display: "inline-block",
+          }}
+          title="총액"
+        >
+          {row.totalAmount}
+        </span>
+      ),
+    },
     { label: "진행현황", key: "status", render: (row) => <StatusCell value={row.status} /> },
     {
       label: "추가내역",
