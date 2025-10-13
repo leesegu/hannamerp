@@ -159,7 +159,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
   // 진행현황 필터(요청: 대시보드 클릭해도 변경하지 않음)
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // 🔹 영수증 미리보기 상태 (⚠️ 여기 "한 번만" 선언)
+  // 🔹 영수증 미리보기 상태
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptRow, setReceiptRow] = useState(null);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState("");
@@ -185,10 +185,29 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       .reduce((acc, r) => acc + toNum(sumTotal(r)), 0);
   }, [rows, statusFilter]);
 
-  /* 정렬 */
+  /* ▼▼▼ 정렬: 오늘(0) → 어제(-1) → 내일(+1) → +2 → +3 … → 그 외 과거(−2, −3 …) 맨 아래 */
   const sortedRows = useMemo(() => {
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+    const todayY = today.getFullYear();
+    const todayM = today.getMonth();
+    const todayD = today.getDate();
+    const todayStart = new Date(todayY, todayM, todayD);
+
+    const dayDiff = (ymdStr) => {
+      // ymdStr: YYYY-MM-DD
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymdStr || ""))) return null;
+      const [y, m, d] = ymdStr.split("-").map((n) => parseInt(n, 10));
+      const dt = new Date(y, (m - 1), d);
+      const diffMs = dt.setHours(0,0,0,0) - todayStart.setHours(0,0,0,0);
+      return Math.round(diffMs / (24 * 60 * 60 * 1000));
+    };
+
+    const rankFromDiff = (diff) => {
+      if (diff === 0) return 0;            // 오늘
+      if (diff === -1) return 1;           // 어제
+      if (diff > 0) return 1 + diff;       // 내일(+1)=2, +2=3, +3=4 …
+      return 10000 + Math.abs(diff || 999); // 그 외 과거는 맨 아래
+    };
 
     const mapped = rowsForFilter.map((r) => {
       const photoCount = Array.isArray(r.photos) ? r.photos.filter((u) => !!String(u || "").trim()).length : 0;
@@ -201,11 +220,10 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       const hasExtras = hasExtrasFromArr || hasExtrasFromPair;
 
       const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(r.moveDate || "")) ? String(r.moveDate) : "0000-00-00";
-      const ymdNum = parseInt(ymd.replace(/-/g, ""), 10) || 0;
 
-      const rank = ymd === todayStr ? 0 : 1;
-      const inv = String(99999999 - ymdNum).padStart(8, "0");
-      const sortCombo = `${rank}-${inv}`;
+      /* ▶ 검색 확장용 원시 금액 */
+      const totalRaw = sumTotal(r);                // 숫자
+      const elecRaw  = toNum(r.electricity);       // 숫자
 
       return {
         ...r,
@@ -216,15 +234,34 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         electricity: fmtAmount(r.electricity),
         tvFee: fmtAmount(r.tvFee),
         cleaningFee: fmtAmount(r.cleaningFee),
-        totalAmount: fmtAmount(sumTotal(r)),
+        totalAmount: fmtAmount(totalRaw),
+
+        /* ▶ 검색 전용 필드(콤마 유/무 모두 대응) */
+        search_total_commas: totalRaw ? totalRaw.toLocaleString() : "0",
+        search_total_raw: String(totalRaw || 0),
+        search_elec_commas: elecRaw ? elecRaw.toLocaleString() : "0",
+        search_elec_raw: String(elecRaw || 0),
+
         __hasPhotos: hasPhotos,
         __hasNote: hasNote,
         __hasExtras: hasExtras,
-        __sortCombo: sortCombo,
+
+        /* ▶ 새 정렬용 랭크/보조키 */
+        __ymd: ymd,
+        __rank: rankFromDiff(dayDiff(ymd)),
       };
     });
 
-    mapped.sort((a, b) => a.__sortCombo.localeCompare(b.__sortCombo));
+    // 1) rank asc  2) 같은 rank면 날짜 asc  3) id asc
+    mapped.sort((a, b) => {
+      const r = (a.__rank ?? 99999) - (b.__rank ?? 99999);
+      if (r !== 0) return r;
+      const da = a.__ymd || "9999-99-99";
+      const db = b.__ymd || "9999-99-99";
+      if (da !== db) return da.localeCompare(db);
+      return String(a.id).localeCompare(String(b.id));
+    });
+
     return mapped;
   }, [rowsForFilter]);
 
@@ -545,10 +582,16 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDeleteRow}
-        searchableKeys={["moveDate","villaName","unitNumber","status","note"]}
+        searchableKeys={[
+          "moveDate","villaName","unitNumber","status","note",
+          /* ▶ 검색 확장: 총액/전기 (콤마 O/X 모두) */
+          "totalAmount", "electricity",
+          "search_total_commas","search_total_raw",
+          "search_elec_commas","search_elec_raw",
+        ]}
         itemsPerPage={15}
         enableExcel={false}
-        sortKey="__sortCombo"
+        sortKey="__rank"       /* 정렬 키는 내부에서 이미 소팅해 전달하지만, DataTable 정렬 옵션 유지 */
         sortOrder="asc"
 
         /* ✅ TelcoPage와 동일: 자동 점프용 */

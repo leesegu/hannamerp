@@ -9,28 +9,16 @@ import {
   onSnapshot,
   query,
   where,
-  /* ✅ 추가: 원격 실시간 저장용 */
   doc,
   writeBatch,
 } from "firebase/firestore";
 
 /** =========================================
  * 공용전기 계산 (라이트 테마, 10원 반올림/차액 공식/자동저장)
- * - 엑셀 업로드:
- *   · 헤더행 자동 탐지(고정 컬럼: 고객번호/청구년월/당월요금계)
- *   · (변경) 중복 고객번호는 선택된 연/월의 한 달 전(YYYYMM-1)의 '당월요금계' 사용
- *     · 해당 월 없으면 주입하지 않음
- *   · 단일 건(중복 아님)은 그 값 그대로 사용
- * - 계산:
- *   · 부과요금: 10원 반올림
- *   · 계산: (청구요금 + 5,000~6,000 랜덤) / 적용세대수 → round10
- *   · 계산안함: 청구요금 / 적용세대수 → round10
- *   · 차액: (부과요금 × 적용세대수) - 청구요금
- * - (변경) pubNo 비숫자여도 계산방법=계산
- * - 연/월 저장: localStorage: PE:SAVE:<YYYYMM>
- * - (추가) 부과설정(부과/부과안함) 모달
- *   · 전월/연도 무관 공통 저장: localStorage: PE:CHARGE:GLOBAL
- *   · 부과안함은 행을 읽기전용(짙은 회색) 처리 + 빌라명 오른쪽에 '부과안함' 표기
+ * - 루프 차단: 저장은 '사용자 동작'에서만 수행 (rows 변경 useEffect 저장 제거)
+ * - 문서키 정합: getDocKey(r)로 원격 id 우선 매칭 → 동일 문서만 갱신
+ * - 안정 난수: yyyymm+code(or id) 시드로 5000~6000 고정
+ * - 실시간 공유: peCalcs/{YYYYMM}/rows 에 쓰므로 다른 계정/PC에서도 동일 표시
  * ========================================= */
 
 const YEARS = (() => {
@@ -50,8 +38,7 @@ const fmt = (n) => (Number.isFinite(n) ? n : 0).toLocaleString("ko-KR");
 const digitsOnly = (s) => String(s ?? "").replace(/\D+/g, "");
 const padLeft = (s, len) => (s.length >= len ? s : "0".repeat(len - s.length) + s);
 const last10 = (s) => (s.length > 10 ? s.slice(-10) : s);
-const randomOffset = () => 5000 + Math.floor(Math.random() * 1001);
-const round10 = (n) => Math.round(toInt(n) / 10) * 10; // ✅ 10원 단위 반올림
+const round10 = (n) => Math.round(toInt(n) / 10) * 10;
 const parseYM = (raw) => {
   const d = digitsOnly(raw);
   if (d.length < 6) return 0;
@@ -63,6 +50,14 @@ const ymToPrev = (yyyymm) => {
   const m = yyyymm % 100;
   if (m === 1) return (y - 1) * 100 + 12;
   return y * 100 + (m - 1);
+};
+
+/* 🔢 안정 랜덤(5000~6000): yyyymm + key(code||id)를 시드로 고정 */
+const stableRand = (key, yyyymm) => {
+  const s = `${key}|${yyyymm}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 131 + s.charCodeAt(i)) >>> 0;
+  return 5000 + (h % 1001); // 5000~6000
 };
 
 /* ===== 고정 헤더 ===== */
@@ -123,6 +118,18 @@ function readTableWithDetectedHeader(ws) {
   return objs;
 }
 
+/* ====== 🔒 쓰기-읽기 루프 방지용 서명 ======
+ * 정규화 후 JSON 문자열로 비교 → 같으면 쓰기 생략
+ */
+const normalizePayload = (r) => ({
+  households: toInt(r.households),
+  billed: toInt(r.billed),
+  method: r.method === "계산안함" ? "계산안함" : "계산",
+  memo: String(r.memo || ""),
+  charge: r.charge === "부과안함" ? "부과안함" : "부과",
+});
+const signatureOf = (payload) => JSON.stringify(payload);
+
 export default function PublicElectricCalcPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -145,7 +152,7 @@ export default function PublicElectricCalcPage() {
         const data = d.data() || {};
         return {
           id: d.id,
-          code: data.code || "",
+          code: data.code ?? "",               // 문자열/숫자 상관없이 그대로 보관
           name: data.name || "",
           publicElectric: String(data.publicElectric ?? "").trim(),
           baseHouseholds: toInt(data.households ?? data.householdCount ?? 0),
@@ -169,20 +176,25 @@ export default function PublicElectricCalcPage() {
 
   /* ✅ 원격 실시간 값 구독(월별): peCalcs/{YYYYMM}/rows/{villaId or code} */
   const [remoteMap, setRemoteMap] = useState({});
+  const remoteSigRef = useRef({}); // 🔒 현재 원격 서명(쓰기에 앞서 비교)
   useEffect(() => {
     const colRef = collection(db, "peCalcs", String(yyyymm), "rows");
     const unsub = onSnapshot(colRef, (snap) => {
       const m = {};
+      const sigs = {};
       snap.forEach((d) => {
         const v = d.data() || {};
-        m[d.id] = {
+        const payload = {
           households: toInt(v.households),
           billed: toInt(v.billed),
           method: v.method === "계산안함" ? "계산안함" : "계산",
           memo: v.memo || "",
           charge: v.charge === "부과안함" ? "부과안함" : "부과",
         };
+        m[d.id] = payload;
+        sigs[d.id] = signatureOf(payload);
       });
+      remoteSigRef.current = sigs; // 🔒 최신 서명 저장
       setRemoteMap(m);
     });
     return () => unsub();
@@ -198,50 +210,8 @@ export default function PublicElectricCalcPage() {
     }
   };
 
-  /* ✅ 로컬 + Firestore 동시 저장 (실시간 공유) */
-  const saveRows = async (ym, rows) => {
-    // 1) 로컬 유지 (오프라인 대비)
-    try {
-      const data = {};
-      rows.forEach((r) => {
-        data[r.id] = {
-          households: toInt(r.households),
-          billed: toInt(r.billed),
-          method: r.method,
-          memo: r.memo || "",
-          charge: r.charge || "부과",
-        };
-      });
-      localStorage.setItem(SAVE_KEY(ym), JSON.stringify(data));
-    } catch {}
-
-    // 2) Firestore 동기화 (문서키: 코드 우선, 없으면 id)
-    try {
-      const batch = writeBatch(db);
-      rows.forEach((r) => {
-        const docKey = r.code || r.id;               // ✅ 핵심 수정
-        const ref = doc(db, "peCalcs", String(ym), "rows", String(docKey));
-        batch.set(
-          ref,
-          {
-            households: toInt(r.households),
-            billed: toInt(r.billed),
-            method: r.method === "계산안함" ? "계산안함" : "계산",
-            memo: r.memo || "",
-            charge: r.charge === "부과안함" ? "부과안함" : "부과",
-            updatedAt: Date.now(),
-          },
-          { merge: true }
-        );
-      });
-      await batch.commit();
-    } catch (e) {
-      console.error("Firestore 동기화 실패:", e);
-    }
-  };
-
-  /* 계산기 */
-  const recomputeRow = (r) => {
+  /* === 계산기 === */
+  const recomputeRow = (r, yyyymmStr) => {
     const hh = toInt(r.households);
     const billed = toInt(r.billed);
 
@@ -249,27 +219,43 @@ export default function PublicElectricCalcPage() {
       return { ...r, assessed: 0, diff: 0 };
     }
 
+    // 고정 난수(깜빡임 방지)
+    const key = String(r.code ?? r.id ?? "");
+    const seeded = stableRand(key, yyyymmStr);
+
     let assessed;
     if (r.method === "계산") {
-      const plus = r._rand || randomOffset();
+      const plus = r._rand ?? seeded;
       assessed = round10((billed + plus) / hh);
     } else {
       assessed = round10(billed / hh);
     }
 
     const diff = toInt(assessed * hh - billed);
-    return { ...r, assessed, diff };
+    return { ...r, assessed, diff, _rand: seeded };
   };
 
-  /* 초기 행 구성 + (원격 > 로컬 > 기본) 병합 */
+  /* 🔑 원격 문서키 결정 (기존 문서 우선) */
+  const getDocKey = (r) => {
+    // 1) 원격에 r.id 로 존재하면 그걸 사용
+    if (remoteMap[r.id]) return String(r.id);
+    // 2) 원격에 r.code 로 존재하면 그걸 사용 (선행 0 포함 문자열 유지)
+    const codeStr = String(r.code ?? "");
+    if (codeStr && remoteMap[codeStr]) return codeStr;
+    // 3) 원격에 없음 → code가 있으면 문자열 그대로 사용, 없으면 id
+    if (codeStr) return codeStr;
+    return String(r.id);
+  };
+
+  /* 초기 행 구성 + (원격 > 로컬 > 기본) 병합  */
   useEffect(() => {
     const saved = loadSaved(yyyymm) || {};
-    const globalCharge = loadChargeGlobal(); // 전월/연도 무관 공통 부과설정
+    const globalCharge = loadChargeGlobal();
     const initial = villas.map((v) => {
-      const pubNo = v.publicElectric || "";
       const savedRow = saved[v.id] || {};
-      // ✅ 핵심 수정: 원격값을 code 또는 id 로 모두 조회
-      const remoteRow = remoteMap[v.id] || remoteMap[v.code] || {};
+      // ✅ 원격값을 code 또는 id 로 둘 다 조회
+      const codeStr = String(v.code ?? "");
+      const remoteRow = remoteMap[v.id] || remoteMap[codeStr] || {};
 
       const households = toInt(
         remoteRow.households ?? savedRow.households ?? v.baseHouseholds ?? 0
@@ -279,14 +265,13 @@ export default function PublicElectricCalcPage() {
 
       const charge =
         (remoteRow.charge ?? savedRow.charge ?? globalCharge[v.id]) || "부과";
-      // (변경) pubNo 비숫자여도 기본 계산방법은 "계산"
       const methodInit = (remoteRow.method ?? savedRow.method) || "계산";
 
       return recomputeRow({
         id: v.id,
         code: v.code,
         name: v.name,
-        pubNo,
+        pubNo: v.publicElectric || "",
         households,
         billed,
         assessed: 0,
@@ -294,50 +279,47 @@ export default function PublicElectricCalcPage() {
         method: methodInit,
         memo,
         charge,
-        _rand: randomOffset(),
-      });
+      }, yyyymm);
     });
     setRows(initial);
-    // 모달 편집초안 동기화
     setChargeDraft(Object.fromEntries(initial.map((r) => [r.id, r.charge || "부과"])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [villas, yyyymm, remoteMap]);
-
-  /* ✅ rows 변경 시: 로컬 + Firestore 동시 저장 */
-  useEffect(() => {
-    if (rows.length) {
-      saveRows(yyyymm, rows);
-    }
-  }, [rows, yyyymm]);
 
   /* ===== 적용세대수 Enter → 다음 칸 포커스 ===== */
   const householdsRefs = useRef([]);
 
-  /* 셀 업데이트 */
-  const updateCell = (id, key, val) => {
-    setRows((old) =>
-      old.map((r) => {
-        if (r.id !== id) return r;
-        let next = { ...r };
-
-        if (key === "households" || key === "billed") {
-          next[key] = toInt(val);
-        } else if (key === "method") {
-          next.method = val === "계산안함" ? "계산안함" : "계산";
-          if (next.method === "계산" && !next._rand) next._rand = randomOffset();
-        } else if (key === "charge") {
-          next.charge = val === "부과안함" ? "부과안함" : "부과";
-        } else {
-          next[key] = val; // memo 등
-        }
-
-        // (변경) pubNo 비숫자여도 강제 변경 없음
-        next = recomputeRow(next);
-        return next;
-      })
-    );
+  /* ===== 저장 디바운스 ===== */
+  const saveTimerRef = useRef(null);
+  const debouncedSave = (ym, rowsToSave) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => _saveRows(ym, rowsToSave), 300);
   };
 
-  /* 엑셀 업로드 */
+  /* ===== 셀 업데이트 (사용자 동작 시에만 저장 호출) ===== */
+  const updateCell = (id, key, val) => {
+    setRows((old) => {
+      const next = old.map((r) => {
+        if (r.id !== id) return r;
+        let n = { ...r };
+        if (key === "households" || key === "billed") {
+          n[key] = toInt(val);
+        } else if (key === "method") {
+          n.method = val === "계산안함" ? "계산안함" : "계산";
+        } else if (key === "charge") {
+          n.charge = val === "부과안함" ? "부과안함" : "부과";
+        } else {
+          n[key] = val; // memo 등
+        }
+        return recomputeRow(n, yyyymm);
+      });
+      // 🔒 사용자 동작에서만 저장
+      debouncedSave(yyyymm, next);
+      return next;
+    });
+  };
+
+  /* ===== Excel 업로드 ===== */
   const fileInputRef = useRef(null);
   const onClickUpload = () => fileInputRef.current?.click();
 
@@ -362,7 +344,6 @@ export default function PublicElectricCalcPage() {
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-
     const json = readTableWithDetectedHeader(ws);
     if (!json.length) {
       window.alert("엑셀에서 '고객번호/청구년월/당월요금계' 헤더 행을 찾지 못했습니다.");
@@ -390,9 +371,8 @@ export default function PublicElectricCalcPage() {
     }
 
     // 정책:
-    // - 그룹에 항목이 1개(중복 아님) → 그 값 사용
-    // - 2개 이상(중복) → 현재 선택한 연/월의 "한달 전(prevYyyymmNum)" 과 일치하는 ym의 amt 사용
-    //   · 해당 ym 없으면 매칭하지 않음
+    // - 그룹 1개 → 그 값 사용
+    // - 2개 이상 → prevYyyymmNum 과 일치하는 ym의 amt 사용(없으면 주입 안함)
     const bestByExact = {};
     const bestByDigits = {};
     for (const [, arr] of groups.entries()) {
@@ -406,7 +386,6 @@ export default function PublicElectricCalcPage() {
           for (const k of variants) bestByDigits[k] = amt;
         }
       } else {
-        // 중복 → prevYyyymmNum 과 일치하는 것 찾기
         const target = arr.find((x) => x.ym === prevYyyymmNum);
         if (target) {
           const amt = toInt(target.amt);
@@ -445,15 +424,15 @@ export default function PublicElectricCalcPage() {
           }
         }
       }
-      if (amt === undefined || amt === 0) return recomputeRow(r);
+      if (amt === undefined || amt === 0) return recomputeRow(r, yyyymm);
 
       matched++;
       const rowNext = { ...r, billed: amt };
-      return recomputeRow(rowNext);
+      return recomputeRow(rowNext, yyyymm);
     });
 
     setRows(updated);
-    await saveRows(yyyymm, updated); // ✅ 업로드 직후 원격도 동기화
+    debouncedSave(yyyymm, updated); // ✅ 업로드 직후 원격도 동기화
 
     window.alert(
       `엑셀 업로드 완료\n` +
@@ -474,7 +453,7 @@ export default function PublicElectricCalcPage() {
   }, [rows]);
 
   /* === 전체 삭제 === */
-  const onClearAll = async () => {
+  const onClearAll = () => {
     if (!rows.length) return;
     const ok = window.confirm(
       "모든 값을 비우고(적용세대수/청구/부과/차액) 계산방법과 부과설정은 유지합니다."
@@ -488,7 +467,7 @@ export default function PublicElectricCalcPage() {
       diff: "",
     }));
     setRows(cleared);
-    await saveRows(yyyymm, cleared); // ✅ 원격 동기화
+    debouncedSave(yyyymm, cleared);
   };
 
   const onToggleEditBilled = () => setEditBilled((v) => !v);
@@ -498,28 +477,70 @@ export default function PublicElectricCalcPage() {
     setChargeDraft(Object.fromEntries(rows.map((r) => [r.id, r.charge || "부과"])));
     setChargeModalOpen(true);
   };
-  const saveChargeModal = async () => {
-    // 상태 반영
-    setRows((old) =>
-      old.map((r) => {
-        const c = chargeDraft[r.id] || "부과";
-        if (c === r.charge) return r;
-        const next = { ...r, charge: c };
-        return recomputeRow(next);
-      })
-    );
-    // 글로벌 저장(기본값)
+  const saveChargeModal = () => {
+    const next = rows.map((r) => {
+      const c = chargeDraft[r.id] || "부과";
+      if (c === r.charge) return r;
+      const n = { ...r, charge: c };
+      return recomputeRow(n, yyyymm);
+    });
+    setRows(next);
+
     const global = loadChargeGlobal();
     const nextGlobal = { ...global, ...chargeDraft };
     saveChargeGlobal(nextGlobal);
     setChargeModalOpen(false);
 
-    // ✅ 원격에도 즉시 반영
-    const toWrite = rows.map((r) => ({
-      ...r,
-      charge: chargeDraft[r.id] || r.charge || "부과",
-    }));
-    await saveRows(yyyymm, toWrite);
+    debouncedSave(yyyymm, next);
+  };
+
+  /* ===== 🔒 저장 로직 (로컬 + 원격) =====
+   * - 로컬: 항상 덮어씀
+   * - 원격: 현재 원격 서명과 비교하여 달라진 문서만 set()
+   * - updatedAt: 실제 변경 있을 때만 갱신
+   */
+  const _saveRows = async (ym, rowsToSave) => {
+    // 1) 로컬
+    try {
+      const data = {};
+      rowsToSave.forEach((r) => {
+        data[r.id] = normalizePayload(r); // 로컬은 id 키 유지(기존 호환)
+      });
+      localStorage.setItem(SAVE_KEY(ym), JSON.stringify(data));
+    } catch {}
+
+    // 2) 원격 (변경된 행만)
+    try {
+      const batch = writeBatch(db);
+      let writeCount = 0;
+
+      rowsToSave.forEach((r) => {
+        const key = getDocKey(r);          // ✅ 실제 원격 문서키와 정확히 일치
+        const payload = normalizePayload(r);
+        const sig = signatureOf(payload);
+        const curSig = remoteSigRef.current[key]; // 최신 원격 서명
+        if (sig === curSig) return;        // 🔒 동일 → 쓰기 생략
+
+        const ref = doc(db, "peCalcs", String(ym), "rows", key);
+        batch.set(
+          ref,
+          {
+            ...payload,
+            updatedAt: Date.now(),         // ✅ 변경 시에만 갱신
+          },
+          { merge: true }
+        );
+        writeCount++;
+        // 낙관적 업데이트: 같은 턴의 중복 저장 방지
+        remoteSigRef.current[key] = sig;
+      });
+
+      if (writeCount > 0) {
+        await batch.commit();
+      }
+    } catch (e) {
+      console.error("Firestore 동기화 실패:", e);
+    }
   };
 
   return (
@@ -557,7 +578,7 @@ export default function PublicElectricCalcPage() {
           </div>
 
           {/* 업로드 */}
-          <button className="pe-btn gradient no-anim" onClick={onClickUpload}>
+          <button className="pe-btn gradient no-anim" onClick={() => fileInputRef.current?.click()}>
             <i className="ri-upload-2-line" />
             엑셀 업로드
           </button>
@@ -569,7 +590,7 @@ export default function PublicElectricCalcPage() {
             onChange={(e) => handleExcel(e.target.files?.[0])}
           />
 
-          {/* ⬅️ 변경: 부과설정 버튼 */}
+          {/* 부과설정 버튼 */}
           <button className="pe-btn accent-muted" onClick={openChargeModal} title="부과 대상 설정">
             <i className="ri-settings-3-line" />
             부과설정
@@ -578,7 +599,6 @@ export default function PublicElectricCalcPage() {
 
         <div className="pe-right">
           <div className="pe-actions">
-            {/* 수정 토글(톤 변경, 두꺼운 테두리/광택 제거) */}
             <button
               className={`pe-btn edit-soft ${editBilled ? "active" : ""}`}
               onClick={onToggleEditBilled}
@@ -588,7 +608,6 @@ export default function PublicElectricCalcPage() {
               {editBilled ? "수정 종료" : "수정"}
             </button>
 
-            {/* 전체 삭제(이미 예쁜 스타일 적용) */}
             <button className="pe-btn danger pretty" onClick={onClearAll} title="전체 삭제">
               <i className="ri-delete-bin-6-line" />
               전체 삭제
@@ -632,7 +651,7 @@ export default function PublicElectricCalcPage() {
                   return (
                     <tr key={r.id} className={readOnly ? "row-excluded" : ""}>
                       <td className="c">{idx + 1}</td>
-                      <td className="c">{r.code}</td>
+                      <td className="c">{String(r.code ?? "")}</td>
                       <td className="l">
                         <div className="pe-villa">
                           <span className="pe-villa-line">
@@ -735,7 +754,6 @@ export default function PublicElectricCalcPage() {
               </tbody>
             </table>
           </div>
-          {/* 하단 범례 없음 */}
         </div>
       </div>
 
@@ -758,7 +776,7 @@ export default function PublicElectricCalcPage() {
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
-                      <td className="c">{r.code}</td>
+                      <td className="c">{String(r.code ?? "")}</td>
                       <td className="l">
                         <div className="pe-villa">
                           <span className="pe-villa-line">
@@ -796,7 +814,20 @@ export default function PublicElectricCalcPage() {
               </table>
             </div>
             <div className="pe-modal-footer">
-              <button className="pe-btn gradient" onClick={saveChargeModal}>
+              <button className="pe-btn gradient" onClick={() => {
+                const next = rows.map((r) => {
+                  const c = chargeDraft[r.id] || "부과";
+                  if (c === r.charge) return r;
+                  const n = { ...r, charge: c };
+                  return recomputeRow(n, yyyymm);
+                });
+                setRows(next);
+                const global = loadChargeGlobal();
+                const nextGlobal = { ...global, ...chargeDraft };
+                saveChargeGlobal(nextGlobal);
+                setChargeModalOpen(false);
+                debouncedSave(yyyymm, next);
+              }}>
                 저장
               </button>
               <button className="pe-btn subtle" onClick={() => setChargeModalOpen(false)}>
