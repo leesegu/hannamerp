@@ -185,7 +185,13 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       .reduce((acc, r) => acc + toNum(sumTotal(r)), 0);
   }, [rows, statusFilter]);
 
-  /* ▼▼▼ 정렬: 오늘(0) → 어제(-1) → 내일(+1) → +2 → +3 … → 그 외 과거(−2, −3 …) 맨 아래 */
+  /* ===========================
+   * ✅ 정렬 로직 (완전 새로 작성)
+   * - 날짜 우선: 오늘(0) → 어제(-1) → 내일(+1) → 모레(+2) → 그 이후 미래(오름차순) → 어제 이전 과거(내림차순: -2, -3 … 가까운 과거 우선)
+   * - 동일 날짜 내 2차 정렬: 진행현황 "정산대기(0) → 입금대기(1) → 정산완료(2) → 기타(3)"
+   * - 이후 타이브레이커: id 오름차순
+   * - 유효하지 않은 날짜는 맨 아래
+   * =========================== */
   const sortedRows = useMemo(() => {
     const today = new Date();
     const todayY = today.getFullYear();
@@ -202,13 +208,64 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       return Math.round(diffMs / (24 * 60 * 60 * 1000));
     };
 
-    const rankFromDiff = (diff) => {
-      if (diff === 0) return 0;            // 오늘
-      if (diff === -1) return 1;           // 어제
-      if (diff > 0) return 1 + diff;       // 내일(+1)=2, +2=3, +3=4 …
-      return 10000 + Math.abs(diff || 999); // 그 외 과거는 맨 아래
+    const statusRank = (v) => {
+      const s = String(v || "").trim();
+      if (s === "정산대기") return 0;
+      if (s === "입금대기") return 1;
+      if (s === "정산완료") return 2;
+      return 3; // 기타/미지정
     };
 
+    // 비교 함수: a가 앞서야하면 음수, 뒤면 양수, 같으면 0
+    const compare = (a, b) => {
+      const da = dayDiff(a.moveDate);
+      const db = dayDiff(b.moveDate);
+
+      // 유효하지 않은 날짜는 맨 아래
+      const aInvalid = da === null;
+      const bInvalid = db === null;
+      if (aInvalid && !bInvalid) return 1;
+      if (!aInvalid && bInvalid) return -1;
+      if (aInvalid && bInvalid) {
+        // 둘 다 invalid면 진행현황, id 순
+        const sa = statusRank(a.status);
+        const sb = statusRank(b.status);
+        if (sa !== sb) return sa - sb;
+        return String(a.id).localeCompare(String(b.id));
+      }
+
+      // 날짜 우선 규칙
+      if (da === db) {
+        // 같은 날짜 → 진행현황 → id
+        const sa = statusRank(a.status);
+        const sb = statusRank(b.status);
+        if (sa !== sb) return sa - sb;
+        return String(a.id).localeCompare(String(b.id));
+      }
+
+      // 1) 오늘(0)
+      if (da === 0) return -1;
+      if (db === 0) return 1;
+
+      // 2) 어제(-1)
+      if (da === -1) return -1;
+      if (db === -1) return 1;
+
+      // 3) 둘 다 미래(>= +1) → diff 오름차순
+      if (da >= 1 && db >= 1) return da - db;
+
+      // 4) 하나는 미래(>=+1), 하나는 과거(<=-2) → 미래 쪽이 먼저
+      if (da >= 1 && db <= -2) return -1;
+      if (da <= -2 && db >= 1) return 1;
+
+      // 5) 둘 다 과거(<= -2) → 가까운 과거(-2가 -3보다 먼저) = |diff| 오름차순
+      if (da <= -2 && db <= -2) return Math.abs(da) - Math.abs(db);
+
+      // 논리적으로 여기까지 오기 어려우나, 안전망
+      return da - db;
+    };
+
+    // 표시용/검색용 필드를 가공하되, 정렬용 __필드는 만들지 않음
     const mapped = rowsForFilter.map((r) => {
       const photoCount = Array.isArray(r.photos) ? r.photos.filter((u) => !!String(u || "").trim()).length : 0;
       const hasPhotos = photoCount > 0;
@@ -219,13 +276,9 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       const hasExtrasFromPair = String(r.extraItems || "").trim().length > 0 && toNum(r.extraAmount) > 0;
       const hasExtras = hasExtrasFromArr || hasExtrasFromPair;
 
-      const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(r.moveDate || "")) ? String(r.moveDate) : "0000-00-00";
+      const totalRaw = sumTotal(r);
+      const elecRaw  = toNum(r.electricity);
 
-      /* ▶ 검색 확장용 원시 금액 */
-      const totalRaw = sumTotal(r);                // 숫자
-      const elecRaw  = toNum(r.electricity);       // 숫자
-
-      /* ===(추가/강화) 검색 전용 금액 키들: 콤마/무콤마 모두 대응 === */
       const totalRawStr = String(totalRaw || 0);
       const elecRawStr  = String(elecRaw  || 0);
       const totalComma  = totalRaw ? totalRaw.toLocaleString() : "0";
@@ -242,36 +295,20 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         cleaningFee: fmtAmount(r.cleaningFee),
         totalAmount: fmtAmount(totalRaw),
 
-        /* ▶ 검색 전용 필드(콤마 유/무 모두) */
+        // 검색 전용(콤마 유/무 모두 대응)
         search_total_commas: totalComma,
         search_total_raw: totalRawStr,
         search_elec_commas: elecComma,
         search_elec_raw: elecRawStr,
-
-        /* ===(신규) 전기/총액 금액을 한 번에 매칭하기 위한 합본 키 === */
         search_money: `${totalRawStr} ${totalComma} ${elecRawStr} ${elecComma}`,
 
         __hasPhotos: hasPhotos,
         __hasNote: hasNote,
         __hasExtras: hasExtras,
-
-        /* ▶ 새 정렬용 랭크/보조키 */
-        __ymd: ymd,
-        __rank: rankFromDiff(dayDiff(ymd)),
       };
     });
 
-    // 1) rank asc  2) 같은 rank면 날짜 asc  3) id asc
-    mapped.sort((a, b) => {
-      const r = (a.__rank ?? 99999) - (b.__rank ?? 99999);
-      if (r !== 0) return r;
-      const da = a.__ymd || "9999-99-99";
-      const db = b.__ymd || "9999-99-99";
-      if (da !== db) return da.localeCompare(db);
-      return String(a.id).localeCompare(String(b.id));
-    });
-
-    return mapped;
+    return mapped.sort(compare);
   }, [rowsForFilter]);
 
   /* ✅ DataTable의 focusId: (빌라명 → 문서ID) 또는 row=id(백워드) */
@@ -602,13 +639,11 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         ]}
         itemsPerPage={15}
         enableExcel={false}
-        sortKey="__rank"       /* 정렬 키는 내부에서 이미 소팅해 전달하지만, DataTable 정렬 옵션 유지 */
-        sortOrder="asc"
-
+        /* ⚠️ 내부에서 이미 최종 정렬을 끝내서 넘기므로 sortKey/sortOrder는 제거 */
+        /* sortKey / sortOrder 미지정 */
         /* ✅ TelcoPage와 동일: 자동 점프용 */
         focusId={focusId}
         rowIdKey="id"
-
         leftControls={leftControls}
       />
 

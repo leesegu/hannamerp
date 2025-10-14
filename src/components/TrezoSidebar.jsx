@@ -43,6 +43,9 @@ import MemoPage from "../pages/MemoPage";
 /* ✅ 일정관리(신규) */
 import ScheduleManager from "../pages/ScheduleManager";
 
+/* ✅ 업데이트(모달) */
+import UpdatesModal from "../components/UpdatesModal";
+
 /* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
@@ -116,6 +119,9 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
   const [activeContent, setActiveContent] = useState(null);
   const [openMenu, setOpenMenu] = useState("");
   const [activeMenu, setActiveMenu] = useState("");
+
+  /* ✅ 업데이트 모달 열림 상태 */
+  const [updatesOpen, setUpdatesOpen] = useState(false);
 
   const handleNavigate = (component, menuKey) => {
     setActiveContent(component);
@@ -544,6 +550,20 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                 </>
               )}
             </div>
+
+            {/* ✅ 최하단: 업데이트 (모달 띄우기) */}
+            <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+              <SidebarItem
+                icon="ri-rocket-line"
+                label="업데이트"
+                onClick={() => {
+                  setOpenMenu("");
+                  setActiveMenu("업데이트");
+                  setUpdatesOpen(true); // 페이지 전환 없이 모달만 오픈
+                }}
+                active={activeMenu === "업데이트"}
+              />
+            </div>
           </nav>
         </div>
       </aside>
@@ -552,6 +572,15 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
       <main className="flex-1 p-6 bg-[linear-gradient(180deg,#fafbff,white)] overflow-auto">
         {activeContent || <Dashboard userId={userId} userName={userName} />}
       </main>
+
+      {/* ✅ 업데이트 모달(전역) */}
+      <UpdatesModal
+        isOpen={updatesOpen}
+        onClose={() => setUpdatesOpen(false)}
+        userId={userId}
+        employeeId={employeeId}
+        displayName={userName}
+      />
     </div>
   );
 };
