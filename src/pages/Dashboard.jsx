@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
 import { format, parseISO, isValid, differenceInDays, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import "./Dashboard.css";
@@ -209,6 +209,10 @@ const sumMoveoutTotal = (x) =>
   toNum(x.cleaningFee) +
   getExtraTotal(x);
 
+/* === 일정 유틸 ===================== */
+const pad2 = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -219,7 +223,11 @@ export default function Dashboard() {
   const [villas, setVillas] = useState([]);
   const [moveouts, setMoveouts] = useState([]);
   const [cleanings, setCleanings] = useState([]);
-  const [receipts, setReceipts] = useState([]); // ✅ 미수금(영수증)용
+  const [receipts, setReceipts] = useState([]);
+
+  // ✅ 일정(어제/오늘 미완료)
+  const [todoSchedules, setTodoSchedules] = useState([]);
+  const [openTodoPop, setOpenTodoPop] = useState(false);
 
   useEffect(() => {
     const qV = query(collection(db, "villas"), orderBy("name", "asc"));
@@ -245,10 +253,29 @@ export default function Dashboard() {
     return () => unsubC();
   }, []);
 
-  // ✅ 영수증(미수금)
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "receipts"), (snap) => {
       setReceipts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  // ✅ 일정(어제/오늘) 미완료
+  useEffect(() => {
+    const today = new Date();
+    const y = new Date(today); y.setDate(today.getDate() - 1);
+    const ymdToday = ymd(today);
+    const ymdYesterday = ymd(y);
+    const col = collection(db, "schedules");
+    const qSch = query(
+      col,
+      where("date", "in", [ymdYesterday, ymdToday]),
+      where("completed", "==", false)
+    );
+    const unsub = onSnapshot(qSch, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || "").localeCompare(String(b.time || "")));
+      setTodoSchedules(rows);
     });
     return () => unsub();
   }, []);
@@ -274,7 +301,7 @@ export default function Dashboard() {
         if (!found) return;
 
         const d0 = new Date(found.getFullYear(), found.getMonth(), found.getDate());
-        const diff = differenceInDays(d0, today0); // 미래+: n, 과거-: -n
+        const diff = differenceInDays(d0, today0);
         const isOverdue = diff < 0;
         const isToday = diff === 0;
 
@@ -282,7 +309,6 @@ export default function Dashboard() {
         let include = false;
 
         if (sec.key === "telco") {
-          // 통신사: 과거/오늘/미래 모두(임박 범위)
           include = (isOverdue || isToday || diff > 0) && withinHorizon;
         } else if (UPCOMING_ONLY_KEYS.has(sec.key)) {
           include = (diff >= 0) && withinHorizon;
@@ -302,7 +328,6 @@ export default function Dashboard() {
         }
       });
 
-      // 정렬
       if (sec.key === "telco") {
         items.sort((a, b) => {
           if (a.isOverdue !== b.isOverdue) return a.isOverdue ? 1 : -1;
@@ -318,7 +343,6 @@ export default function Dashboard() {
         items.sort((a, b) => a.date - b.date);
       }
 
-      // 통신사 요약
       let summary = null;
       if (sec.key === "telco") {
         const overdueCount = items.filter((x) => x.isOverdue).length;
@@ -412,18 +436,6 @@ export default function Dashboard() {
     navigate(url);
   };
 
-  /** ✅ 하단 공통 이동 유틸 (필터는 건드리지 않고, '빌라명'으로만 이동/하이라이트) */
-  const goHighlight = ({ go, sub, villa /* tab, row 사용 안 함 */ }) => {
-    // ✅ 라우터 키 보정: "이사정산" → "이사정산 조회"
-    const effectiveGo = go === "이사정산" ? "이사정산 조회" : go;
-    const params = new URLSearchParams({
-      ...(effectiveGo ? { go: effectiveGo } : {}),
-      ...(sub ? { sub } : {}),
-      ...(villa ? { villa } : {}),
-    });
-    navigate(`/main?${params.toString()}`);
-  };
-
   /** ✅ 기준 드롭다운(커스텀 메뉴) */
   const [openMenu, setOpenMenu] = useState(false);
   const menuRef = useRef(null);
@@ -477,6 +489,38 @@ export default function Dashboard() {
     </div>
   );
 
+  /** 상단 라인 미니 칩(일정 미완료만 유지) */
+  const InlineChipSchedule = () => (
+    <div className="mini-chip" onClick={() => setOpenTodoPop((v) => !v)} title="어제/오늘 미완료 일정">
+      <i className="ri-calendar-check-line mini-icon" />
+      <span className="mini-label">일정 미완료</span>
+      <span className="mini-count">{todoSchedules.length}건</span>
+      {openTodoPop && (
+        <div
+          className="chip-pop"
+          onMouseDown={(e)=>e.stopPropagation()}
+          onClick={(e)=>e.stopPropagation()}
+        >
+          <div className="chip-pop-head">어제/오늘 추가 · 미완료</div>
+          <ul className="chip-pop-list">
+            {todoSchedules.length === 0 ? (
+              <li className="empty">모든 일정이 완료되었습니다.</li>
+            ) : (
+              todoSchedules.slice(0, 12).map((s) => (
+                <li key={s.id} className="item">
+                  <span className="date">{s.date.slice(5)}</span>
+                  <span className="time">{s.time || "—"}</span>
+                  <span className="title" title={s.title}>{s.title}</span>
+                </li>
+              ))
+            )}
+          </ul>
+          {/* 이동 버튼 제거: 표시만 합니다 */}
+        </div>
+      )}
+    </div>
+  );
+
   /** 카드 컴포넌트 (CSS 적용) */
   const TopCard = ({ title, icon, items, summary, isTelco, secKey }) => (
     <div className="dash-card">
@@ -518,7 +562,7 @@ export default function Dashboard() {
     </div>
   );
 
-  /** 하단 카드 (헤더: 제목 → 금액 → 건 순) — onRowClick 추가 */
+  /** 하단 카드 */
   const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null, onRowClick }) => (
     <div className="dash-card">
       <div
@@ -547,7 +591,7 @@ export default function Dashboard() {
     </div>
   );
 
-  /** 배지 렌더: 1차정산/보증금제외 */
+  /** 배지 */
   const Badge = ({ children, kind }) => (
     <span className={`tag ${kind === "first" ? "tag--first" : "tag--exclude"}`}>{children}</span>
   );
@@ -559,9 +603,14 @@ export default function Dashboard() {
         html, body, #root { background: #ffffff !important; }
       `}</style>
 
-      {/* 상단: 기준 */}
-      <div className="flex items-center justify-end mb-3">
-        <HorizonDropdown />
+      {/* 상단: 기준 + 미니 칩들 (출금대조 불일치 칩 제거) */}
+      <div className="dash-topbar mb-3">
+        <div className="dash-topbar-left">
+          <InlineChipSchedule />
+        </div>
+        <div className="dash-topbar-right">
+          <HorizonDropdown />
+        </div>
       </div>
 
       {/* 상단: 5개 섹션 */}
@@ -587,7 +636,9 @@ export default function Dashboard() {
           items={sectionMoveoutWait}
           tone="amber"
           onRowClick={(m) => {
-            goHighlight({ go: "이사정산 조회", villa: m.villaName || "" }); // ✅ 이동 키 고정
+            const effectiveGo = "이사정산 조회";
+            const params = new URLSearchParams({ go: effectiveGo, villa: m.villaName || "" });
+            navigate(`/main?${params.toString()}`);
           }}
           renderRow={(m) => {
             const showBadges = isFirstAndExclude(m);
@@ -623,11 +674,13 @@ export default function Dashboard() {
           tone="blue"
           amountText={`${fmtComma(sectionMoveoutDeposit.sum)}원`}
           onRowClick={(m) => {
-            goHighlight({ go: "이사정산 조회", villa: m.villaName || "" }); // ✅ 이동 키 고정
+            const effectiveGo = "이사정산 조회";
+            const params = new URLSearchParams({ go: effectiveGo, villa: m.villaName || "" });
+            navigate(`/main?${params.toString()}`);
           }}
           renderRow={(m) => {
             const showBadges = isFirstAndExclude(m);
-            const total = sumMoveoutTotal(m); // 총 이사정산금액
+            const total = sumMoveoutTotal(m);
             return (
               <div className="flex items-center justify-between gap-3 w-full">
                 <div className="min-w-0">
@@ -687,7 +740,7 @@ export default function Dashboard() {
                   {r.fullAddr || "-"}
                 </div>
               </div>
-              <span className="text-rose-700 font-semibold text-[13px]">
+              <span className="text-rose-700 font-semibold text:[13px]">
                 {fmtComma(r.amount)}원
               </span>
             </div>

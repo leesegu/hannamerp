@@ -11,6 +11,7 @@ import {
   where,
   doc,
   writeBatch,
+  setDoc,
 } from "firebase/firestore";
 
 /** =========================================
@@ -19,6 +20,7 @@ import {
  * - 문서키 정합: getDocKey(r)로 원격 id 우선 매칭 → 동일 문서만 갱신
  * - 안정 난수: yyyymm+code(or id) 시드로 5000~6000 고정
  * - 실시간 공유: peCalcs/{YYYYMM}/rows 에 쓰므로 다른 계정/PC에서도 동일 표시
+ * - ✅ 부과설정 전역화: peChargeGlobal/{villaId}.charge 에 저장/구독 → 모든 달에 공통 적용
  * ========================================= */
 
 const YEARS = (() => {
@@ -118,9 +120,7 @@ function readTableWithDetectedHeader(ws) {
   return objs;
 }
 
-/* ====== 🔒 쓰기-읽기 루프 방지용 서명 ======
- * 정규화 후 JSON 문자열로 비교 → 같으면 쓰기 생략
- */
+/* ====== 🔒 쓰기-읽기 루프 방지용 서명 ====== */
 const normalizePayload = (r) => ({
   households: toInt(r.households),
   billed: toInt(r.billed),
@@ -162,6 +162,22 @@ export default function PublicElectricCalcPage() {
         String(a.code).localeCompare(String(b.code), "ko", { numeric: true })
       );
       setVillas(list);
+    });
+    return () => unsub();
+  }, []);
+
+  /* ===== ✅ 전역 부과설정 (모든 달 공통) Firestore 구독 ===== */
+  const [globalChargeRemote, setGlobalChargeRemote] = useState({});
+  useEffect(() => {
+    const col = collection(db, "peChargeGlobal");
+    const unsub = onSnapshot(col, (snap) => {
+      const m = {};
+      snap.forEach((d) => {
+        const v = d.data() || {};
+        const c = v.charge === "부과안함" ? "부과안함" : "부과";
+        m[d.id] = c;
+      });
+      setGlobalChargeRemote(m);
     });
     return () => unsub();
   }, []);
@@ -247,24 +263,29 @@ export default function PublicElectricCalcPage() {
     return String(r.id);
   };
 
-  /* 초기 행 구성 + (원격 > 로컬 > 기본) 병합  */
+  /* 초기 행 구성 + (전역 > 원격(월) > 로컬(월) > 로컬 전역) 병합  */
   useEffect(() => {
     const saved = loadSaved(yyyymm) || {};
-    const globalCharge = loadChargeGlobal();
+    const globalChargeLocal = loadChargeGlobal();
     const initial = villas.map((v) => {
       const savedRow = saved[v.id] || {};
       // ✅ 원격값을 code 또는 id 로 둘 다 조회
       const codeStr = String(v.code ?? "");
       const remoteRow = remoteMap[v.id] || remoteMap[codeStr] || {};
 
+      // ✅ 부과설정 우선순위: 전역(Firestore) > 월 원격 > 월 로컬 > 로컬 전역 > "부과"
+      const charge =
+        (globalChargeRemote[v.id]) ??
+        (remoteRow.charge) ??
+        (savedRow.charge) ??
+        (globalChargeLocal[v.id]) ??
+        "부과";
+
       const households = toInt(
         remoteRow.households ?? savedRow.households ?? v.baseHouseholds ?? 0
       );
       const billed = toInt(remoteRow.billed ?? savedRow.billed ?? 0);
       const memo = (remoteRow.memo ?? savedRow.memo) ?? "";
-
-      const charge =
-        (remoteRow.charge ?? savedRow.charge ?? globalCharge[v.id]) || "부과";
       const methodInit = (remoteRow.method ?? savedRow.method) || "계산";
 
       return recomputeRow({
@@ -282,9 +303,14 @@ export default function PublicElectricCalcPage() {
       }, yyyymm);
     });
     setRows(initial);
-    setChargeDraft(Object.fromEntries(initial.map((r) => [r.id, r.charge || "부과"])));
+    // 모달 초안은 전역 설정을 우선으로 준비
+    const draftFromGlobal = {};
+    initial.forEach((r) => {
+      draftFromGlobal[r.id] = (globalChargeRemote[r.id]) || r.charge || "부과";
+    });
+    setChargeDraft(draftFromGlobal);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [villas, yyyymm, remoteMap]);
+  }, [villas, yyyymm, remoteMap, globalChargeRemote]);
 
   /* ===== 적용세대수 Enter → 다음 칸 포커스 ===== */
   const householdsRefs = useRef([]);
@@ -474,10 +500,17 @@ export default function PublicElectricCalcPage() {
 
   /* 부과설정 모달 오픈/저장 */
   const openChargeModal = () => {
-    setChargeDraft(Object.fromEntries(rows.map((r) => [r.id, r.charge || "부과"])));
+    // ✅ 전역(Firestore) 우선 → 없으면 현재 행 → 기본 "부과"
+    const draft = {};
+    rows.forEach((r) => {
+      draft[r.id] = globalChargeRemote[r.id] || r.charge || "부과";
+    });
+    setChargeDraft(draft);
     setChargeModalOpen(true);
   };
-  const saveChargeModal = () => {
+
+  const saveChargeModal = async () => {
+    // 1) 화면 반영 (모든 행에 즉시)
     const next = rows.map((r) => {
       const c = chargeDraft[r.id] || "부과";
       if (c === r.charge) return r;
@@ -486,19 +519,30 @@ export default function PublicElectricCalcPage() {
     });
     setRows(next);
 
-    const global = loadChargeGlobal();
-    const nextGlobal = { ...global, ...chargeDraft };
+    // 2) 전역 저장: Firestore peChargeGlobal/{villaId}.charge
+    try {
+      const batch = writeBatch(db);
+      Object.entries(chargeDraft).forEach(([villaId, c]) => {
+        const ref = doc(db, "peChargeGlobal", villaId);
+        batch.set(ref, { charge: c === "부과안함" ? "부과안함" : "부과", updatedAt: Date.now() }, { merge: true });
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error("전역 부과설정 저장 실패:", e);
+    }
+
+    // 3) 로컬 전역도 동기화(오프라인/캐시)
+    const globalLocal = loadChargeGlobal();
+    const nextGlobal = { ...globalLocal, ...chargeDraft };
     saveChargeGlobal(nextGlobal);
+
     setChargeModalOpen(false);
 
+    // 4) 월별 원격도 동기화(선택사항): 현재 월 rows 저장
     debouncedSave(yyyymm, next);
   };
 
-  /* ===== 🔒 저장 로직 (로컬 + 원격) =====
-   * - 로컬: 항상 덮어씀
-   * - 원격: 현재 원격 서명과 비교하여 달라진 문서만 set()
-   * - updatedAt: 실제 변경 있을 때만 갱신
-   */
+  /* ===== 🔒 저장 로직 (로컬 + 원격) ===== */
   const _saveRows = async (ym, rowsToSave) => {
     // 1) 로컬
     try {
@@ -814,20 +858,7 @@ export default function PublicElectricCalcPage() {
               </table>
             </div>
             <div className="pe-modal-footer">
-              <button className="pe-btn gradient" onClick={() => {
-                const next = rows.map((r) => {
-                  const c = chargeDraft[r.id] || "부과";
-                  if (c === r.charge) return r;
-                  const n = { ...r, charge: c };
-                  return recomputeRow(n, yyyymm);
-                });
-                setRows(next);
-                const global = loadChargeGlobal();
-                const nextGlobal = { ...global, ...chargeDraft };
-                saveChargeGlobal(nextGlobal);
-                setChargeModalOpen(false);
-                debouncedSave(yyyymm, next);
-              }}>
+              <button className="pe-btn gradient" onClick={saveChargeModal}>
                 저장
               </button>
               <button className="pe-btn subtle" onClick={() => setChargeModalOpen(false)}>

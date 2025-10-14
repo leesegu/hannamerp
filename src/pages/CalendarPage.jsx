@@ -21,7 +21,11 @@ import {
  * - ✅ "가려진 항목 더보기" 버튼을 토글로 동작: 펼친 상태에서 다시 클릭하면 접힘
  * - ✅ 오버레이 하단 잘림 방지: 아래쪽에서도 잘리지 않도록 화면 하단에 고정 배치(조건부) + 컨테이너 overflow:auto
  * - ✅ 오버레이의 X 버튼으로도 닫기 가능
- * - ✅ (이번 요청) 팝오버의 제목 헤더('항목 보기' 타이틀 및 X 버튼) 제거
+ * - ✅ 팝오버의 제목 헤더 제거
+ * - ✅ (이번 요청) 검색:
+ *      · 한 단어 → 부분 일치(contains)
+ *      · 두 단어 이상 → (빌라명 + 공백 + 호수) "완전 일치"만
+ *   그리고 가려진 항목 버튼에 "숨은 일치 개수" 배지 표시
  */
 
 const STATUS_COLORS = [
@@ -102,7 +106,6 @@ export default function CalendarPage() {
   // 가려진 항목 오버레이 상태
   const [moreOverlay, setMoreOverlay] = useState({
     open: false, key: null, x: 0, y: 0, w: 0, events: [],
-    // ▼ 추가 필드(요청 반영)
     useBottom: false, // true면 bottom 고정 배치
     b: 0,             // bottom 값(px)
   });
@@ -449,10 +452,9 @@ export default function CalendarPage() {
     if (!el) return;
     const rect = el.getBoundingClientRect();
 
-    // ▼ 아래 공간이 협소하면 화면 하단에 고정 배치(useBottom)로 전환 (잘림 방지)
     const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
-    const belowSpace = viewportH - rect.bottom - 8; // 버튼 아래 여유
-    const needBottomPin = belowSpace < 200; // 임계치(200px)보다 좁으면 하단 고정
+    const belowSpace = viewportH - rect.bottom - 8;
+    const needBottomPin = belowSpace < 200;
 
     if (needBottomPin) {
       setMoreOverlay({
@@ -463,7 +465,7 @@ export default function CalendarPage() {
         w: rect.width,
         events: cellEvents,
         useBottom: true,
-        b: 8, // 화면 하단에서 8px 띄움
+        b: 8,
       });
     } else {
       setMoreOverlay({
@@ -544,6 +546,13 @@ export default function CalendarPage() {
               dragState.overYMD.m === cell.m &&
               dragState.overYMD.d === cell.d;
 
+            // 🔎 가려진 영역 내 "일치 개수" 계산
+            const visibleCount = Math.max(0, cellEvents.length - (ov.hiddenBelow || 0));
+            const hiddenEvents = cellEvents.slice(visibleCount);
+            const hiddenMatchCount = queryText.trim()
+              ? hiddenEvents.filter((e) => isMatch(e, queryText)).length
+              : 0;
+
             return (
               <div
                 key={idx}
@@ -592,7 +601,7 @@ export default function CalendarPage() {
                   </div>
                 </div>
 
-                {/* 하단 'N건 더보기' */}
+                {/* 하단 'N건 더보기' (+ 숨은 일치 배지) */}
                 {ov.hiddenBelow > 0 && (
                   <div className="more-gradient">
                     <button
@@ -600,7 +609,6 @@ export default function CalendarPage() {
                       title="가려진 항목 펼치기"
                       onClick={(evt) => {
                         evt.stopPropagation();
-                        // ▼ 토글 동작: 같은 셀에서 다시 클릭 시 접기
                         if (moreOverlay.open && moreOverlay.key === key) {
                           closeMoreOverlay();
                         } else {
@@ -609,6 +617,9 @@ export default function CalendarPage() {
                       }}
                     >
                       가려진 항목 {ov.hiddenBelow}건 더보기
+                      {hiddenMatchCount > 0 && (
+                        <span className="match-badge">일치 {hiddenMatchCount}건</span>
+                      )}
                     </button>
                   </div>
                 )}
@@ -630,17 +641,7 @@ export default function CalendarPage() {
               className="popover"
               style={{ left: `${popover.x}px`, top: `${popover.y}px` }}
             >
-              {/* ▼▼▼ (요청사항) 팝오버 헤더 영역 제거 ▼▼▼ */}
-              {/*
-              <div className="popover-head">
-                <div className="popover-title">항목 보기</div>
-                <div className="popover-actions">
-                  <button className="btn-x" title="닫기">✕</button>
-                </div>
-              </div>
-              */}
-              {/* ▲▲▲ (요청사항) 팝오버 헤더 영역 제거 ▲▲▲ */}
-
+              {/* 헤더 제거 */}
               <div className="popover-body">
                 <div className="two-col">
                   <Field label="빌라명" value={selected.villaName} readOnly />
@@ -679,7 +680,6 @@ export default function CalendarPage() {
         >
           <div className="more-overlay-head">
             <div className="more-overlay-title">가려진 항목</div>
-            {/* ✅ 이번 요청: X 버튼으로 닫기 가능 */}
             <button className="btn-x" onClick={closeMoreOverlay} title="닫기">✕</button>
           </div>
 
@@ -707,7 +707,6 @@ export default function CalendarPage() {
 
   /* ===== Firestore 패치 ===== */
   async function patchEvent(selected, patch) {
-    // 로컬 즉시 반영
     setEvents((prev) => prev.map((e) => {
       if (e.id !== selected.id) return e;
       const nextRaw = { ...e.raw };
@@ -717,7 +716,6 @@ export default function CalendarPage() {
       return { ...e, ...("statusKey" in patch ? { statusKey: patch.statusKey } : {}), raw: nextRaw, ...(patch.note != null ? { note: patch.note } : {}) };
     }));
 
-    // DB 업데이트 페이로드
     const update = {};
     if (patch.note != null) update.note = patch.note;
     if (patch.status != null) update.status = patch.status;
@@ -737,7 +735,6 @@ export default function CalendarPage() {
   /**
    * 색 전환 규칙 → DB 필드 패치 계산
    * oldKey, newKey ∈ {"sky","deepblue","darkgray","green","red"}
-   * 기준: 사용자 요구사항 텍스트 매핑
    */
   function applyColorTransition(oldKey, newKey, raw) {
     let status = raw?.status ?? null;
@@ -751,48 +748,39 @@ export default function CalendarPage() {
     const OK = oldKey || "sky";
     const NK = newKey;
 
-    // ▼▼▼ 전환표 구현
     if (OK === "sky") {
-      if (NK === "green") { setFirst(true); }                                    // 하늘→녹색: 1차정산 체크
-      else if (NK === "red") { setExcl(true); }                                  // 하늘→빨강: 보증금제외 체크
-      else if (NK === "deepblue") { setStatus("입금대기"); }                     // 하늘→파랑: 입금대기
-      else if (NK === "darkgray") { setStatus("정산완료"); }                     // 하늘→회색: 정산완료
-      // 하늘→하늘: 변화 없음
+      if (NK === "green") { setFirst(true); }
+      else if (NK === "red") { setExcl(true); }
+      else if (NK === "deepblue") { setStatus("입금대기"); }
+      else if (NK === "darkgray") { setStatus("정산완료"); }
     }
-    else if (OK === "darkgray") { // 회색(정산완료)
-      if (NK === "green") { setFirst(true); setStatus("입금대기"); }             // 회색→녹색
-      else if (NK === "red") { setExcl(true); setStatus("입금대기"); }           // 회색→빨강
-      else if (NK === "deepblue") { setStatus("입금대기"); }                     // 회색→파랑
-      else if (NK === "sky") { setStatus("정산대기"); }                          // 회색→하늘
-      // 회색→회색: 변화 없음
+    else if (OK === "darkgray") {
+      if (NK === "green") { setFirst(true); setStatus("입금대기"); }
+      else if (NK === "red") { setExcl(true); setStatus("입금대기"); }
+      else if (NK === "deepblue") { setStatus("입금대기"); }
+      else if (NK === "sky") { setStatus("정산대기"); }
     }
-    else if (OK === "red") { // 빨강(보증금제외)
-      if (NK === "sky") { setExcl(false); setStatus("정산대기"); }               // 빨강→하늘
-      else if (NK === "green") { setExcl(false); setFirst(true); }               // 빨강→녹색 (상태 유지)
-      else if (NK === "deepblue") { setExcl(false); setStatus("입금대기"); }     // 빨강→파랑
-      else if (NK === "darkgray") { setExcl(true); setStatus("정산완료"); }      // 빨강→회색(플래그 유지)
-      // 빨강→빨강: 변화 없음
+    else if (OK === "red") {
+      if (NK === "sky") { setExcl(false); setStatus("정산대기"); }
+      else if (NK === "green") { setExcl(false); setFirst(true); }
+      else if (NK === "deepblue") { setExcl(false); setStatus("입금대기"); }
+      else if (NK === "darkgray") { setExcl(true); setStatus("정산완료"); }
     }
-    else if (OK === "green") { // 녹색(1차정산)
-      if (NK === "red") { setFirst(false); setExcl(true); }                      // 녹색→빨강 (상태 유지)
-      else if (NK === "sky") { setFirst(false); setStatus("정산대기"); }         // 녹색→하늘
-      else if (NK === "deepblue") { setFirst(false); setStatus("입금대기"); }    // 녹색→파랑
-      else if (NK === "darkgray") { setFirst(true); setStatus("정산완료"); }     // 녹색→회색(플래그 유지)
-      // 녹색→녹색: 변화 없음
+    else if (OK === "green") {
+      if (NK === "red") { setFirst(false); setExcl(true); }
+      else if (NK === "sky") { setFirst(false); setStatus("정산대기"); }
+      else if (NK === "deepblue") { setFirst(false); setStatus("입금대기"); }
+      else if (NK === "darkgray") { setFirst(true); setStatus("정산완료"); }
     }
-    else if (OK === "deepblue") { // 파랑(입금대기)
-      if (NK === "sky") { setStatus("정산대기"); }                               // 파랑→하늘
-      else if (NK === "red") { setExcl(true); /* 상태 유지(입금대기) */ }        // 파랑→빨강
-      else if (NK === "green") { setFirst(true); /* 상태 유지(입금대기) */ }     // 파랑→녹색
-      else if (NK === "darkgray") { setStatus("정산완료"); }                     // 파랑→회색
-      // 파랑→파랑: 변화 없음
+    else if (OK === "deepblue") {
+      if (NK === "sky") { setStatus("정산대기"); }
+      else if (NK === "red") { setExcl(true); }
+      else if (NK === "green") { setFirst(true); }
+      else if (NK === "darkgray") { setStatus("정산완료"); }
     }
-    // ▲▲▲ 전환표 끝
 
     const patch = {};
-    // status는 명시된 경우에만 패치
     if (status !== (raw?.status ?? null)) patch.status = status;
-    // 플래그는 명시된 경우 true/false로 패치
     if (first !== !!raw?.firstSettlement) patch.firstSettlement = first;
     if (excl  !== !!raw?.excludeDeposit)  patch.excludeDeposit  = excl;
 
@@ -935,13 +923,57 @@ function yearOptions() {
   for (let y = t - 5; y <= t + 5; y++) list.push(y);
   return list;
 }
+
+/* ====== 🔧 검색 로직 수정 ======
+ * - 한 단어: 부분 일치(contains)
+ * - 두 단어 이상: (빌라명 + 공백 + 호수) 완전 일치만
+ * - 금액/메모는 기존 부분 일치 + 숫자 연속 매칭 유지
+ */
 function isMatch(e, q) {
-  const hay = [
-    e.villaName, e.unitNumber, e.amount, e.note
-  ].map(s => (s || "").toLowerCase());
-  const needle = q.toLowerCase();
-  return hay.some(s => s.includes(needle));
+  const qRaw = String(q || "");
+  const qTrim = qRaw.trim();
+  if (!qTrim) return false;
+
+  const norm = (s) => String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+
+  const combined = norm(`${e.villaName || ""} ${e.unitNumber || ""}`); // "빌라명 호수"
+  const qNorm = norm(qTrim);
+
+  const hasSpace = /\s/.test(qTrim);
+
+  if (hasSpace) {
+    // 두 단어 이상 → 완전 일치만 (빌라명+공백+호수)
+    return combined === qNorm;
+  }
+
+  // 한 단어 → 부분 일치
+  const fields = [
+    String(e.villaName || ""),
+    String(e.unitNumber || ""),
+    String(e.amount || ""),
+    String(e.note || ""),
+    `${e.villaName || ""} ${e.unitNumber || ""}`,
+  ];
+
+  const needleLower = qNorm;
+  const needleDigits = digitsOnly(qTrim);
+
+  // 일반 부분일치
+  const textHit = fields.some((f) => String(f).toLowerCase().includes(needleLower));
+
+  if (textHit) return true;
+
+  // "10000" ↔ "10,000" 같은 숫자연속 매칭
+  if (needleDigits) {
+    return fields.some((f) => digitsOnly(f).includes(needleDigits));
+  }
+  return false;
 }
+
+function digitsOnly(v) {
+  return String(v ?? "").replace(/[^\d]/g, "");
+}
+
 function allMatches(events, q) {
   const m = events.filter((e) => isMatch(e, q));
   return m.sort((a, b) => {
@@ -950,14 +982,22 @@ function allMatches(events, q) {
     return da - db;
   });
 }
+
+/* ====== 🔧 정렬 규칙: 'darkgray'는 항상 맨 아래 ====== */
 function sortByOrder(arr) {
   const withOrder = arr.map((e, idx) => ({
     ...e,
     _orderTmp: Number.isFinite(e.order) ? e.order : (idx + 1) * ORDER_STEP,
   }));
-  withOrder.sort((a, b) => a._orderTmp - b._orderTmp || a.id.localeCompare(b.id));
+  const weight = (k) => (k === "darkgray" ? 1 : 0); // 회색이면 뒤로
+  withOrder.sort((a, b) => {
+    const cw = weight(a.statusKey) - weight(b.statusKey);
+    if (cw !== 0) return cw;
+    return a._orderTmp - b._orderTmp || a.id.localeCompare(b.id);
+  });
   return withOrder;
 }
+
 function safeParseDrag(text) {
   try { return JSON.parse(text); } catch { return null; }
 }

@@ -121,7 +121,7 @@ html, body, #root { height: 100%; overflow: hidden; }
   width: 100%;
 
   /* ✅ 가용영역 내 중앙 정렬 (우측 쏠림 방지) */
-  max-width: min(1280px, var(--content-max));
+  max-width: min(1380px, var(--content-max));
   margin-left:auto;
   margin-right:auto;
 }
@@ -136,7 +136,7 @@ html, body, #root { height: 100%; overflow: hidden; }
   border-radius:16px;
   padding:.9rem 1rem .9rem;
   box-shadow:0 8px 24px rgba(20,20,40,.06);
-  border:1px solid rgba(0,0,0,.05);
+  border:1px solid rgba(0,0,0,.25);
   display:flex;flex-direction:column;
   min-height:0;
   height:calc(100% - 48px);
@@ -185,7 +185,7 @@ html, body, #root { height: 100%; overflow: hidden; }
 
 /* ✅ 누락된 점 보정 */
 .schedule-app .schedule-details{flex:1}
-.schedule-app .schedule-title{margin:0 0 .14rem;font-weight:700;font-size:.9rem;color:#1f2430}
+.schedule-app .schedule-title{margin:0 0 .14rem;font-weight:700;font-size:.7rem;color:#1f2430}
 .schedule-app .schedule-title.small{font-size:.86rem}
 .schedule-app .schedule-meta{display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:#8a93a3}
 .schedule-app .schedule-meta.smaller{font-size:.72rem}

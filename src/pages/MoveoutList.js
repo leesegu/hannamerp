@@ -225,6 +225,12 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
       const totalRaw = sumTotal(r);                // 숫자
       const elecRaw  = toNum(r.electricity);       // 숫자
 
+      /* ===(추가/강화) 검색 전용 금액 키들: 콤마/무콤마 모두 대응 === */
+      const totalRawStr = String(totalRaw || 0);
+      const elecRawStr  = String(elecRaw  || 0);
+      const totalComma  = totalRaw ? totalRaw.toLocaleString() : "0";
+      const elecComma   = elecRaw  ? elecRaw.toLocaleString()  : "0";
+
       return {
         ...r,
         arrears: fmtAmount(r.arrears),
@@ -236,11 +242,14 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         cleaningFee: fmtAmount(r.cleaningFee),
         totalAmount: fmtAmount(totalRaw),
 
-        /* ▶ 검색 전용 필드(콤마 유/무 모두 대응) */
-        search_total_commas: totalRaw ? totalRaw.toLocaleString() : "0",
-        search_total_raw: String(totalRaw || 0),
-        search_elec_commas: elecRaw ? elecRaw.toLocaleString() : "0",
-        search_elec_raw: String(elecRaw || 0),
+        /* ▶ 검색 전용 필드(콤마 유/무 모두) */
+        search_total_commas: totalComma,
+        search_total_raw: totalRawStr,
+        search_elec_commas: elecComma,
+        search_elec_raw: elecRawStr,
+
+        /* ===(신규) 전기/총액 금액을 한 번에 매칭하기 위한 합본 키 === */
+        search_money: `${totalRawStr} ${totalComma} ${elecRawStr} ${elecComma}`,
 
         __hasPhotos: hasPhotos,
         __hasNote: hasNote,
@@ -588,6 +597,8 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
           "totalAmount", "electricity",
           "search_total_commas","search_total_raw",
           "search_elec_commas","search_elec_raw",
+          /* ===(신규) 전기+총액 합본 키 === */
+          "search_money",
         ]}
         itemsPerPage={15}
         enableExcel={false}

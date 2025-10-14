@@ -131,9 +131,20 @@
 .more-button {
   width: 100%; border-radius: 6px; font-size: 10px; padding: 3px 8px;
   border: 1px solid #d1d5db; color: #374151; background: #fff;
-  cursor: pointer;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .more-button:hover { background: #f9fafb; }
+
+/* 🔔 가려진 항목에 검색 일치가 있을 때 배지 */
+.match-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  color: #b91c1c;              /* 레드-700 */
+  background: #fee2e2;         /* 레드-100 */
+  border: 1px solid #fecaca;   /* 레드-200 */
+  border-radius: 9999px;
+  padding: 1px 6px;
+}
 
 /* 팝오버 */
 .screen-dim { position: fixed; inset: 0; z-index: 40; }
@@ -147,13 +158,9 @@
   will-change: left, top;
 }
 .popover-head {
-  display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb; padding: 8px;
-  position: sticky; top: 0; background: #fff;
+  display: none; /* 헤더 제거 */
 }
-.popover-title { font-size: 13px; font-weight: 600; }
-.popover-actions { display: flex; align-items: center; gap: 6px; }
-.btn-x { font-size: 20px; color: #4b5563; background: transparent; border: none; cursor: default; } /* onClick 제거에 맞춰 default */
+.btn-x { font-size: 20px; color: #4b5563; background: transparent; border: none; cursor: default; }
 .btn-x:hover { color: #1f2937; }
 .popover-body { padding: 10px; display: grid; row-gap: 8px; }
 
@@ -191,18 +198,14 @@
 }
 
 /* ===============================
-   ✅ 진행현황 색상 선택(필수 추가)
+   ✅ 진행현황 색상 선택
    ===============================*/
-
-/* 색상 점 */
 .color-dot {
   display: inline-block;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.1);
   vertical-align: middle;
 }
-
-/* 점 색상 (pill 색과 동일 팔레트 사용) */
 .color-sky      { background: #38bdf8; border-color: #38bdf8; }
 .color-deepblue { background: #1e3a8a; border-color: #1e3a8a; }
 .color-darkgray { background: #6b7280; border-color: #6b7280; }
@@ -211,7 +214,6 @@
 .color-purple   { background: #8b5cf6; border-color: #8b5cf6; }
 .color-amber    { background: #f59e0b; border-color: #f59e0b; }
 
-/* 상태 선택기 */
 .status-picker { position: relative; }
 .status-btn {
   height: 32px; width: 40px;
@@ -220,15 +222,13 @@
 }
 .status-btn:hover { background: #f9fafb; }
 
-/* 상태 팝업 (popover 내부에서 넘쳐도 보이도록) */
 .status-pop {
   position: absolute; top: calc(100% + 6px); left: 0;
   background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
   box-shadow: 0 10px 24px rgba(0,0,0,0.12);
-  padding: 8px; z-index: 2; /* popover 내부에서 위로 */
+  padding: 8px; z-index: 2;
 }
 
-/* 색상 그리드: 7개 색 */
 .status-grid {
   display: grid;
   grid-template-columns: repeat(7, 24px);
@@ -243,10 +243,10 @@
 .status-cell:hover { background: #f9fafb; }
 
 /* ===============================
-   🔍 검색결과 하이라이트 (내용만 강조)
+   🔍 검색결과 하이라이트
    ===============================*/
 .event-pill.search-hit {
-  border: 2px solid #f59e0b !important;     /* 진한 노랑 테두리 */
-  box-shadow: 0 0 0 2px rgba(245,158,11,.35);/* 은은한 글로우 */
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245,158,11,.35);
   border-radius: 6px;
 }

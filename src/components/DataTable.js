@@ -107,14 +107,26 @@ export default function DataTable({
   const normalizeForSearch = (v) => {
     const out = [];
     if (v == null) return out;
+
     const base =
       typeof v === "string" || typeof v === "number" || typeof v === "boolean"
         ? String(v)
         : "";
+
     if (base) out.push(base);
+
+    // 숫자 타입: "15000" + "15,000" 모두 색인
     if (typeof v === "number" && Number.isFinite(v)) {
       try { out.push(v.toLocaleString()); } catch {}
     }
+
+    // ✅ 문자열이지만 금액/숫자 형태에 콤마가 포함된 경우: 콤마 제거 버전도 색인 (예: "15,000" -> "15000")
+    if (typeof v === "string" && /[0-9]/.test(v)) {
+      const stripped = v.replace(/[,\s]/g, "");
+      if (stripped !== v) out.push(stripped);
+    }
+
+    // 날짜 변형 지원
     if (/^\d{4}-\d{2}-\d{2}$/.test(base)) out.push(base.slice(2));
     if (/^\d{2}-\d{2}-\d{2}$/.test(base)) {
       const [yy, mm, dd] = base.split("-");
@@ -141,22 +153,44 @@ export default function DataTable({
     return [];
   };
 
+  const columnKeys = Array.isArray(columns) ? columns.map(c => c.key).filter(Boolean) : [];
   const activeColumns =
     Array.isArray(searchableKeys) && searchableKeys.length > 0
       ? columns.filter((c) => searchableKeys.includes(c.key))
       : columns;
 
+  // ✅ 컬럼 외의 가상키(search_* 등)도 검색 가능하게 처리
+  const extraSearchKeys = useMemo(() => {
+    if (!Array.isArray(searchableKeys) || searchableKeys.length === 0) return [];
+    const set = new Set(columnKeys);
+    return searchableKeys.filter(k => typeof k === "string" && !set.has(k));
+  }, [searchableKeys, columnKeys]);
+
   // ---------- 필터링 ----------
   const filteredData = useMemo(() => {
     if (!searchText) return sortedData;
-    const needle = searchText.toLowerCase();
+
+    // ✅ 입력 검색어의 변형(원문 + 콤마/공백 제거) 모두 사용
+    const needleRaw = searchText.toLowerCase();
+    const needleNoComma = needleRaw.replace(/[,\s]/g, "");
+    const needles = needleNoComma && needleNoComma !== needleRaw
+      ? [needleRaw, needleNoComma]
+      : [needleRaw];
 
     return sortedData.filter((row) => {
+      // 1) 컬럼 기반 색인
       const colStrings = activeColumns
         .flatMap((col) => getSearchableStringsFromColumn(row, col))
         .map((s) => s.toLowerCase());
 
-      let haystack = colStrings;
+      // 2) 가상키(search_total_raw, search_elec_raw, search_money 등) 색인
+      const extraStrings = extraSearchKeys
+        .flatMap((k) => normalizeForSearch(getByPath(row, k)))
+        .map((s) => s.toLowerCase());
+
+      let haystack = [...colStrings, ...extraStrings];
+
+      // 3) searchableKeys 미지정 시: 행 전체도 보조 색인(기존 동작 유지)
       if (!Array.isArray(searchableKeys) || searchableKeys.length === 0) {
         const rowStrings = Object.values(row ?? {})
           .flatMap((v) => normalizeForSearch(v))
@@ -165,9 +199,11 @@ export default function DataTable({
         rowStrings.forEach((s) => set.add(s));
         haystack = Array.from(set);
       }
-      return haystack.some((str) => str.includes(needle));
+
+      // ✅ needles 중 하나라도 포함되면 매칭
+      return haystack.some((str) => needles.some((n) => str.includes(n)));
     });
-  }, [sortedData, searchText, activeColumns, searchableKeys]);
+  }, [sortedData, searchText, activeColumns, searchableKeys, extraSearchKeys]);
 
   // ---------- 페이지네이션 ----------
   const totalPages = Math.ceil((filteredData.length || 0) / itemsPerPage);
