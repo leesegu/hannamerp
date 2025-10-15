@@ -359,6 +359,102 @@ export default function DailyClosePage() {
   const [calOpen, setCalOpen] = useState(false);
   const dateAnchorRef = useRef(null);
 
+  /* --------------------------------------------
+   * ✅ 추가: "최근 10일 불일치" 스캔 & 버튼/펼침 패널(오버레이)
+   *  - 버튼 바로 아래에 겹쳐서 펼쳐짐(레이아웃 밀어내지 않음)
+   *  - 패널 폭 축소
+   *  - 제목 문구: "출금계좌 대조 불일치"
+   * -------------------------------------------- */
+  const [recentMismatches, setRecentMismatches] = useState([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [showMismatch, setShowMismatch] = useState(false);
+  const mismatchWrapRef = useRef(null);      // ✅ 추가: 오버레이 닫기용 외부클릭
+  useOutsideClick(mismatchWrapRef, () => setShowMismatch(false)); // ✅ 추가
+
+  // 재사용: 날짜별 대조 행 계산
+  const computeReconciliationRows = useCallback((inRows, exRows) => {
+    const iwMap = sumBy(
+      inRows,
+      (r) => prefixTag356352(onlyDigits(r.account)),
+      (r) => r.incomeWithdraw || 0
+    );
+    const expByMethodAll = new Map();
+    exRows.forEach((r) => {
+      const label = r.account || "(미지정)";
+      expByMethodAll.set(label, (expByMethodAll.get(label) || 0) + (r.amount || 0));
+    });
+
+    const rows = [];
+    expByMethodAll.forEach((sum, label) => {
+      const tag = methodTag356352(label);
+      const incomeW = tag ? (iwMap.get(tag) || 0) : 0;
+      rows.push({ account: label, incomeW, expense: sum, diff: incomeW - sum });
+    });
+    ["356계좌", "352계좌"].forEach((tag) => {
+      const incomeW = iwMap.get(tag) || 0;
+      if (incomeW > 0) {
+        const present = rows.some((r) => methodTag356352(r.account) === tag);
+        if (!present) rows.push({ account: tag, incomeW, expense: 0, diff: incomeW - 0 });
+      }
+    });
+    rows.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+    return rows;
+  }, []);
+
+  const loadRecentMismatches = useCallback(async () => {
+    setRecentLoading(true);
+    try {
+      const today = new Date();
+      const dates = [];
+      for (let i = 0; i <= 10; i++) { // 오늘 포함 ~ 10일 전 (포함)
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        dates.push(toYMD(d));
+      }
+
+      // 필요한 monthKey 미리 모아 한 번만 가져오기 (월 경계 대응)
+      const needMonths = Array.from(new Set(dates.map(monthKeyFromYMD)));
+      const [incomePacks, expensePacks] = await Promise.all([
+        Promise.all(needMonths.map((mk) => fetchMonthJson("acct_income_json", mk))),
+        Promise.all(needMonths.map((mk) => fetchMonthJson("acct_expense_json", mk))),
+      ]);
+      const incomeByMonth = new Map(needMonths.map((mk, i) => [mk, incomePacks[i] || {}]));
+      const expenseByMonth = new Map(needMonths.map((mk, i) => [mk, expensePacks[i] || {}]));
+
+      const results = [];
+      for (const ymd of dates) {
+        const mk = monthKeyFromYMD(ymd);
+        const incomeJson = incomeByMonth.get(mk) || {};
+        const expenseJson = expenseByMonth.get(mk) || {};
+
+        const inRaw = extractRowsForDate(incomeJson, ymd);
+        const exRaw = extractRowsForDate(expenseJson, ymd);
+
+        const inRows = inRaw.map(normIncome).filter((r) => r.amount || r.incomeWithdraw);
+        const exRows = exRaw.map(normExpense).filter((r) => r.amount && r.status === "출금완료");
+
+        const recRows = computeReconciliationRows(inRows, exRows);
+        recRows.forEach((r, idx) => {
+          if (Math.abs(r.diff) >= 1) {
+            results.push({ date: ymd, account: r.account, incomeW: r.incomeW, expense: r.expense, diff: r.diff, idx });
+          }
+        });
+      }
+
+      // 정렬: 날짜 내림차순 → 차액 절대값 큰 순
+      results.sort((a, b) => (a.date === b.date ? Math.abs(b.diff) - Math.abs(a.diff) : b.date.localeCompare(a.date)));
+      setRecentMismatches(results);
+    } catch (e) {
+      console.error(e);
+      setRecentMismatches([]);
+    } finally {
+      setRecentLoading(false);
+    }
+  }, [computeReconciliationRows, extractRowsForDate]);
+
+  // 최초 진입 시 10일 스캔
+  useEffect(() => { loadRecentMismatches(); }, [loadRecentMismatches]);
+
   return (
     <div className="dcx-page dcx-compact">
       {/* 헤더/툴바 */}
@@ -366,6 +462,63 @@ export default function DailyClosePage() {
         <div className="left">
           <span className="mark">일마감</span>
           <span className="sub">Daily Closing</span>
+
+          {/* ✅ 추가: 버튼 + 오버레이 래퍼 (겹쳐서 펼쳐짐) */}
+          <span className="mismatch-wrap" ref={mismatchWrapRef}>
+            <button
+              className={`dcx-mismatch-btn ${recentMismatches.length > 0 ? "warn" : "ok"}`}
+              onClick={() => setShowMismatch((v) => !v)}
+              title="최근 10일 출금계좌 대조 불일치 확인"
+            >
+              <i className="ri-error-warning-line" />
+              <span className="txt">불일치</span>
+              <span className="cnt">{recentLoading ? "..." : `${recentMismatches.length}건`}</span>
+              <i className={`ri-arrow-${showMismatch ? "up" : "down"}-s-line caret`} />
+            </button>
+
+            {/* ✅ 수정: 아래 패널들을 밀지 않고 버튼 아래로 '겹쳐서' 펼쳐지는 팝오버 */}
+            {showMismatch && (
+              <section className="dcx-alert-pop">
+                <header className="alert-head">
+                  <div className="lh">
+                    <i className="ri-error-warning-line" />
+                    <span>출금계좌 대조 불일치</span> {/* ✅ 수정: 명칭 변경 */}
+                    {!recentLoading && recentMismatches.length === 0 && <em className="oktext">모두 일치</em>}
+                  </div>
+                  <div className="rh">
+                    <button className="dcx-btn tiny ghost" onClick={loadRecentMismatches} disabled={recentLoading}>
+                      <i className="ri-refresh-line" />
+                      {recentLoading ? "확인 중…" : "다시 확인"}
+                    </button>
+                  </div>
+                </header>
+                <div className="alert-list">
+                  {recentLoading ? (
+                    <div className="alert-loading">
+                      <div className="dcx-spinner" />
+                      <span>최근 10일 대조 결과 확인 중…</span>
+                    </div>
+                  ) : (
+                    recentMismatches.map((m, i) => (
+                      <button
+                        key={`${m.date}-${m.account}-${i}`}
+                        className="alert-item"
+                        title="해당 날짜로 이동"
+                        onClick={() => { setDate(m.date); setShowMismatch(false); }}
+                      >
+                        <span className="d">{m.date}</span>
+                        <span className="acc">{m.account}</span>
+                        <span className="amt">
+                          <b>{fmt(m.incomeW)}</b> / {fmt(m.expense)}
+                        </span>
+                        <span className={`diff ${Math.abs(m.diff) < 1 ? "ok" : "warn"}`}>{fmt(m.diff)}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+          </span>
         </div>
         <div className="right">
           <label className="dcx-label">마감일</label>

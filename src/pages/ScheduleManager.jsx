@@ -84,10 +84,536 @@ const fmtDate = (d) => {
   return `${nd.getFullYear()}-${pad2(nd.getMonth() + 1)}-${pad2(nd.getDate())}`;
 };
 
+/** =========================================================
+ *  🇰🇷 한국 공휴일 유틸 (간단 버전)
+ * ========================================================= */
+const FIXED_SOLAR_HOLIDAYS = new Set([
+  '01-01', // 신정
+  '03-01', // 삼일절
+  '05-05', // 어린이날
+  '06-06', // 현충일
+  '08-15', // 광복절
+  '10-03', // 개천절
+  '10-09', // 한글날
+  '12-25', // 성탄절
+]);
+const HOLIDAY_OVERRIDES = {
+  // '2025-01-28': '설연휴',
+  // '2025-01-29': '설날',
+  // '2025-01-30': '설연휴',
+  // '2025-05-06': '대체공휴일(어린이날)',
+};
+
+/* ===== 바깥 클릭 닫기 ===== */
+function useOutsideClose(ref, onClose) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (!ref.current || ref.current.contains(e.target)) return;
+      onClose?.();
+    };
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
+  }, [ref, onClose]);
+}
+
+/* ===== Date Popover ===== */
+function DatePopover({ value, onChange, onClose }) {
+  const boxRef = useRef(null);
+  useOutsideClose(boxRef, onClose);
+
+  const selDate = value ? new Date(value) : new Date();
+  const [viewDate, setViewDate] = useState(selDate);
+
+  const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+  const startDay = startOfMonth.getDay();
+
+  const monthDays = [];
+  for (let i = 1; i <= endOfMonth.getDate(); i++) {
+    monthDays.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), i));
+  }
+  const leading = Array(startDay).fill(null);
+  const baseCells = [...leading, ...monthDays];
+  const trailing = Array(42 - baseCells.length).fill(null);
+  const calendarDays = [...baseCells, ...trailing];
+
+  const pick = (d, e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    const next = fmtDate(d);
+    onChange?.(next);
+    onClose?.();
+  };
+
+  return (
+    <div className="pop-calendar" ref={boxRef} onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="pop-cal-head">
+        <button type="button" className="nav-btn ghost" onMouseDown={(e)=>e.stopPropagation()} onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>
+          <IconChevronLeft />
+        </button>
+        <div className="ym-pill">{viewDate.getFullYear()}년 {viewDate.toLocaleString('ko-KR', { month: 'long' })}</div>
+        <button type="button" className="nav-btn ghost" onMouseDown={(e)=>e.stopPropagation()} onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>
+          <IconChevronRight />
+        </button>
+      </div>
+
+      <div className="pop-cal-grid head">
+        {['일','월','화','수','목','금','토'].map((d) => (
+          <div key={d} className="dow">{d}</div>
+        ))}
+      </div>
+
+      <div className="pop-cal-grid body">
+        {calendarDays.map((d, i) => (
+          <button
+            type="button"
+            key={i}
+            className={`pop-day ${!d ? 'empty' : ''} ${d && fmtDate(d) === value ? 'selected' : ''}`}
+            disabled={!d}
+            onMouseDown={(e)=>e.stopPropagation()}
+            onClick={(e) => d && pick(d, e)}
+          >
+            {d ? d.getDate() : ''}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ===== Time Popover ===== */
+function TimePopover({ value, onChange, onClose, align = 'left' }) {
+  const boxRef = useRef(null);
+  useOutsideClose(boxRef, onClose);
+
+  /* ✅ 기본 시간: 현재시각에 가장 가까운 5분 단위 */
+  const parseInit = (val) => {
+    if (!val) {
+      const now = new Date();
+      const rawMin = now.getMinutes();
+      const nearest5 = Math.round(rawMin / 5) * 5;
+      let h24 = now.getHours();
+      let m5 = nearest5;
+      if (nearest5 === 60) { h24 = (h24 + 1) % 24; m5 = 0; }
+      const ap = h24 >= 12 ? '오후' : '오전';
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      return { ap, h: String(h12).padStart(2, '0'), m: String(m5).padStart(2, '0') };
+    }
+    const [HH, MM] = val.split(':');
+    let ap = '오전';
+    let h = Number(HH);
+    if (h >= 12) { ap = '오후'; if (h > 12) h -= 12; }
+    if (h === 0) h = 12;
+    return { ap, h: String(h).padStart(2, '0'), m: String(Number(MM) - (Number(MM) % 5)).padStart(2, '0') };
+  };
+
+  const init = parseInit(value);
+  const [ap, setAp] = useState(init.ap);
+  const [h, setH] = useState(init.h);
+  const [m, setM] = useState(init.m);
+
+  const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+  const minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+  const to24h = (ap_, h_) => {
+    const hh = Number(h_);
+    if (ap_ === '오전') return hh === 12 ? '00' : String(hh).padStart(2, '0');
+    return hh === 12 ? '12' : String(hh + 12).padStart(2, '0');
+  };
+
+  const apply = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation?.();
+    const HH = to24h(ap, h);
+    const MM = m;
+    onChange?.(`${HH}:${MM}`);
+    onClose?.();
+  };
+
+  const closeOnly = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation?.();
+    onClose?.();
+  };
+
+  return (
+    <div className={`pop-time ampm ${align === 'right' ? 'align-right' : ''}`} ref={boxRef} onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="pop-time-head">시간 선택</div>
+
+      <div className="ampm-row">
+        <button type="button" className={`ampm-btn ${ap === '오전' ? 'active' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setAp('오전')}>오전</button>
+        <button type="button" className={`ampm-btn ${ap === '오후' ? 'active' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setAp('오후')}>오후</button>
+      </div>
+
+      <div className="time-columns">
+        <div className="time-col">
+          <div className="col-title">시간</div>
+          <div className="col-list">
+            {hours.map((it) => (
+              <button type="button" key={it} className={`col-item ${h === it ? 'selected' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setH(it)}>{it}</button>
+            ))}
+          </div>
+        </div>
+        <div className="time-col">
+          <div className="col-title">분</div>
+          <div className="col-list">
+            {minutes.map((it) => (
+              <button type="button" key={it} className={`col-item ${m === it ? 'selected' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setM(it)}>{it}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="time-actions">
+        <button type="button" className="time-btn primary small" onMouseDown={(e)=>e.stopPropagation()} onClick={apply}>적용</button>
+        <button type="button" className="time-btn ghost" onMouseDown={(e)=>e.stopPropagation()} onClick={closeOnly}>닫기</button>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 모달 (함수 선언문으로 변경: ESLint/TDZ 이슈 회피) ===== */
+function ScheduleModal({ schedule, onSave, onClose }) {
+  const [title, setTitle] = useState(schedule?.title || '');
+  const [date, setDate] = useState(schedule?.date || fmtDate(new Date()));
+  const [time, setTime] = useState(schedule?.time || '');
+  const [type, setType] = useState(schedule?.type || 'shared'); // 기본: 공유
+  const [alarm, setAlarm] = useState(schedule?.alarm || false);
+  const [memo, setMemo] = useState(schedule?.memo || '');
+
+  const [openDate, setOpenDate] = useState(false);
+  const [openTime, setOpenTime] = useState(false);
+
+  const dateWrapRef = useRef(null);
+  const timeWrapRef = useRef(null);
+
+  useOutsideClose(dateWrapRef, () => setOpenDate(false));
+  useOutsideClose(timeWrapRef, () => setOpenTime(false));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title || !date) {
+      alert('제목과 날짜를 입력해주세요.');
+      return;
+    }
+    onSave({ title, date, time, type, alarm, memo });
+  };
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="modal-content modal-tall-narrow">
+        <div className="modal-head gradient">
+          <h2>{schedule ? '일정 수정' : '새 일정 추가'}</h2>
+        </div>
+
+        <form onSubmit={handleSubmit} className="schedule-form modal-grid">
+          <div className="form-group span-2 mt-header-gap">
+            <label htmlFor="title"><span className="label-icon"><IconEdit /></span>일정 제목</label>
+            <input type="text" id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </div>
+
+          <div className="form-group picker-wrap" ref={dateWrapRef}>
+            <label><span className="label-icon"><IconCalendar /></span>날짜</label>
+            <div className="picker-input picker-compact" tabIndex={0} onMouseDown={(e)=>{ e.stopPropagation(); setOpenDate(true); }}>
+              <span>{date || '날짜 선택'}</span>
+            </div>
+            {openDate && <DatePopover value={date} onChange={setDate} onClose={() => setOpenDate(false)} />}
+          </div>
+
+          <div className="form-group picker-wrap" ref={timeWrapRef}>
+            <label><span className="label-icon"><IconClock /></span>시간</label>
+            <div className="picker-input picker-compact" tabIndex={0} onMouseDown={(e)=>{ e.stopPropagation(); setOpenTime(true); }}>
+              <span>{time || '시간 선택'}</span>
+            </div>
+            {openTime && <TimePopover value={time} onChange={setTime} onClose={() => setOpenTime(false)} align="right" />}
+          </div>
+
+          <div className="form-group">
+            <label><span className="label-icon"><IconType /></span>종류</label>
+            <div className="segmented">
+              <button type="button" className={`seg-btn ${type === 'shared' ? 'active' : ''}`} onClick={() => setType('shared')}>공유</button>
+              <button type="button" className={`seg-btn ${type === 'personal' ? 'active' : ''}`} onClick={() => setType('personal')}>개인</button>
+            </div>
+          </div>
+
+          <div className="form-group notify-inline">
+            <label><span className="label-icon"><IconBell /></span>알림</label>
+            <div className="toggle-switch xsmall">
+              <input type="checkbox" id="alarm" checked={alarm} onChange={(e) => setAlarm(e.target.checked)} />
+              <label htmlFor="alarm">알림</label>
+            </div>
+          </div>
+
+          <div className="form-group span-2">
+            <label htmlFor="memo"><span className="label-icon"><IconNote /></span>메모</label>
+            <textarea id="memo" rows={6} className="memo-input" value={memo} onChange={(e)=>setMemo(e.target.value)} />
+          </div>
+
+          <div className="form-actions span-2 dual">
+            <button type="submit" className="form-submit-btn small">{schedule ? '수정하기' : '추가'}</button>
+            <button type="button" className="form-cancel-btn small" onClick={onClose}>닫기</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ===== 전체 달력 ===== */
+function CalendarView({ schedules, onClose, onDropMove, onOpenEdit }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [query, setQuery] = useState(''); // ✅ 검색어 상태
+
+  /* === 🔎 달 간 검색 & 순환을 위한 유틸/상태 추가 (요청 반영) === */
+  const norm = (s) => String(s || '').toLowerCase();
+  const yyyymm = (d) => {
+    const nd = new Date(d);
+    return `${nd.getFullYear()}-${pad2(nd.getMonth() + 1)}`;
+  };
+  const firstDayOfKey = (key) => {
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m - 1, 1);
+  };
+
+  // 입력한 검색어와 매칭되는 전체 일정(모든 달)
+  const matchedAll = useMemo(() => {
+    const q = norm(query);
+    if (!q) return [];
+    return schedules.filter(it =>
+      norm(it.title).includes(q) || norm(it.memo).includes(q)
+    );
+  }, [schedules, query]);
+
+  // 매칭된 달 키 목록(중복 제거) — 현재 달을 맨 앞으로 우선
+  const matchedMonths = useMemo(() => {
+    if (!matchedAll.length) return [];
+    const set = new Set(matchedAll.map(it => yyyymm(it.date)));
+    const arr = Array.from(set).sort(); // 기본 오름차순
+    const curKey = yyyymm(currentDate);
+    if (arr.includes(curKey)) {
+      return [curKey, ...arr.filter(k => k !== curKey)];
+    }
+    return arr;
+  }, [matchedAll, currentDate]);
+
+  // 검색어 변경 시: 현재 달에 매칭이 없고, 다른 달에 매칭이 있으면 첫 매칭 달로 자동 이동
+  useEffect(() => {
+    if (!query) return;
+    const curKey = yyyymm(currentDate);
+    const curHas = matchedMonths.includes(curKey);
+    if (!curHas && matchedMonths.length > 0) {
+      setCurrentDate(firstDayOfKey(matchedMonths[0]));
+    }
+  }, [query, matchedMonths, currentDate]);
+
+  // Enter 키로 다음 매칭 달로 순환 이동
+  const onSearchKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    if (!matchedMonths.length) return;
+    const curKey = yyyymm(currentDate);
+    const idx = matchedMonths.indexOf(curKey);
+    const nextIdx = (idx === -1 ? 0 : (idx + 1) % matchedMonths.length);
+    setCurrentDate(firstDayOfKey(matchedMonths[nextIdx]));
+  };
+
+  /* === 기존 달 렌더 로직 === */
+  const matches = (it) => {
+    const q = norm(query);
+    if (!q) return true;
+    return norm(it.title).includes(q) || norm(it.memo).includes(q);
+  };
+
+  const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  const startDay = startOfMonth.getDay();
+
+  const daysInMonth = [];
+  for (let i = 1; i <= endOfMonth.getDate(); i++) {
+    daysInMonth.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
+  }
+  const leading = Array(startDay).fill(null);
+  const baseCells = [...leading, ...daysInMonth];
+  const trailing = Array(42 - baseCells.length).fill(null);
+  const calendarDays = [...baseCells, ...trailing];
+
+  /* 🇰🇷 공휴일/일요일 체크 */
+  const isKoreanHoliday = (day) => {
+    if (!day) return false;
+    const ymd = fmtDate(day);
+    if (HOLIDAY_OVERRIDES[ymd]) return true;
+    const md = ymd.slice(5); // 'MM-DD'
+    return FIXED_SOLAR_HOLIDAYS.has(md);
+  };
+  const holidayName = (day) => {
+    if (!day) return '';
+    const ymd = fmtDate(day);
+    if (HOLIDAY_OVERRIDES[ymd]) return HOLIDAY_OVERRIDES[ymd];
+    const names = {
+      '01-01': '신정',
+      '03-01': '삼일절',
+      '05-05': '어린이날',
+      '06-06': '현충일',
+      '08-15': '광복절',
+      '10-03': '개천절',
+      '10-09': '한글날',
+      '12-25': '성탄절',
+    };
+    const md = ymd.slice(5);
+    return names[md] || '';
+  };
+  const isSunday = (day) => !!day && day.getDay() === 0;
+
+  const getSchedulesForDay = (day) => {
+    if (!day) return [];
+    const dateString = fmtDate(day);
+    return schedules
+      .filter((s) => s.date === dateString)
+      .filter(matches)
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  };
+
+  const changeMonth = (offset) => {
+    const d = new Date(currentDate);
+    d.setMonth(d.getMonth() + offset);
+    setCurrentDate(d);
+  };
+
+  const onDropDay = (e, day) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (id && day) onDropMove(id, fmtDate(day));
+  };
+
+  const goToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  /* 검색 하이라이트 */
+  const highlight = (text) => {
+    if (!query) return text;
+    const q = query.toLowerCase();
+    const idx = String(text).toLowerCase().indexOf(q);
+    if (idx === -1) return text;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark className="hl">{text.slice(idx, idx + q.length)}</mark>
+        {text.slice(idx + q.length)}
+      </>
+    );
+  };
+
+  return (
+    <div className="modal-backdrop calendar-backdrop" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="calendar-view fixed-size bigger">
+        {/* ✅ 오늘 버튼 (닫기 왼쪽) */}
+        <button
+          type="button"
+          onClick={goToday}
+          className="calendar-today-btn"
+          aria-label="오늘로 이동"
+          title="오늘"
+        >
+          오늘
+        </button>
+
+        {/* 닫기 */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="calendar-close-text"
+          aria-label="달력 닫기"
+          title="닫기"
+        >
+          닫기
+        </button>
+
+        {/* 검색창: Enter로 매칭 달 순환 이동 (가로폭 유지) */}
+        <div className="calendar-search-abs">
+          <input
+            type="text"
+            placeholder="일정 검색"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onSearchKeyDown}
+          />
+        </div>
+
+        {/* 타이틀 영역 */}
+        <div className="calendar-header compact">
+          <div className="cal-title-group">
+            <button type="button" className="nav-btn" onClick={() => changeMonth(-1)} aria-label="이전 달"><IconChevronLeft /></button>
+            <h2 className="cal-title">
+              <span className="title-icon"><IconCalendar /></span>
+              {currentDate.getFullYear()}년 {currentDate.toLocaleString('ko-KR', { month: 'long' })}
+            </h2>
+            <button type="button" className="nav-btn" onClick={() => changeMonth(1)} aria-label="다음 달"><IconChevronRight /></button>
+          </div>
+        </div>
+
+        <div className="calendar-grid fixed-rows clamp">
+          {['일','월','화','수','목','금','토'].map((d) => (
+            <div key={d} className="day-name">{d}</div>
+          ))}
+
+          {calendarDays.map((day, index) => {
+            const items = getSchedulesForDay(day);
+            const sharedCount = items.filter(i => i.type === 'shared').length;
+            const personalCount = items.filter(i => i.type === 'personal').length;
+            const isHol = isKoreanHoliday(day);
+            const holName = isHol ? holidayName(day) : '';
+
+            return (
+              <div
+                key={index}
+                className={`calendar-day ${!day ? 'empty' : ''} ${day && day.toDateString() === new Date().toDateString() ? 'today' : ''} ${isHol ? 'holiday' : ''} ${isSunday(day) ? 'sunday' : ''}`}
+                onDragOver={(e)=>e.preventDefault()}
+                onDrop={(e)=>onDropDay(e, day)}
+              >
+                {day && (
+                  <>
+                    <div className="day-number" title={holName || undefined}>
+                      <span className="num">{day.getDate()}</span>
+                      <span className="count-badge count-shared" title="공유 일정">공유 {sharedCount}</span>
+                      <span className="count-badge count-personal" title="개인 일정">개인 {personalCount}</span>
+                    </div>
+
+                    {/* 공휴일 문구: 공유/개인 배지 아래 표시 */}
+                    {isHol && holName && (
+                      <div className="holiday-line" aria-label="공휴일">{holName}</div>
+                    )}
+                  </>
+                )}
+
+                {/* 일정 목록 */}
+                <div className="day-items">
+                  {day && items.map((s) => (
+                    <div
+                      key={s.id}
+                      className={`day-chip ultra-tiny ${s.type} ${s.completed ? 'completed' : ''}`}
+                      draggable
+                      onDragStart={(e)=>{ e.dataTransfer.setData('text/plain', String(s.id)); }}
+                      onClick={()=>onOpenEdit(s)}
+                      title={`${s.time || '—'} ${s.title}`}
+                    >
+                      <span className="chip-time ultra-tiny">{s.time || '—'}</span>
+                      <span className="chip-title ultra-tiny">{highlight(s.title)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* =========================================================
   메인 페이지
 ========================================================= */
-const SchedulePage = () => {
+function SchedulePage() {
   const [schedules, setSchedules] = useState([]);          // 전체(공유 + 내 개인)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -115,7 +641,7 @@ const SchedulePage = () => {
       const list = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
       setSchedules((prev) => {
-        const personalOnly = prev.filter((v) => v.type === 'personal'); // 잠시 유지된 개인 부분
+        const personalOnly = prev.filter((v) => v.type === 'personal');
         const merged = [...personalOnly, ...list];
         return dedupById(merged);
       });
@@ -377,361 +903,6 @@ const SchedulePage = () => {
       )}
     </div>
   );
-};
-
-/* ===== 바깥 클릭 닫기 ===== */
-const useOutsideClose = (ref, onClose) => {
-  useEffect(() => {
-    const handler = (e) => {
-      if (!ref.current || ref.current.contains(e.target)) return;
-      onClose?.();
-    };
-    document.addEventListener('mousedown', handler, true);
-    return () => document.removeEventListener('mousedown', handler, true);
-  }, [ref, onClose]);
-};
-
-/* ===== Date Popover ===== */
-const DatePopover = ({ value, onChange, onClose }) => {
-  const boxRef = useRef(null);
-  useOutsideClose(boxRef, onClose);
-
-  const selDate = value ? new Date(value) : new Date();
-  const [viewDate, setViewDate] = useState(selDate);
-
-  const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-  const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
-  const startDay = startOfMonth.getDay();
-
-  const monthDays = [];
-  for (let i = 1; i <= endOfMonth.getDate(); i++) {
-    monthDays.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), i));
-  }
-  const leading = Array(startDay).fill(null);
-  const baseCells = [...leading, ...monthDays];
-  const trailing = Array(42 - baseCells.length).fill(null);
-  const calendarDays = [...baseCells, ...trailing];
-
-  const pick = (d, e) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    const next = fmtDate(d);
-    onChange?.(next);
-    onClose?.();
-  };
-
-  return (
-    <div className="pop-calendar" ref={boxRef} onMouseDown={(e)=>e.stopPropagation()}>
-      <div className="pop-cal-head">
-        <button type="button" className="nav-btn ghost" onMouseDown={(e)=>e.stopPropagation()} onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>
-          <IconChevronLeft />
-        </button>
-        <div className="ym-pill">{viewDate.getFullYear()}년 {viewDate.toLocaleString('ko-KR', { month: 'long' })}</div>
-        <button type="button" className="nav-btn ghost" onMouseDown={(e)=>e.stopPropagation()} onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>
-          <IconChevronRight />
-        </button>
-      </div>
-
-      <div className="pop-cal-grid head">
-        {['일','월','화','수','목','금','토'].map((d) => (
-          <div key={d} className="dow">{d}</div>
-        ))}
-      </div>
-
-      <div className="pop-cal-grid body">
-        {calendarDays.map((d, i) => (
-          <button
-            type="button"
-            key={i}
-            className={`pop-day ${!d ? 'empty' : ''} ${d && fmtDate(d) === value ? 'selected' : ''}`}
-            disabled={!d}
-            onMouseDown={(e)=>e.stopPropagation()}
-            onClick={(e) => d && pick(d, e)}
-          >
-            {d ? d.getDate() : ''}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-/* ===== Time Popover ===== */
-const TimePopover = ({ value, onChange, onClose, align = 'left' }) => {
-  const boxRef = useRef(null);
-  useOutsideClose(boxRef, onClose);
-
-  /* ✅ 기본 시간: 현재시각에 가장 가까운 5분 단위 */
-  const parseInit = (val) => {
-    if (!val) {
-      const now = new Date();
-      const rawMin = now.getMinutes();
-      const nearest5 = Math.round(rawMin / 5) * 5;
-      let h24 = now.getHours();
-      let m5 = nearest5;
-      if (nearest5 === 60) { h24 = (h24 + 1) % 24; m5 = 0; }
-      const ap = h24 >= 12 ? '오후' : '오전';
-      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-      return { ap, h: String(h12).padStart(2, '0'), m: String(m5).padStart(2, '0') };
-    }
-    const [HH, MM] = val.split(':');
-    let ap = '오전';
-    let h = Number(HH);
-    if (h >= 12) { ap = '오후'; if (h > 12) h -= 12; }
-    if (h === 0) h = 12;
-    return { ap, h: String(h).padStart(2, '0'), m: String(Number(MM) - (Number(MM) % 5)).padStart(2, '0') };
-  };
-
-  const init = parseInit(value);
-  const [ap, setAp] = useState(init.ap);
-  const [h, setH] = useState(init.h);
-  const [m, setM] = useState(init.m);
-
-  const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
-  const minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
-
-  const to24h = (ap_, h_) => {
-    const hh = Number(h_);
-    if (ap_ === '오전') return hh === 12 ? '00' : String(hh).padStart(2, '0');
-    return hh === 12 ? '12' : String(hh + 12).padStart(2, '0');
-  };
-
-  const apply = (e) => {
-    e?.preventDefault();
-    e?.stopPropagation?.();
-    const HH = to24h(ap, h);
-    const MM = m;
-    onChange?.(`${HH}:${MM}`);
-    onClose?.();
-  };
-
-  const closeOnly = (e) => {
-    e?.preventDefault();
-    e?.stopPropagation?.();
-    onClose?.();
-  };
-
-  return (
-    <div className={`pop-time ampm ${align === 'right' ? 'align-right' : ''}`} ref={boxRef} onMouseDown={(e)=>e.stopPropagation()}>
-      <div className="pop-time-head">시간 선택</div>
-
-      <div className="ampm-row">
-        <button type="button" className={`ampm-btn ${ap === '오전' ? 'active' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setAp('오전')}>오전</button>
-        <button type="button" className={`ampm-btn ${ap === '오후' ? 'active' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setAp('오후')}>오후</button>
-      </div>
-
-      <div className="time-columns">
-        <div className="time-col">
-          <div className="col-title">시간</div>
-          <div className="col-list">
-            {hours.map((it) => (
-              <button type="button" key={it} className={`col-item ${h === it ? 'selected' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setH(it)}>{it}</button>
-            ))}
-          </div>
-        </div>
-        <div className="time-col">
-          <div className="col-title">분</div>
-          <div className="col-list">
-            {minutes.map((it) => (
-              <button type="button" key={it} className={`col-item ${m === it ? 'selected' : ''}`} onMouseDown={(e)=>e.stopPropagation()} onClick={() => setM(it)}>{it}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="time-actions">
-        <button type="button" className="time-btn primary small" onMouseDown={(e)=>e.stopPropagation()} onClick={apply}>적용</button>
-        <button type="button" className="time-btn ghost" onMouseDown={(e)=>e.stopPropagation()} onClick={closeOnly}>닫기</button>
-      </div>
-    </div>
-  );
-};
-
-/* ===== 모달 ===== */
-const ScheduleModal = ({ schedule, onSave, onClose }) => {
-  const [title, setTitle] = useState(schedule?.title || '');
-  const [date, setDate] = useState(schedule?.date || fmtDate(new Date()));
-  const [time, setTime] = useState(schedule?.time || '');
-  const [type, setType] = useState(schedule?.type || 'shared'); // 기본: 공유
-  const [alarm, setAlarm] = useState(schedule?.alarm || false);
-  const [memo, setMemo] = useState(schedule?.memo || '');
-
-  const [openDate, setOpenDate] = useState(false);
-  const [openTime, setOpenTime] = useState(false);
-
-  const dateWrapRef = useRef(null);
-  const timeWrapRef = useRef(null);
-
-  useOutsideClose(dateWrapRef, () => setOpenDate(false));
-  useOutsideClose(timeWrapRef, () => setOpenTime(false));
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!title || !date) {
-      alert('제목과 날짜를 입력해주세요.');
-      return;
-    }
-    onSave({ title, date, time, type, alarm, memo });
-  };
-
-  return (
-    <div className="modal-backdrop" onMouseDown={(e)=>e.stopPropagation()}>
-      <div className="modal-content modal-tall-narrow">
-        <div className="modal-head gradient">
-          <h2>{schedule ? '일정 수정' : '새 일정 추가'}</h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="schedule-form modal-grid">
-          <div className="form-group span-2 mt-header-gap">
-            <label htmlFor="title"><span className="label-icon"><IconEdit /></span>일정 제목</label>
-            <input type="text" id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </div>
-
-          <div className="form-group picker-wrap" ref={dateWrapRef}>
-            <label><span className="label-icon"><IconCalendar /></span>날짜</label>
-            <div className="picker-input picker-compact" tabIndex={0} onMouseDown={(e)=>{ e.stopPropagation(); setOpenDate(true); }}>
-              <span>{date || '날짜 선택'}</span>
-            </div>
-            {openDate && <DatePopover value={date} onChange={setDate} onClose={() => setOpenDate(false)} />}
-          </div>
-
-          <div className="form-group picker-wrap" ref={timeWrapRef}>
-            <label><span className="label-icon"><IconClock /></span>시간</label>
-            <div className="picker-input picker-compact" tabIndex={0} onMouseDown={(e)=>{ e.stopPropagation(); setOpenTime(true); }}>
-              <span>{time || '시간 선택'}</span>
-            </div>
-            {openTime && <TimePopover value={time} onChange={setTime} onClose={() => setOpenTime(false)} align="right" />}
-          </div>
-
-          <div className="form-group">
-            <label><span className="label-icon"><IconType /></span>종류</label>
-            <div className="segmented">
-              <button type="button" className={`seg-btn ${type === 'shared' ? 'active' : ''}`} onClick={() => setType('shared')}>공유</button>
-              <button type="button" className={`seg-btn ${type === 'personal' ? 'active' : ''}`} onClick={() => setType('personal')}>개인</button>
-            </div>
-          </div>
-
-          <div className="form-group notify-inline">
-            <label><span className="label-icon"><IconBell /></span>알림</label>
-            <div className="toggle-switch xsmall">
-              <input type="checkbox" id="alarm" checked={alarm} onChange={(e) => setAlarm(e.target.checked)} />
-              <label htmlFor="alarm">알림</label>
-            </div>
-          </div>
-
-          <div className="form-group span-2">
-            <label htmlFor="memo"><span className="label-icon"><IconNote /></span>메모</label>
-            <textarea id="memo" rows={6} className="memo-input" value={memo} onChange={(e)=>setMemo(e.target.value)} />
-          </div>
-
-          <div className="form-actions span-2 dual">
-            <button type="submit" className="form-submit-btn small">{schedule ? '수정하기' : '추가'}</button>
-            <button type="button" className="form-cancel-btn small" onClick={onClose}>닫기</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-/* ===== 전체 달력 ===== */
-const CalendarView = ({ schedules, onClose, onDropMove, onOpenEdit }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-
-  const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-  const startDay = startOfMonth.getDay();
-
-  const daysInMonth = [];
-  for (let i = 1; i <= endOfMonth.getDate(); i++) {
-    daysInMonth.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
-  }
-  const leading = Array(startDay).fill(null);
-  const baseCells = [...leading, ...daysInMonth];
-  const trailing = Array(42 - baseCells.length).fill(null);
-  const calendarDays = [...baseCells, ...trailing];
-
-  const getSchedulesForDay = (day) => {
-    if (!day) return [];
-    const dateString = fmtDate(day);
-    return schedules
-      .filter((s) => s.date === dateString)
-      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-  };
-
-  const changeMonth = (offset) => {
-    const d = new Date(currentDate);
-    d.setMonth(d.getMonth() + offset);
-    setCurrentDate(d);
-  };
-
-  const onDropDay = (e, day) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData('text/plain');
-    if (id && day) onDropMove(id, fmtDate(day));
-  };
-
-  return (
-    <div className="modal-backdrop calendar-backdrop" onMouseDown={(e)=>e.stopPropagation()}>
-      <div className="calendar-view fixed-size bigger">
-        <button type="button" onClick={onClose} className="calendar-close-text" aria-label="달력 닫기" title="닫기">닫기</button>
-
-        <div className="calendar-header compact">
-          <div className="cal-title-group">
-            <button type="button" className="nav-btn" onClick={() => changeMonth(-1)} aria-label="이전 달"><IconChevronLeft /></button>
-            <h2 className="cal-title">
-              <span className="title-icon"><IconCalendar /></span>
-              {currentDate.getFullYear()}년 {currentDate.toLocaleString('ko-KR', { month: 'long' })}
-            </h2>
-            <button type="button" className="nav-btn" onClick={() => changeMonth(1)} aria-label="다음 달"><IconChevronRight /></button>
-          </div>
-        </div>
-
-        <div className="calendar-grid fixed-rows clamp">
-          {['일','월','화','수','목','금','토'].map((d) => (
-            <div key={d} className="day-name">{d}</div>
-          ))}
-
-          {calendarDays.map((day, index) => {
-            const items = getSchedulesForDay(day);
-            const sharedCount = items.filter(i => i.type === 'shared').length;
-            const personalCount = items.filter(i => i.type === 'personal').length;
-            return (
-              <div
-                key={index}
-                className={`calendar-day ${!day ? 'empty' : ''} ${day && day.toDateString() === new Date().toDateString() ? 'today' : ''}`}
-                onDragOver={(e)=>e.preventDefault()}
-                onDrop={(e)=>onDropDay(e, day)}
-              >
-                {day && (
-                  <div className="day-number">
-                    {day.getDate()}
-                    <span className="count-badge count-shared" title="공유 일정">공유 {sharedCount}</span>
-                    <span className="count-badge count-personal" title="개인 일정">개인 {personalCount}</span>
-                  </div>
-                )}
-                <div className="day-items">
-                  {day && items.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`day-chip ultra-tiny ${s.type}`}
-                      draggable
-                      onDragStart={(e)=>{ e.dataTransfer.setData('text/plain', String(s.id)); }}
-                      onClick={()=>onOpenEdit(s)}
-                      title={`${s.time || '—'} ${s.title}`}
-                    >
-                      <span className="chip-time ultra-tiny">{s.time || '—'}</span>
-                      <span className="chip-title ultra-tiny">{s.title}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
+}
 
 export default SchedulePage;

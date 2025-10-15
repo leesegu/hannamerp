@@ -16,9 +16,9 @@
 
 /* 메인 패널 (글래스 + 골드 포인트) — 고정 크기 */
 .updates-modal__panel {
-  width: 980px;           /* ✅ 고정 너비 */
+  width: 1080px;           /* ✅ 고정 너비 */
   max-width: 96vw;        /* 화면이 작을 때만 축소 */
-  height: 720px;          /* ✅ 고정 높이 */
+  height: 920px;          /* ✅ 고정 높이 */
   max-height: 92vh;       /* 화면이 작을 때만 축소 */
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(12px) saturate(140%);
@@ -260,6 +260,7 @@
   white-space: pre-wrap;
   line-height: 1.6;
   color: #111827;
+  font-size: 12px;
 }
 
 /* 댓글 */

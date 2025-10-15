@@ -16,9 +16,9 @@ DailyClosePage.css — Light Neon Purple Edition
   --card:#ffffff;
 
   /* 포인트 (보라 네온) */
-  --primary:#7B5CFF;     /* 보라 */
-  --primary-2:#AE9BFF;   /* 연보라 */
-  --aqua:#00E6FF;        /* 살짝 네온 보조 */
+  --primary:#7B5CFF;
+  --primary-2:#AE9BFF;
+  --aqua:#00E6FF;
   --green:#12C6A2;
   --red:#FF4D7A;
 
@@ -42,8 +42,8 @@ html, body, #root { height:100%; background:
   gap:14px;
   padding:16px 18px;
   box-sizing:border-box;
-  font-size:12px; /* 기존 유지 */
-  overflow:hidden; /* 외부 스크롤 금지 */
+  font-size:12px;
+  overflow:hidden;
 }
 
 /* ===== Toolbar ===== */
@@ -55,6 +55,7 @@ html, body, #root { height:100%; background:
 }
 .dcx-toolbar .left{
   display:flex; align-items:center; gap:10px;
+  position:relative; /* 오버레이 포지셔닝 기준 */
 }
 .dcx-toolbar .left .mark{
   display:inline-flex; align-items:center; gap:8px;
@@ -65,10 +66,55 @@ html, body, #root { height:100%; background:
   box-shadow:var(--shadow-sm);
 }
 .dcx-toolbar .left .sub{ color:var(--muted); font-weight:800; }
+
+/* 버튼 + 오버레이 래퍼 */
+.mismatch-wrap{
+  position:relative; display:inline-block;
+}
+
+/* ===== 불일치 버튼 (럭셔리 룩) ===== */
+.dcx-mismatch-btn{
+  margin-left:8px;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:14px;
+  border:1px solid transparent;
+  background:
+    linear-gradient(180deg, #ffffff, #f6f6ff) padding-box,
+    linear-gradient(135deg, rgba(123,92,255,.6), rgba(0,230,255,.6)) border-box;
+  font-weight:900; cursor:pointer;
+  box-shadow:0 6px 16px rgba(123,92,255,.18), inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease, filter .15s ease;
+}
+.dcx-mismatch-btn .txt{ letter-spacing:-.01em; }
+.dcx-mismatch-btn .cnt{
+  padding:2px 8px; border-radius:999px; font-size:11px; font-weight:900;
+  background:linear-gradient(180deg,#eef0ff,#dde1ff); color:#4338ca;
+  box-shadow: inset 0 0 0 1px rgba(76,81,191,.15);
+}
+.dcx-mismatch-btn.ok .cnt{
+  background:linear-gradient(180deg,rgba(18,198,162,.18),rgba(18,198,162,.10));
+  color:#0f9d84;
+}
+.dcx-mismatch-btn.warn .cnt{
+  background:linear-gradient(180deg,rgba(255,77,122,.20),rgba(255,77,122,.10));
+  color:#d83c66;
+}
+.dcx-mismatch-btn .caret{ margin-left:2px; color:#9aa0b5; }
+.dcx-mismatch-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 24px rgba(123,92,255,.24), inset 0 1px 0 rgba(255,255,255,1);
+  filter: saturate(1.08);
+}
+.dcx-mismatch-btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(123,92,255,.28), 0 8px 20px rgba(0,230,255,.18);
+}
+
+/* 오른쪽 영역 */
 .dcx-toolbar .right{ display:flex; align-items:center; gap:12px; }
 .dcx-label{ color:var(--muted); font-weight:800; }
 
-/* ===== Date pill + Calendar (라이트 네온) ===== */
+/* ===== Date pill + Calendar ===== */
 .datebox{ position:relative; }
 .datepill{
   display:inline-flex; align-items:center; gap:8px;
@@ -82,8 +128,8 @@ html, body, #root { height:100%; background:
 .datepill:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md); }
 .datepill i{ color:var(--primary); }
 
-/* Calendar Popover */
-.dcx-page .cal-pop{
+/* Calendar Popover — 원래 스타일로 복원 */
+.dcx-page .cal-pop{ /* ✅ 복원 */
   position:absolute; right:0; top:46px; z-index:80;
   width:320px; border-radius:16px; padding:12px;
   background:#ffffff;
@@ -92,29 +138,37 @@ html, body, #root { height:100%; background:
   animation:fadeSlide .18s ease;
 }
 @keyframes fadeSlide{from{opacity:.6; transform:translateY(-6px)} to{opacity:1; transform:translateY(0)}}
-
-.dcx-page .cal-head{ display:grid; grid-template-columns:36px 1fr 36px; align-items:center; margin-bottom:8px; }
-.dcx-page .cal-title{
+.dcx-page .cal-head{ /* ✅ 복원 */
+  display:grid; grid-template-columns:36px 1fr 36px; align-items:center; margin-bottom:8px;
+}
+.dcx-page .cal-title{ /* ✅ 복원 */
   text-align:center; font-weight:900;
   background:linear-gradient(90deg,var(--aqua),var(--primary));
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
-.dcx-page .cal-nav{
+.dcx-page .cal-nav{ /* ✅ 복원 */
   border:1px solid var(--line); background:#fff; border-radius:10px; height:32px;
   display:flex; align-items:center; justify-content:center; cursor:pointer;
   transition:box-shadow .15s ease, transform .15s ease;
 }
 .dcx-page .cal-nav:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); }
-
-.dcx-page .cal-week{ display:grid; grid-template-columns:repeat(7,1fr); margin:6px 0; color:var(--muted); font-weight:800; }
+.dcx-page .cal-week{ /* ✅ 복원 */
+  display:grid; grid-template-columns:repeat(7,1fr); margin:6px 0; color:var(--muted); font-weight:800;
+}
 .dcx-page .cal-week .w{ text-align:center; }
 
-.dcx-page .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
-.dcx-page .cal-grid .cell{
+/* 날짜 그리드 — 원래 디자인 + 버튼 리셋 추가 */
+.dcx-page .cal-grid{ /* ✅ 복원 */
+  display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
+}
+.dcx-page .cal-grid .cell{ /* ✅ 복원 + 리셋 */
+  -webkit-appearance: none; appearance: none; /* 버튼 기본 제거 */
+  font: inherit; color: inherit;             /* 폰트 상속 */
+  background:#fff;                            /* 기본 배경 */
   border:1px solid var(--line);
   border-radius:10px;
   padding:8px 0;
-  text-align:center; cursor:pointer; background:#fff;
+  text-align:center; cursor:pointer;
   transition:all .12s ease;
 }
 .dcx-page .cal-grid .cell:hover{
@@ -129,20 +183,98 @@ html, body, #root { height:100%; background:
   border-color:#cfd4ff; font-weight:900;
   box-shadow:0 0 0 2px rgba(0,230,255,.18) inset;
 }
+.dcx-page .cal-grid .cell:focus-visible{ /* ✅ 리셋: 포커스 접근성 */
+  outline:2px solid rgba(123,92,255,.4); outline-offset:-2px;
+}
 
-/* 공용 버튼 */
+/* ===== 알림 팝오버 (겹쳐서 펼침, 폭 축소 + 좌우 클램프) ===== */
+.dcx-alert-pop{
+  position:absolute;
+  left:50%;
+  transform:translateX(-14%);
+  top:calc(100% + 8px);
+  z-index:120;
+  width:520px;
+  max-width:clamp(280px, 80vw, 520px);
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(180deg,#ffffff,#f8f9ff);
+  box-shadow:0 18px 40px rgba(123,92,255,.22), 0 4px 12px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+@media (max-width: 640px){
+  .dcx-alert-pop{
+    left:50%; transform:translateX(-50%);
+    width:92vw; max-width:92vw;
+  }
+}
+.dcx-alert-pop .alert-head{
+  display:grid; grid-template-columns:1fr max-content; align-items:center;
+  gap:10px; padding:10px 12px; border-bottom:1px solid var(--line);
+}
+.dcx-alert-pop .alert-head .lh{
+  display:flex; align-items:center; gap:8px; font-weight:900;
+}
+.dcx-alert-pop .alert-head .lh i{ color:#d9486e; }
+.dcx-alert-pop .alert-head .oktext{ color:var(--green); margin-left:8px; font-weight:800; }
+.dcx-alert-pop .alert-head .rh{ display:flex; align-items:center; gap:8px; }
+.dcx-alert-pop .alert-list{
+  max-height:240px; overflow:auto; padding:6px; display:grid; gap:6px;
+}
+.dcx-alert-pop .alert-loading{
+  display:flex; align-items:center; gap:10px; padding:10px 12px; color:var(--muted); font-weight:900;
+}
+.dcx-alert-pop .alert-item{
+  display:grid; grid-template-columns:110px 1fr 1fr 90px; gap:10px;
+  align-items:center; width:100%;
+  padding:8px 10px; border:1px solid var(--line);
+  background:#fff; border-radius:12px; cursor:pointer;
+  transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  text-align:left;
+}
+.dcx-alert-pop .alert-item:hover{
+  transform:translateY(-2px); box-shadow:var(--shadow-sm); border-color:#dcdfff;
+}
+.dcx-alert-pop .alert-item .d{ font-weight:900; color:#374151; }
+.dcx-alert-pop .alert-item .acc{ color:#4f46e5; font-weight:900; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dcx-alert-pop .alert-item .amt{ color:var(--muted); font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dcx-alert-pop .alert-item .diff{ justify-self:end; font-weight:900; }
+.dcx-alert-pop .alert-item .diff.ok{ color:#0f9d84; }
+.dcx-alert-pop .alert-item .diff.warn{ color:#d83c66; }
+
+/* ===== 공용 버튼 (럭셔리 업그레이드) ===== */
 .dcx-btn{
   display:inline-flex; align-items:center; gap:6px;
   padding:9px 14px; border-radius:14px;
-  border:1px solid var(--line); font-weight:900;
-  background:linear-gradient(180deg,#ffffff,#f6f6ff);
-  color:var(--ink); cursor:pointer; box-shadow:var(--shadow-sm);
-  transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+  border:1px solid transparent;
+  background:
+    linear-gradient(180deg,#ffffff,#f6f6ff) padding-box,
+    linear-gradient(135deg, rgba(174,155,255,.7), rgba(99,102,241,.7)) border-box;
+  color:var(--ink); font-weight:900; cursor:pointer;
+  box-shadow:0 8px 18px rgba(99,102,241,.18), inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease, filter .15s ease;
 }
 .dcx-btn:hover{
   transform:translateY(-2px);
-  box-shadow:var(--shadow-md);
-  background:linear-gradient(180deg,#fafbff,#eef0ff);
+  box-shadow:0 12px 26px rgba(99,102,241,.24), inset 0 1px 0 rgba(255,255,255,1);
+  filter:saturate(1.05);
+}
+.dcx-btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(99,102,241,.28), 0 10px 24px rgba(0,230,255,.16);
+}
+
+/* 세부 변형 */
+.dcx-btn.ghost{
+  background:
+    linear-gradient(180deg,#ffffff,#f7f7ff) padding-box,
+    linear-gradient(135deg, rgba(123,92,255,.6), rgba(0,230,255,.6)) border-box;
+}
+.dcx-btn.tiny{
+  padding:6px 10px; border-radius:10px; font-size:11px;
+  background:
+    linear-gradient(180deg,#ffffff,#f7f7ff) padding-box,
+    linear-gradient(135deg, rgba(174,155,255,.7), rgba(99,102,241,.7)) border-box;
 }
 
 /* ===== KPI ===== */
@@ -175,18 +307,17 @@ html, body, #root { height:100%; background:
 .dcx-kpi.net.neg .bar span{ background:linear-gradient(90deg,#ff6c9a,#f34171); }
 @keyframes fill{from{width:0} to{width:100%}}
 
-/* ===== 본문 그리드 (수입 좁게 / 지출 넓게 / 대조 수입과 유사 폭) ===== */
+/* ===== 본문 그리드 ===== */
 .dcx-grid{
   display:grid;
   grid-template-columns:.9fr 1.4fr .9fr;
   gap:14px;
-  flex:1; min-height:0; /* 내부 스크롤 허용 */
-  /* FIX: 그리드 아이템이 내부 콘텐츠 때문에 가로로 커지지 않도록 */
+  flex:1; min-height:0;
 }
-.dcx-grid > *{ min-width:0; }           /* FIX */
-.dcx-grid > .dcx-card{ min-width:0; }   /* FIX */
+.dcx-grid > *{ min-width:0; }
+.dcx-grid > .dcx-card{ min-width:0; }
 
-/* 카드 공통 (라이트 글래스 느낌) */
+/* 카드 공통 */
 .dcx-card{
   display:flex; flex-direction:column;
   background:#ffffff;
@@ -194,13 +325,13 @@ html, body, #root { height:100%; background:
   border-radius:16px;
   box-shadow:var(--shadow-lg);
   overflow:hidden;
-  min-width:0; /* FIX: 카드 자체가 늘어나지 않도록 */
+  min-width:0;
 }
 .dcx-card .head{
   display:grid; grid-template-columns:1fr max-content; align-items:center;
   gap:10px; padding:10px 12px; border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,#ffffff,#f7f8ff);
-  min-width:0; /* FIX */
+  min-width:0;
 }
 .dcx-card .head.income{ background:linear-gradient(180deg,#f9fffb,#ffffff); }
 .dcx-card .head.expense{ background:linear-gradient(180deg,#fff7fb,#ffffff); }
@@ -216,17 +347,17 @@ html, body, #root { height:100%; background:
   flex:1 1 auto;
   min-height:0;
   overflow:auto;
-  min-width:0;           /* FIX */
-  contain: content;      /* FIX: 내부 레이아웃 영향 최소화 */
+  min-width:0;
+  contain: content;
 }
 
 /* ===== Table ===== */
 .dcx-table{
   width:100%;
-  max-width:100%;        /* FIX */
+  max-width:100%;
   border-collapse:collapse;
   font-size:12px; color:var(--ink);
-  table-layout: fixed;   /* FIX: 셀 너비 균등, 긴 내용이 레이아웃을 밀지 않게 */
+  table-layout: fixed;
 }
 .dcx-table thead th{
   position:sticky; top:0; z-index:1;
@@ -234,13 +365,13 @@ html, body, #root { height:100%; background:
   text-align:left; padding:9px 11px;
   border-bottom:1px solid var(--line);
   color:var(--muted); font-weight:900;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; /* FIX */
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .dcx-table tbody td{
   padding:9px 11px;
   border-bottom:1px solid #eef0fb;
-  overflow:hidden; text-overflow:ellipsis; /* FIX */
-  word-break:break-word;                   /* FIX: 긴 한글/영문 섞여도 줄바꿈 */
+  overflow:hidden; text-overflow:ellipsis;
+  word-break:break-word;
 }
 .dcx-table .right{text-align:right} .dcx-table .center{text-align:center}
 .dcx-table .bold{font-weight:900} .dcx-table .muted{color:var(--muted)}
@@ -251,9 +382,9 @@ html, body, #root { height:100%; background:
 .dcx-table tbody tr:hover td{ background:#f7f9ff; }
 
 /* 지출표: 대분류칸에 이름 + 합계 2줄 표시용 */
-.bigcell{ display:flex; flex-direction:column; line-height:1.12; min-width:0; } /* FIX */
+.bigcell{ display:flex; flex-direction:column; line-height:1.12; min-width:0; }
 .bigcell .name{ font-weight:900; }
-.bigcell .sumline{ font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; } /* FIX */
+.bigcell .sumline{ font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; }
 
 /* ===== Recon badges ===== */
 .recon-table .badge{
