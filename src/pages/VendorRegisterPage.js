@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import PageTitle from "../components/PageTitle";
 import "remixicon/fonts/remixicon.css";
+import "./VendorRegisterPage.css"; // ✅ 디자인 분리
 
 /* ────────────────────────────────────────────────────────────────────
    공통 유틸
@@ -110,8 +111,8 @@ function EditableCategoryTable({ collectionName, categories = [], onReadyChange 
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1000px] border text-sm text-center">
+    <div className="overflow-x-auto vrp-card">
+      <table className="w-full min-w-[1000px] border text-sm text-center vrp-table">
         <thead className="bg-gray-100 text-gray-700">
           <tr>
             {safeCategories.map((cat) => (
@@ -233,9 +234,9 @@ function AccountingSettingsPanel() {
     await updateDoc(doc(db, "acct_expense_main", expId), { subs });
   };
 
-  // 뷰: 탭 공통 헤더
+  // 뷰: 탭 공통 헤더(스타일 클래스만 추가)
   const TabHeader = ({ icon, title, onAdd, addLabel = "추가" }) => (
-    <div className="flex items-center justify-between mb-3">
+    <div className="flex items-center justify-between mb-3 vrp-subheader">
       <div className="flex items-center gap-2 font-extrabold text-sm">
         <i className={`${icon} text-indigo-500`} />
         {title}
@@ -251,10 +252,10 @@ function AccountingSettingsPanel() {
   );
 
   const MethodsTab = () => (
-    <div className="bg-white border rounded-xl p-3 shadow-sm">
+    <div className="bg-white border rounded-xl p-3 shadow-sm vrp-card">
       <TabHeader icon="ri-bank-card-2-line" title="결제방법" onAdd={() => addItem("methods")} />
       <div className="overflow-hidden border rounded-lg">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-[12px] vrp-table">
           <colgroup>
             <col style={{ width: "70%" }} />
             <col style={{ width: "30%" }} />
@@ -303,10 +304,10 @@ function AccountingSettingsPanel() {
   );
 
   const IncomeTab = () => (
-    <div className="bg-white border rounded-xl p-3 shadow-sm">
+    <div className="bg-white border rounded-xl p-3 shadow-sm vrp-card">
       <TabHeader icon="ri-download-2-line" title="수입 대분류" onAdd={() => addItem("income")} />
       <div className="overflow-hidden border rounded-lg">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-[12px] vrp-table">
           <colgroup>
             <col style={{ width: "70%" }} />
             <col style={{ width: "30%" }} />
@@ -355,7 +356,7 @@ function AccountingSettingsPanel() {
   );
 
   const ExpenseTab = () => (
-    <div className="bg-white border rounded-xl p-3 shadow-sm">
+    <div className="bg-white border rounded-xl p-3 shadow-sm vrp-card">
       <TabHeader
         icon="ri-upload-2-line"
         title="지출 대분류 / 소분류"
@@ -364,7 +365,7 @@ function AccountingSettingsPanel() {
       />
       <div className="flex flex-col gap-2">
         {expense.map((e) => (
-          <div key={e.id} className="border rounded-lg p-3 bg-gradient-to-b from-white to-indigo-50/20">
+          <div key={e.id} className="border rounded-lg p-3 bg-gradient-to-b from-white to-indigo-50/20 vrp-card--soft">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="font-extrabold text-[13px]">{e.name}</div>
               <div className="flex items-center gap-1">
@@ -550,41 +551,35 @@ export default function VendorRegisterPage() {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 vrp">
       {/* 상단 헤더 */}
-      <div className="flex items-center justify-between gap-4 mb-4">
+      <div className="flex items-center justify-between gap-4 mb-4 vrp-header">
         <div className="flex items-center gap-3">
           <PageTitle>기초설정</PageTitle>
-          <div className="flex items-center gap-2 ml-2">
+          <div className="flex items-center gap-2 ml-2 vrp-nav">
             <button
               onClick={() => setActivePanel("villa")}
-              className={`px-3 py-2 rounded border text-sm ${
-                activePanel === "villa"
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              }`}
+              className={`vrp-navbtn ${activePanel === "villa" ? "is-active" : ""}`}
+              title="빌라정보 설정"
             >
-              빌라정보 설정
+              <i className="ri-building-3-line vrp-navbtn__icon" />
+              <span className="vrp-navbtn__label">빌라정보 설정</span>
             </button>
             <button
               onClick={() => setActivePanel("service")}
-              className={`px-3 py-2 rounded border text-sm ${
-                activePanel === "service"
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              }`}
+              className={`vrp-navbtn ${activePanel === "service" ? "is-active" : ""}`}
+              title="부가서비스 설정"
             >
-              부가서비스 설정
+              <i className="ri-customer-service-2-line vrp-navbtn__icon" />
+              <span className="vrp-navbtn__label">부가서비스 설정</span>
             </button>
             <button
               onClick={() => setActivePanel("acct")}
-              className={`px-3 py-2 rounded border text-sm ${
-                activePanel === "acct"
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              }`}
+              className={`vrp-navbtn ${activePanel === "acct" ? "is-active" : ""}`}
+              title="관리비회계 설정"
             >
-              관리비회계 설정
+              <i className="ri-bank-card-line vrp-navbtn__icon" />
+              <span className="vrp-navbtn__label">관리비회계 설정</span>
             </button>
           </div>
         </div>
@@ -593,15 +588,18 @@ export default function VendorRegisterPage() {
         {showSave && (
           <button
             onClick={onClickSave}
-            className="bg-indigo-600 text-white px-5 py-2 rounded-md hover:bg-indigo-700"
+            className="vrp-savebtn vrp-savebtn--header"
           >
+            <i className="ri-save-3-line" />
             저장
           </button>
         )}
       </div>
 
       {/* 콘텐츠 영역 */}
-      {renderPanel()}
+      <div className="vrp-body">
+        {renderPanel()}
+      </div>
     </div>
   );
 }

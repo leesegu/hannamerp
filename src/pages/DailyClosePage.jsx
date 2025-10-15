@@ -143,6 +143,16 @@ const methodTag356352 = (methodLabel) => {
   return prefixTag356352(dig);
 };
 
+// ✅ 추가: 지출 결제방법 라벨 → 수입출금 대조용 태그(356/352 또는 '선수금계좌'/'지로계좌')
+const accountLabelToIncomeTag = (label) => {
+  const t = methodTag356352(label);
+  if (t) return t;
+  const L = s(label);
+  if (L.includes("선수금")) return "선수금계좌";
+  if (L.includes("지로")) return "지로계좌";
+  return null;
+};
+
 const sumBy = (rows, keyFn, amountFn) => {
   const m = new Map();
   rows.forEach((r) => {
@@ -297,11 +307,24 @@ export default function DailyClosePage() {
 
   /* ===== 356/352 전용 출금계좌 대조 ===== */
   const incomeWithdrawMap = useMemo(() => {
-    return sumBy(
+    // 기본: 356/352 계좌 기반 수입 출금 합계
+    const base = sumBy(
       incomeRows,
       (r) => prefixTag356352(onlyDigits(r.account)),
       (r) => r.incomeWithdraw || 0
     );
+    // ✅ 추가: '선수금' / '지로입금' 이면서 "입금금액은 0" + "출금금액만 있는" 경우를 별도 계좌 태그로 합산
+    const advSum = incomeRows
+      .filter((r) => s(r.big) === "선수금" && !(r.amount > 0) && (r.incomeWithdraw || 0) > 0)
+      .reduce((acc, r) => acc + (r.incomeWithdraw || 0), 0);
+    const giroSum = incomeRows
+      .filter((r) => s(r.big) === "지로입금" && !(r.amount > 0) && (r.incomeWithdraw || 0) > 0)
+      .reduce((acc, r) => acc + (r.incomeWithdraw || 0), 0);
+
+    const m = new Map(base);
+    if (advSum > 0) m.set("선수금계좌", (m.get("선수금계좌") || 0) + advSum);
+    if (giroSum > 0) m.set("지로계좌", (m.get("지로계좌") || 0) + giroSum);
+    return m;
   }, [incomeRows]);
   const iw356 = incomeWithdrawMap.get("356계좌") || 0;
   const iw352 = incomeWithdrawMap.get("352계좌") || 0;
@@ -336,14 +359,16 @@ export default function DailyClosePage() {
   const reconciliation = useMemo(() => {
     const rows = [];
     expenseByMethodAll.forEach((sum, label) => {
-      const tag = methodTag356352(label);
+      // ✅ 변경: 356/352 → 기존 매핑, 그 외 '선수금계좌'/'지로계좌'는 라벨 매칭
+      const tag = accountLabelToIncomeTag(label);
       const incomeW = tag ? (incomeWithdrawMap.get(tag) || 0) : 0;
       rows.push({ account: label, incomeW, expense: sum, diff: incomeW - sum });
     });
-    ["356계좌", "352계좌"].forEach((tag) => {
+    // ✅ 변경: 수입 쪽에만 있는 태그도 표시(356/352 + 선수금/지로)
+    ["356계좌", "352계좌", "선수금계좌", "지로계좌"].forEach((tag) => {
       const incomeW = incomeWithdrawMap.get(tag) || 0;
       if (incomeW > 0) {
-        const present = rows.some((r) => methodTag356352(r.account) === tag);
+        const present = rows.some((r) => accountLabelToIncomeTag(r.account) === tag || r.account === tag);
         if (!present) {
           rows.push({ account: tag, incomeW, expense: 0, diff: incomeW - 0 });
         }
@@ -373,11 +398,23 @@ export default function DailyClosePage() {
 
   // 재사용: 날짜별 대조 행 계산
   const computeReconciliationRows = useCallback((inRows, exRows) => {
-    const iwMap = sumBy(
+    // 기본 356/352 출금 합계
+    const iwMapBase = sumBy(
       inRows,
       (r) => prefixTag356352(onlyDigits(r.account)),
       (r) => r.incomeWithdraw || 0
     );
+    // ✅ 추가: 선수금/지로 — "입금금액 0 + 출금금액만" 조건으로 합산
+    const advSum = inRows
+      .filter((r) => s(r.big) === "선수금" && !(r.amount > 0) && (r.incomeWithdraw || 0) > 0)
+      .reduce((acc, r) => acc + (r.incomeWithdraw || 0), 0);
+    const giroSum = inRows
+      .filter((r) => s(r.big) === "지로입금" && !(r.amount > 0) && (r.incomeWithdraw || 0) > 0)
+      .reduce((acc, r) => acc + (r.incomeWithdraw || 0), 0);
+    const iwMap = new Map(iwMapBase);
+    if (advSum > 0) iwMap.set("선수금계좌", (iwMap.get("선수금계좌") || 0) + advSum);
+    if (giroSum > 0) iwMap.set("지로계좌", (iwMap.get("지로계좌") || 0) + giroSum);
+
     const expByMethodAll = new Map();
     exRows.forEach((r) => {
       const label = r.account || "(미지정)";
@@ -386,14 +423,14 @@ export default function DailyClosePage() {
 
     const rows = [];
     expByMethodAll.forEach((sum, label) => {
-      const tag = methodTag356352(label);
+      const tag = accountLabelToIncomeTag(label);
       const incomeW = tag ? (iwMap.get(tag) || 0) : 0;
       rows.push({ account: label, incomeW, expense: sum, diff: incomeW - sum });
     });
-    ["356계좌", "352계좌"].forEach((tag) => {
+    ["356계좌", "352계좌", "선수금계좌", "지로계좌"].forEach((tag) => {
       const incomeW = iwMap.get(tag) || 0;
       if (incomeW > 0) {
-        const present = rows.some((r) => methodTag356352(r.account) === tag);
+        const present = rows.some((r) => accountLabelToIncomeTag(r.account) === tag || r.account === tag);
         if (!present) rows.push({ account: tag, incomeW, expense: 0, diff: incomeW - 0 });
       }
     });

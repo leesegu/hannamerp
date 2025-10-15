@@ -1,0 +1,373 @@
+/* src/pages/VendorRegisterPage.css */
+
+/* =========================================================
+Luxe Light Theme — White & Gold, Clean & Readable
+(모든 스타일은 .vrp 스코프 안에서만 동작)
+========================================================= */
+.vrp {
+  /* Palette */
+  --vrp-bg: #F7F9FC;              /* 페이지 배경(밝은 화이트 톤) */
+  --vrp-surface: #FFFFFF;         /* 카드/버튼 기본 표면 */
+  --vrp-surface-2: #FAFBFF;       /* 보조 표면 */
+  --vrp-fg: #1E2432;              /* 본문 텍스트 */
+  --vrp-fg-muted: #6B7280;        /* 보조 텍스트 */
+  --vrp-border: #E6E9F1;          /* 엷은 보더 */
+  --vrp-shadow: 0 10px 30px rgba(16, 24, 40, .08);
+  --vrp-shadow-lg: 0 18px 42px rgba(16, 24, 40, .12);
+
+  /* Luxe accents */
+  --vrp-gold-1: #F4D27A;
+  --vrp-gold-2: #EDC24D;
+  --vrp-gold-3: #D9B04C;
+  --vrp-ink-1: #2E3A59;
+  --vrp-ink-2: #4B5A7C;
+  --vrp-ink-3: #8391B5;
+
+  /* Gradients */
+  --vrp-grad-gold: linear-gradient(135deg, #FFF2C4, #FFE59A, #FFD86B);
+  --vrp-grad-ink: linear-gradient(135deg, #EEF3FF, #F7F9FF);
+  --vrp-grad-nav: linear-gradient(135deg, #FDFEFF, #F3F7FF);
+
+  /* Rounding & spacing */
+  --vrp-radius: 16px;
+  --vrp-radius-lg: 18px;
+
+  /* Effects */
+  --vrp-ring: 0 0 0 4px rgba(237, 194, 77, .22);
+}
+
+/* ===== Page canvas ===== */
+.vrp {
+  color: var(--vrp-fg);
+  background:
+    radial-gradient(1100px 560px at 90% -10%, rgba(240, 199, 74, .12), transparent 60%),
+    radial-gradient(900px 560px at -10% 110%, rgba(125, 155, 255, .12), transparent 60%),
+    var(--vrp-bg);
+  min-height: 100%;
+}
+
+/* =========================================
+Header (Page Title + Nav Buttons + Save)
+========================================= */
+.vrp-header {
+  padding: 16px 18px;
+  border: 1px solid var(--vrp-border);
+  border-radius: var(--vrp-radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.75)),
+    var(--vrp-grad-ink);
+  box-shadow: var(--vrp-shadow);
+}
+
+.vrp-nav {
+  display: inline-flex;
+  gap: 14px;
+}
+
+.vrp-navbtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px; /* ▶ 더 크게 */
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--vrp-ink-1);
+  border: 1px solid var(--vrp-border);
+  border-radius: calc(var(--vrp-radius) + 6px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.7)),
+    var(--vrp-grad-nav);
+  box-shadow: 0 2px 0 rgba(16,24,40,.02), 0 8px 18px rgba(16,24,40,.06);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  will-change: transform;
+}
+
+.vrp-navbtn__icon {
+  font-size: 22px;
+  color: var(--vrp-ink-2);
+  filter: drop-shadow(0 2px 3px rgba(16,24,40,.08));
+}
+
+.vrp-navbtn__label {
+  letter-spacing: .2px;
+}
+
+.vrp-navbtn:is(:hover, :focus-visible) {
+  transform: translateY(-1px);
+  border-color: #DFE3EE;
+  box-shadow: 0 2px 0 rgba(16,24,40,.02), 0 12px 26px rgba(16,24,40,.08);
+  outline: none;
+}
+
+.vrp-navbtn.is-active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.75)),
+    var(--vrp-grad-gold);
+  color: #2D2A1E;
+  border-color: rgba(217, 176, 76, .55);
+  box-shadow: 0 16px 32px rgba(217,176,76,.20);
+}
+
+.vrp-navbtn.is-active .vrp-navbtn__icon {
+  color: #7A5B09;
+}
+
+/* =========================================
+Save Button (Header & floating)
+========================================= */
+.vrp-savebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: .2px;
+  color: #3A2C03;
+  background: linear-gradient(135deg, #FFEAA6, #FFD86B, #F8C948);
+  border: 1px solid rgba(217,176,76,.55);
+  border-radius: calc(var(--vrp-radius) + 4px);
+  box-shadow: 0 16px 28px rgba(217,176,76,.25), inset 0 1px 0 rgba(255,255,255,.6);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.vrp-savebtn i { font-size: 18px; color: #7A5B09; }
+
+.vrp-savebtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 34px rgba(217,176,76,.32), inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.vrp-savebtn--header { padding: 14px 24px; }
+
+/* =========================================
+Cards / Panels / Tables
+========================================= */
+.vrp-body {
+  margin-top: 14px;
+  display: block;
+  gap: 18px;
+}
+
+/* 유리 느낌의 화이트 카드 */
+.vrp-card {
+  border-radius: var(--vrp-radius);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.9)),
+    var(--vrp-surface);
+  border: 1px solid var(--vrp-border);
+  box-shadow: var(--vrp-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.vrp-card--soft {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.92)),
+    var(--vrp-surface-2);
+}
+
+/* 테이블 — 더 큰 패딩 & 뚜렷한 대비 */
+.vrp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--vrp-fg);
+}
+.vrp-table thead th {
+  font-weight: 800;
+  font-size: 12.5px;
+  color: var(--vrp-ink-1);
+  background:
+    linear-gradient(180deg, rgba(248,250,255,1), rgba(244,247,255,1));
+  border-bottom: 1px solid var(--vrp-border);
+  padding: 10px 12px;
+  text-align: left;
+  letter-spacing: .2px;
+}
+.vrp-table tbody td {
+  padding: 12px 12px;
+  font-size: 13px;
+  color: var(--vrp-fg);
+  border-bottom: 1px solid var(--vrp-border);
+  background: #fff;
+}
+.vrp-table tbody tr:hover td {
+  background: #FCFEFF;
+}
+.vrp-table th, .vrp-table td {
+  border-color: var(--vrp-border) !important;
+}
+
+/* 카테고리 테이블 입력 필드(가독성 강화) */
+.vrp .vrp-table input[type="text"],
+.vrp .vrp-table input:not([type]) {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E5E9F4;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--vrp-fg);
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.vrp .vrp-table input:focus {
+  border-color: var(--vrp-gold-2);
+  box-shadow: var(--vrp-ring);
+  outline: none;
+  background: #FFFDF5;
+}
+
+/* 카테고리 칩 스타일 (지출 소분류 등) */
+.vrp .vrp-card--soft .inline-flex {
+  border-color: #EEF2FB !important;
+  background: #FFFFFF;
+  box-shadow: 0 8px 18px rgba(16,24,40,.06);
+  font-weight: 700;
+  color: var(--vrp-ink-1);
+}
+.vrp .vrp-card--soft .inline-flex i {
+  color: var(--vrp-ink-2) !important;
+}
+
+/* =========================================
+Sub Header (패널 헤더 라인)
+========================================= */
+.vrp-subheader {
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed var(--vrp-border);
+}
+.vrp-subheader .text-indigo-500 { color: var(--vrp-ink-2) !important; }
+
+/* =========================================
+Empty / Muted
+========================================= */
+.vrp-empty,
+.vrp .text-gray-400 { color: var(--vrp-fg-muted) !important; }
+
+/* =========================================
+Buttons / icon-only inside tables
+========================================= */
+.vrp .border:hover { border-color: #E3E8F4; }
+.vrp button[title="삭제"] {
+  color: #C2410C !important;
+}
+
+/* =========================================
+Scrollbars (Desktop; scoped)
+========================================= */
+.vrp *::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.vrp *::-webkit-scrollbar-track {
+  background: #F2F4FA;
+  border-radius: 999px;
+}
+.vrp *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #E9EDF7, #DDE3F3);
+  border: 1px solid #D1D9EC;
+  border-radius: 999px;
+}
+.vrp *::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #E5EAF6, #D8DEF0);
+}
+
+/* =========================================
+Fine details
+========================================= */
+/* 테이블 행 마지막 보더 부드럽게 */
+.vrp-table tbody tr:last-child td {
+  border-bottom-color: rgba(0,0,0,0);
+}
+
+/* 카드 안쪽 테이블 모서리 둥글게 보이도록 래퍼 */
+.vrp .overflow-hidden.border.rounded-lg {
+  border-color: var(--vrp-border) !important;
+  border-radius: calc(var(--vrp-radius) - 6px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+/* 삭제 버튼(×) 정교한 터치 공간 */
+.vrp .vrp-card button[title="삭제"] {
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.vrp .vrp-card button[title="삭제"]:hover {
+  background: #FFF5F5;
+}
+
+/* 표 머리의 좌/우 라운딩 느낌 (시각적) */
+.vrp-table thead tr th:first-child {
+  border-top-left-radius: 10px;
+}
+.vrp-table thead tr th:last-child {
+  border-top-right-radius: 10px;
+}
+
+/* =========================================
+Responsive
+========================================= */
+@media (max-width: 1180px) {
+  .vrp-navbtn {
+    padding: 14px 20px;
+    font-size: 14px;
+  }
+  .vrp-navbtn__icon { font-size: 20px; }
+}
+@media (max-width: 860px) {
+  .vrp-header {
+    padding: 14px;
+  }
+  .vrp-nav {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .vrp-navbtn {
+    width: calc(50% - 6px);
+    justify-content: center;
+  }
+}
+@media (max-width: 560px) {
+  .vrp-navbtn {
+    width: 100%;
+  }
+  .vrp-savebtn--header {
+    padding: 12px 18px;
+  }
+}
+
+/* =========================================
+Micro Interactions
+========================================= */
+/* 버튼 프레스 감 */
+.vrp button:active {
+  transform: translateY(0);
+  transition: transform .06s ease;
+}
+
+/* 포커스 링 (접근성) */
+.vrp .vrp-navbtn:focus-visible,
+.vrp .vrp-savebtn:focus-visible,
+.vrp .vrp-table input:focus-visible {
+  outline: none;
+  box-shadow: var(--vrp-ring);
+}
+
+/* =========================================
+Extra: section headings inside cards
+========================================= */
+.vrp .bg-indigo-50.text-indigo-900 {
+  background: linear-gradient(180deg, #F9FBFF, #F3F6FF) !important;
+  color: var(--vrp-ink-1) !important;
+  font-weight: 800;
+}
+
+/* =========================================
+Make content pop — ensure high readability
+========================================= */
+.vrp .text-gray-700 { color: #3C4257 !important; }
+.vrp .text-gray-500 { color: #6B7280 !important; }
+.vrp .text-indigo-900 { color: #2E3A59 !important; }
+.vrp .text-indigo-500 { color: #5B6EA8 !important; }

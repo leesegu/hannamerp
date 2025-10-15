@@ -395,7 +395,7 @@ async function readMonthJSON(monthKey) {
     return { meta: obj.meta || {}, items: obj.items || {} };
   } catch (e) {
     const code = e?.code || "";
-    const msg = String(e?.message || "");
+       const msg = String(e?.message || "");
     const notFound =
       code === "storage/object-not-found" ||
       msg.includes("object-not-found") ||
@@ -1056,20 +1056,37 @@ export default function IncomeImportPage() {
     setAddOpen(true);
   };
   const changeAdd = (key, val) => setAddForm((p) => ({ ...p, [key]: val }));
+
+  // ✅ 변경: 선행 '-' 허용 + 천단위 콤마 유지 포맷터 (타이핑 중 '-' 단독도 유지)
   const changeMoney = (val) => {
-    const n = toNumber(val);
-    return n ? n.toLocaleString() : "";
+    const txt = String(val ?? "");
+    if (txt === "-") return "-";
+    const neg = txt.trim().startsWith("-");
+    const digits = txt.replace(/[^0-9]/g, "");
+    if (digits === "") return neg ? "-" : "";
+    const n = Number(digits);
+    const formatted = n.toLocaleString();
+    return neg ? `-${formatted}` : formatted;
   };
+
+  // ★★★ 변경 핵심: 마이너스 입력 시 '출금'으로 저장 ★★★
   const saveAdd = async () => {
     const date = s(addForm.date);
     const category = s(addForm.category);
-    const inAmtNum = toNumber(addForm.inAmt);
+    const inAmtNum = toNumber(addForm.inAmt); // 음수 가능
     const record = s(addForm.record);
     const memo = s(addForm.memo);
     if (!date || !category || !inAmtNum) {
       alert("거래일, 구분, 입금금액은 필수입니다.");
       return;
     }
+
+    // 음수라면 '출금' 처리
+    const isExpense = inAmtNum < 0;
+    const inAmt = isExpense ? 0 : inAmtNum;
+    const outAmt = isExpense ? Math.abs(inAmtNum) : 0;
+    const type = isExpense ? "출금" : "입금";
+
     const id = `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
     const newRow = {
       _id: id,
@@ -1078,14 +1095,14 @@ export default function IncomeImportPage() {
       date,
       time: "00:00:00",
       datetime: `${date} 00:00:00`,
-      inAmt: inAmtNum,
-      outAmt: 0,
+      inAmt,
+      outAmt,
       balance: 0,
       record,
       memo,
       category,
       _seq: "",
-      type: "입금",
+      type,
       unconfirmed: false,
       monthKey: monthKeyOf(date),
     };
@@ -1110,7 +1127,6 @@ export default function IncomeImportPage() {
   /* ===== 삭제모드 토글 & 삭제 반영 (비밀번호 확인 추가) ===== */
   const toggleDeleteMode = async () => {
     if (!deleteMode) {
-      // 켜기 전 비밀번호 확인
       const pw = window.prompt("삭제 비밀번호를 입력하세요.");
       if (pw !== "20453948") {
         alert("비밀번호가 올바르지 않습니다.");
@@ -1120,7 +1136,6 @@ export default function IncomeImportPage() {
       setDeleteMode(true);
       return;
     }
-    // 끄기 → 선택건수 확인 후 삭제 여부 묻기
     const ids = Object.keys(deleteSel).filter((k) => deleteSel[k]);
     if (ids.length === 0) {
       setDeleteMode(false);
@@ -1128,10 +1143,8 @@ export default function IncomeImportPage() {
     }
     const ok = window.confirm(`선택한 ${ids.length.toLocaleString()}건을 삭제하시겠습니까?`);
     if (!ok) {
-      // 취소 → 삭제모드 유지
       return;
     }
-    // 실제 삭제
     const store = monthsRef.current;
     const affectedMonths = new Set();
     setRows((prev) => prev.filter((r) => !deleteSel[r._id]));
@@ -1392,7 +1405,7 @@ export default function IncomeImportPage() {
                         </div>
                       ) : (
                         <span
-                          className={`type-badge ${shownCat ? "cat" : toNumber(r.inAmt) > 0 ? "in" : toNumber(r.outAmt) > 0 ? "out" : ""}`}
+                          className={`type-badge ${shownCat ? "cat" : toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : ""}`}
                           title={shownCat || (toNumber(r.inAmt) > 0 ? "입금" : toNumber(r.outAmt) > 0 ? "출금" : "-")}
                           style={shownCat ? colorVars(shownCat) : undefined}
                         >
@@ -1668,7 +1681,6 @@ export default function IncomeImportPage() {
   value={addForm.date}
   onChange={(e) => changeAdd("date", e.target.value)}
   onMouseDown={(e) => {
-    // 기본 포커스/클릭 동작을 잠시 막고 사용자 제스처 안에서 픽커를 직접 열기
     e.preventDefault();
     try { e.currentTarget.showPicker?.(); } catch {}
   }}
@@ -1696,7 +1708,7 @@ export default function IncomeImportPage() {
             <label>입금금액</label>
             <input
               className="edit-input"
-              inputMode="numeric"
+              inputMode="decimal"
               placeholder="0"
               value={addForm.inAmt}
               onChange={(e) => changeAdd("inAmt", changeMoney(e.target.value))}
