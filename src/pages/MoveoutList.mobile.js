@@ -516,28 +516,54 @@ export default function MoveoutListMobile() {
     return list;
   }, [rows, statusFilter, keyword]);
 
+  /* ===== 🔄 정렬: 오늘 → 어제 → 내일 → 모레 → 나머지(원래 순서) ===== */
   const displayRows = useMemo(() => {
     const today = new Date();
-    const t = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
-    const mapped = filtered.map(r => {
-      const extrasArr = Array.isArray(r.extras) ? r.extras : [];
-      const hasExtrasArr = extrasArr.some(e => String(e?.desc || "").trim().length > 0 && toNum(e?.amount) > 0);
-      const hasExtrasPair = String(r.extraItems || "").trim().length > 0 && toNum(r.extraAmount) > 0;
-      const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(r.moveDate || "")) ? String(r.moveDate) : "0000-00-00";
-      const ymdNum = parseInt(ymd.replace(/-/g,""),10) || 0;
-      const rank = ymd === t ? 0 : 1;
-      const inv = String(99999999 - ymdNum).padStart(8,"0");
-      return {
-        ...r,
-        __hasNote: String(r.note || "").trim().length > 0,
-        __hasPhotos: Array.isArray(r.photos) && r.photos.filter(Boolean).length > 0,
-        __hasExtras: hasExtrasArr || hasExtrasPair,
-        __totalDisplay: fmtAmount(r.totalAmount),
-        __sortCombo: `${rank}-${inv}`
-      };
-    });
-    mapped.sort((a,b) => a.__sortCombo.localeCompare(b.__sortCombo));
-    return mapped;
+    const base = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+
+    // 다양한 moveDate 형태(Date/Timestamp/ISO/문자열) 대응
+    const dayDiff = (val) => {
+      if (!val) return null;
+
+      // Firestore Timestamp
+      if (typeof val === "object" && typeof val.toDate === "function") {
+        const d = val.toDate();
+        const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        return Math.round((dd.getTime() - base.getTime()) / 86400000);
+      }
+      // Date
+      if (val instanceof Date && !isNaN(val)) {
+        const dd = new Date(val.getFullYear(), val.getMonth(), val.getDate(), 0, 0, 0, 0);
+        return Math.round((dd.getTime() - base.getTime()) / 86400000);
+      }
+      // String (구분자 다양)
+      const s = String(val).trim();
+      const m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return null;
+      const y = parseInt(m[1], 10), mo = parseInt(m[2], 10), d = parseInt(m[3], 10);
+      if (!y || !mo || !d) return null;
+      const dd = new Date(y, mo - 1, d, 0, 0, 0, 0);
+      if (isNaN(dd)) return null;
+      return Math.round((dd.getTime() - base.getTime()) / 86400000);
+    };
+
+    // 원본 순서는 Firestore orderBy("moveDate","desc") 결과이므로 유지
+    const todayList   = [];
+    const ydayList    = [];
+    const tmrwList    = [];
+    const dayAfterList= [];
+    const rest        = [];
+
+    for (const r of filtered) {
+      const d = dayDiff(r.moveDate);
+      if (d === 0)  { todayList.push(r);    continue; }
+      if (d === -1) { ydayList.push(r);     continue; }
+      if (d === 1)  { tmrwList.push(r);     continue; }
+      if (d === 2)  { dayAfterList.push(r); continue; }
+      rest.push(r); // 그 외는 원래 정렬 유지
+    }
+
+    return [...todayList, ...ydayList, ...tmrwList, ...dayAfterList, ...rest];
   }, [filtered]);
 
   useEffect(() => {

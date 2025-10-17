@@ -186,86 +186,42 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
   }, [rows, statusFilter]);
 
   /* ===========================
-   * ✅ 정렬 로직 (완전 새로 작성)
-   * - 날짜 우선: 오늘(0) → 어제(-1) → 내일(+1) → 모레(+2) → 그 이후 미래(오름차순) → 어제 이전 과거(내림차순: -2, -3 … 가까운 과거 우선)
-   * - 동일 날짜 내 2차 정렬: 진행현황 "정산대기(0) → 입금대기(1) → 정산완료(2) → 기타(3)"
-   * - 이후 타이브레이커: id 오름차순
-   * - 유효하지 않은 날짜는 맨 아래
+   * ✅ 정렬 로직: 오늘(0) → 어제(-1) → 내일(+1) → 모레(+2) → 나머지(원래 순서)
+   *  - 날짜 파싱 강건화 (문자열/ISO/Date/Timestamp 모두 지원)
+   *  - 정렬 고정을 위해 __rank 부여 (DataTable에서 sortKey="__rank" 사용)
    * =========================== */
   const sortedRows = useMemo(() => {
     const today = new Date();
-    const todayY = today.getFullYear();
-    const todayM = today.getMonth();
-    const todayD = today.getDate();
-    const todayStart = new Date(todayY, todayM, todayD);
+    const base = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
 
-    const dayDiff = (ymdStr) => {
-      // ymdStr: YYYY-MM-DD
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymdStr || ""))) return null;
-      const [y, m, d] = ymdStr.split("-").map((n) => parseInt(n, 10));
-      const dt = new Date(y, (m - 1), d);
-      const diffMs = dt.setHours(0,0,0,0) - todayStart.setHours(0,0,0,0);
-      return Math.round(diffMs / (24 * 60 * 60 * 1000));
-    };
+    const dayDiff = (val) => {
+      if (!val) return null;
 
-    const statusRank = (v) => {
-      const s = String(v || "").trim();
-      if (s === "정산대기") return 0;
-      if (s === "입금대기") return 1;
-      if (s === "정산완료") return 2;
-      return 3; // 기타/미지정
-    };
-
-    // 비교 함수: a가 앞서야하면 음수, 뒤면 양수, 같으면 0
-    const compare = (a, b) => {
-      const da = dayDiff(a.moveDate);
-      const db = dayDiff(b.moveDate);
-
-      // 유효하지 않은 날짜는 맨 아래
-      const aInvalid = da === null;
-      const bInvalid = db === null;
-      if (aInvalid && !bInvalid) return 1;
-      if (!aInvalid && bInvalid) return -1;
-      if (aInvalid && bInvalid) {
-        // 둘 다 invalid면 진행현황, id 순
-        const sa = statusRank(a.status);
-        const sb = statusRank(b.status);
-        if (sa !== sb) return sa - sb;
-        return String(a.id).localeCompare(String(b.id));
+      // Firestore Timestamp
+      if (typeof val === "object" && typeof val.toDate === "function") {
+        const d = val.toDate();
+        const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        return Math.round((dd.getTime() - base.getTime()) / 86400000);
       }
-
-      // 날짜 우선 규칙
-      if (da === db) {
-        // 같은 날짜 → 진행현황 → id
-        const sa = statusRank(a.status);
-        const sb = statusRank(b.status);
-        if (sa !== sb) return sa - sb;
-        return String(a.id).localeCompare(String(b.id));
+      // Date 객체
+      if (val instanceof Date && !isNaN(val)) {
+        const dd = new Date(val.getFullYear(), val.getMonth(), val.getDate(), 0, 0, 0, 0);
+        return Math.round((dd.getTime() - base.getTime()) / 86400000);
       }
-
-      // 1) 오늘(0)
-      if (da === 0) return -1;
-      if (db === 0) return 1;
-
-      // 2) 어제(-1)
-      if (da === -1) return -1;
-      if (db === -1) return 1;
-
-      // 3) 둘 다 미래(>= +1) → diff 오름차순
-      if (da >= 1 && db >= 1) return da - db;
-
-      // 4) 하나는 미래(>=+1), 하나는 과거(<=-2) → 미래 쪽이 먼저
-      if (da >= 1 && db <= -2) return -1;
-      if (da <= -2 && db >= 1) return 1;
-
-      // 5) 둘 다 과거(<= -2) → 가까운 과거(-2가 -3보다 먼저) = |diff| 오름차순
-      if (da <= -2 && db <= -2) return Math.abs(da) - Math.abs(db);
-
-      // 논리적으로 여기까지 오기 어려우나, 안전망
-      return da - db;
+      // 문자열 (공백/시간/구분자 다양)
+      const s = String(val).trim();
+      const m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10);
+      const d = parseInt(m[3], 10);
+      if (!y || !mo || !d) return null;
+      const dd = new Date(y, mo - 1, d, 0, 0, 0, 0);
+      if (isNaN(dd)) return null;
+      return Math.round((dd.getTime() - base.getTime()) / 86400000);
     };
 
-    // 표시용/검색용 필드를 가공하되, 정렬용 __필드는 만들지 않음
+    // 표시/검색 포맷 적용 + diff 계산
     const mapped = rowsForFilter.map((r) => {
       const photoCount = Array.isArray(r.photos) ? r.photos.filter((u) => !!String(u || "").trim()).length : 0;
       const hasPhotos = photoCount > 0;
@@ -295,7 +251,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         cleaningFee: fmtAmount(r.cleaningFee),
         totalAmount: fmtAmount(totalRaw),
 
-        // 검색 전용(콤마 유/무 모두 대응)
+        // 검색 전용(콤마 유/무 대응)
         search_total_commas: totalComma,
         search_total_raw: totalRawStr,
         search_elec_commas: elecComma,
@@ -305,13 +261,31 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         __hasPhotos: hasPhotos,
         __hasNote: hasNote,
         __hasExtras: hasExtras,
+
+        __diff: dayDiff(r.moveDate),
       };
     });
 
-    return mapped.sort(compare);
+    const todayList = [];
+    const ydayList = [];
+    const tmrwList = [];
+    const dayAfterList = [];
+    const rest = [];
+
+    for (const item of mapped) {
+      const d = item.__diff;
+      if (d === 0)  { todayList.push(item); continue; }
+      if (d === -1) { ydayList.push(item);  continue; }
+      if (d === 1)  { tmrwList.push(item);  continue; }
+      if (d === 2)  { dayAfterList.push(item); continue; }
+      rest.push(item);
+    }
+
+    const ordered = [...todayList, ...ydayList, ...tmrwList, ...dayAfterList, ...rest];
+    return ordered.map((row, idx) => ({ ...row, __rank: idx }));
   }, [rowsForFilter]);
 
-  /* ✅ DataTable의 focusId: (빌라명 → 문서ID) 또는 row=id(백워드) */
+  /* ✅ DataTable의 focusId */
   const focusId = useMemo(() => {
     if (paramVilla) {
       const found = sortedRows.find(r => normVilla(r.villaName) === paramVilla);
@@ -324,7 +298,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     return "";
   }, [sortedRows, paramVilla, paramRowId]);
 
-  /* ✅ 표시 배열: 포커스 대상이 항상 보이도록 맨 위로 올림 */
+  /* ✅ 표시 배열: 포커스 대상 맨 위로 */
   const displayRows = useMemo(() => {
     if (!sortedRows.length || !focusId) return sortedRows;
     const idx = sortedRows.findIndex(r => r.id === focusId);
@@ -335,7 +309,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     return sortedRows;
   }, [sortedRows, focusId]);
 
-  /* 컬럼 (tr 내에 마커 심기: focusId 탐색 보조용) */
+  /* 컬럼 */
   const columns = [
     { label: "이사날짜", key: "moveDate" },
     {
@@ -363,7 +337,6 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
     { label: "전기", key: "electricity" },
     { label: "TV수신료", key: "tvFee" },
     { label: "청소", key: "cleaningFee" },
-    /* ✅ 총액만 노란색 하이라이트 */
     {
       label: "총액",
       key: "totalAmount",
@@ -598,7 +571,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
 
   return (
     <div className="page-wrapper">
-      {/* ✅ 통신사 페이지와 완전 동일 톤의 노란 하이라이트 */}
+      {/* ✅ 통신사 페이지와 동일 톤 하이라이트 */}
       <style>{`
         @keyframes pulseGlow {
           0%   { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.55); }
@@ -608,13 +581,12 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         tr.is-highlighted--yellow,
         tr.is-highlighted--yellow > td,
         tr.is-highlighted--yellow > th {
-          background: rgba(255, 235, 59, 0.6) !important; /* 행 전체 칠하기 */
+          background: rgba(255, 235, 59, 0.6) !important;
         }
         .is-highlighted--yellow {
           animation: pulseGlow 1.4s ease-out 2;
           transition: background .3s ease;
         }
-        /* div 기반 셀에도 강제 */
         .is-highlighted--yellow-cell {
           background: rgba(255, 235, 59, 0.6) !important;
         }
@@ -630,18 +602,17 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         onDelete={handleDeleteRow}
         searchableKeys={[
           "moveDate","villaName","unitNumber","status","note",
-          /* ▶ 검색 확장: 총액/전기 (콤마 O/X 모두) */
           "totalAmount", "electricity",
           "search_total_commas","search_total_raw",
           "search_elec_commas","search_elec_raw",
-          /* ===(신규) 전기+총액 합본 키 === */
           "search_money",
         ]}
         itemsPerPage={15}
         enableExcel={false}
-        /* ⚠️ 내부에서 이미 최종 정렬을 끝내서 넘기므로 sortKey/sortOrder는 제거 */
-        /* sortKey / sortOrder 미지정 */
-        /* ✅ TelcoPage와 동일: 자동 점프용 */
+        /* ✅ 우리가 부여한 __rank 기준으로 내부정렬 고정 */
+        sortKey="__rank"
+        sortOrder="asc"
+        /* ✅ 자동 점프 */
         focusId={focusId}
         rowIdKey="id"
         leftControls={leftControls}
@@ -671,7 +642,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         <div
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.25)", display:"flex",
                    alignItems:"center", justifyContent:"center", zIndex:10001 }}
-          onClick={closeMini}
+          onClick={() => { setMiniOpen(false); setMiniType(null); setMiniRow(null); }}
         >
           <div
             style={{ width: miniType === "photos" ? 640 : 420, background:"#fff", borderRadius:10, padding:16,
@@ -682,16 +653,16 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
               <strong>
                 {miniType === "photos" ? "사진 보기" : miniType === "note" ? "비고" : "추가내역"}
               </strong>
-              <button className="close-btn" onClick={closeMini}>닫기</button>
+              <button className="close-btn" onClick={() => { setMiniOpen(false); }}>닫기</button>
             </div>
 
             {miniType === "note" && (
-              <div style={{ whiteSpace:"pre-wrap", lineHeight:1.6 }}>{miniRow.note}</div>
+              <div style={{ whiteSpace:"pre-wrap", lineHeight:1.6 }}>{miniRow?.note}</div>
             )}
 
             {miniType === "extras" && (
               <div>
-                {Array.isArray(miniRow.extras) && miniRow.extras.length > 0 ? (
+                {Array.isArray(miniRow?.extras) && miniRow.extras.length > 0 ? (
                   miniRow.extras.map((e, i) => (
                     <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee" }}>
                       <span>{e.desc}</span>
@@ -700,9 +671,9 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
                   ))
                 ) : (
                   <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0" }}>
-                    <span>{String(miniRow.extraItems || "").trim() || "-"}</span>
+                    <span>{String(miniRow?.extraItems || "").trim() || "-"}</span>
                     <span style={{ fontVariantNumeric:"tabular-nums", textAlign:"left" }}>
-                      {fmtAmount(miniRow.extraAmount)}
+                      {fmtAmount(miniRow?.extraAmount)}
                     </span>
                   </div>
                 )}
@@ -711,7 +682,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
 
             {miniType === "photos" && (
               <div style={{ position:"relative" }}>
-                {Array.isArray(miniRow.photos) && miniRow.photos.filter(Boolean).length > 0 ? (
+                {Array.isArray(miniRow?.photos) && miniRow.photos.filter(Boolean).length > 0 ? (
                   <>
                     <div style={{ textAlign:"center" }}>
                       <img
@@ -721,8 +692,8 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
                         onClick={() => { setFullImageSrc(miniRow.photos[miniPhotoIdx]); setFullImageOpen(true); }}
                       />
                     </div>
-                    <button type="button" onClick={() => nextMiniPhoto(-1)} style={miniNavBtn("left")} aria-label="이전">‹</button>
-                    <button type="button" onClick={() => nextMiniPhoto(1)} style={miniNavBtn("right")} aria-label="다음">›</button>
+                    <button type="button" onClick={() => setMiniPhotoIdx((p)=> (p-1+miniRow.photos.length)%miniRow.photos.length)} style={miniNavBtn("left")} aria-label="이전">‹</button>
+                    <button type="button" onClick={() => setMiniPhotoIdx((p)=> (p+1)%miniRow.photos.length)} style={miniNavBtn("right")} aria-label="다음">›</button>
                     <div style={{ position:"absolute", right:12, bottom:12, background:"rgba(0,0,0,0.55)", color:"#fff",
                                   padding:"2px 8px", borderRadius:12, fontSize:12 }}>
                       {miniPhotoIdx + 1} / {miniRow.photos.length}
@@ -776,7 +747,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
         <div
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.25)", display:"flex",
                    alignItems:"center", justifyContent:"center", zIndex:10002 }}
-          onClick={closeReceiptPreview}
+          onClick={() => { setReceiptOpen(false); }}
         >
           <div
             style={{
@@ -813,7 +784,7 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
                 <button className="save-btn" onClick={(e) => { e.stopPropagation(); downloadReceipt("pdf"); }}>
                   PDF 저장
                 </button>
-                <button className="close-btn" onClick={(e) => { e.stopPropagation(); closeReceiptPreview(); }}>
+                <button className="close-btn" onClick={(e) => { e.stopPropagation(); setReceiptOpen(false); }}>
                   닫기
                 </button>
               </div>
@@ -844,17 +815,17 @@ export default function MoveoutList({ employeeId, userId, isMobile }) {
               <ReceiptTemplate
                 refProp={receiptRef}
                 item={{
-                  moveOutDate: receiptRow.moveDate || "",
-                  name: receiptRow.villaName || "",
-                  roomNumber: receiptRow.unitNumber || "",
-                  arrears: toNum(receiptRow.arrears),
-                  currentFee: toNum(receiptRow.currentMonth),
-                  waterCost: toNum(receiptRow.waterFee),
-                  electricity: toNum(receiptRow.electricity),
-                  tvFee: toNum(receiptRow.tvFee),
-                  cleaning: toNum(receiptRow.cleaningFee),
-                  defects: (Array.isArray(receiptRow.extras) ? receiptRow.extras : []).map((e) => ({ desc: e.desc, amount: toNum(e.amount) })),
-                  total: sumTotal(receiptRow),
+                  moveOutDate: receiptRow?.moveDate || "",
+                  name: receiptRow?.villaName || "",
+                  roomNumber: receiptRow?.unitNumber || "",
+                  arrears: toNum(receiptRow?.arrears),
+                  currentFee: toNum(receiptRow?.currentMonth),
+                  waterCost: toNum(receiptRow?.waterFee),
+                  electricity: toNum(receiptRow?.electricity),
+                  tvFee: toNum(receiptRow?.tvFee),
+                  cleaning: toNum(receiptRow?.cleaningFee),
+                  defects: (Array.isArray(receiptRow?.extras) ? receiptRow.extras : []).map((e) => ({ desc: e.desc, amount: toNum(e.amount) })),
+                  total: sumTotal(receiptRow || {}),
                 }}
               />
             </div>

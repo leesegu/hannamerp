@@ -89,10 +89,17 @@ export default function DataTable({
       copied.sort((a, b) => {
         const valA = a?.[sortKey] ?? "";
         const valB = b?.[sortKey] ?? "";
-        return (
-          valA.toString().localeCompare(valB.toString()) *
-          (sortOrder === "asc" ? 1 : -1)
-        );
+
+        // ✅ 숫자 형태면 숫자 비교, 아니면 문자열 비교 (다른 페이지 동작 유지)
+        const numA = typeof valA === "number" ? valA : Number(valA);
+        const numB = typeof valB === "number" ? valB : Number(valB);
+        const bothNumberLike = Number.isFinite(numA) && Number.isFinite(numB);
+        if (bothNumberLike) {
+          return (numA - numB) * (sortOrder === "asc" ? 1 : -1);
+        }
+        const sa = valA != null ? String(valA) : "";
+        const sb = valB != null ? String(valB) : "";
+        return sa.localeCompare(sb) * (sortOrder === "asc" ? 1 : -1);
       });
     }
     return copied;
@@ -120,7 +127,7 @@ export default function DataTable({
       try { out.push(v.toLocaleString()); } catch {}
     }
 
-    // ✅ 문자열이지만 금액/숫자 형태에 콤마가 포함된 경우: 콤마 제거 버전도 색인 (예: "15,000" -> "15000")
+    // ✅ 문자열이지만 금액/숫자 형태에 콤마가 포함된 경우: 콤마 제거 버전도 색인
     if (typeof v === "string" && /[0-9]/.test(v)) {
       const stripped = v.replace(/[,\s]/g, "");
       if (stripped !== v) out.push(stripped);

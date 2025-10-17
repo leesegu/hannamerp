@@ -61,7 +61,18 @@
   background:#6d28d9; border:1px solid #6d28d9; cursor:pointer;
   box-shadow: 0 6px 18px rgba(109,40,217,.32); white-space:nowrap;
 }
-.m-btn-primary:hover{ filter:brightness(1.05); }
+/* ✅ [추가] 오늘 버튼(프라이머리) 터치/포커스 시에도 색상 고정 */
+.m-btn-primary{ -webkit-appearance:none; appearance:none; }
+.m-btn-primary:hover,
+.m-btn-primary:active,
+.m-btn-primary:focus,
+.m-btn-primary:focus-visible{
+  background:#6d28d9;    /* 배경 고정 */
+  border-color:#6d28d9;  /* 보더 고정 */
+  color:#fff;            /* 글자색 고정 */
+  filter:none;
+}
+.m-btn-primary:hover{ filter:brightness(1.05); } /* 기존 호버 살짝 밝기 효과 유지 */
 
 /* 검색 입력창: 다음 행 전체 폭 */
 .m-inp-search{

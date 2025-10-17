@@ -87,7 +87,7 @@ export default function MobilePersonalLedgerPage() {
   const [rowsMonth, setRowsMonth] = useState([]); // 선택 월 전체(합계 카드용)
   const [rowsDay, setRowsDay] = useState([]);     // 선택 일 리스트
 
-  // ☑️ 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화
+  // ☑️ 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화 (월 합계도 즉시 반영)
   const onSubmit = async () => {
     const uidUse = liveUid || uid;
     if (!uidUse) {
@@ -114,6 +114,7 @@ export default function MobilePersonalLedgerPage() {
       if (editingId) {
         /* ★ 낙관적 업데이트 (수정) */
         setRowsDay((prev) => upsertById(prev, { id: editingId, ...data }));
+        // ✅ 현재 선택 월과 동일하면 월 리스트도 즉시 반영 → 합계 즉시 갱신
         if (data.monthKey === monthKey) {
           setRowsMonth((prev) => upsertById(prev, { id: editingId, ...data }));
         }
@@ -122,7 +123,10 @@ export default function MobilePersonalLedgerPage() {
         /* ★ 낙관적 업데이트 (신규) — 임시 ID */
         const tempId = "__temp__" + Date.now();
         const tempDoc = { id: tempId, createdAt: Date.now(), ...data };
+
+        // 선택 '일' 리스트 즉시 반영
         if (date === data.date) setRowsDay((prev) => upsertById(prev, tempDoc));
+        // ✅ 선택 '월'과 같다면 월 리스트도 즉시 반영 → 합계 즉시 갱신
         if (data.monthKey === monthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
 
         const ref = await addDoc(collection(db, "users", uidUse, "personal_ledger"), {
@@ -539,11 +543,28 @@ export default function MobilePersonalLedgerPage() {
       {calOpen && (
         <div className="cal-overlay" onClick={closeCalendar}>
           <div className="cal" onClick={(e) => e.stopPropagation()}>
+            {/* ✅ [수정] 헤더 구성: ← / 년.월 / → (중앙), ‘오늘로’(우측 끝) */}
             <div className="cal-header">
               <button className="nav prev" onClick={prevMonth} aria-label="이전 달">‹</button>
               <div className="ym">{calYear}.{pad2(calMonth + 1)}</div>
               <button className="nav next" onClick={nextMonth} aria-label="다음 달">›</button>
+              <button
+                className="pill today"
+                onClick={() => {
+                  const t = new Date();
+                  setCalYear(t.getFullYear());
+                  setCalMonth(t.getMonth());
+                  const ds = todayStr();
+                  setDate(ds);
+                  const mk = ds.slice(0, 7);
+                  if (mk !== monthKey) setMonthKey(mk);
+                  setCalOpen(false);
+                }}
+              >
+                오늘로
+              </button>
             </div>
+
             <div className="cal-grid">
               {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
                 <div key={d} className="wd">{d}</div>
@@ -566,23 +587,10 @@ export default function MobilePersonalLedgerPage() {
                 );
               })}
             </div>
+
+            {/* ✅ [수정] 하단 액션에는 ‘닫기’만 유지 (오늘로 버튼은 헤더로 이동) */}
             <div className="cal-actions">
               <button className="pill close" onClick={closeCalendar}>닫기</button>
-              <button
-                className="pill today"
-                onClick={() => {
-                  const t = new Date();
-                  setCalYear(t.getFullYear());
-                  setCalMonth(t.getMonth());
-                  const ds = todayStr();
-                  setDate(ds);
-                  const mk = ds.slice(0, 7);
-                  if (mk !== monthKey) setMonthKey(mk);
-                  setCalOpen(false);
-                }}
-              >
-                오늘로
-              </button>
             </div>
           </div>
         </div>
