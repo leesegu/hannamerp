@@ -14,7 +14,7 @@ import {
  * - 입력 폼: 수입/지출 토글, 날짜(기본 오늘), 거래처/현장, 내용, 금액(천단위 콤마), 메모
  * - 월 선택: 날짜 선택 시 monthKey 자동 갱신
  * - 내역 리스트: 가능한 2줄로 압축표시 → ☑️ (요청에 따라 리스트는 '선택한 날짜'만 노출)
- * - 모바일 전용 레이아웃(네온/글로시), 페이지 스코프 CSS
+ * - 모바일 전용 레이아웃, 페이지 스코프 CSS
  * - ☑️ 우측 상단 연간 요약 모달: 연도 선택 → 1~12월 수입/지출/차액 표시
  * ========================= */
 
@@ -36,7 +36,7 @@ const TYPE_OPTIONS = [
   { key: "expense", label: "지출" },
 ];
 
-/* ===== ★ 낙관적 업데이트 유틸 (중복 없이 즉시 반영) ===== */
+/* ===== 낙관적 업데이트 유틸 ===== */
 const upsertById = (arr, item) => {
   const i = arr.findIndex((v) => v.id === item.id);
   if (i === -1) return [item, ...arr];
@@ -51,7 +51,7 @@ export default function MobilePersonalLedgerPage() {
   const user = auth.currentUser;
   const uid = user?.uid || null;
 
-  /* ★ auth 상태 구독 → 실시간 uid */
+  /* auth 상태 구독 → 실시간 uid */
   const [liveUid, setLiveUid] = useState(uid);
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => setLiveUid(u?.uid || null));
@@ -69,7 +69,7 @@ export default function MobilePersonalLedgerPage() {
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
 
-  // ☑️ 수정 모드(ID 보관)
+  // 수정 모드(ID)
   const [editingId, setEditingId] = useState(null);
 
   const amountNumber = useMemo(() => toNumber(amount), [amount]);
@@ -87,7 +87,7 @@ export default function MobilePersonalLedgerPage() {
   const [rowsMonth, setRowsMonth] = useState([]); // 선택 월 전체(합계 카드용)
   const [rowsDay, setRowsDay] = useState([]);     // 선택 일 리스트
 
-  // ☑️ 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화 (월 합계도 즉시 반영)
+  // 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화
   const onSubmit = async () => {
     const uidUse = liveUid || uid;
     if (!uidUse) {
@@ -112,21 +112,18 @@ export default function MobilePersonalLedgerPage() {
 
     try {
       if (editingId) {
-        /* ★ 낙관적 업데이트 (수정) */
+        // 수정(낙관적)
         setRowsDay((prev) => upsertById(prev, { id: editingId, ...data }));
-        // ✅ 현재 선택 월과 동일하면 월 리스트도 즉시 반영 → 합계 즉시 갱신
         if (data.monthKey === monthKey) {
           setRowsMonth((prev) => upsertById(prev, { id: editingId, ...data }));
         }
         await updateDoc(doc(db, "users", uidUse, "personal_ledger", editingId), data);
       } else {
-        /* ★ 낙관적 업데이트 (신규) — 임시 ID */
+        // 신규(낙관적)
         const tempId = "__temp__" + Date.now();
         const tempDoc = { id: tempId, createdAt: Date.now(), ...data };
 
-        // 선택 '일' 리스트 즉시 반영
         if (date === data.date) setRowsDay((prev) => upsertById(prev, tempDoc));
-        // ✅ 선택 '월'과 같다면 월 리스트도 즉시 반영 → 합계 즉시 갱신
         if (data.monthKey === monthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
 
         const ref = await addDoc(collection(db, "users", uidUse, "personal_ledger"), {
@@ -134,18 +131,12 @@ export default function MobilePersonalLedgerPage() {
           createdAt: Date.now(),
         });
 
-        /* 스냅샷이 오면 실제 ID로 대체되지만, 혹시 늦어질 경우를 대비해 즉시 교체 */
-        setRowsDay((prev) =>
-          prev.map((r) => (r.id === tempId ? { ...r, id: ref.id } : r))
-        );
-        setRowsMonth((prev) =>
-          prev.map((r) => (r.id === tempId ? { ...r, id: ref.id } : r))
-        );
+        setRowsDay((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: ref.id } : r)));
+        setRowsMonth((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: ref.id } : r)));
       }
 
       resetForm();
 
-      // 저장 후 리스트 쪽으로 자연 스크롤
       requestAnimationFrame(() => {
         const list = document.querySelector(".mplg .mplg-list");
         if (list) list.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -162,12 +153,9 @@ export default function MobilePersonalLedgerPage() {
     const ok = window.confirm("삭제하시겠습니까?");
     if (!ok) return;
     try {
-      /* ★ 낙관적 업데이트 (삭제) */
       setRowsDay((prev) => removeById(prev, id));
       setRowsMonth((prev) => removeById(prev, id));
-
       await deleteDoc(doc(db, "users", uidUse, "personal_ledger", id));
-
       if (editingId === id) resetForm();
     } catch (err) {
       console.error(err);
@@ -175,7 +163,7 @@ export default function MobilePersonalLedgerPage() {
     }
   };
 
-  // ☑️ 수정 버튼: 폼으로 로드
+  // 수정 버튼 → 폼 로드
   const onEditLoad = (r) => {
     setEditingId(r.id);
     setType(r.type || "expense");
@@ -202,7 +190,7 @@ export default function MobilePersonalLedgerPage() {
     );
     const unsub = onSnapshot(
       q,
-      { includeMetadataChanges: true },            // ✅ 캐시 포함 즉시 반영
+      { includeMetadataChanges: true },
       (snap) => {
         const list = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
@@ -218,20 +206,15 @@ export default function MobilePersonalLedgerPage() {
     if (!uidUse || !date) return;
     const ref = collection(db, "users", uidUse, "personal_ledger");
 
-    // ✅ [수정] 복합 색인 없이도 동작하도록 orderBy 제거 → 클라이언트 정렬
-    const q = query(
-      ref,
-      where("date", "==", date)
-      // (orderBy("createdAt","desc") 제거)
-    );
+    // 복합 색인 없이도 동작하도록 orderBy 제거 → 클라이언트 정렬
+    const q = query(ref, where("date", "==", date));
 
     const unsub = onSnapshot(
       q,
-      { includeMetadataChanges: true },            // ✅ 캐시 포함 즉시 반영
+      { includeMetadataChanges: true },
       (snap) => {
         const list = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-        // ✅ 생성시각 기준 내림차순 정렬(필드 없으면 0)
         list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
         setRowsDay(list);
       }
@@ -303,15 +286,10 @@ export default function MobilePersonalLedgerPage() {
     const ref = collection(db, "users", uidUse, "personal_ledger");
     const start = `${year}-01`;
     const end = `${year}-12`;
-    const q = query(
-      ref,
-      orderBy("monthKey"),
-      startAt(start),
-      endAt(end + "\uf8ff")
-    );
+    const q = query(ref, orderBy("monthKey"), startAt(start), endAt(end + "\uf8ff"));
     const unsub = onSnapshot(
       q,
-      { includeMetadataChanges: true },          // ✅ 캐시 포함 즉시 반영
+      { includeMetadataChanges: true },
       (snap) => {
         const list = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
@@ -340,7 +318,7 @@ export default function MobilePersonalLedgerPage() {
     return base;
   }, [yearRows]);
 
-  /* 월 클릭 시 일자별 집계 펼침 */
+  /* 월 클릭 시 일자별 집계 */
   const [expandedMonth, setExpandedMonth] = useState(null);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const yearsList = useMemo(
@@ -379,7 +357,7 @@ export default function MobilePersonalLedgerPage() {
       {/* 상단 헤더 */}
       <div className="mplg-top">
         <button
-          className="back-btn luxe"
+          className="back-btn luxe nowrap"
           onClick={() => {
             if (window.history.length > 1) navigate(-1);
             else navigate("/mobile/list", { replace: true });
@@ -387,18 +365,18 @@ export default function MobilePersonalLedgerPage() {
           aria-label="뒤로가기"
           title="뒤로가기"
         >
-          <span className="back-icon">←</span>
-          <span className="back-text">뒤로가기</span>
+          <span className="back-icon" aria-hidden>←</span>
+          <span className="back-text nowrap">뒤로가기</span>
         </button>
 
         {/* 중앙 타이틀 */}
-        <div className="mplg-title">
+        <div className="mplg-title nowrap">
           <span>개인 장부</span>
         </div>
 
         {/* 우측 상단 요약 버튼 */}
         <div className="top-right">
-          <button className="year-btn" onClick={() => setYearOpen(true)} aria-label="요약">
+          <button className="year-btn nowrap" onClick={() => setYearOpen(true)} aria-label="요약">
             요약
           </button>
         </div>
@@ -408,15 +386,15 @@ export default function MobilePersonalLedgerPage() {
       <div className="mplg-cards">
         <div className="mplg-card income">
           <div className="label">월 수입</div>
-          <div className="value nowrap small">{comma(incomeSum)}원</div>
+          <div className="value nowrap small">{comma(incomeSum)}</div>
         </div>
         <div className="mplg-card expense">
           <div className="label">월 지출</div>
-          <div className="value nowrap small">{comma(expenseSum)}원</div>
+          <div className="value nowrap small">{comma(expenseSum)}</div>
         </div>
         <div className={`mplg-card diff ${diff >= 0 ? "pos" : "neg"}`}>
           <div className="label">월 차액</div>
-          <div className="value nowrap small">{comma(diff)}원</div>
+          <div className="value nowrap small">{comma(diff)}</div>
         </div>
       </div>
 
@@ -426,7 +404,7 @@ export default function MobilePersonalLedgerPage() {
           {TYPE_OPTIONS.map((t) => (
             <button
               key={t.key}
-              className={`seg-btn ${type === t.key ? "on" : ""}`}
+              className={`seg-btn ${type === t.key ? "on" : ""} nowrap`}
               onClick={() => setType(t.key)}
             >
               {t.label}
@@ -456,7 +434,7 @@ export default function MobilePersonalLedgerPage() {
             className="inp date-hidden"
           />
           <div className="date-display">
-            {date || "-"}
+            <span className="nowrap">{date || "-"}</span>
             <span className="date-caret" aria-hidden>▾</span>
           </div>
         </div>
@@ -498,10 +476,10 @@ export default function MobilePersonalLedgerPage() {
         </div>
 
         <div className="actions">
-          <button className="btn save" onClick={onSubmit}>
+          <button className="btn save nowrap" onClick={onSubmit}>
             {editingId ? "수정 저장" : "저장하기"}
           </button>
-          <button className="btn reset" onClick={resetForm}>
+          <button className="btn reset nowrap" onClick={resetForm}>
             초기화
           </button>
         </div>
@@ -516,8 +494,8 @@ export default function MobilePersonalLedgerPage() {
             <div key={r.id} className={`item compact ${r.type} ${editingId === r.id ? "editing" : ""}`}>
               <div className="line1 alt">
                 <div className="l1-left">
-                  <span className="ty">{r.type === "income" ? "수입" : "지출"}</span>
-                  <span className="date">{r.date}</span>
+                  <span className="ty nowrap">{r.type === "income" ? "수입" : "지출"}</span>
+                  <span className="date nowrap">{r.date}</span>
                 </div>
                 <div className="l1-right amt nowrap">{comma(r.amount || 0)}원</div>
               </div>
@@ -528,8 +506,8 @@ export default function MobilePersonalLedgerPage() {
                   <span className="title">{r.title || "-"}</span>
                 </div>
                 <div className="l2-right">
-                  <button className="mini-btn edit" onClick={() => onEditLoad(r)} aria-label="수정">수정</button>
-                  <button className="mini-btn del" onClick={() => onDelete(r.id)} aria-label="삭제">삭제</button>
+                  <button className="mini-btn edit nowrap" onClick={() => onEditLoad(r)} aria-label="수정">수정</button>
+                  <button className="mini-btn del nowrap" onClick={() => onDelete(r.id)} aria-label="삭제">삭제</button>
                 </div>
               </div>
             </div>
@@ -543,13 +521,15 @@ export default function MobilePersonalLedgerPage() {
       {calOpen && (
         <div className="cal-overlay" onClick={closeCalendar}>
           <div className="cal" onClick={(e) => e.stopPropagation()}>
-            {/* ✅ [수정] 헤더 구성: ← / 년.월 / → (중앙), ‘오늘로’(우측 끝) */}
+            {/* 헤더: ← / 년.월 / → / 오늘로(우측 상단) */}
             <div className="cal-header">
-              <button className="nav prev" onClick={prevMonth} aria-label="이전 달">‹</button>
-              <div className="ym">{calYear}.{pad2(calMonth + 1)}</div>
-              <button className="nav next" onClick={nextMonth} aria-label="다음 달">›</button>
+              <button className="nav prev nowrap" onClick={prevMonth} aria-label="이전 달">‹</button>
+              <div className="ym nowrap" aria-live="polite">{calYear}.{pad2(calMonth + 1)}</div>
+              <button className="nav next nowrap" onClick={nextMonth} aria-label="다음 달">›</button>
+
+              {/* 오늘로: 가로 사이즈 축소, 헤더 우측 상단 */}
               <button
-                className="pill today"
+                className="pill today tiny nowrap"
                 onClick={() => {
                   const t = new Date();
                   setCalYear(t.getFullYear());
@@ -560,6 +540,8 @@ export default function MobilePersonalLedgerPage() {
                   if (mk !== monthKey) setMonthKey(mk);
                   setCalOpen(false);
                 }}
+                aria-label="오늘 날짜로 이동"
+                title="오늘로"
               >
                 오늘로
               </button>
@@ -588,9 +570,9 @@ export default function MobilePersonalLedgerPage() {
               })}
             </div>
 
-            {/* ✅ [수정] 하단 액션에는 ‘닫기’만 유지 (오늘로 버튼은 헤더로 이동) */}
+            {/* 하단 액션: ‘닫기’만 유지 */}
             <div className="cal-actions">
-              <button className="pill close" onClick={closeCalendar}>닫기</button>
+              <button className="pill close nowrap" onClick={closeCalendar}>닫기</button>
             </div>
           </div>
         </div>
@@ -602,7 +584,7 @@ export default function MobilePersonalLedgerPage() {
           <div className="year-modal" onClick={(e) => e.stopPropagation()}>
             {/* 헤더: 제목 '요약' + 커스텀 드롭다운 + X */}
             <div className="year-head trio">
-              <div className="title white">요약</div>
+              <div className="title white nowrap">요약</div>
 
               <div className="year-head-controls">
                 {/* 접근성용 실제 select (시각적으로 숨김) */}
@@ -625,13 +607,13 @@ export default function MobilePersonalLedgerPage() {
                 <div className="year-dd" data-open={yearMenuOpen ? "1" : "0"}>
                   <button
                     type="button"
-                    className="year-trigger"
+                    className="year-trigger nowrap"
                     aria-haspopup="listbox"
                     aria-expanded={yearMenuOpen}
                     onClick={() => setYearMenuOpen((v) => !v)}
                   >
                     <span className="year-trigger-label">{year}</span>
-                    <span className="caret">▾</span>
+                    <span className="caret" aria-hidden>▾</span>
                   </button>
 
                   {yearMenuOpen && (
@@ -655,7 +637,7 @@ export default function MobilePersonalLedgerPage() {
                   )}
                 </div>
 
-                <button className="x square" onClick={() => setYearOpen(false)} aria-label="닫기">✕</button>
+                <button className="x square nowrap" onClick={() => setYearOpen(false)} aria-label="닫기">✕</button>
               </div>
             </div>
 
@@ -690,25 +672,11 @@ export default function MobilePersonalLedgerPage() {
 
                         {isOpen && (
                           <div id={`m-${m.m}-days`} className="y-days">
-                            {/* =================================================================
-                                 ✅ [수정] 월별 상세 내역 헤더를 렌더링하지 않도록 주석 처리
-                                ================================================================= */}
-                            {/*
-                            <div className="y-days-head">
-                              <div>일자</div>
-                              <div>수입</div>
-                              <div>지출</div>
-                              <div>차액</div>
-                            </div>
-                            */}
                             {dailyAggByMonth[m.m].length === 0 ? (
                               <div className="y-days-empty">해당 월 데이터가 없습니다.</div>
                             ) : (
                               dailyAggByMonth[m.m].map((d) => (
                                 <div className="y-days-row nowrap-rows small-rows" key={d.date}>
-                                  {/* =================================================================
-                                       ✅ [수정] 일자 표시를 'YYYY-MM-DD'에서 'MM-DD'로 변경 (slice(5) 사용)
-                                      ================================================================= */}
                                   <div className="nowrap">{d.date.slice(5)}</div>
                                   <div className="pos nowrap">{comma(d.income)}원</div>
                                   <div className="neg nowrap">{comma(d.expense)}원</div>
@@ -728,7 +696,7 @@ export default function MobilePersonalLedgerPage() {
             </div>
 
             <div className="year-foot">
-              <button className="pill close" onClick={() => setYearOpen(false)}>닫기</button>
+              <button className="pill close nowrap" onClick={() => setYearOpen(false)}>닫기</button>
             </div>
           </div>
         </div>

@@ -1,73 +1,114 @@
 /* =========================================
-   MobilePersonalLedgerPage.css (scoped)
-   — White & Gold Luxe Redesign
+   MobilePersonalLedgerPage — Aether Royale Rebrand v2
+   - Luxe, jewel-tone glass (no dark theme, no gold)
+   - Keep same layout & class names
+   - KR: Pretendard Variable / EN display: Cinzel
 ========================================= */
 
+/* ▼ Premium typography */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap');
+
 .mplg {
-  /* ===== Luxe Tokens ===== */
-  --bg: #F7F9FC;                /* 페이지 배경 (밝은 화이트 톤) */
-  --bg-2: #FFFFFF;              /* 카드/입력 표면 */
-  --card: rgba(255,255,255,0.88);
-  --line: #E6E9F1;              /* 엷은 보더 */
-  --ink: #1E2432;               /* 본문 텍스트 */
+  /* ===== Design Tokens (Gold-free, richer & luxe) ===== */
+  --bg: #F6F7FB;                 /* 밝지만 차분한 베이스 */
+  --paper: #FFFFFF;              /* 카드/입력 표면 */
+  --ink: #0E1322;                /* 본문 텍스트 */
+  --muted: #5D667B;              /* 보조 텍스트 */
+  --line: #E3E8F3;               /* 엷은 보더 */
 
-  --muted: #6B7280;             /* 보조 텍스트 */
+  /* Accents — Jewel & Pearl */
+  --accent-1: #6E7BF2;           /* Sapphire Blue */
+  --accent-2: #AAB9FF;           /* Ice Periwinkle */
+  --accent-3: #B89CFF;           /* Amethyst */
+  --accent-4: #26C7C3;           /* Aquamarine */
+  --pearl: rgba(255,255,255,.86);
+  --frost: rgba(255,255,255,.65);
 
-  /* 포인트 (화이트 럭스 골드 & 실버) */
-  --primary: #C9A227;           /* 골드 */
-  --primary-2: #E6C766;         /* 밝은 골드 */
-  --silver-1: #CBD5E1;
-  --silver-2: #ECEFF5;
-
-  /* 상태 */
+  /* State */
   --green: #16A34A;
   --red: #EF4444;
 
-  /* 광택/그림자 */
-  --shadow-sm: 0 4px 12px rgba(16, 24, 40, .06);
-  --shadow-md: 0 12px 30px rgba(16, 24, 40, .10);
-  --shadow-lg: 0 24px 60px rgba(16, 24, 40, .12);
-  --glow-gold: 0 0 0 1px rgba(201,162,39,.18), 0 10px 30px rgba(201,162,39,.18);
-  --ring-focus: 0 0 0 3px rgba(201,162,39,.22);
+  /* Effects — Crystal glass & soft depth */
+  --shadow-sm: 0 10px 22px rgba(14, 19, 34, .07);
+  --shadow-md: 0 18px 36px rgba(14, 19, 34, .12);
+  --shadow-lg: 0 32px 70px rgba(14, 19, 34, .16);
+  --ring-focus: 0 0 0 3px rgba(110, 123, 242, .28);
 
   color: var(--ink);
   background:
-    radial-gradient(1400px 600px at 80% -10%, rgba(201,162,39,.06), transparent 60%),
-    radial-gradient(1200px 600px at 0% 110%, rgba(99,102,241,.05), transparent 60%),
+    radial-gradient(1200px 720px at 90% -10%, rgba(110,123,242,.10), transparent 60%),
+    radial-gradient(1100px 620px at 0% 110%, rgba(184,156,255,.10), transparent 60%),
+    conic-gradient(from 220deg at 80% 10%, #FFFFFF, #F9FAFF, #F3F5FE, #FFFFFF),
+    linear-gradient(180deg, #FFFFFF, var(--bg) 46%),
     var(--bg);
   min-height: 100vh;
 
-  /* 스크롤 보강 */
   height: 100dvh;
-  padding: calc(16px + env(safe-area-inset-top)) 16px calc(36px + env(safe-area-inset-bottom));
+  padding: calc(18px + env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
+
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+               "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
 }
 
-/* ===== 헤더 ===== */
+/* Util */
+.mplg .nowrap { white-space: nowrap; }
+
+/* ===== Top bar ===== */
 .mplg .mplg-top {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 48px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .mplg .mplg-title {
   justify-self: center;
   text-align: center;
-  font-weight: 800;
-  letter-spacing: .3px;
+  /* EN heading은 Cinzel, 한글은 Pretendard 폴백 */
+  font-family: "Cinzel","Pretendard Variable", Pretendard, "Noto Sans KR", serif;
+  font-weight: 700;
+  letter-spacing: .4px;
   color: var(--ink);
-  text-shadow: 0 1px 0 #fff;
+  text-shadow:
+    0 1px 0 #fff,
+    0 8px 30px rgba(110,123,242,.20);
   display: inline-grid;
   grid-auto-flow: column;
   gap: 10px;
   align-items: center;
-  font-size: 20px;
+  font-size: 22px;
+}
+.mplg .top-right { justify-self: end; }
+
+/* ===== Buttons — Royale Crystal Gloss (공통 룩) ===== */
+.mplg .back-btn,
+.mplg .year-btn,
+.mplg .btn,
+.mplg .mini-btn,
+.mplg .seg-btn,
+.mplg .cal-header .nav,
+.mplg .cal-actions .pill,
+.mplg .year-trigger,
+.mplg .year-option {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease, opacity .15s ease;
+  background:
+    linear-gradient(180deg, var(--pearl), rgba(255,255,255,.94)),
+    radial-gradient(130% 140% at 20% -20%, rgba(170,185,255,.18), transparent 55%),
+    radial-gradient(120% 160% at 120% 120%, rgba(184,156,255,.16), transparent 60%),
+    #FFFFFF;
+  color: var(--ink);
 }
 
-/* 뒤로가기 / 요약 버튼 (화이트 럭스) */
 .mplg .back-btn,
 .mplg .year-btn{
   display: inline-grid;
@@ -75,26 +116,21 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background:
-    radial-gradient(160px 80px at 10% -10%, rgba(201,162,39,.10), transparent 60%),
-    radial-gradient(200px 100px at 110% 120%, rgba(99,102,241,.10), transparent 70%),
-    var(--bg-2);
-  color: var(--ink);
-  box-shadow: var(--shadow-sm);
-  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 .mplg .back-btn:hover,
 .mplg .year-btn:hover{
-  border-color: #D9DCE6;
+  border-color: #D4DCF2;
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
+.mplg .back-btn:active,
+.mplg .year-btn:active { transform: translateY(0); }
+.mplg .back-btn:focus-visible,
+.mplg .year-btn:focus-visible { outline: none; box-shadow: var(--ring-focus), var(--shadow-sm); }
 .mplg .back-btn .back-icon { font-weight: 900; font-size: 14px; line-height: 1; }
 .mplg .back-btn .back-text { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
 
-/* 합계 카드 (화이트 글래스 + 골드 링) */
+/* ===== Metric cards ===== */
 .mplg .mplg-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -102,100 +138,113 @@
   margin-bottom: 16px;
 }
 .mplg .mplg-card {
-  border-radius: 16px;
-  padding: 12px 14px 10px;
+  border-radius: 18px;
+  padding: 14px 14px 12px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.70)),
-    var(--bg-2);
+    linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.85)),
+    radial-gradient(620px 320px at 100% -10%, rgba(170,185,255,.14), transparent 60%),
+    radial-gradient(820px 360px at -10% 110%, rgba(184,156,255,.14), transparent 60%),
+    var(--paper);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(4px);
   transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+  min-height: 96px;               /* 동일 높이 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
-.mplg .mplg-card:hover{
-  border-color: #DADFE8;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
+/* ▲ ‘월 수입/월 지출/월 차액’ 라벨 한 단계 ↑, 금액 한 단계 ↓ */
 .mplg .mplg-card .label {
-  font-size: 12px;
+  font-size: 14px;               /* 12px → 14px */
   color: var(--muted);
   margin-bottom: 6px;
   letter-spacing: .2px;
+  font-weight: 700;
 }
-.mplg .mplg-card .value { font-size: 16px; font-weight: 900; letter-spacing: .2px; }
+.mplg .mplg-card .value {        /* 금액 표기 한 단계 ↓ */
+  font-size: 15px;               /* 16px → 15px */
+  font-weight: 900;
+  letter-spacing: .2px;
+}
 .mplg .mplg-card .value.nowrap{ white-space: nowrap; }
-.mplg .mplg-card .value.small{ font-size: 16px; }
+.mplg .mplg-card .value.small{ font-size: 15px; }
 
-/* 골드/상태 링 */
-.mplg .mplg-card.income { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(22,163,74,.20) inset; }
-.mplg .mplg-card.expense { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(239,68,68,.20) inset; }
-.mplg .mplg-card.diff.pos { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(201,162,39,.24) inset; }
-.mplg .mplg-card.diff.neg { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(239,68,68,.24) inset; }
+.mplg .mplg-card:hover{
+  border-color: #D9E0F1;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
 
-/* ===== 입력 폼 ===== */
+/* 상태 엣지 (no gold) */
+.mplg .mplg-card.income { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(22,163,74,.18) inset; }
+.mplg .mplg-card.expense { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(239,68,68,.18) inset; }
+.mplg .mplg-card.diff.pos { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(110,123,242,.22) inset; }
+.mplg .mplg-card.diff.neg { box-shadow: var(--shadow-sm), 0 0 0 1px rgba(239,68,68,.22) inset; }
+
+/* ===== Form ===== */
 .mplg .mplg-form {
-  border-radius: 18px;
+  border-radius: 20px;
   border: 1px solid var(--line);
   background:
-    radial-gradient(140% 140% at 0% 0%, rgba(201,162,39,.08), transparent 55%),
-    radial-gradient(120% 120% at 100% 0%, rgba(99,102,241,.08), transparent 60%),
-    rgba(255,255,255,.80);
+    radial-gradient(140% 140% at 0% 0%, rgba(170,185,255,.16), transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(184,156,255,.16), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.88));
   box-shadow: var(--shadow-sm);
-  padding: 14px;
+  padding: 16px;
   margin-bottom: 16px;
 }
 
-/* 수입/지출 세그먼트 */
+/* Segmented control */
 .mplg .seg {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 12px;
 }
 .mplg .seg-btn {
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--bg-2);
+  background:
+    linear-gradient(180deg, #FFFFFF, #F6F8FF);
   color: var(--ink);
   padding: 10px 0;
   font-weight: 800;
   text-align: center;
   font-size: 15px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease, background .15s ease;
+  border: 1px solid var(--line);
 }
+.mplg .seg-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: #D6DEF1; }
+.mplg .seg-btn:focus-visible { outline: none; box-shadow: var(--ring-focus), var(--shadow-sm); }
 .mplg .seg-btn.on {
   background:
-    linear-gradient(90deg, rgba(201,162,39,.16), rgba(99,102,241,.14)),
-    var(--bg-2);
-  border-color: #E7E1CC;
-  box-shadow: var(--glow-gold);
+    linear-gradient(90deg, rgba(170,185,255,.26), #FFFFFF 55%, rgba(184,156,255,.24));
+  border-color: #D6DFFF;
+  box-shadow: 0 0 0 1px rgba(170,185,255,.28) inset, var(--shadow-sm);
   transform: translateY(-1px);
 }
 
+/* Inputs */
 .mplg .row { display: grid; gap: 6px; margin-bottom: 12px; }
 .mplg .row label { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing:.2px; }
 
-/* 입력 */
 .mplg .inp {
   width: 100%;
   box-sizing: border-box;
   background: #fff;
   border: 1px solid var(--line);
   color: var(--ink);
-  border-radius: 12px;
-  padding: 12px 12px;
+  border-radius: 14px;
+  padding: 13px 12px;
   font-size: 15px;
   text-align: left;
   box-shadow: inset 0 1px 0 #fff, var(--shadow-sm);
   transition: box-shadow .15s ease, border-color .15s ease;
 }
-.mplg .inp::placeholder { color: #9AA3B2; }
-.mplg .inp:focus{ outline: none; box-shadow: var(--ring-focus), inset 0 1px 0 #fff; border-color: #E7E1CC; }
+.mplg .inp::placeholder { color: #97A2B8; }
+.mplg .inp:focus{ outline: none; box-shadow: var(--ring-focus), inset 0 1px 0 #fff; border-color: #CCD6F3; }
 .mplg .inp.amt { font-weight: 900; letter-spacing: .2px; }
 
-/* 날짜 셀렉터 */
+/* Date selector (opens custom calendar) */
 .mplg .row-calendar { cursor: pointer; }
 .mplg .row-calendar .date-hidden{ position:absolute!important; opacity:0!important; pointer-events:none!important; width:0; height:0; }
 .mplg .row-calendar .date-display{
@@ -203,48 +252,51 @@
   justify-content: space-between; align-items: center;
   background: #fff;
   border: 1px solid var(--line); color: var(--ink);
-  border-radius: 12px; padding: 12px 12px; font-size: 15px;
+  border-radius: 14px; padding: 13px 12px; font-size: 15px;
   box-shadow: var(--shadow-sm);
 }
 .mplg .row-calendar .date-display .date-caret{ opacity:.66; }
 
-/* 폼 액션 */
+/* Form actions */
 .mplg .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 .mplg .btn {
   display: grid; place-items: center; min-height: 48px;
-  padding: 12px 12px; border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--bg-2); color: var(--ink);
+  padding: 12px 12px; border-radius: 14px;
+  background:
+    linear-gradient(180deg, #FFFFFF, #F6F8FF);
+  color: var(--ink);
   font-weight: 900; text-align: center; font-size: 16px;
-  box-shadow: var(--shadow-sm);
-  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  border: 1px solid var(--line);
 }
-.mplg .btn:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); border-color:#DCE1EA; }
+.mplg .btn:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); border-color:#D6DEF1; }
+.mplg .btn:active{ transform: translateY(0); }
+.mplg .btn:focus-visible{ outline:none; box-shadow: var(--ring-focus), var(--shadow-sm); }
+
 .mplg .btn.save{
-  background: linear-gradient(90deg, #FFF4CC, #FFFFFF 40%, #E9ECF8);
-  border: 1px solid #E7E1CC;
-  color: #1E2432;
-  text-shadow: 0 1px 0 rgba(255,255,255,.55);
-  box-shadow: var(--glow-gold);
+  background:
+    linear-gradient(90deg, rgba(110,123,242,.22), #FFFFFF 45%, rgba(184,156,255,.18));
+  border: 1px solid #D4DCF8;
+  color: #0E1322;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
 }
 .mplg .btn.reset{
-  border: 1px solid #E1E6EF;
-  background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,.85));
-  color:#495063;
+  border: 1px solid #E0E5EE;
+  background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,.92));
+  color:#475067;
 }
 
-/* 리스트 */
+/* ===== List ===== */
 .mplg .mplg-list { display: grid; gap: 10px; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
 .mplg .empty { text-align: center; color: #8A94AA; padding: 22px 0; font-weight:700; letter-spacing:.2px; }
 .mplg .item {
   display: grid; grid-template-rows: auto auto; gap: 8px;
-  padding: 12px; border-radius: 16px;
+  padding: 12px; border-radius: 18px;
   background: #fff;
   border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
 }
 .mplg .item.compact{
-  padding: 12px; border-radius: 16px;
+  padding: 12px; border-radius: 18px;
   background: #fff;
   border: 1px solid var(--line);
 }
@@ -253,128 +305,169 @@
 }
 .mplg .item .l1-left{ display:inline-flex; gap:10px; align-items:center; min-width:0; }
 .mplg .item .ty{
-  font-size: 11px; font-weight: 900; padding: 4px 10px; border-radius: 999px; text-align: center; border: 1px solid #EDEFF5;
-  background: #F6F7FB; color:#495063;
+  font-size: 11px; font-weight: 900; padding: 4px 10px; border-radius: 999px; text-align: center; border: 1px solid #EAF0FF;
+  background: #EEF2FF; color:#374579;
 }
-.mplg .item.income .ty{ background: #F0FFF7; color:#06603A; border-color:#BFEBD2; }
-.mplg .item.expense .ty{ background: #FFF1F2; color:#7F1D1D; border-color:#F8C5CB; }
-.mplg .item .amt{ font-weight: 900; letter-spacing:.2px; color:#111827; }
+.mplg .item.income .ty{ background: #EEFFF7; color:#065F46; border-color:#CFEFE0; }
+.mplg .item.expense .ty{ background: #FFF1F1; color:#7F1D1D; border-color:#F7CACA; }
+
+/* ▼ 금액 폰트 한 단계 ↓ (리스트) */
+.mplg .item .amt{
+  font-size: 15px;              /* downstep */
+  font-weight: 900; letter-spacing:.2px; color:#0E1322;
+}
 .mplg .item .amt.nowrap{ white-space: nowrap; }
 .mplg .item.income .amt{ color:#065F46; }
 .mplg .item.expense .amt{ color:#7F1D1D; }
 .mplg .item .line1 .date{ color:#6B7280; font-size:12px; }
 
 .mplg .item .l2-left{ display:inline-flex; align-items:baseline; gap:8px; min-width:0; }
-.mplg .item .party-strong{ color:#111827; font-weight:900; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.mplg .item .comma{ color:#94A3B8; opacity:.9; }
+.mplg .item .party-strong{ color:#0E1322; font-weight:900; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mplg .item .comma{ color:#98A4BC; opacity:.9; }
 .mplg .item .title{ font-weight:700; color:#1F2937; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .mplg .item .l2-right{ display:inline-grid; grid-auto-flow:column; gap:8px; }
+/* 미니버튼 — 동일 룩 */
 .mplg .mini-btn{
   padding: 8px 12px; font-size: 12px; line-height:1; border-radius: 999px;
-  border: 1px solid #E1E6EF; background: #FFFFFF; color:#1E2432; min-width:64px; text-align:center; font-weight:900;
-  box-shadow: var(--shadow-sm);
-}
-.mplg .mini-btn.edit{ border-color: #E7E1CC; background: linear-gradient(90deg, rgba(201,162,39,.12), #FFFFFF 60%); }
-.mplg .mini-btn.del{ border-color: #F3D3D6; background: linear-gradient(180deg, #FFFFFF, #FFF5F7); color:#91212A; }
-
-.mplg .item.editing{ outline: 2px solid rgba(201,162,39,.35); }
-
-/* 숨김 유지 */
-.mplg .item .mid .memo{ display:none!important; }
-.mplg .item .right .quick{ display:none!important; }
-
-/* ===== 달력 모달 — 화이트 럭스 리디자인 ===== */
-.mplg .cal-overlay{ position:fixed; inset:0; background: rgba(17,19,23,0.35); display:grid; place-items:center; z-index:9999; backdrop-filter: blur(2px); }
-.mplg .cal{
-  width: min(94vw, 380px);
-  border-radius: 18px;
   border: 1px solid var(--line);
   background:
-    radial-gradient(160% 160% at 0% 0%, rgba(201,162,39,.10), transparent 55%),
-    radial-gradient(120% 120% at 100% 0%, rgba(99,102,241,.10), transparent 60%),
-    rgba(255,255,255,.96);
-  box-shadow: var(--shadow-lg);
-  padding: 14px;
+    linear-gradient(180deg, #FFFFFF, #F6F8FF);
+  color:#1E2432; min-width:64px; text-align:center; font-weight:900;
+  box-shadow: var(--shadow-sm);
+}
+.mplg .mini-btn:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: #D6DEF1; }
+.mplg .mini-btn:active{ transform: translateY(0); }
+.mplg .mini-btn:focus-visible{ outline:none; box-shadow: var(--ring-focus), var(--shadow-sm); }
+
+.mplg .mini-btn.edit{
+  border-color: #D4DCF8;
+  background: linear-gradient(90deg, rgba(110,123,242,.18), #FFFFFF 60%);
+}
+.mplg .mini-btn.del{
+  border-color: #F3D3D6;
+  background: linear-gradient(180deg, #FFFFFF, #FFF6F6);
+  color:#91212A;
 }
 
-/* 헤더: ← / 년월 / → / 오늘로 */
+.mplg .item.editing{ outline: 2px solid rgba(110,123,242,.30); }
+
+/* ===== Calendar Modal — Royale Crystal ===== */
+.mplg .cal-overlay{
+  position:fixed; inset:0; background: rgba(12,14,22,0.28);
+  display:grid; place-items:center; z-index:9999; backdrop-filter: blur(3px);
+}
+.mplg .cal{
+  width: min(94vw, 380px);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(160% 160% at 0% 0%, rgba(170,185,255,.16), transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(184,156,255,.16), transparent 60%),
+    rgba(255,255,255,.98);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  position: relative;
+}
+
+/* Calendar header: prev / YM(center) / next / 오늘로(우측) */
 .mplg .cal-header{
   display:grid;
-  grid-template-columns:32px 1fr 32px auto;
+  grid-template-columns: 32px 1fr 32px auto;
+  grid-template-areas: "prev ym next today";
   align-items:center;
   margin-bottom:12px;
   column-gap:10px;
+  position: relative;
 }
 .mplg .cal-header .ym{
-  text-align:center; font-weight:900; letter-spacing:.4px; color:#1E2432; font-size:16px;
-  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  grid-area: ym;
+  justify-self: center;
+  text-align:center;
+  font-weight: 700;
+  letter-spacing:.45px;
+  color:#0f1220;
+  font-size:16px;
+  text-shadow: 0 1px 0 rgba(255,255,255,.75);
+  /* ▼ 년/월 표시는 Cinzel로 변경 */
+  font-family: "Cinzel","Pretendard Variable", Pretendard, "Noto Sans KR", serif;
 }
 .mplg .cal-header .nav{
-  width:32px; height:32px; border-radius:10px; border:1px solid #E1E6EF;
-  background: linear-gradient(180deg, #FFFFFF, #F5F7FB);
-  color:#1E2432; box-shadow: var(--shadow-sm);
+  width:32px; height:32px; border-radius:10px; border:1px solid var(--line);
+  background: linear-gradient(180deg, #FFFFFF, #F2F5FF);
+  color:#0f1220; box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }
-.mplg .cal-header .nav:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.mplg .cal-header .nav:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); border-color:#D6DEF1; }
+.mplg .cal-header .prev{ grid-area: prev; }
+.mplg .cal-header .next{ grid-area: next; }
+
+/* 오늘로 버튼 (겹침 방지, 크기 유지) */
 .mplg .cal-header .today{
-  background: linear-gradient(90deg, #FFF4CC, #FFFFFF 50%, #ECEFF6);
-  border:1px solid #E7E1CC;
-  color:#1E2432;
+  grid-area: today;
+  justify-self: end;
+  background: linear-gradient(90deg, rgba(110,123,242,.22), #FFFFFF 45%, rgba(184,156,255,.20));
+  border:1px solid #D4DCF8;
+  color:#0f1220;
   font-weight:900;
-  height:32px;
+  height:30px;
   padding:0 10px;
   border-radius:999px;
   font-size:12px;
   min-width:auto;
   white-space:nowrap;
-  box-shadow: var(--glow-gold);
+  box-shadow: var(--shadow-sm);
 }
 
-/* 달력 그리드 */
+/* Calendar grid */
 .mplg .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
-.mplg .cal-grid .wd{ text-align:center; font-size:12px; color:#64748B; font-weight:800; }
+.mplg .cal-grid .wd{ text-align:center; font-size:12px; color:#6A7691; font-weight:800; }
 .mplg .cal-grid .emp{ visibility:hidden; }
 
-/* 일자 버튼 — 네오모피즘 + Gold hover */
+/* Day cells */
 .mplg .cal-grid .day{
-  height:42px; border:1px solid #E1E6EF;
-  background: linear-gradient(180deg, #FFFFFF, #F7F9FC);
-  color:#111827; border-radius:12px; font-weight:800;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.9),
-    0 3px 10px rgba(16,24,40,.08);
+  height:42px; border:1px solid var(--line);
+  background: linear-gradient(180deg, #FFFFFF, #F6F9FF);
+  color:#0f1220; border-radius:12px; font-weight:800;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 3px 10px rgba(16,24,40,.08);
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }
 .mplg .cal-grid .day:hover{
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(16,24,40,.12), 0 0 0 1px rgba(201,162,39,.18) inset;
-  border-color:#E7E1CC;
+  box-shadow: 0 8px 24px rgba(16,24,40,.12), 0 0 0 1px rgba(170,185,255,.30) inset;
+  border-color:#D4DCF8;
 }
 .mplg .cal-grid .day.sel{
-  background: linear-gradient(90deg, rgba(201,162,39,.18), #FFFFFF 40%, rgba(99,102,241,.18));
-  border-color:#E7E1CC; font-weight:900;
-  box-shadow: var(--glow-gold);
+  background: linear-gradient(90deg, rgba(170,185,255,.26), #FFFFFF 40%, rgba(184,156,255,.24));
+  border-color:#D4DCF8; font-weight:900;
+  box-shadow: 0 0 0 1px rgba(170,185,255,.28) inset;
 }
 
-/* 하단 액션 */
+/* Footer actions */
 .mplg .cal-actions{
   display:grid; grid-auto-flow:column; gap:8px; margin-top:12px; justify-content:end;
 }
 .mplg .cal-actions .pill{
   padding:8px 12px; border-radius: 999px;
-  border:1px solid #E1E6EF; background: linear-gradient(180deg, #FFFFFF, #F7F9FC);
-  color:#1E2432; font-weight:800; box-shadow: var(--shadow-sm);
+  border:1px solid var(--line); background: linear-gradient(180deg, #FFFFFF, #F6F9FF);
+  color:#0f1220; font-weight:800; box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
 }
-.mplg .cal-actions .pill:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.mplg .cal-actions .pill:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); border-color:#D6DEF1; }
+.mplg .cal-actions .pill:focus-visible{ outline:none; box-shadow: var(--ring-focus), var(--shadow-sm); }
 
-/* ===== 연간 요약 모달 (화이트 글래스) ===== */
-.mplg .year-overlay{ position:fixed; inset:0; background: rgba(17,19,23,.40); display:grid; place-items:center; z-index:10000; backdrop-filter: blur(2px); }
+/* ===== Year summary modal ===== */
+.mplg .year-overlay{
+  position:fixed; inset:0; background: rgba(12,14,22,.24);
+  display:grid; place-items:center; z-index:10000; backdrop-filter: blur(3px);
+}
 .mplg .year-modal{
   width: min(94vw, 560px); max-height: 90vh; overflow:hidden;
-  border-radius: 16px; border:1px solid var(--line);
+  border-radius: 20px; border:1px solid var(--line);
   background:
-    radial-gradient(160% 160% at 0% 0%, rgba(201,162,39,.10), transparent 55%),
-    radial-gradient(120% 120% at 100% 0%, rgba(99,102,241,.10), transparent 60%),
+    radial-gradient(160% 160% at 0% 0%, rgba(170,185,255,.16), transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(184,156,255,.16), transparent 60%),
     rgba(255,255,255,.98);
   box-shadow: var(--shadow-lg);
   padding: 14px;
@@ -382,93 +475,126 @@
 .mplg .year-head.trio{
   display:grid; grid-template-columns: 1fr max-content; align-items:center; gap:10px; margin-bottom:10px;
 }
-.mplg .year-head .title{ font-size:20px; font-weight:900; letter-spacing:.3px; color:#111827; }
-.mplg .year-head .title.white{ color:#111827; }
+.mplg .year-head .title{
+  font-family: "Cinzel","Pretendard Variable", Pretendard, "Noto Sans KR", serif;
+  font-size:20px; font-weight:700; letter-spacing:.35px; color:#0f1220;
+}
+.mplg .year-head .title.white{ color:#0f1220; }
 
 .mplg .year-head .year-head-controls{
   display:grid; grid-auto-flow: column; align-items:center; gap:10px;
 }
 
-/* 접근성 숨김 */
+/* A11y hide */
 .mplg .sr-only{
   position:absolute !important; width:1px !important; height:1px !important;
   padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important;
 }
 
-/* 커스텀 드롭다운 */
+/* Custom year dropdown */
 .mplg .year-dd{ position:relative; }
 .mplg .year-trigger{
   height:40px; min-width:110px;
   display:inline-flex; align-items:center; justify-content:space-between;
-  padding:0 12px; border-radius:10px; border:1px solid #E1E6EF;
-  background: linear-gradient(180deg, #FFFFFF, #F7F9FC);
-  color:#1E2432; font-weight:800;
+  padding:0 12px; border-radius:10px; border:1px solid var(--line);
+  background: linear-gradient(180deg, #FFFFFF, #F6F9FF);
+  color:#0f1220; font-weight:800;
   box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
 }
+.mplg .year-trigger:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); border-color:#D6DEF1; }
+.mplg .year-trigger:focus-visible{ outline:none; box-shadow: var(--ring-focus), var(--shadow-sm); }
 .mplg .year-trigger .caret{ opacity:.8; }
 
 .mplg .year-menu{
   position:absolute; top:calc(100% + 6px); right:0; z-index:10;
   width:160px; max-height: 280px; overflow:auto;
-  border-radius:12px; border:1px solid #E1E6EF;
-  background: linear-gradient(180deg, #FFFFFF, #F7F9FC);
+  border-radius:12px; border:1px solid var(--line);
+  background: linear-gradient(180deg, #FFFFFF, #F6F9FF);
   box-shadow: var(--shadow-md);
 }
 .mplg .year-option{
   width:100%; text-align:left;
   display:flex; align-items:center; justify-content:space-between; gap:10px;
-  padding:10px 12px; border:0; background:transparent; color:#1E2432; font-weight:700;
+  padding:10px 12px; border:0;
+  background:linear-gradient(180deg, #FFFFFF, #F7FAFF);
+  color:#0f1220; font-weight:700;
+  transition: background .15s ease;
 }
-.mplg .year-option:hover{ background: #F7F9FC; }
+.mplg .year-option:hover{ background: #EEF3FF; }
 .mplg .year-option.sel{
-  background: linear-gradient(90deg, rgba(201,162,39,.18), rgba(99,102,241,.18));
+  background: linear-gradient(90deg, rgba(170,185,255,.26), rgba(184,156,255,.24));
   color:#0c0f15; font-weight:900;
 }
 
+/* 닫기 버튼 */
 .mplg .year-head .x.square{
   width:40px; height:40px; border-radius:10px;
-  border:1px solid #E1E6EF; background: linear-gradient(180deg, #FFFFFF, #F7F9FC);
-  color:#1E2432; display:grid; place-items:center; box-shadow: var(--shadow-sm);
+  border:1px solid var(--line); background: linear-gradient(180deg, #FFFFFF, #F6F9FF);
+  color:#0f1220; display:grid; place-items:center; box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
+.mplg .year-head .x.square:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); border-color:#D6DEF1; }
 
-/* 본문 */
+/* Body */
 .mplg .year-body{
   overflow-y:auto;
   max-height: calc(90vh - 14px - 50px - 54px);
   padding-right:6px; scrollbar-gutter: stable;
 }
 
-/* 표 */
+/* ===== Year Table (정렬 & 탭울러 숫자) ===== */
 .mplg .year-table{ display:grid; gap:8px; margin-top:6px; }
 .mplg .y-row{
   display:grid; grid-template-columns: 60px 1fr 1fr 1fr; gap:10px;
-  padding:10px 12px; border-radius:12px; border:1px solid #E1E6EF; background: #FFFFFF;
+  padding:10px 12px; border-radius:12px; border:1px solid var(--line); background: #FFFFFF;
   box-shadow: var(--shadow-sm);
+  font-variant-numeric: tabular-nums;
 }
-.mplg .y-row.y-head{ background: #F6F7FB; font-weight:900; }
+.mplg .y-row.y-head{ background: #EEF3FF; font-weight:900; }
+
+/* 2~4열 금액 우측 정렬 */
+.mplg .y-row > div:nth-child(2),
+.mplg .y-row > div:nth-child(3),
+.mplg .y-row > div:nth-child(4){
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .mplg .y-row .pos{ color:#065F46; font-weight:800; }
 .mplg .y-row .neg{ color:#7F1D1D; font-weight:800; }
-.mplg .y-row .diff.pos{ color:#8B6B13; }
+.mplg .y-row .diff.pos{ color:#3B57CC; }
 .mplg .y-row .diff.neg{ color:#8E2731; }
 .mplg .y-row.y-month{ cursor:pointer; transition: transform .12s ease, box-shadow .12s ease; }
 .mplg .y-row.y-month:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); }
 .mplg .y-row .nowrap{ white-space: nowrap; }
 
-/* 월 상세 */
+/* Month details (일별) — 동일 정렬 */
 .mplg .y-days{
   display:grid; gap:6px; margin:8px 0 12px 0;
-  padding:10px; border-radius:12px; border:1px dashed #E1E6EF; background: #FFFFFF;
+  padding:10px; border-radius:12px; border:1px dashed #E1E6F2; background: #FFFFFF;
+  font-variant-numeric: tabular-nums;
 }
-.mplg .y-days-head,
 .mplg .y-days-row{
   display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px;
-  padding:8px 10px; border-radius:8px; border:1px solid #EDEFF5; background: #FFFFFF;
+  padding:8px 10px; border-radius:8px; border:1px solid #EAF0FF; background: #FFFFFF;
 }
-.mplg .y-days-head{ font-weight:900; background: #F6F7FB; }
-.mplg .y-days-empty{ color:#6B7280; text-align:center; padding:8px 0; }
+.mplg .y-days-row > div:nth-child(2),
+.mplg .y-days-row > div:nth-child(3),
+.mplg .y-days-row > div:nth-child(4){
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
+.mplg .y-days-empty{ color:#6B7280; text-align:center; padding:8px 0; }
 .mplg .nowrap-rows > *{ white-space: nowrap; }
 .mplg .small-rows{ font-size: 13px; }
 
 .mplg .loading{ text-align:center; color:#6B7280; padding:8px 0; }
 .mplg .year-foot{ display:grid; justify-content:end; margin-top:12px; }
+
+/* NOTE:
+   - “금액 뒤 '원' 제거”는 마크업/JSX의 텍스트 변경이 필요합니다.
+     (CSS만으로 특정 문자의 제거는 불가) */
