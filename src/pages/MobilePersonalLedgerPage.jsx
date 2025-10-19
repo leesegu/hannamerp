@@ -62,6 +62,9 @@ export default function MobilePersonalLedgerPage() {
   const [monthKey, setMonthKey] = useState(ymStr());
   const [date, setDate] = useState(todayStr());
 
+  // ✅ 월 카드 전용: “현재 달(오늘 기준)” 고정 키
+  const currentMonthKey = useMemo(() => ymStr(new Date()), []);
+
   // ===== 입력 폼 =====
   const [type, setType] = useState("expense");
   const [party, setParty] = useState("");
@@ -84,7 +87,7 @@ export default function MobilePersonalLedgerPage() {
   };
 
   // ===== 실시간 데이터 상태 =====
-  const [rowsMonth, setRowsMonth] = useState([]); // 선택 월 전체(합계 카드용)
+  const [rowsMonth, setRowsMonth] = useState([]); // ✅ “현재 달” 전체(합계 카드용)
   const [rowsDay, setRowsDay] = useState([]);     // 선택 일 리스트
 
   // 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화
@@ -114,7 +117,8 @@ export default function MobilePersonalLedgerPage() {
       if (editingId) {
         // 수정(낙관적)
         setRowsDay((prev) => upsertById(prev, { id: editingId, ...data }));
-        if (data.monthKey === monthKey) {
+        // ✅ 월 카드: 현재 달인 경우 즉시 반영
+        if (data.monthKey === currentMonthKey) {
           setRowsMonth((prev) => upsertById(prev, { id: editingId, ...data }));
         }
         await updateDoc(doc(db, "users", uidUse, "personal_ledger", editingId), data);
@@ -124,7 +128,8 @@ export default function MobilePersonalLedgerPage() {
         const tempDoc = { id: tempId, createdAt: Date.now(), ...data };
 
         if (date === data.date) setRowsDay((prev) => upsertById(prev, tempDoc));
-        if (data.monthKey === monthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
+        // ✅ 월 카드: 현재 달인 경우 즉시 반영
+        if (data.monthKey === currentMonthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
 
         const ref = await addDoc(collection(db, "users", uidUse, "personal_ledger"), {
           ...data,
@@ -182,9 +187,10 @@ export default function MobilePersonalLedgerPage() {
     const uidUse = liveUid || uid;
     if (!uidUse) return;
     const ref = collection(db, "users", uidUse, "personal_ledger");
+    // ✅ “현재 달(오늘 기준)”만 집계
     const q = query(
       ref,
-      where("monthKey", "==", monthKey),
+      where("monthKey", "==", currentMonthKey),
       orderBy("date", "desc"),
       orderBy("createdAt", "desc")
     );
@@ -198,7 +204,7 @@ export default function MobilePersonalLedgerPage() {
       }
     );
     return () => unsub();
-  }, [liveUid, uid, monthKey]);
+  }, [liveUid, uid, currentMonthKey]);
 
   // ===== 일별 내역(리스트용) 실시간 구독 =====
   useEffect(() => {
@@ -222,7 +228,7 @@ export default function MobilePersonalLedgerPage() {
     return () => unsub();
   }, [liveUid, uid, date]);
 
-  // ===== 월 합계(상단 카드) =====
+  // ===== 월 합계(상단 카드, 현재 달) =====
   const { incomeSum, expenseSum, diff } = useMemo(() => {
     let inc = 0;
     let exp = 0;
@@ -382,7 +388,7 @@ export default function MobilePersonalLedgerPage() {
         </div>
       </div>
 
-      {/* 합계 카드 (월 기준) */}
+      {/* 합계 카드 (현재 달 기준) */}
       <div className="mplg-cards">
         <div className="mplg-card income">
           <div className="label">월 수입</div>
@@ -676,14 +682,26 @@ export default function MobilePersonalLedgerPage() {
                               <div className="y-days-empty">해당 월 데이터가 없습니다.</div>
                             ) : (
                               dailyAggByMonth[m.m].map((d) => (
-                                <div className="y-days-row nowrap-rows small-rows" key={d.date}>
+                                <button
+                                  key={d.date}
+                                  type="button"
+                                  className="y-days-row nowrap-rows small-rows clickable"
+                                  onClick={() => {
+                                    // ✅ 일자 선택 시: 요약 모달 닫고 해당 날짜로 이동
+                                    setDate(d.date);
+                                    const mk = d.date.slice(0, 7);
+                                    if (mk !== monthKey) setMonthKey(mk);
+                                    setExpandedMonth(null);
+                                    setYearOpen(false);
+                                  }}
+                                >
                                   <div className="nowrap">{d.date.slice(5)}</div>
-                                  <div className="pos nowrap">{comma(d.income)}원</div>
-                                  <div className="neg nowrap">{comma(d.expense)}원</div>
+                                  <div className="pos nowrap"><span className="num">{comma(d.income)}</span>원</div>
+                                  <div className="neg nowrap"><span className="num">{comma(d.expense)}</span>원</div>
                                   <div className={`diff ${d.diff >= 0 ? "pos" : "neg"} nowrap`}>
-                                    {comma(d.diff)}원
+                                    <span className="num">{comma(d.diff)}</span>원
                                   </div>
-                                </div>
+                                </button>
                               ))
                             )}
                           </div>

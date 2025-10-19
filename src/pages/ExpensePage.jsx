@@ -994,14 +994,6 @@ export default function ExpensePage() {
     performLoadForDate(date);
   }, []); // eslint-disable-line
 
-  const onRefresh = async () => {
-    const ok = window.confirm("새로고침하면 현재 지출 입력 내용이 모두 삭제되고 오늘 날짜로 이동합니다. 계속할까요?");
-    if (!ok) return;
-    const today = todayYMD();
-    initialMountRef.current = true;
-    await performLoadForDate(today, { setDateAfter: true });
-  };
-
   const openNextRowMain = (i) => {
     const next = openers.current[i + 1];
     if (next?.openMain) next.openMain();
@@ -1219,22 +1211,13 @@ export default function ExpensePage() {
       {/* 상단 바 — 요청 순서대로 한 줄 정렬 */}
       <div className="xp-top slim fancy" style={{ gridTemplateColumns: "1fr" }}>
         <div className="xp-actions" style={{ overflow: "visible", flexWrap: "nowrap" }}>
-          {/* 1) 10줄 추가 */}
+          {/* 1) 추가 */}
           <button
             className="xp-btn xp-load small pad-s"
-            onClick={() => addRows(10)}
-            title="10줄 추가"
+            onClick={() => addRows(1)}
+            title="추가"
           >
-            <i className="ri-add-line" /> 10줄 추가
-          </button>
-
-          {/* 2) 새로고침 */}
-          <button
-            className="xp-btn xp-refresh small pad-s"
-            onClick={onRefresh}
-            title="새로고침"
-          >
-            <i className="ri-refresh-line" /> 새로고침
+            <i className="ri-add-line" /> 추가
           </button>
 
           {/* 3) 출금보류 */}

@@ -357,8 +357,15 @@
   position:fixed; inset:0; background: rgba(12,14,22,0.28);
   display:grid; place-items:center; z-index:9999; backdrop-filter: blur(3px);
 }
+
+/* ✅ 달력 높이 고정 + 내부 고정 레이아웃으로 버튼 흔들림 제거 */
 .mplg .cal{
   width: min(94vw, 380px);
+  height: 420px;              /* ← 고정 높이 */
+  /* ▼ column flex → 고정 3행 그리드(헤더/그리드/풋터) + 행 간격 고정 */
+  display: grid;
+  grid-template-rows: 40px 1fr 38px;  /* 헤더·본문·풋터 고정 */
+  row-gap: 12px;                       /* ✅ 아래 공간은 갭으로만 확보 */
   border-radius: 20px;
   border: 1px solid var(--line);
   background:
@@ -368,6 +375,7 @@
   box-shadow: var(--shadow-lg);
   padding: 14px;
   position: relative;
+  overflow: hidden;           /* 내부 변동으로 높이 흔들림 방지 */
 }
 
 /* Calendar header: prev / YM(center) / next / 오늘로(우측) */
@@ -376,9 +384,10 @@
   grid-template-columns: 32px 1fr 32px auto;
   grid-template-areas: "prev ym next today";
   align-items:center;
-  margin-bottom:12px;
+  margin-bottom:0;            /* ✅ 아래 여백 제거(행 갭으로 통일) */
   column-gap:10px;
   position: relative;
+  height: 40px;               /* 고정 높이로 버튼 Y위치 고정 */
 }
 .mplg .cal-header .ym{
   grid-area: ym;
@@ -388,20 +397,37 @@
   letter-spacing:.45px;
   color:#0f1220;
   font-size:16px;
+  white-space: nowrap;        /* ✅ 줄바꿈 방지로 헤더 높이 고정 */
   text-shadow: 0 1px 0 rgba(255,255,255,.75);
   /* ▼ 년/월 표시는 Cinzel로 변경 */
   font-family: "Cinzel","Pretendard Variable", Pretendard, "Noto Sans KR", serif;
 }
 .mplg .cal-header .nav{
-  width:32px; height:32px; border-radius:10px; border:1px solid var(--line);
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  border:1px solid var(--line);
   background: linear-gradient(180deg, #FFFFFF, #F2F5FF);
-  color:#0f1220; box-shadow: var(--shadow-sm);
+  color:#0f1220;
+  box-shadow: var(--shadow-sm);
   white-space: nowrap;
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  /* ✅ 추가: 글리프 베이스라인 차이/포커스 등으로 인한 세로 흔들림 방지 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  /* ✅ 추가: 헤더 안에서 항상 세로 중앙 고정 */
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
-.mplg .cal-header .nav:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); border-color:#D6DEF1; }
-.mplg .cal-header .prev{ grid-area: prev; }
-.mplg .cal-header .next{ grid-area: next; }
+.mplg .cal-header .nav:hover{ box-shadow: var(--shadow-md); border-color:#D6DEF1; }
+/* ✅ 추가: hover시에도 세로 중앙 기준 유지 */
+.mplg .cal-header .nav:hover{ transform: translateY(calc(-50% - 1px)); }
+
+.mplg .cal-header .prev{ grid-area: prev; left: 0; }
+.mplg .cal-header .next{ grid-area: next; right: 0; }
 
 /* 오늘로 버튼 (겹침 방지, 크기 유지) */
 .mplg .cal-header .today{
@@ -420,8 +446,12 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Calendar grid */
-.mplg .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+/* Calendar grid — 가변 영역(1fr)을 채우되 내부 콘텐츠가 넘쳐도 상단 고정 */
+.mplg .cal-grid{
+  display:grid; grid-template-columns:repeat(7,1fr); gap:8px;
+  align-content: start;      /* 행을 상단 고정(남는 공간은 아래) */
+  overflow: hidden;          /* 스크롤바 생성으로 인한 레이아웃 흔들림 방지 */
+}
 .mplg .cal-grid .wd{ text-align:center; font-size:12px; color:#6A7691; font-weight:800; }
 .mplg .cal-grid .emp{ visibility:hidden; }
 
@@ -446,7 +476,8 @@
 
 /* Footer actions */
 .mplg .cal-actions{
-  display:grid; grid-auto-flow:column; gap:8px; margin-top:12px; justify-content:end;
+  display:grid; grid-auto-flow:column; gap:8px; margin-top:0; justify-content:end;  /* ✅ 상단 여백 제거(행 갭으로 통일) */
+  height: 38px;               /* 풋터 고정 높이로 버튼 위치 고정 */
 }
 .mplg .cal-actions .pill{
   padding:8px 12px; border-radius: 999px;
@@ -580,6 +611,14 @@
   display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px;
   padding:8px 10px; border-radius:8px; border:1px solid #EAF0FF; background: #FFFFFF;
 }
+
+/* ✅ [수정] 일자(1열) 좌측 정렬 */
+.mplg .y-days-row > div:first-child{
+  text-align: left;           /* ← center 에서 left 로 변경 */
+  white-space: nowrap;
+}
+
+/* ✅ [유지/명시] 금액(2~4열) 모두 우측 정렬 + 탭울러 숫자 */
 .mplg .y-days-row > div:nth-child(2),
 .mplg .y-days-row > div:nth-child(3),
 .mplg .y-days-row > div:nth-child(4){
@@ -594,7 +633,3 @@
 
 .mplg .loading{ text-align:center; color:#6B7280; padding:8px 0; }
 .mplg .year-foot{ display:grid; justify-content:end; margin-top:12px; }
-
-/* NOTE:
-   - “금액 뒤 '원' 제거”는 마크업/JSX의 텍스트 변경이 필요합니다.
-     (CSS만으로 특정 문자의 제거는 불가) */
