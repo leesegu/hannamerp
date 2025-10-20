@@ -383,6 +383,12 @@ function parseOne(block) {
     address = (address ? `${address} ` : "") + inlineLine;
   }
 
+  // ★ 추가: 맨 아래줄 '공간XXXX (###호|숫자호|없음)' 힌트 보강
+  const bottomSpace = extractBottomSpaceHint(original);
+  if (bottomSpace && !address.includes(bottomSpace)) {
+    address = (address ? `${address} ` : "") + bottomSpace;
+  }
+
   // ✅ 주소 후처리: 은행 제거 + 중복어절 제거
   address = dedupeAddress(address);
 
@@ -534,6 +540,35 @@ function inlineAddressLine(raw) {
     if (m) return m[0].replace(/\*/g, "").trim();
   }
   return "";
+}
+
+/* ★ 추가: 맨 아래 줄의 '공간XXXX (옵션: ###호 또는 숫자호)' 감지 */
+function extractBottomSpaceHint(raw) {
+  // 마지막 non-empty 라인만 검사 (오탐 최소화)
+  const lines = String(raw || "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.length) return "";
+
+  const last = lines[lines.length - 1];
+
+  // 허용 패턴:
+  //   - 공간907
+  //   - 공간 907
+  //   - 공간907 205호
+  //   - 공간907 ###호 (###호 그대로 인정)
+  //   - (라인 전체가 이 패턴에 '가깝다'가 아니라 '정확히' 이 패턴이어야 함)
+  const m =
+    last.match(/^공간\s*?(\d{1,4})(?:\s*(\d{1,4}\s*호|###\s*호|###호))?$/) ||
+    null;
+
+  if (!m) return "";
+
+  const num = (m[1] || "").replace(/\s+/g, "");
+  const hoRaw = (m[2] || "").replace(/\s+/g, "");
+  return hoRaw ? `공간${num} ${hoRaw}` : `공간${num}`;
 }
 
 /* ✅ 주소 후처리 */

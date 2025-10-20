@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
   collection, addDoc, onSnapshot, query, orderBy, where, doc, deleteDoc, updateDoc,
-  startAt, endAt
+  startAt, endAt, getDocs // ✅ 추가: 초기 로딩 즉시 합계를 위해
 } from "firebase/firestore";
 
 /** =========================
@@ -62,8 +62,8 @@ export default function MobilePersonalLedgerPage() {
   const [monthKey, setMonthKey] = useState(ymStr());
   const [date, setDate] = useState(todayStr());
 
-  // ✅ 월 카드 전용: “현재 달(오늘 기준)” 고정 키
-  const currentMonthKey = useMemo(() => ymStr(new Date()), []);
+  // ✅ (변경) “현재 달 고정 키” 제거 — 선택한 monthKey로 항상 카드 계산
+  // const currentMonthKey = useMemo(() => ymStr(new Date()), []); // ★ 삭제
 
   // ===== 입력 폼 =====
   const [type, setType] = useState("expense");
@@ -87,7 +87,7 @@ export default function MobilePersonalLedgerPage() {
   };
 
   // ===== 실시간 데이터 상태 =====
-  const [rowsMonth, setRowsMonth] = useState([]); // ✅ “현재 달” 전체(합계 카드용)
+  const [rowsMonth, setRowsMonth] = useState([]); // ✅ 선택 월 전체(합계 카드용)
   const [rowsDay, setRowsDay] = useState([]);     // 선택 일 리스트
 
   // 저장/수정 — 낙관적 업데이트 + 스냅샷 동기화
@@ -117,8 +117,8 @@ export default function MobilePersonalLedgerPage() {
       if (editingId) {
         // 수정(낙관적)
         setRowsDay((prev) => upsertById(prev, { id: editingId, ...data }));
-        // ✅ 월 카드: 현재 달인 경우 즉시 반영
-        if (data.monthKey === currentMonthKey) {
+        // ✅ (변경) 선택된 monthKey에 즉시 반영
+        if (data.monthKey === monthKey) {
           setRowsMonth((prev) => upsertById(prev, { id: editingId, ...data }));
         }
         await updateDoc(doc(db, "users", uidUse, "personal_ledger", editingId), data);
@@ -128,8 +128,8 @@ export default function MobilePersonalLedgerPage() {
         const tempDoc = { id: tempId, createdAt: Date.now(), ...data };
 
         if (date === data.date) setRowsDay((prev) => upsertById(prev, tempDoc));
-        // ✅ 월 카드: 현재 달인 경우 즉시 반영
-        if (data.monthKey === currentMonthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
+        // ✅ (변경) 선택된 monthKey에 즉시 반영
+        if (data.monthKey === monthKey) setRowsMonth((prev) => upsertById(prev, tempDoc));
 
         const ref = await addDoc(collection(db, "users", uidUse, "personal_ledger"), {
           ...data,
@@ -185,16 +185,29 @@ export default function MobilePersonalLedgerPage() {
   // ===== 월별 내역(합계 카드용) 실시간 구독 =====
   useEffect(() => {
     const uidUse = liveUid || uid;
-    if (!uidUse) return;
+    if (!uidUse || !monthKey) return;
     const ref = collection(db, "users", uidUse, "personal_ledger");
-    // ✅ “현재 달(오늘 기준)”만 집계
     const q = query(
       ref,
-      where("monthKey", "==", currentMonthKey),
-      orderBy("date", "desc"),
-      orderBy("createdAt", "desc")
+      where("monthKey", "==", monthKey)
+      // orderBy 제거
     );
-    const unsub = onSnapshot(
+
+    let unsub = () => {};
+    // ✅ 추가: 초기 진입 즉시 한 번 가져와서 카드가 비어 보이지 않도록 함
+    (async () => {
+      try {
+        const snap = await getDocs(q);
+        const firstList = [];
+        snap.forEach((d) => firstList.push({ id: d.id, ...d.data() }));
+        setRowsMonth(firstList); // 즉시 합계 표시
+      } catch (e) {
+        console.error("초기 월 데이터 로드 오류:", e);
+      }
+    })();
+
+    // 이어서 실시간 구독 유지
+    unsub = onSnapshot(
       q,
       { includeMetadataChanges: true },
       (snap) => {
@@ -203,8 +216,9 @@ export default function MobilePersonalLedgerPage() {
         setRowsMonth(list);
       }
     );
+
     return () => unsub();
-  }, [liveUid, uid, currentMonthKey]);
+  }, [liveUid, uid, monthKey]); // ★ (변경) currentMonthKey → monthKey
 
   // ===== 일별 내역(리스트용) 실시간 구독 =====
   useEffect(() => {
@@ -228,7 +242,7 @@ export default function MobilePersonalLedgerPage() {
     return () => unsub();
   }, [liveUid, uid, date]);
 
-  // ===== 월 합계(상단 카드, 현재 달) =====
+  // ===== 월 합계(상단 카드, 선택 달) =====
   const { incomeSum, expenseSum, diff } = useMemo(() => {
     let inc = 0;
     let exp = 0;
@@ -388,7 +402,7 @@ export default function MobilePersonalLedgerPage() {
         </div>
       </div>
 
-      {/* 합계 카드 (현재 달 기준) */}
+      {/* 합계 카드 (선택 달 기준) */}
       <div className="mplg-cards">
         <div className="mplg-card income">
           <div className="label">월 수입</div>

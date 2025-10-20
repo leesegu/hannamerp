@@ -1,4 +1,5 @@
-:root{
+/* ✅ 전역 영향 차단: 변수/리셋을 annual-sheet 스코프로 한정 */
+.annual-sheet{
   --bg: #f5f3ff;
   --card: #ffffff;
   --border: #e9e4ff;
@@ -15,10 +16,20 @@
   --grad-2: linear-gradient(135deg,#ff8ad6 0%,#8aa3ff 50%,#7efff2 100%);
   --grad-3: linear-gradient(135deg,#ffd36e 0%,#ff7ea8 50%,#8a7bff 100%);
   --glass: rgba(255,255,255,.35);
+
+  /* ✅ 헤더 컨트롤 간격 커스텀 */
+  --ctrl-col-gap: 4px;          /* 연도/집계 사이 간격 */
+  --ctrl-title-row-gap: 10px;   /* 제목행과 입력행 사이 간격 */
+  --ctrl-block-gap: 2px;        /* 컨트롤 블록 전체 상단 여백 */
+
+  background: var(--bg);
+  color: var(--ink);
 }
 
-*{ box-sizing: border-box; }
-body{ background: var(--bg); color: var(--ink); }
+/* 전역 리셋도 스코프 안에서만 */
+.annual-sheet *{ box-sizing: border-box; }
+
+/* as-wrap는 기존 클래스 유지 (컨테이너는 annual-sheet + as-wrap) */
 .as-wrap{ padding: 18px; display:flex; flex-direction:column; gap:18px; }
 
 /* ===== Header (화려한 배경 + 글램 폰트) ===== */
@@ -31,6 +42,14 @@ body{ background: var(--bg); color: var(--ink); }
   position: relative;
   overflow: hidden;
 }
+
+/* ✅ 헤더 고정 */
+.as-header-sticky{
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
 .as-header.fancy{
   background: var(--grad-1);
   border: 0;
@@ -43,14 +62,13 @@ body{ background: var(--bg); color: var(--ink); }
   pointer-events:none;
 }
 .as-header.fancy::after{
-  /* 유리감 오버레이 */
   content:"";
   position:absolute; inset:0;
   background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
   pointer-events:none;
 }
 
-/* 현재 연도 & 서브 타이틀 (화려한 폰트/텍스트 효과) */
+/* 현재 연도 & 서브 타이틀 */
 .as-year{ display:flex; flex-direction:column; line-height:1; z-index:1; }
 .as-year-num{
   font-size:64px; font-weight:1000; letter-spacing:1.5px;
@@ -70,7 +88,7 @@ body{ background: var(--bg); color: var(--ink); }
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 
-/* ===== KPI 카드 (아이콘 + 제목 좌상단 / 금액 우하단 대각) ===== */
+/* ===== KPI 카드 ===== */
 .as-metrics{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; z-index:1; }
 .metric{
   position: relative;
@@ -118,14 +136,54 @@ body{ background: var(--bg); color: var(--ink); }
 .metric.net.good .glam-value{ color:#0ea5e9; }
 .metric.net.bad  .glam-value{ color:#e11d48; }
 
-/* ===== 화려한 드롭다운 ===== */
-.as-controls{ display:flex; justify-content:flex-end; z-index:1; }
+/* ===== ✅ 연도/집계 컨트롤(두 줄 레이아웃) ===== */
+.as-controls.two-rows{
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-rows: auto auto; /* 제목행 / 입력행 */
+  grid-template-columns: 1fr;
+  row-gap: var(--ctrl-title-row-gap);
+  z-index: 1;
+  margin-top: var(--ctrl-block-gap);
+}
+
+/* 드롭다운 행은 그대로 오른쪽 정렬 */
+.as-controls.two-rows .ctrl-inputs{
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  justify-content: end;
+  align-items: center;
+  column-gap: var(--ctrl-col-gap);
+}
+
+/* ✅ 제목행(라벨들)만 왼쪽 정렬 + 간격 적용 */
+.as-controls.two-rows .ctrl-labels{
+  display: flex;
+  justify-content: flex-start; /* 왼쪽 정렬 */
+  align-items: center;
+  gap: 42px;                   /* 연도 ↔ 집계 제목 간격 */
+  margin-left: 20px;           /* 제목 전체를 왼쪽으로 이동 */
+}
+
+/* 제목 라벨 스타일 */
+.as-controls.two-rows .ctrl-labels .sel-label{
+  padding:6px 10px;
+  border-radius:10px;
+  background: rgba(255,255,255,.2);
+  border:1px solid rgba(255,255,255,.35);
+  color:#ffffff;
+  font-weight:800;
+}
+
+/* 드롭다운행 */
 .year-select{
   display:flex; align-items:center; gap:10px; color:#ffffff; font-weight:800;
 }
-.glam-controls .sel-label{
-  padding:6px 10px; border-radius:10px; background: rgba(255,255,255,.2);
-  border:1px solid rgba(255,255,255,.35);
+.glam-select{ position:relative; }
+.glam-select::after{
+  content:"▾";
+  position:absolute; right:12px; top:50%; transform: translateY(-50%);
+  font-size:14px; color:#1b1e50; pointer-events:none;
 }
 .year-select select{
   appearance:none; -webkit-appearance:none; -moz-appearance:none;
@@ -138,15 +196,7 @@ body{ background: var(--bg); color: var(--ink); }
   backdrop-filter: blur(6px);
   cursor:pointer;
 }
-/* 커스텀 화살표 */
-.glam-select{ position:relative; }
-.glam-select::after{
-  content:"▾";
-  position:absolute; right:12px; top:50%; transform: translateY(-50%);
-  font-size:14px; color:#1b1e50; pointer-events:none;
-}
 
-/* ▼▼▼ 드롭다운 목록(옵션) 스타일 강화 ▼▼▼ */
 .year-select select:focus{
   border-color: rgba(255,255,255,.9);
   box-shadow:
@@ -154,8 +204,6 @@ body{ background: var(--bg); color: var(--ink); }
     0 0 0 6px rgba(107,90,255,.45),
     0 8px 22px rgba(0,0,0,.12) inset;
 }
-
-/* 옵션 기본 스타일 */
 .year-select select option{
   background: linear-gradient(180deg,#ffffff 0%,#f5f7ff 100%);
   color:#1b1e50;
@@ -163,28 +211,22 @@ body{ background: var(--bg); color: var(--ink); }
   font-size:14px;
   padding:8px 12px;
 }
-
-/* 옵션 Hover/Focus */
 .year-select select option:hover,
 .year-select select option:focus{
   background: linear-gradient(180deg,#eaf0ff 0%,#fffbe6 100%);
   color:#0f1240;
 }
-
-/* 현재 선택된 옵션 */
 .year-select select option:checked{
   background: linear-gradient(180deg,#dfe7ff 0%,#e9fff7 100%);
   color:#0f1240;
 }
-
-/* 스크롤바 커스텀 (WebKit) */
 .year-select select::-webkit-scrollbar{ width: 10px; }
 .year-select select::-webkit-scrollbar-track{ background: rgba(0,0,0,.06); border-radius: 8px; }
 .year-select select::-webkit-scrollbar-thumb{ background: linear-gradient(180deg,#7b5cff,#5fd4ff); border-radius: 8px; }
 .year-select select::-webkit-scrollbar-thumb:hover{ filter: brightness(1.05); }
 .year-select select::-ms-expand{ display:none; }
 
-/* ===== Section Titles (화려한 패널) ===== */
+/* ===== Section Titles ===== */
 .as-section{ display:flex; flex-direction:column; gap:10px; }
 .as-sec-title{
   font-weight:1000; color:#4d3eea; padding:6px 12px; border:1px dashed var(--border); border-radius:12px; background:#faf9ff; width:fit-content;
@@ -213,7 +255,7 @@ body{ background: var(--bg); color: var(--ink); }
 .as-chart .line-net{ stroke:#20b36a; stroke-width:2.2; }
 .as-chart .net-point{ fill:#20b36a; }
 
-/* 좌측 패딩 범례(그래프 밖) */
+/* 좌측 패딩 범례 */
 .legend-left .tick{ font-weight:800; fill:#7f77ba; }
 
 /* ===== Tables ===== */
@@ -225,6 +267,7 @@ body{ background: var(--bg); color: var(--ink); }
   overflow-y: auto;
   overflow-x: hidden;
   border-radius:12px; border:1px solid var(--border);
+  max-height: 70vh;
 }
 .as-table{ width:100%; border-collapse: collapse; background:#fff; }
 .as-table thead th{
@@ -241,7 +284,7 @@ body{ background: var(--bg); color: var(--ink); }
 
 .as-table .m-num-sm{ font-size:11px; }
 
-/* “요약/수입/지출/결제방법”의 항목 폰트 살짝 축소 */
+/* 항목 라벨 */
 .as-table.as-summary .label,
 .as-table.as-income  .label,
 .as-table.as-expense .label,
@@ -259,6 +302,27 @@ body{ background: var(--bg); color: var(--ink); }
 
 /* ✅ 지출 대분류 소계 강조 */
 .as-table.as-expense tr.as-subtotal td{
+  background:#f9f7ff;
+  font-weight:1000;
+  border-top:1px dashed var(--border);
+}
+
+/* ✅ 수입정리 tfoot(월별 합계) 음영 */
+.as-table.as-income tfoot tr td{
+  background:#f9f7ff;
+  font-weight:1000;
+  border-top:1px dashed var(--border);
+}
+
+/* ✅ 지출 결제방법 tfoot(합계) 음영 */
+.as-table.as-pay tfoot tr td{
+  background:#f9f7ff;
+  font-weight:1000;
+  border-top:1px dashed var(--border);
+}
+
+/* ✅ 요약표의 '수익률' 행 음영 */
+.as-table.as-summary tbody tr.sum-rate td{
   background:#f9f7ff;
   font-weight:1000;
   border-top:1px dashed var(--border);
@@ -284,4 +348,8 @@ body{ background: var(--bg); color: var(--ink); }
 @media (max-width: 1100px){
   .as-header{ grid-template-columns: 1fr; }
   .as-metrics{ grid-template-columns: 1fr; }
+
+  .as-controls.two-rows .ctrl-row{
+    justify-content: end;
+  }
 }

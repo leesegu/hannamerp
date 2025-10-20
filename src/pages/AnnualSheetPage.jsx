@@ -29,6 +29,15 @@ const readJson = async (storage, path) => {
 const toMonthKey = (year, m) => `${year}-${zpad2(m)}`;
 const sum = (arr, pick = (x) => x) => arr.reduce((s, v) => s + toNum(pick(v)), 0);
 
+/* 날짜 유틸 */
+const daysInMonth = (y, m /*1-12*/) => new Date(y, m, 0).getDate();
+const parseDate = (s) => {
+  if (!s) return null;
+  const [Y, M, D] = String(s).split("-").map(Number);
+  if (!Y || !M || !D) return null;
+  return new Date(Y, M - 1, D, 12);
+};
+
 /* ========= 정규화 ========= */
 function normalizeIncomeFromStorageJson(json) {
   const rows = [];
@@ -52,43 +61,57 @@ function normalizeIncomeFromStorageJson(json) {
   return rows;
 }
 
-/* ✅ 결제방법 정규화: 다양한 표기를 6개 표준 라벨로 통일 */
+/* ✅ 결제방법 정규화 */
 const PAY_LABELS = ["356계좌","352계좌","지로계좌","선수금계좌","기업카드","현금"];
 function normalizePayLabel(v) {
   const txt = String(v || "").trim();
   if (!txt) return "";
   const t = txt.toLowerCase();
 
-  // 숫자/키워드 포착
   if (t.includes("356")) return "356계좌";
   if (t.includes("352")) return "352계좌";
 
-  if (t.includes("지로")) return "지로계좌";
+  if (t.includes("지로") || t.includes("giro")) return "지로계좌";
   if (t.includes("선수")) return "선수금계좌";
 
-  if (t.includes("기업카드") || t.includes("법인카드") || t.includes("카드")) return "기업카드";
+  if (t.includes("기업카드") || t.includes("법인카드") || t.includes("카드") || t.includes("credit")) return "기업카드";
 
-  if (t === "현" || t.includes("현금")) return "현금";
+  if (t === "현" || t.includes("현금") || t.includes("cash")) return "현금";
 
-  // 정확히 이미 표준 라벨이면 그대로
   if (PAY_LABELS.includes(txt)) return txt;
 
-  return ""; // 인식 실패
+  if (t.includes("nh") || t.includes("농협")) {
+    if (t.includes("356")) return "356계좌";
+    if (t.includes("352")) return "352계좌";
+  }
+
+  return "";
 }
 
-/* ✅ 메모/내용에서 보조 추정 */
 function inferPayFromText(r) {
   const txt = [r?.memo, r?.desc, r?.record, r?.content, r?.note]
     .map(v => String(v || "")).join(" ");
   return normalizePayLabel(txt);
 }
 
-/* ✅ 우선순위: 출금방법 > 결제방법 > 기타 동의어들 */
 function pickPayField(r) {
   const direct =
     r?.["출금방법"] ?? r?.["결제방법"] ??
-    r?.payMethod ?? r?.paymentMethod ?? r?.payment ?? r?.method ?? r?.pay;
+    r?.outMethod ??
+    r?.payMethod ?? r?.paymentMethod ?? r?.payment ?? r?.method ?? r?.pay ??
+    r?.withdrawMethod ?? r?.["출금"] ?? r?.["방법"] ?? r?.["결제수단"];
   return direct;
+}
+
+function pickWithdrawAccount(r) {
+  return (
+    r?.["출금계좌"] ??
+    r?.outMethod ??
+    r?.withdrawAccount ??
+    r?.account ?? r?.accountName ?? r?.bankAccount ?? r?.bank ?? r?.accountNo ??
+    r?.["계좌"] ?? r?.["계좌번호"] ??
+    ""
+  );
 }
 
 function normalizeExpenseFromStorageJson(json) {
@@ -104,13 +127,16 @@ function normalizeExpenseFromStorageJson(json) {
     const amount = toNum(r.amount ?? r.outAmt);
     const memo = r.memo || r.record || r.desc || r.content || "";
 
-    // ✅ 1) 저장된 출금/결제 방법을 최우선 사용 → 표준 라벨로 정규화
-    let pay = normalizePayLabel(pickPayField(r));
+    const withdrawAccount = String(pickWithdrawAccount(r) || "").trim();
 
-    // ✅ 2) 없으면 메모/내용에서 보조 추정
+    let pay = normalizePayLabel(pickPayField(r));
     if (!pay) pay = inferPayFromText(r);
 
-    if (date) rows.push({ date, big, sub, amount, memo, payMethod: pay });
+    if (date) rows.push({
+      date, big, sub, amount, memo,
+      payMethod: pay,
+      withdrawAccount,
+    });
   };
   if (json && typeof json === "object") {
     if (Array.isArray(json.items)) json.items.forEach((r) => push(r));
@@ -125,29 +151,29 @@ function normalizeExpenseFromStorageJson(json) {
   return rows;
 }
 
-/* 수입: 카테고리 월별 합계 [{category,total,months[12]}] */
-function categoryMonthMatrix(rows) {
+/* 수입: 카테고리 월별 합계 */
+function categoryMonthMatrixByBuckets(rows, getBucketIdx) {
   const map = new Map();
   for (const r of rows) {
-    const m = Number((r.date || "").slice(5, 7)) || 0;
-    if (!m) continue;
+    const b = getBucketIdx(r.date);
+    if (!b) continue;
     const key = r.category || "(미지정)";
     if (!map.has(key)) map.set(key, { total: 0, months: Array(12).fill(0) });
     const obj = map.get(key);
     obj.total += toNum(r.amount);
-    obj.months[m - 1] += toNum(r.amount);
+    obj.months[b - 1] += toNum(r.amount);
   }
   return Array.from(map.entries())
     .map(([category, data]) => ({ category, ...data }))
     .sort((a, b) => b.total - a.total);
 }
 
-/* 지출: 대분류/소분류 월별 합계 [{big, rows:[{sub,total,months[12]}], total, months}] */
-function expenseBigSubGroups(rows) {
-  const map = new Map(); // big -> sub -> {total, months[12]}
+/* 지출: 대/소분류 월별 합계 */
+function expenseBigSubGroupsByBuckets(rows, getBucketIdx) {
+  const map = new Map();
   for (const r of rows) {
-    const m = Number((r.date || "").slice(5, 7)) || 0;
-    if (!m) continue;
+    const b = getBucketIdx(r.date);
+    if (!b) continue;
     const big = r.big || "(미지정)";
     const sub = r.sub || "(소분류없음)";
     if (!map.has(big)) map.set(big, new Map());
@@ -155,9 +181,8 @@ function expenseBigSubGroups(rows) {
     if (!subMap.has(sub)) subMap.set(sub, { total: 0, months: Array(12).fill(0) });
     const obj = subMap.get(sub);
     obj.total += toNum(r.amount);
-    obj.months[m - 1] += toNum(r.amount);
+    obj.months[b - 1] += toNum(r.amount);
   }
-  // to array + big별 months 합계 계산
   const groups = [];
   map.forEach((subMap, big) => {
     const rowsArr = [];
@@ -174,19 +199,27 @@ function expenseBigSubGroups(rows) {
   return groups;
 }
 
-/* ✅ 결제방법 월별 합계: 저장된 라벨(정규화된 6개)만 집계 */
-function paymentMethodMatrix(rows){
-  const map = new Map(PAY_LABELS.map(n=>[n,{ total:0, months:Array(12).fill(0) }]));
+/* ✅ 출금계좌별 월별 합계 */
+function withdrawAccountMatrixByBuckets(rows, getBucketIdx){
+  const map = new Map();
   for(const r of rows){
-    const m = Number((r.date || "").slice(5,7)) || 0;
-    if(!m) continue;
-    const key = normalizePayLabel(r.payMethod || ""); // 이미 정규화되어 있어도 재확인
-    if(!key) continue;
-    const obj = map.get(key);
+    const b = getBucketIdx(r.date);
+    if(!b) continue;
+
+    let label = String(r.withdrawAccount || "").trim();
+    if(!label){
+      const pay = normalizePayLabel(r.payMethod || "");
+      label = pay || "기타";
+    }
+
+    if(!map.has(label)) map.set(label, { total:0, months:Array(12).fill(0) });
+    const obj = map.get(label);
     obj.total += toNum(r.amount);
-    obj.months[m-1] += toNum(r.amount);
+    obj.months[b-1] += toNum(r.amount);
   }
-  return Array.from(map.entries()).map(([name, data]) => ({ name, ...data }));
+  return Array.from(map.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .sort((a,b)=> b.total - a.total);
 }
 
 /* ================= SVG 차트 ================= */
@@ -274,12 +307,41 @@ export default function AnnualSheetPage() {
   const storage = getStorage();
   const now = new Date();
 
-  const [year, setYear] = useState(now.getFullYear());
+  const [year, setYear] = useState(Math.max(2025, now.getFullYear()));
+  const [anchorDay, setAnchorDay] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [incomeRows, setIncomeRows] = useState([]);
   const [expenseRows, setExpenseRows] = useState([]);
+
+  const bucketBoundaries = useMemo(() => {
+    const bd = [];
+    for (let m = 1; m <= 12; m++) {
+      const startDay = Math.min(anchorDay, daysInMonth(year, m));
+      const nextMonth = m === 12 ? 1 : m + 1;
+      const nextYear = m === 12 ? year + 1 : year;
+      const nextStartDay = Math.min(anchorDay, daysInMonth(nextYear, nextMonth));
+
+      const start = new Date(year, m - 1, startDay, 0, 0, 0, 0);
+      const end = new Date(nextYear, nextMonth - 1, nextStartDay, 0, 0, 0, 0);
+      end.setDate(end.getDate() - 1);
+      bd.push({ start, end });
+    }
+    return bd;
+  }, [year, anchorDay]);
+
+  const getBucketIdx = useMemo(() => {
+    return (dateStr) => {
+      const d = parseDate(dateStr);
+      if (!d) return null;
+      for (let i = 0; i < 12; i++) {
+        const { start, end } = bucketBoundaries[i];
+        if (d >= start && d <= end) return i + 1;
+      }
+      return null;
+    };
+  }, [bucketBoundaries]);
 
   useEffect(() => {
     let cancelled = false;
@@ -290,15 +352,25 @@ export default function AnnualSheetPage() {
         const months = Array.from({ length: 12 }, (_, i) => i + 1);
         const incPromises = months.map((m) => readJson(storage, `acct_income_json/${toMonthKey(year, m)}.json`));
         const expPromises = months.map((m) => readJson(storage, `acct_expense_json/${toMonthKey(year, m)}.json`));
+        incPromises.push(readJson(storage, `acct_income_json/${toMonthKey(year + 1, 1)}.json`));
+        expPromises.push(readJson(storage, `acct_expense_json/${toMonthKey(year + 1, 1)}.json`));
+
         const [incs, exps] = await Promise.all([Promise.all(incPromises), Promise.all(expPromises)]);
         if (cancelled) return;
 
         const incAll = incs.flatMap((j) => normalizeIncomeFromStorageJson(j));
         const expAll = exps.flatMap((j) => normalizeExpenseFromStorageJson(j));
 
-        const prefix = String(year) + "-";
-        setIncomeRows(incAll.filter((r) => String(r.date).startsWith(prefix)));
-        setExpenseRows(expAll.filter((r) => String(r.date).startsWith(prefix)));
+        const globalStart = bucketBoundaries[0].start;
+        const globalEnd = bucketBoundaries[11].end;
+
+        const inRange = (r) => {
+          const d = parseDate(r.date);
+          return d && d >= globalStart && d <= globalEnd;
+        };
+
+        setIncomeRows(incAll.filter(inRange));
+        setExpenseRows(expAll.filter(inRange));
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("연간 데이터를 불러오지 못했습니다.");
@@ -307,33 +379,33 @@ export default function AnnualSheetPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [year, storage]);
+  }, [year, storage, bucketBoundaries]);
 
   const monthIncome = useMemo(() => {
     const arr = Array(12).fill(0);
     for (const r of incomeRows) {
-      const m = Number((r.date || "").slice(5, 7)) || 0;
-      if (m) arr[m - 1] += toNum(r.amount);
+      const b = getBucketIdx(r.date);
+      if (b) arr[b - 1] += toNum(r.amount);
     }
     return arr;
-  }, [incomeRows]);
+  }, [incomeRows, getBucketIdx]);
 
   const monthExpense = useMemo(() => {
     const arr = Array(12).fill(0);
     for (const r of expenseRows) {
-      const m = Number((r.date || "").slice(5, 7)) || 0;
-      if (m) arr[m - 1] += toNum(r.amount);
+      const b = getBucketIdx(r.date);
+      if (b) arr[b - 1] += toNum(r.amount);
     }
     return arr;
-  }, [expenseRows]);
+  }, [expenseRows, getBucketIdx]);
 
   const totalIncome = useMemo(() => sum(monthIncome), [monthIncome]);
   const totalExpense = useMemo(() => sum(monthExpense), [monthExpense]);
   const netIncome = totalIncome - totalExpense;
 
-  const incomeMatrix = useMemo(() => categoryMonthMatrix(incomeRows), [incomeRows]);
-  const expenseGroups = useMemo(() => expenseBigSubGroups(expenseRows), [expenseRows]);
-  const payMethodMatrix = useMemo(() => paymentMethodMatrix(expenseRows), [expenseRows]); /* ✅ */
+  const incomeMatrix = useMemo(() => categoryMonthMatrixByBuckets(incomeRows, getBucketIdx), [incomeRows, getBucketIdx]);
+  const expenseGroups = useMemo(() => expenseBigSubGroupsByBuckets(expenseRows, getBucketIdx), [expenseRows, getBucketIdx]);
+  const withdrawAccountMatrix = useMemo(() => withdrawAccountMatrixByBuckets(expenseRows, getBucketIdx), [expenseRows, getBucketIdx]);
 
   const summaryRows = useMemo(() => {
     const rows = [
@@ -354,12 +426,15 @@ export default function AnnualSheetPage() {
     return rows;
   }, [monthIncome, monthExpense]);
 
+  /* ✅ 연도 옵션: 2025 ~ 현재연도+5 (필요 시 YEARS_AHEAD 조절) */
   const yearOptions = useMemo(() => {
-    const y = now.getFullYear();
-    return Array.from({ length: 6 }, (_, i) => y - i);
+    const yNow = now.getFullYear();
+    const YEARS_AHEAD = 5;
+    const list = [];
+    for (let y = 2025; y <= yNow + YEARS_AHEAD; y++) list.push(y);
+    return list;
   }, [now]);
 
-  /* 수입정리 월별 합계 (tfoot) */
   const incomeMonthTotals = useMemo(()=>{
     const arr = Array(12).fill(0);
     incomeMatrix.forEach(row => row.months.forEach((v,i)=> arr[i]+=toNum(v)));
@@ -368,10 +443,19 @@ export default function AnnualSheetPage() {
   const incomeGrandTotal = useMemo(()=>sum(incomeMonthTotals),[incomeMonthTotals]);
   const incomeMonthlyAvg = useMemo(()=>Math.round(incomeGrandTotal/12),[incomeGrandTotal]);
 
+  const withdrawAccountMonthTotals = useMemo(() => {
+    const arr = Array(12).fill(0);
+    withdrawAccountMatrix.forEach(r => r.months.forEach((v, i) => (arr[i] += toNum(v))));
+    return arr;
+  }, [withdrawAccountMatrix]);
+  const withdrawAccountGrandTotal = useMemo(() => sum(withdrawAccountMonthTotals), [withdrawAccountMonthTotals]);
+  const withdrawAccountMonthlyAvg = useMemo(() => Math.round(withdrawAccountGrandTotal / 12), [withdrawAccountGrandTotal]);
+
   return (
-    <div className="as-wrap">
+    /* ✅ 다른 페이지 영향 방지용 스코프 클래스 추가 */
+    <div className="annual-sheet as-wrap">
       {/* 헤더 */}
-      <header className="as-header fancy">
+      <header className="as-header fancy as-header-sticky">
         <div className="as-year">
           <span className="as-year-num glam-year">{year}</span>
           <span className="as-year-sub glam-sub">Annual Closing</span>
@@ -402,16 +486,34 @@ export default function AnnualSheetPage() {
           </div>
         </div>
 
-        {/* 연도 선택 */}
-        <div className="as-controls glam-controls">
-          <label className="year-select glam-select">
+        {/* 컨트롤 */}
+        <div className="as-controls two-rows glam-controls">
+          <div className="ctrl-row ctrl-labels">
             <span className="sel-label">연도</span>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </label>
+            <span className="sel-label">집계</span>
+          </div>
+          <div className="ctrl-row ctrl-inputs">
+            <label className="year-select glam-select">
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="연도 선택">
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="year-select glam-select">
+              <select
+                value={anchorDay}
+                onChange={(e)=> setAnchorDay(clamp(Number(e.target.value),1,31))}
+                aria-label="집계 기준일 선택"
+                title="집계 기준일"
+              >
+                {Array.from({length:31},(_,i)=>i+1).map(d=>(
+                  <option key={d} value={d}>{d}일</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       </header>
 
@@ -447,7 +549,7 @@ export default function AnnualSheetPage() {
                       <td className="num total nowrap m-num-sm">{row.isPercent ? `${total}%` : `₩ ${fmtWon(total)}`}</td>
                       {row.values.map((v, i) => (
                         <td key={i} className="num nowrap m-num-sm">
-                          {row.isPercent ? `${v}%` : `₩ {fmtWon(v)}`.replace("{fmtWon(v)}", fmtWon(v))}
+                          {row.isPercent ? `${v}%` : `₩ ${fmtWon(v)}`}
                         </td>
                       ))}
                       <td className="num nowrap m-num-sm">{row.isPercent ? `${avg}%` : `₩ ${fmtWon(avg)}`}</td>
@@ -494,7 +596,6 @@ export default function AnnualSheetPage() {
                   </tr>
                 )}
               </tbody>
-              {/* 월별 합계(tfoot) */}
               <tfoot>
                 <tr>
                   <td className="label nowrap">월별 합계</td>
@@ -543,7 +644,7 @@ export default function AnnualSheetPage() {
                     return (
                       <tr key={`g_${gi}_${idx}`}>
                         {idx === 0 ? (
-                          <td className="label nowrap" rowSpan={g.rows.length + 1 /* 소계 포함 */}>{g.big}</td>
+                          <td className="label nowrap" rowSpan={g.rows.length + 1}>{g.big}</td>
                         ) : null}
                         <td className="label nowrap">{r.sub}</td>
                         <td className="num total nowrap m-num-sm">₩ {fmtWon(r.total)}</td>
@@ -579,7 +680,7 @@ export default function AnnualSheetPage() {
         </div>
       </section>
 
-      {/* 지출 결제방법 (출금방법 기반) */}
+      {/* 지출 결제방법 → 출금계좌 기준 */}
       <section className="as-section">
         <div className="as-sec-title glam-sec">지출 결제방법</div>
         <div className="as-table-card">
@@ -594,7 +695,7 @@ export default function AnnualSheetPage() {
                 </tr>
               </thead>
               <tbody>
-                {payMethodMatrix.map((row)=> {
+                {withdrawAccountMatrix.map((row)=> {
                   const avg = Math.round(toNum(row.total)/12);
                   return (
                     <tr key={row.name}>
@@ -607,7 +708,22 @@ export default function AnnualSheetPage() {
                     </tr>
                   );
                 })}
+                {!withdrawAccountMatrix.length && (
+                  <tr>
+                    <td colSpan={16} className="empty">표시할 데이터가 없습니다.</td>
+                  </tr>
+                )}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td className="label nowrap">합계</td>
+                  <td className="num total nowrap m-num-sm">₩ {fmtWon(withdrawAccountGrandTotal)}</td>
+                  {withdrawAccountMonthTotals.map((v,i)=>(
+                    <td key={i} className="num nowrap m-num-sm">₩ {fmtWon(v)}</td>
+                  ))}
+                  <td className="num nowrap m-num-sm">₩ {fmtWon(withdrawAccountMonthlyAvg)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
