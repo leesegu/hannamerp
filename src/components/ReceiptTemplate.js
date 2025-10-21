@@ -17,7 +17,8 @@ export default function ReceiptTemplate({
   const parseAmount = (value) =>
     parseFloat((value || "0").toString().replace(/,/g, "")) || 0;
   const fmtWON = (value) => `${parseAmount(value).toLocaleString("ko-KR")}원`;
-  const has = (v) => parseAmount(v) > 0;
+  /* ✅ 변경: 0이 아닌 경우(양수/음수 모두) 항목을 표시 */
+  const has = (v) => parseAmount(v) !== 0;
 
   /* ===== Theme (세련된 뉴트럴 & 소프트 포인트) ===== */
   const C = {

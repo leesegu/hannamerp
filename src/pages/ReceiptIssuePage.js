@@ -375,6 +375,16 @@ export default function ReceiptIssuePage() {
     return lines.join("\n");
   };
 
+  /* ✅ 비고 표시 축약 함수 (표시만 줄이고, 원본은 보존) */
+  const shortenNoteForCell = (note, maxLen = 80) => {
+    const raw = s(note);
+    if (!raw) return "";
+    // 개행/공백 정리 후 길이 제한
+    const compact = raw.replace(/\s+/g, " ").trim();
+    if (compact.length <= maxLen) return compact;
+    return compact.slice(0, maxLen) + "…";
+  };
+
   /* ✅ 칼럼 순서: 내용 → 금액 */
   const columns = useMemo(
     () => [
@@ -400,23 +410,24 @@ export default function ReceiptIssuePage() {
       { key: "receiver", label: "받는사람", width: 120 },
       { key: "billingMethod", label: "청구방법", width: 120 },
       { key: "depositDate", label: "입금날짜", width: 110 },
-      // ✅ 비고가 길어도 테이블을 밀지 않게: 말줄임 + 마우스오버 툴팁
+      // ✅ 비고가 길어도 테이블을 밀지 않게: 표시용 축약 + 말줄임 + 툴팁(전체)
       {
         key: "note",
         label: "비고",
         width: 160,
         render: (row) => {
-          const note = s(row.note);
-          if (!note) return "";
+          const full = s(row.note);
+          if (!full) return "";
+          const short = shortenNoteForCell(full, 80); // ← 화면 표시용만 축약
           return (
             <span
               className="note-ellipsis"
-              onMouseEnter={(e) => showTip(note, e)}
+              onMouseEnter={(e) => showTip(full, e)} // 전체 원문 툴팁
               onMouseMove={moveTip}
               onMouseLeave={hideTip}
               title=""
             >
-              {note}
+              {short}
             </span>
           );
         },

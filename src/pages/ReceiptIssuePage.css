@@ -15,6 +15,9 @@
 
   /* 삭제 아이콘 전용 컬럼 폭 */
   --actions-w: 40px;
+
+  /* ✅ 비고 셀 최대 가로폭 (테이블 밀림 방지) */
+  --note-max-w: 220px;
 }
 
 /* 페이지 */
@@ -147,8 +150,16 @@
 .desc-ellipsis{ display:inline-block; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
 .hover-tooltip{ position:fixed; z-index:1500; max-width:460px; white-space:pre-wrap; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,0.25); }
 
-/* ✅ 비고 말줄임: 열 폭 안에서만 줄임, 오버플로우 방지 */
-.note-ellipsis{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
+/* ✅ 비고 말줄임: 열 폭 고정 + 넘침 차단(테이블 우측 밀림 방지) */
+.note-ellipsis{
+  display:inline-block;
+  max-width: var(--note-max-w);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 긴 단일 토큰(연속문자) 대비 — 셀 자체가 늘어나지 않도록 보호 */
+  contain: content;
+}
 
 /* ⚠️ 인쇄용 CSS는 이 파일에서 제거합니다.
    (ReceiptPreviewModal 내부 <style>이 전담) */
