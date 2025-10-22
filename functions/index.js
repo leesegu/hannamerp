@@ -4,22 +4,28 @@
  *   - ping:                   GET  → "pong" (헬스체크)
  *   - importIncomeFromExcel:  POST { downloadUrl, recentMonths? }
  *   - migrateIncomeToStorage: GET/POST (?from=YYYY-MM&to=YYYY-MM&dryRun=1&rewrite=1&startAfter=DOCID)
- * Storage layout:
+ *   - createIntakeLink:       onCall({ villaName, unitNo, phone, expiresInHours? })        // 로그인 필요
+ *   - listActiveIntakeLinks:  onCall()                                                     // 로그인 필요
+ *   - verifyIntakeToken:      onCall({ token })                                            // 비로그인 허용(익명도 OK)
+ *   - submitResidentCard:     onCall({ token, payload })                                   // 익명 가능
+ *   - deleteResidentCard:     onCall({ id })                                               // 로그인 필요(요청대로 누구나)
+ * Storage layout (income json):
  *   gs://<bucket>/acct_income_json/<YYYY-MM>.json
  *   payload = { meta:{updatedAt}, items:{ [id]: Row } }
  * ========================================= */
 
 const admin = require("firebase-admin");
 const ExcelJS = require("exceljs");
-const { onRequest } = require("firebase-functions/v2/https");
+const { onRequest, onCall } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const crypto = require("crypto");
 
 // 🚀 전역 옵션 (서울 리전). Node 런타임은 package.json의 engines.node.
 setGlobalOptions({ region: "asia-northeast3", maxInstances: 10 });
 
 admin.initializeApp();
 
-/* ------------------------- 공통 유틸 ------------------------- */
+/* ------------------------- 공통 유틸 (Income) ------------------------- */
 const MAX_TEXT = 2000;
 const s = (v) => String(v ?? "").trim();
 const toNumber = (v) => {
@@ -69,7 +75,7 @@ async function writeMonthJSON(mk, items, { merge = true } = {}) {
   return Object.keys(merged).length;
 }
 
-/* ------------------------- 엑셀 파싱 ------------------------- */
+/* ------------------------- 엑셀 파싱 (Income) ------------------------- */
 function normalizeExcel2D(ws) {
   const rows = [];
   const rowCount = ws.rowCount;
@@ -456,4 +462,165 @@ exports.migrateIncomeToStorage = onRequest(async (req, res) => {
     console.error(e);
     res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
+});
+
+/* ================================================================
+ * 👇👇👇  여기부터: 입주자카드(Resident Card) callable 함수들  👇👇👇
+ *  - Firestore 규칙은 요청대로 "로그인한 모든 사용자"에게
+ *    세션/제출본 read, delete 허용(create/update는 서버만)으로 작성했다고 가정
+ * ================================================================ */
+
+// 공용 유틸(토큰)
+const b64url = (buf) => buf.toString("base64url");
+const sha256 = (s2) => crypto.createHash("sha256").update(s2).digest("base64url");
+
+/** 링크 생성 — 로그인되어 있으면 OK */
+exports.createIntakeLink = onCall(async (req) => {
+  const { auth, data } = req;
+  if (!auth) throw new Error("unauthenticated: Sign-in required");
+
+  const { villaName, unitNo, phone, expiresInHours = 24 * 14 } = data || {};
+  if (!s(villaName) || !s(unitNo) || !s(phone)) {
+    throw new Error("invalid-argument: villaName, unitNo, phone required");
+  }
+
+  const db = admin.firestore();
+  const sessionRef = db.collection("tenant_intake_sessions").doc();
+
+  const sessionId = sessionRef.id;
+  const rand = crypto.randomBytes(16);
+  const expSec = Math.floor((Date.now() + Number(expiresInHours) * 3600 * 1000) / 1000);
+
+  // 토큰 = sessionId.rand.exp  (서명 대신 해시로 검증)
+  const token = `${sessionId}.${b64url(rand)}.${expSec}`;
+  const tokenHash = sha256(token);
+
+  // ⚠️ 실제 호스팅 도메인으로 교체 필요
+  const url = `https://hannam-move-calculate.web.app/intake.html?t=${encodeURIComponent(token)}`;
+
+  await sessionRef.set({
+    villaName: s(villaName),
+    unitNo: s(unitNo),
+    phone: s(phone),
+    status: "active",
+    tokenHash,
+    expiresAt: admin.firestore.Timestamp.fromMillis(expSec * 1000),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: auth.uid,
+    url,
+  });
+
+  return { url, sessionId, expiresAt: new Date(expSec * 1000).toISOString() };
+});
+
+/** 대기(미제출) 링크 목록 — 로그인되어 있으면 OK */
+exports.listActiveIntakeLinks = onCall(async (req) => {
+  if (!req.auth) throw new Error("unauthenticated: Sign-in required");
+  const db = admin.firestore();
+  const qs = await db.collection("tenant_intake_sessions")
+    .where("status", "==", "active")
+    .orderBy("createdAt", "desc")
+    .limit(200)
+    .get();
+  return qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+});
+
+/** 토큰 검증 — 익명 허용(입주자 폼) */
+exports.verifyIntakeToken = onCall(async (req) => {
+  const token = s(req.data?.token || "");
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("invalid-argument: bad token format");
+
+  const [sessionId, _rand, expStr] = parts;
+  const expSec = Number(expStr);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(expSec) || nowSec > expSec) {
+    return { status: "expired" };
+  }
+
+  const db = admin.firestore();
+  const snap = await db.doc(`tenant_intake_sessions/${sessionId}`).get();
+  if (!snap.exists) throw new Error("not-found: session missing");
+  const sdoc = snap.data() || {};
+
+  if (sdoc.status !== "active") {
+    return { status: sdoc.status, alreadySubmitted: !!sdoc.submissionId };
+  }
+
+  const tokenHash = sha256(token);
+  if (tokenHash !== sdoc.tokenHash) {
+    throw new Error("permission-denied: invalid token");
+  }
+
+  return {
+    status: "active",
+    sessionId,
+    prefill: { villa_name: sdoc.villaName, address: "", unitNo: sdoc.unitNo },
+  };
+});
+
+/** 제출 — 익명 허용, 트랜잭션으로 1회 소진 */
+exports.submitResidentCard = onCall(async (req) => {
+  const token = s(req.data?.token || "");
+  const payload = req.data?.payload || {};
+
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("invalid-argument: bad token");
+  const [sessionId, _rand, expStr] = parts;
+  const expSec = Number(expStr);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(expSec) || nowSec > expSec) {
+    throw new Error("deadline-exceeded: token expired");
+  }
+
+  const db = admin.firestore();
+  const sessionRef = db.doc(`tenant_intake_sessions/${sessionId}`);
+  const submissionRef = db.collection("resident_cards").doc();
+
+  await db.runTransaction(async (tx) => {
+    const ss = await tx.get(sessionRef);
+    if (!ss.exists) throw new Error("not-found: session missing");
+    const sdoc = ss.data() || {};
+
+    const tokenHash = sha256(token);
+    if (tokenHash !== sdoc.tokenHash) throw new Error("permission-denied: invalid token");
+    if (sdoc.status !== "active") throw new Error("failed-precondition: already used/expired");
+
+    const {
+      move_in_date, villa_name, address, name, phone,
+      checklist, notes, photos,
+    } = payload;
+
+    tx.set(submissionRef, {
+      move_in_date: s(move_in_date),
+      villa_name: s(villa_name || sdoc.villaName || ""),
+      address: s(address),
+      name: s(name),
+      phone: s(phone),
+      checklist: checklist || {},
+      notes: s(notes || ""),
+      photos: Array.isArray(photos) ? photos.slice(0, 20) : [],
+      sessionId,
+      villaName: sdoc.villaName,
+      unitNo: sdoc.unitNo,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    tx.update(sessionRef, {
+      status: "used",
+      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      submissionId: submissionRef.id,
+    });
+  });
+
+  return { ok: true, submissionId: submissionRef.id };
+});
+
+/** 삭제 — 로그인된 모든 사용자 허용(요청에 따라) */
+exports.deleteResidentCard = onCall(async (req) => {
+  if (!req.auth) throw new Error("unauthenticated: Sign-in required");
+  const id = s(req.data?.id || "");
+  if (!id) throw new Error("invalid-argument: id required");
+  await admin.firestore().doc(`resident_cards/${id}`).delete();
+  return { ok: true };
 });

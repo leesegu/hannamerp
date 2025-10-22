@@ -60,6 +60,9 @@ import MobilePersonalLedgerPage from "./pages/MobilePersonalLedgerPage";
 /* ✅ 추가: 일정관리(어제·오늘·내일 + 대형 달력) */
 import ScheduleManager from "./pages/ScheduleManager";
 
+/* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
+import ResidentCardPage from "./pages/ResidentCardPage";
+
 import "./App.css";
 
 /* ✅ Firebase Auth 상태도 함께 인지해서 모바일 로그인과 동작 일치 */
@@ -304,6 +307,12 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       {/* 기초등록/사원 */}
       <Route path="/basic/vendor-register" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <VendorRegisterPage />} />
       <Route path="/employee" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <EmployeePage />} />
+
+      {/* ✅ (추가) 부가서비스 · 입주자카드 (직접 URL 접근용 라우트) */}
+      <Route
+        path="/addon/resident-card"
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ResidentCardPage />}
+      />
 
       {/* 와일드카드 */}
       <Route

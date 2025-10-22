@@ -1,0 +1,506 @@
+/* src/pages/ResidentCardPage.css */
+
+/* ===== [신규] 디자인 시스템: 변수 정의 ===== */
+:root {
+  --color-primary: #3B82F6; /* [수정] 활기찬 파란색 */
+  --color-primary-dark: #2563EB;
+  --color-primary-light: #EFF6FF; /* 매우 옅은 파란색 배경 */
+  --color-accent-green: #10B981; /* [신규] 사진 아이콘 */
+  --color-accent-amber: #F59E0B; /* [신규] 노트 아이콘 */
+  --color-danger: #d92d20;
+  --color-danger-light: #fef2f2;
+  --color-text: #1f2937; /* 기본 텍스트 */
+  --color-text-light: #6b7280; /* 보조 텍스트 */
+  --color-border: #e5e7eb; /* 연한 테두리 */
+  --color-bg: #f9fafb; /* 페이지 배경 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+  --radius-md: .75rem; /* 12px */
+  --radius-lg: 1rem; /* 16px */
+}
+
+/* ===== [신규] 페이지 기본 레이아웃 ===== */
+.rcp {
+  padding: 2rem;
+  background-color: var(--color-bg);
+  min-height: 100vh;
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+/* [신규] 페이지 헤더 (제목 + 버튼) */
+.rcp .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.rcp .section-title {
+  font-size: 1.5rem; /* [수정] 페이지 타이틀 역할 겸임 */
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0; /* [수정] 기존 여백 제거 */
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.rcp .section-title svg {
+  color: var(--color-primary);
+}
+
+
+/* ===== [수정] 카드 (공통) ===== */
+.rcp .card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+/* ===== [삭제] 상단 패널 (JSX에서 제거됨) ===== */
+/* .rcp .panel-top.card { ... } */
+
+
+/* ===== [신규] 버튼 (공통) ===== */
+.rcp .btn,
+.rcp .btn-primary {
+  padding: .6rem 1.2rem;
+  border-radius: .5rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  border: 1px solid transparent;
+  transition: all .2s ease;
+  cursor: pointer;
+}
+.rcp .btn:disabled,
+.rcp .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* [수정] 파란색 (주요) 버튼 */
+.rcp .btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.rcp .btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* [신규] 일반 (보조) 버튼 */
+.rcp .btn {
+  background: #fff;
+  color: var(--color-text-light);
+  border: 1px solid var(--color-border);
+}
+.rcp .btn:hover:not(:disabled) {
+  background: var(--color-bg);
+  border-color: #d1d5db;
+  color: var(--color-text);
+}
+
+/* [수정] 아이콘 버튼 */
+.rcp .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px; /* 원형 버튼 */
+  padding: .4rem;
+  background: transparent;
+  color: var(--color-text-light);
+  transition: all .2s ease; /* [수정] 호버 애니메이션 */
+}
+.rcp .icon:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  transform: scale(1.1); /* [신규] 호버 시 확대 */
+}
+
+/* [신규] 아이콘 색상 커스텀 */
+.rcp .icon.icon-checklist { color: var(--color-primary); }
+.rcp .icon.icon-checklist:hover { color: var(--color-primary-dark); }
+
+.rcp .icon.icon-notes { color: var(--color-accent-amber); }
+.rcp .icon.icon-notes:hover { color: #D97706; /* Amber dark */ }
+
+.rcp .icon.icon-photo { color: var(--color-accent-green); }
+.rcp .icon.icon-photo:hover { color: #059669; /* Green dark */ }
+
+.rcp .icon.danger {
+  color: var(--color-danger);
+  border-color: transparent;
+}
+.rcp .icon.danger:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border-color: #fee2e2;
+  transform: scale(1.1); /* [추가] */
+}
+
+/* [수정] 닫기 X 아이콘 (세련되게) */
+.rcp .icon.close {
+  color: var(--color-text-light);
+  padding: 0; /* [신규] 패딩 제거 (아이콘 자체가 큼) */
+  border: none;
+  background: transparent;
+}
+.rcp .icon.close:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: none;
+  transform: scale(1.05) rotate(90deg); /* [신규] 호버 시 회전 */
+}
+
+/* ===== [신규] 입력창 (공통) ===== */
+.rcp .ipt {
+  border: 1px solid var(--color-border);
+  border-radius: .5rem;
+  padding: .6rem .8rem;
+  width: 100%;
+  font-size: .95rem;
+  transition: all .2s ease;
+}
+.rcp .ipt:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); /* [수정] 파란색 섀도우 */
+}
+/* [신규] 작은 입력창 (링크 모달용) */
+.rcp .ipt.ipt-sm {
+  padding: .5rem .75rem; /* [수정] 세로 폭 축소 */
+  font-size: .9rem; /* [수정] 폰트 축소 */
+}
+
+/* ===== [신규] 테이블 디자인 ===== */
+.rcp .table-wrapper {
+  width: 100%;
+  overflow-x: auto; /* 작은 화면에서 가로 스크롤 */
+}
+.rcp .rcp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rcp .rcp-table th, 
+.rcp .rcp-table td {
+  padding: .75rem .75rem;  /* [수정] 세로 폭 줄이기 (1rem -> .75rem) */
+  text-align: center;      /* [수정] 가운데 정렬 */
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.rcp .rcp-table th {
+  background: #fff; /* [수정] 깔끔한 흰색 배경 */
+  font-weight: 600;
+  font-size: .85rem; /* [수정] 폰트 한단계 업 (.8rem -> .85rem) */
+  color: var(--color-text); /* [수정] 더 진한 색 */
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom-width: 2px; /* [신규] 헤더 하단 강조 */
+}
+.rcp .rcp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.rcp .rcp-table tbody tr:hover {
+  background-color: var(--color-primary-light); /* [수정] 호버 색상 변경 */
+}
+.rcp .rcp-table td.truncate {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ===== [수정] 모달 (공통) - 딤 + 블러 배경 ===== */
+@keyframes modal-fade-in {
+  from { opacity: 0; transform: scale(.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rcp .modal,
+.rcp-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 2000;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* ===== [수정] 상세 모달 (.modal .panel) - 럭셔리 디자인 ===== */
+.rcp .modal .panel {
+  background: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); /* [수정] 더 강한 그림자 */
+  padding: 0; /* [수정] 헤더 분리를 위해 패딩 0 */
+  box-sizing: border-box;
+  margin: auto;
+  width: 100%;
+  max-width: 640px; 
+  animation: modal-fade-in .3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  overflow: hidden; /* [신규] 헤더 radius 적용 */
+}
+/* [신규] 모달 헤더 (그라데이션) */
+.rcp .modal .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, var(--color-primary-light), #fff 70%);
+  border-bottom: 1px solid var(--color-border);
+}
+.rcp .modal .panel-header .modal-title {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  font-size: 1.3rem; /* [수정] 폰트 키움 */
+}
+
+/* [신규] 모달 공통 타이틀 (아이콘 포함) */
+.rcp .modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rcp .modal-title svg {
+  color: var(--color-primary); /* 타이틀 아이콘은 메인 컬러 */
+}
+
+/* [수정] 상세 모달 컨텐츠 영역 (패딩 추가) */
+.rcp .modal .modal-content {
+  padding: 1.5rem;
+  max-height: 60dvh; /* [수정] 70dvh -> 60dvh (헤더 크기만큼) */
+  overflow-y: auto;
+  padding-right: .25rem;
+}
+.rcp .checklist-item {
+  background: var(--color-bg);
+  padding: .5rem .75rem;
+  border-radius: .5rem;
+  border: 1px solid var(--color-border);
+}
+
+/* [신규] 하자체크 그룹 디자인 */
+.rcp .checklist-group {
+  margin-bottom: 1rem;
+}
+.rcp .checklist-group:last-child {
+  margin-bottom: 0;
+}
+.rcp .checklist-category {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  margin-bottom: 0.75rem;
+  border-bottom: 2px solid var(--color-primary-light);
+  padding-bottom: 0.25rem;
+}
+.rcp .checklist-items-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rcp .checklist-item-tag {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 0.25rem 0.6rem;
+  border-radius: 99px;
+  font-size: 0.9rem;
+}
+
+/* [수정] 사진 썸네일 (button) */
+.rcp .photo-thumb {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  transition: all .2s ease;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  cursor: pointer;
+}
+.rcp .photo-thumb:hover {
+  transform: scale(1.03);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
+}
+.rcp .photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== [신규] 사진 라이트박스 ===== */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  z-index: 3000; /* 모달보다 위 */
+  padding: 1rem;
+  animation: modal-fade-in .2s ease;
+}
+.lightbox img {
+  display: block;
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+.lightbox .icon.close {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 99px;
+  padding: .25rem;
+}
+.lightbox .icon.close:hover {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  transform: scale(1.1) rotate(90deg);
+}
+
+
+/* ===== [수정] 링크생성/목록 모달 (.rcp-modal .panel) ===== */
+.rcp-modal .panel {
+  background: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.5rem; /* [수정] 패딩 축소 */
+  box-sizing: border-box;
+  margin: auto;
+  width: 100%;
+  max-width: 960px; /* [수정] 가로 사이즈 줄이기 (1100px -> 960px) */
+  animation: modal-fade-in .3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ===== [수정] 링크 목록 (모달 내부) ===== */
+.rcp .waiting-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #fff;
+}
+.rcp .waiting-list .list-body {
+  max-height: 35dvh; /* [수정] 세로 사이즈 줄이기 (40dvh -> 35dvh) */
+  overflow-y: auto;
+}
+
+.rcp .waiting-list .list-head,
+.rcp .waiting-list .row {
+  display: grid;
+  grid-template-columns:
+    clamp(140px, 16vw, 180px)
+    clamp(140px, 18vw, 220px)
+    clamp(90px,  10vw, 110px)
+    clamp(130px, 16vw, 180px)
+    minmax(0, 1fr)
+    clamp(60px,  8vw,  90px);
+  gap: .5rem;
+  align-items: center;
+}
+
+.rcp .waiting-list .list-head {
+  padding: .6rem 1rem; /* [수정] 패딩 축소 */
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 600;
+  color: var(--color-text-light);
+  font-size: .7rem; /* [수정] 폰트 축소 */
+  text-transform: uppercase;
+}
+.rcp .waiting-list .list-head .c { white-space:nowrap; }
+
+.rcp .waiting-list .row {
+  padding: .6rem 1rem; /* [수정] 패딩 축소 */
+  border-bottom: 1px solid #f3f5fa;
+  transition: background .15s;
+}
+.rcp .waiting-list .row:last-child { border-bottom: none; }
+.rcp .waiting-list .row:hover { background: #fcfcfc; }
+
+.rcp .waiting-list .c { 
+  min-width: 0; 
+  font-size: .875rem; /* [수정] 폰트 축소 */
+}
+
+.rcp .waiting-list .link {
+  display: inline-flex; 
+  align-items: center; 
+  gap: .25rem;
+  color: var(--color-primary-dark); /* [수정] 테마색 적용 */
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.rcp .waiting-list .link:hover { text-decoration: underline; }
+
+.rcp .waiting-list .c-act { display:flex; align-items:center; justify-content: center; }
+.rcp .waiting-list .empty { padding: 2.5rem 1rem; text-align:center; color: var(--color-text-light); }
+
+/* [수정] 목록 푸터 (새로고침 버튼 영역) */
+.rcp .waiting-list .list-footer.hint {
+  padding: .6rem 1rem; /* [수정] 패딩 축소 */
+  background: var(--color-primary-light); /* [수정] 테마색 적용 */
+  border-top: 1px solid var(--color-border); /* [수정] 테마색 적용 */
+  color: var(--color-primary-dark); /* [수정] 테마색 적용 */
+  font-size: .8rem; /* [수정] 폰트 축소 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* --- 작은 화면 보정 --- */
+@media (max-width: 1120px) {
+  .rcp .waiting-list .list-head { padding:.6rem .75rem }
+  .rcp .waiting-list .row { padding:.6rem .75rem }
+}
+
+@media (max-width: 768px) {
+  .rcp {
+    padding: 1rem;
+  }
+  .rcp .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .rcp .section-title {
+    font-size: 1.25rem;
+  }
+  /* [삭제] .panel-top.card (제거됨) */
+
+  .rcp .modal-title {
+    font-size: 1.15rem;
+  }
+  .rcp-modal .panel {
+    padding: 1rem;
+  }
+  .rcp .modal .panel .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

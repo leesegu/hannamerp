@@ -46,6 +46,9 @@ import ScheduleManager from "../pages/ScheduleManager";
 /* ✅ 업데이트(모달) */
 import UpdatesModal from "../components/UpdatesModal";
 
+/* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
+import ResidentCardPage from "../pages/ResidentCardPage";
+
 /* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
@@ -401,7 +404,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                 <>
                   <div className="hn-divider my-1.5" />
                   <SidebarSubmenu
-                    items={["입주청소", "도배", "전기요금 추출", "공용전기 계산"]}
+                    items={["입주청소", "도배", "전기요금 추출", "공용전기 계산", "입주자카드"]}
                     activeMenu={activeMenu}
                     onClick={(item) => {
                       setActiveMenu(item);
@@ -410,6 +413,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                         도배: <PaperingPage />,
                         "전기요금 추출": <MessageExtractor />,
                         "공용전기 계산": <PublicElectricCalcPage />,
+                        "입주자카드": <ResidentCardPage />, // ✅ 추가: 부가서비스 > 입주자카드
                       };
                       handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
                     }}
