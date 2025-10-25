@@ -55,6 +55,7 @@ const DATE_SECTIONS = [
     title: "정화조",
     icon: "ri-recycle-line",
     route: "/septic",
+    // ※ 정의는 유지하되, 실제 계산은 아래 dateSections에서 '작업검토일'로 대체
     paths: ["septicDate", "septic.workDate", "septic.nextWorkDate", "septicWorkDate"],
   },
   {
@@ -213,6 +214,24 @@ const sumMoveoutTotal = (x) =>
 const pad2 = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
+/* === ✅ 정화조 ‘작업검토일’ 계산 전용 유틸 ===================== */
+/** 작업날짜 후보(원본 작업일) 가져오기: nextWorkDate는 제외 (검토일은 작업일 +1년 -1일 기준) */
+function getSepticWorkDate(villa) {
+  const candidates = ["septicDate", "septic.workDate", "septicWorkDate"];
+  for (const p of candidates) {
+    const d = toDateSafe(getByPath(villa, p));
+    if (d) return d;
+  }
+  return null;
+}
+/** 작업검토일 = 작업날짜 + 1년 - 1일 */
+function computeSepticReviewDate(workDate) {
+  if (!workDate) return null;
+  const base = new Date(workDate.getFullYear() + 1, workDate.getMonth(), workDate.getDate());
+  base.setDate(base.getDate() - 1);
+  return isNaN(base.getTime()) ? null : base;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -292,20 +311,30 @@ export default function Dashboard() {
       const items = [];
 
       villas.forEach((v) => {
-        let found = null;
-        for (const p of sec.paths) {
-          const raw = getByPath(v, p);
-          const d = toDateSafe(raw);
-          if (d) { found = d; break; }
-        }
-        if (!found) return;
+        let dateForSection = null;
 
-        const d0 = new Date(found.getFullYear(), found.getMonth(), found.getDate());
+        if (sec.key === "septic") {
+          // ✅ 정화조는 '작업검토일'을 기준으로 표시/정렬/임박판정
+          const work = getSepticWorkDate(v);                 // 원본 작업날짜
+          const review = computeSepticReviewDate(work);      // 작업검토 = +1년 -1일
+          if (review) dateForSection = review;
+        } else {
+          // 기존 로직 유지: 섹션 paths 중 첫 유효 날짜
+          for (const p of sec.paths) {
+            const raw = getByPath(v, p);
+            const d = toDateSafe(raw);
+            if (d) { dateForSection = d; break; }
+          }
+        }
+
+        if (!dateForSection) return;
+
+        const d0 = new Date(dateForSection.getFullYear(), dateForSection.getMonth(), dateForSection.getDate());
         const diff = differenceInDays(d0, today0);
         const isOverdue = diff < 0;
         const isToday = diff === 0;
 
-        const withinHorizon = found <= soonEdge;
+        const withinHorizon = dateForSection <= soonEdge;
         let include = false;
 
         if (sec.key === "telco") {
@@ -320,7 +349,7 @@ export default function Dashboard() {
             villaName: v.name || v.villaName || "",
             district: v.district || "",
             address: v.address || "",
-            date: found,
+            date: dateForSection,   // ✅ 정화조는 작업검토일로 저장
             diff,
             isOverdue,
             isToday,

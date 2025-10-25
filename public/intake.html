@@ -4,76 +4,85 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>한남주택관리 입주자카드</title>
-    
-    <!-- Tailwind & Fonts (디자인 전용 추가) -->
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
+        /* 이전 라이트 테마 CSS 스타일 복원 */
         body {
             font-family: 'Noto Sans KR', sans-serif;
-            background-color: #1a1a1a;
-            color: #f0f0f0;
+            background-color: #f9fafb; /* Light background */
+            color: #1f2937; /* Dark text */
         }
         .form-container {
-            background-color: #2c2c2c;
-            border: 1px solid #444;
+            background-color: #ffffff; /* White background */
+            border: 1px solid #e5e7eb; /* Light border */
         }
         .progress-bar-fill {
             transition: width 0.5s ease-in-out;
+            background: linear-gradient(to right, #fbbf24, #f59e0b); /* Amber gradient */
         }
         .btn-primary {
-            background: linear-gradient(145deg, #d4af37, #b08f2d);
-            color: #1a1a1a;
+            background: linear-gradient(145deg, #3B82F6, #2563EB); /* Blue gradient */
+            color: #ffffff; /* White text */
             font-weight: 700;
             border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
             transition: all 0.3s ease;
+            padding: 0.5rem 1.5rem; /* Ensure padding */
+            border: none; /* Ensure no border */
+            cursor: pointer;
         }
         .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+            background: linear-gradient(145deg, #2563EB, #1D4ED8); /* Darker blue */
         }
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: translateY(0);
-            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
         }
         .btn-secondary {
-            background-color: #4a4a4a;
-            color: #f0f0f0;
-            border: 1px solid #666;
+            background-color: #ffffff; /* White background */
+            color: #4b5563; /* Medium gray text */
+            border: 1px solid #d1d5db; /* Gray border */
             transition: background-color 0.3s ease;
-            border-radius: 8px; /* 통일성을 위해 추가 */
-            font-weight: 700; /* 통일성을 위해 추가 */
-            padding: 0.5rem 1.5rem; /* 통일성을 위해 추가 */
+            border-radius: 8px;
+            font-weight: 700;
+            padding: 0.5rem 1.5rem;
+            cursor: pointer;
         }
         .btn-secondary:hover {
-            background-color: #5a5a5a;
+            background-color: #f9fafb; /* Lighter gray background on hover */
         }
         .form-input, .form-textarea, .custom-date-input {
-            background-color: #3a3a3a;
-            border: 1px solid #555;
-            color: #f0f0f0;
+            background-color: #ffffff; /* White background */
+            border: 1px solid #d1d5db; /* Gray border */
+            color: #1f2937; /* Dark text */
             border-radius: 8px;
+            padding: 0.75rem; /* Consistent padding */
+            width: 100%; /* Ensure full width */
+            box-sizing: border-box; /* Include padding in width */
         }
         .form-input:focus, .form-textarea:focus, .custom-date-input:focus {
             outline: none;
-            border-color: #d4af37;
-            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.5);
+            border-color: #3B82F6; /* Blue border on focus */
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); /* Blue shadow on focus */
         }
         .form-label {
-            color: #ccc;
+            color: #4b5563; /* Medium gray text */
         }
         /* Custom scrollbar */
         .policy-text::-webkit-scrollbar { width: 8px; }
-        .policy-text::-webkit-scrollbar-track { background: #3a3a3a; border-radius: 10px; }
-        .policy-text::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
-        .policy-text::-webkit-scrollbar-thumb:hover { background: #b08f2d; }
-        
+        .policy-text::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 10px; }
+        .policy-text::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 10px; } /* Gray scrollbar thumb */
+        .policy-text::-webkit-scrollbar-thumb:hover { background: #6b7280; } /* Darker gray on hover */
+
         .page { display: none; animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -84,12 +93,12 @@
         .custom-date-input {
             position: relative;
             cursor: pointer;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="%23d4af37" d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V10h16v11zM4 8V5h16v3H4z"/></svg>');
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="%236b7280" d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c-1.1-.9-2-.9-2-2zm0 18H4V10h16v11zM4 8V5h16v3H4z"/></svg>'); /* Gray icon */
             background-repeat: no-repeat;
             background-position: right 1rem center;
             background-size: 1.25rem;
         }
-        
+
         input[type="date"]::-webkit-calendar-picker-indicator {
             opacity: 0;
             position: absolute;
@@ -98,8 +107,9 @@
             cursor: pointer;
         }
 
+        /* Light theme for date picker */
         input[type="date"] {
-            color-scheme: dark; 
+            color-scheme: light;
         }
 
         /* Image Preview Style */
@@ -108,7 +118,7 @@
             padding-top: 100%; /* 1:1 Aspect Ratio */
             border-radius: 8px;
             overflow: hidden;
-            background-color: #3a3a3a;
+            background-color: #f3f4f6; /* Light gray background */
         }
         .image-preview-item img {
             position: absolute; top: 0; left: 0;
@@ -119,7 +129,7 @@
         .image-delete-btn {
             position: absolute; top: 4px; right: 4px;
             width: 24px; height: 24px;
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0, 0, 0, 0.6); /* Slightly less dark */
             color: white; border: none; border-radius: 50%;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
             font-size: 14px; font-weight: bold; line-height: 1;
@@ -127,14 +137,14 @@
             z-index: 10;
         }
         .image-delete-btn:hover {
-            background-color: rgba(239, 68, 68, 0.9);
+            background-color: rgba(239, 68, 68, 0.9); /* Red hover */
         }
 
         /* Image Modal Styles */
         .image-modal {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
+            background-color: rgba(0, 0, 0, 0.85); /* Slightly less dark */
             display: flex; align-items: center; justify-content: center;
             z-index: 1000;
             animation: fadeInModal 0.3s;
@@ -152,59 +162,78 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        /* File input styling - Restored from previous correct version */
+        input[type="file"] {
+          color: #9ca3af; /* Make default text subtle */
+        }
+        input[type="file"]::file-selector-button {
+          margin-right: 1rem;
+          padding: 0.5rem 1rem;
+          border-radius: 9999px; /* Full */
+          border: none;
+          font-size: 0.875rem; /* text-sm */
+          font-weight: 600;
+          background-color: #EBF8FF; /* blue-50 */
+          color: #2B6CB0; /* blue-700 */
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        input[type="file"]::file-selector-button:hover {
+          background-color: #BEE3F8; /* blue-100 */
+        }
     </style>
 </head>
 
 <body class="min-h-screen flex items-center justify-center p-4">
     <div id="app-container" class="w-full max-w-md mx-auto">
 
-        <!-- 진행바/제목/페이지 (디자인 적용) -->
-        <div id="form-wizard" class="form-container rounded-2xl p-6 md:p-8 shadow-2xl space-y-6 hidden">
-            <div id="progress-container" class="w-full bg-gray-600 rounded-full h-2.5">
-                <div id="progress-bar" class="bg-gradient-to-r from-yellow-500 to-amber-400 h-2.5 rounded-full progress-bar-fill" style="width: 0%"></div>
+        <!-- 진행바/제목/페이지 -->
+        <div id="form-wizard" class="form-container rounded-2xl p-6 md:p-8 shadow-lg space-y-6 hidden border border-gray-200">
+            <div id="progress-container" class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progress-bar" class="h-2.5 rounded-full progress-bar-fill" style="width: 0%"></div>
             </div>
-            
-            <h2 id="page-title" class="text-2xl font-bold text-center text-gray-100"></h2>
+
+            <h2 id="page-title" class="text-2xl font-bold text-center text-gray-800"></h2>
 
             <!-- 동적 콘텐츠 -->
             <div id="page-content" class="min-h-[400px] flex flex-col justify-between"></div>
 
-            <!-- 네비게이션 (디자인 적용) -->
+            <!-- 네비게이션 -->
             <div id="navigation-buttons" class="flex justify-between items-center pt-4">
                 <button id="prev-btn" class="btn-secondary py-2 px-6 rounded-lg font-semibold">이전</button>
-                <span id="step-counter" class="text-sm text-gray-400"></span>
+                <span id="step-counter" class="text-sm text-gray-500"></span>
                 <button id="next-btn" class="btn-primary py-2 px-6 rounded-lg font-bold">다음 →</button>
                 <button id="submit-btn" class="btn-primary py-2 px-6 rounded-lg font-bold hidden">제출하기</button>
             </div>
         </div>
 
-        <!-- 이미 제출/만료 (디자인 적용) -->
-        <div id="already-submitted" class="form-container rounded-2xl p-8 shadow-2xl text-center space-y-4 hidden">
-             <svg class="mx-auto h-16 w-16 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <!-- 이미 제출/만료 -->
+        <div id="already-submitted" class="form-container rounded-2xl p-8 shadow-lg text-center space-y-4 hidden border border-gray-200">
+             <svg class="mx-auto h-16 w-16 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h2 class="text-2xl font-bold text-gray-100">제출 완료</h2>
-            <p class="text-gray-300">입주자카드 작성을 이미 완료하셨습니다. <br> 추가 문의는 관리사무소로 연락주시기 바랍니다.</p>
-            <div class="mt-6 border-t border-gray-700 pt-6 space-y-3">
-                <p class="font-semibold text-lg">한남주택관리 042-489-8555</p>
+            <h2 class="text-2xl font-bold text-gray-800">제출 내역 확인</h2>
+            <p class="text-gray-600">제출완료 된 입주자카드가 있어서 추가 제출, 수정이 안됩니다. <br> 추가 문의는 관리사무소로 연락주시기 바랍니다.</p>
+            <div class="mt-6 border-t border-gray-200 pt-6 space-y-3">
+                <p class="font-semibold text-lg text-gray-700">한남주택관리 042-489-8555</p>
                 <a href="http://pf.kakao.com/_ggrxaK/chat" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 mt-3 bg-[#FEE500] text-black px-5 py-2.5 rounded-lg font-bold hover:opacity-90 transition-opacity">
                     <svg viewBox="0 0 32 32" class="w-6 h-6"><path fill="currentColor" d="M16 4.64c-6.96 0-12.64 4.48-12.64 10.08 0 3.52 2.24 6.624 5.76 8.48l-1.92 7.04 7.52-3.84c.448.064.896.064 1.344.064 6.96 0 12.64-4.48 12.64-10.08S22.96 4.64 16 4.64z"></path></svg>
                     카카오톡 채널 추가
                 </a>
             </div>
-             <!-- view-data-btn 제거됨 (Firebase 로직에는 없음) -->
         </div>
 
-        <!-- 동의 모달 (디자인 적용) -->
+        <!-- 동의 모달 -->
         <div id="consent-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
-            <div class="bg-gray-800 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl border border-yellow-500/30">
-                <h3 class="text-xl font-bold text-yellow-400 mb-4">안내</h3>
-                <p class="text-gray-300 mb-6">개인정보 수집 및 이용에 동의하지 않으실 경우, 입주자카드 작성을 진행할 수 없습니다.</p>
+            <div class="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl border border-gray-200">
+                <h3 class="text-xl font-bold text-blue-600 mb-4">안내</h3>
+                <p class="text-gray-600 mb-6">개인정보 수집 및 이용에 동의하지 않으실 경우, 입주자카드 작성을 진행할 수 없습니다.</p>
                 <button id="close-modal-btn" class="btn-primary w-full py-2.5 rounded-lg">확인</button>
             </div>
         </div>
 
-        <!-- 사진 모달 (디자인 적용) -->
+        <!-- 사진 모달 -->
         <div id="image-fullscreen-modal" class="image-modal hidden">
             <span id="image-modal-close-btn" class="image-modal-close">&times;</span>
             <img id="image-modal-content" class="image-modal-content" src="" alt="Full size image">
@@ -236,7 +265,7 @@
         let signaturePad, ctx;
         let isDrawing = false;
         let uploadedFiles = [];
-        
+
         const logoBase64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAAAAAAAAAAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApkZXNjAAAA/AAAAHxjcHJ0AAABcAAAACh3dHB0AAABoAAAAAxyVFJDAAABvAAAAA5nVFJDAAABvAAAAA5iVFJDAAABvAAAAA5kZXNjAAAAAAAAAANjMgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB0ZXh0AAAAAElYAABDb3B5cmlnaHQgKEMpIDIwMjIgR2vZ2xlIExMQwAAAA5zZjA2AAAAAAEAACovAAAFoAAAACg/AAARiQAAHdQABVguAAEBdAAB/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgBiAGIAwEiAAIRAQADAQD/xAAfAAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TVWdTW1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/aAAwDAQACEQMRAD8A/vrorzLwH8WdL+AGteI9I0bTvFC3nhPVzoWsvqfhrVNItoL4RRTtHbS31tAlzGYpowZYS8YJK7tytt+m6ACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAPgj9nH/ka/aJ/wCyyaj/AOm3S6+/a+BP2cf+Rr/aJ/7LJqP/AKbdLr77oAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAPgj9nH/ka/aJ/wCyyaj/AOm3S6+/a+BP2cf+Rr/aJ/7LJqP/AKbdLr77oAKKKKACiiigAooooAKKKK";
 
         const formWizard = document.getElementById('form-wizard');
@@ -248,7 +277,7 @@
         const submitBtn = document.getElementById('submit-btn');
         const stepCounter = document.getElementById('step-counter');
         const consentModal = document.getElementById('consent-modal');
-        const closeModalBtn = document.getElementById('close-modal-btn'); // (디자인 적용)
+        const closeModalBtn = document.getElementById('close-modal-btn');
         const alreadySubmittedEl = document.getElementById('already-submitted');
         const imageModal = document.getElementById('image-fullscreen-modal');
         const imageModalContent = document.getElementById('image-modal-content');
@@ -263,24 +292,25 @@
         }
 
         // ===== 페이지 콘텐츠 (디자인/문구 적용) =====
-        
+
         function generateChecklistSection(title, items) {
-            const checklistItems = items.map(item => `<label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-700/50 cursor-pointer"><div class="relative flex items-center justify-center w-5 h-5"><input type="checkbox" name="${title}_${item}" class="absolute opacity-0 w-full h-full cursor-pointer peer"><div class="w-5 h-5 border-2 border-gray-500 rounded-md bg-gray-600 peer-checked:bg-amber-400 peer-checked:border-amber-400 transition-all duration-200 flex-shrink-0"></div><svg class="absolute w-4 h-4 text-gray-900 hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg></div><span>${item}</span></label>`).join('');
-            return `<fieldset class="border border-gray-600 p-4 rounded-lg"><legend class="px-2 text-lg font-semibold text-amber-400">${title}</legend><div class="grid grid-cols-2 gap-x-4 gap-y-2">${checklistItems}</div></fieldset>`;
+            // Tailwind classes restored for checklist items
+            const checklistItems = items.map(item => `<label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer"><div class="relative flex items-center justify-center w-5 h-5"><input type="checkbox" name="${title}_${item}" class="absolute opacity-0 w-full h-full cursor-pointer peer"><div class="w-5 h-5 border-2 border-gray-300 rounded-md bg-white peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all duration-200 flex-shrink-0"></div><svg class="absolute w-4 h-4 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg></div><span class="text-gray-700">${item}</span></label>`).join('');
+            return `<fieldset class="border border-gray-300 p-4 rounded-lg"><legend class="px-2 text-lg font-semibold text-blue-600">${title}</legend><div class="grid grid-cols-2 gap-x-4 gap-y-2">${checklistItems}</div></fieldset>`;
         }
-        
+
         const pages = {
             1: {
                 title: '환영합니다',
                 content: `
                     <div class="text-center flex-grow flex flex-col justify-center items-center p-4">
-                        <h3 class="text-3xl font-bold text-gray-100 mb-4">환영합니다</h3>
+                        <h3 class="text-3xl font-bold text-gray-800 mb-4">환영합니다</h3>
                         <img src="${logoBase64}" alt="한남주택관리 로고" class="mb-4 w-32 h-32 object-contain">
-                        <p class="text-xl font-semibold text-amber-400 mb-6">입주자카드 작성</p>
-                        <div class="text-gray-300 text-left space-y-2 bg-gray-700/30 p-4 rounded-lg">
+                        <p class="text-xl font-semibold text-blue-600 mb-6">입주자카드 작성</p>
+                        <div class="text-gray-600 text-left space-y-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
                              <p>새로운 보금자리에 입주하신 것을 진심으로<br>환영합니다.</p>
                              <p>본 카드는 입주 시점의 상태를 정확히 기록하여,<br>거주하시는 동안 그리고 퇴실 시 발생할 수 있는<br>분쟁을 예방하기 위한 중요한 자료입니다.</p>
-                             <p>우측 하단의 <span class="font-bold text-amber-400">[다음 →]</span> 버튼을 눌러 각 항목을<br>꼼꼼히 확인하고 작성해 주시기 바랍니다.</p>
+                             <p>우측 하단의 <span class="font-bold text-blue-600">[다음 →]</span> 버튼을 눌러 각 항목을<br>꼼꼼히 확인하고 작성해 주시기 바랍니다.</p>
                         </div>
                     </div>
                 `
@@ -289,14 +319,14 @@
                 title: '개인정보 수집 및 이용 동의',
                 content: `
                     <div class="h-full flex flex-col p-1">
-                        <div class="policy-text overflow-y-auto pr-2 flex-grow bg-gray-800/50 p-4 rounded-lg text-sm text-gray-300 space-y-4">
-                            <p class="font-semibold text-gray-100">본 체크리스트는 입주민의 편의를 위한 상태 기록용 문서로, 작성된 내용은 해당 거주지의 상태 확인 및 관리 목적으로만 사용됩니다.</p>
-                            <div><h4 class="font-bold text-amber-400 mb-1">✔ 수집 항목</h4><p>- 이름, 연락처, 주소, 체크리스트 응답 내용, 서명</p></div>
-                            <div><h4 class="font-bold text-amber-400 mb-1">✔ 수집 목적</h4><p>- 퇴실 시 상태 비교, 하자 발생 시 증빙자료 확보, 관리대장 작성</p></div>
-                            <div><h4 class="font-bold text-amber-400 mb-1">✔ 보관 기간</h4><p>- 퇴실일로부터 최대 1년 (또는 관리 목적 달성 시까지)</p></div>
-                            <div><h4 class="font-bold text-amber-400 mb-1">✔ 제3자 제공</h4><p>- 없음</p></div>
-                            <div><h4 class="font-bold text-amber-400 mb-1">✔ 보관 주체</h4><p>- 해당 건물 관리사무소 또는 위탁 관리업체</p></div>
-                            <p class="font-semibold text-gray-100 pt-2">※ 위 목적 외 사용되거나 외부에 제공되지 않으며, 동의하지 않으실 경우 체크리스트 제출이 제한될 수 있습니다.</p>
+                        <div class="policy-text overflow-y-auto pr-2 flex-grow bg-gray-50 p-4 rounded-lg text-sm text-gray-600 space-y-4 border border-gray-200">
+                            <p class="font-semibold text-gray-800">본 체크리스트는 입주민의 편의를 위한 상태 기록용 문서로, 작성된 내용은 해당 거주지의 상태 확인 및 관리 목적으로만 사용됩니다.</p>
+                            <div><h4 class="font-bold text-blue-600 mb-1">✔ 수집 항목</h4><p>- 이름, 연락처, 주소, 체크리스트 응답 내용, 서명</p></div>
+                            <div><h4 class="font-bold text-blue-600 mb-1">✔ 수집 목적</h4><p>- 퇴실 시 상태 비교, 하자 발생 시 증빙자료 확보, 관리대장 작성</p></div>
+                            <div><h4 class="font-bold text-blue-600 mb-1">✔ 보관 기간</h4><p>- 퇴실일로부터 최대 1년 (또는 관리 목적 달성 시까지)</p></div>
+                            <div><h4 class="font-bold text-blue-600 mb-1">✔ 제3자 제공</h4><p>- 없음</p></div>
+                            <div><h4 class="font-bold text-blue-600 mb-1">✔ 보관 주체</h4><p>- 해당 건물 관리사무소 또는 위탁 관리업체</p></div>
+                            <p class="font-semibold text-gray-800 pt-2">※ 위 목적 외 사용되거나 외부에 제공되지 않으며, 동의하지 않으실 경우 체크리스트 제출이 제한될 수 있습니다.</p>
                         </div>
                     </div>
                 `
@@ -305,11 +335,11 @@
                 title: '개인정보 동의 확인',
                 content: `
                     <div class="flex-grow flex flex-col justify-center items-center p-4">
-                        <p class="text-lg font-semibold text-center mb-4 text-gray-100">개인정보 수집 및 이용에 동의하십니까?</p>
-                        <p class="text-sm text-center mb-8 text-gray-400">※ 해당 체크리스트는 개인정보 수집 및 이용 동의가 필요합니다. 동의하지 않으실 경우 제출이 제한되거나, 체크리스트 확인이 어려울 수 있습니다.</p>
+                        <p class="text-lg font-semibold text-center mb-4 text-gray-800">개인정보 수집 및 이용에 동의하십니까?</p>
+                        <p class="text-sm text-center mb-8 text-gray-500">※ 해당 체크리스트는 개인정보 수집 및 이용 동의가 필요합니다. 동의하지 않으실 경우 제출이 제한되거나, 체크리스트 확인이 어려울 수 있습니다.</p>
                         <div class="space-y-4 w-full max-w-xs">
-                            <label class="flex items-center p-4 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700/80"><input type="radio" name="consent" value="agree" class="hidden peer"><div class="w-6 h-6 border-2 border-gray-400 rounded-full mr-4 peer-checked:border-amber-400 peer-checked:bg-amber-400 relative"></div><span class="text-gray-100">동의합니다</span></label>
-                            <label class="flex items-center p-4 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700/80"><input type="radio" name="consent" value="disagree" class="hidden peer"><div class="w-6 h-6 border-2 border-gray-400 rounded-full mr-4 peer-checked:border-red-500 peer-checked:bg-red-500 relative"></div><span class="text-gray-100">동의하지 않습니다</span></label>
+                            <label class="flex items-center p-4 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100"><input type="radio" name="consent" value="agree" class="hidden peer"><div class="w-6 h-6 border-2 border-gray-300 rounded-full mr-4 peer-checked:border-blue-600 peer-checked:bg-blue-600 relative"></div><span class="text-gray-700">동의합니다</span></label>
+                            <label class="flex items-center p-4 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100"><input type="radio" name="consent" value="disagree" class="hidden peer"><div class="w-6 h-6 border-2 border-gray-300 rounded-full mr-4 peer-checked:border-red-500 peer-checked:bg-red-500 relative"></div><span class="text-gray-700">동의하지 않습니다</span></label>
                         </div>
                     </div>
                 `
@@ -318,18 +348,19 @@
                 title: '입주자 정보',
                 content: `
                      <div class="space-y-5 py-4">
-                        <div><label for="name" class="form-label block mb-1.5 text-sm font-medium">성함</label><input type="text" id="name" name="name" class="form-input w-full p-3" placeholder="홍길동"></div>
-                        <div><label for="phone" class="form-label block mb-1.5 text-sm font-medium">전화번호</label><input type="tel" id="phone" name="phone" class="form-input w-full p-3" placeholder="010-1234-5678"></div>
-                        <div><label for="address" class="form-label block mb-1.5 text-sm font-medium">주소</label><input type="text" id="address" name="address" class="form-input w-full p-3" placeholder="상세 주소를 입력해주세요"></div>
-                        <div><label for="villa_name" class="form-label block mb-1.5 text-sm font-medium">빌라명</label><input type="text" id="villa_name" name="villa_name" class="form-input w-full p-3" placeholder="예) 한남빌라 101호"></div>
-                        <div><label for="move_in_date" class="form-label block mb-1.5 text-sm font-medium">입주날짜</label><input type="date" id="move_in_date" name="move_in_date" class="custom-date-input w-full p-3"></div>
-                    </div>
-                `
+                         <div><label for="name" class="form-label block mb-1.5 text-sm font-medium">성함</label><input type="text" id="name" name="name" class="form-input w-full p-3" placeholder="홍길동"></div>
+                         <div><label for="phone" class="form-label block mb-1.5 text-sm font-medium">전화번호</label><input type="tel" id="phone" name="phone" class="form-input w-full p-3" placeholder="010-1234-5678" maxlength="13"></div>
+                         <div><label for="address" class="form-label block mb-1.5 text-sm font-medium">주소</label><input type="text" id="address" name="address" class="form-input w-full p-3" placeholder="상세 주소를 입력해주세요"></div>
+                         <div><label for="villa_name" class="form-label block mb-1.5 text-sm font-medium">빌라명</label><input type="text" id="villa_name" name="villa_name" class="form-input w-full p-3" placeholder="예) 한남빌라"></div>
+                         <div><label for="unit_no" class="form-label block mb-1.5 text-sm font-medium">호수</label><input type="text" id="unit_no" name="unit_no" class="form-input w-full p-3" placeholder="예) 101호"></div>
+                         <div><label for="move_in_date" class="form-label block mb-1.5 text-sm font-medium">입주날짜</label><input type="date" id="move_in_date" name="move_in_date" class="custom-date-input w-full p-3"></div>
+                     </div>
+                 `
             },
             5: {
                 title: '체크리스트 (1/2)',
                 content: `
-                    <div class="space-y-4"><div class="bg-gray-800/50 p-3 rounded-lg text-center text-sm text-gray-300"><p class="font-semibold text-gray-100">각 공간의 시설물 상태를 확인해주세요.</p><p>하자가 있는 항목에 체크해주시고, 목록에 없는 내용은 마지막 페이지의 '기타 하자내용'에 상세히 기재해주시면 됩니다.</p></div><div class="space-y-6 overflow-y-auto pr-2 h-[320px] policy-text">${generateChecklistSection('방', ['도배', '장판', '몰딩', '문짝', '조명', '창문', '방충망'])}${generateChecklistSection('주방', ['도배', '장판', '씽크대', '인덕션(가스레인지, 쿡탑)', '후드', '조명', '수전(수도꼭지)'])}${generateChecklistSection('욕실', ['타일', '조명', '문짝', '세면대', '변기', '거울', '수전(수도꼭지)', '수건장', '악세사리세트', '환풍기', '배수', '창문', '방충망'])}</div></div>`
+                    <div class="space-y-4"><div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center text-sm text-blue-700"><p class="font-semibold text-blue-800">각 공간의 시설물 상태를 확인해주세요.</p><p>하자가 있는 항목에 체크해주시고, 목록에 없는 내용은 마지막 페이지의 '기타 하자내용'에 상세히 기재해주시면 됩니다.</p></div><div class="space-y-6 overflow-y-auto pr-2 h-[320px] policy-text">${generateChecklistSection('방', ['도배', '장판', '몰딩', '문짝', '조명', '창문', '방충망'])}${generateChecklistSection('주방', ['도배', '장판', '씽크대', '인덕션(가스레인지, 쿡탑)', '후드', '조명', '수전(수도꼭지)'])}${generateChecklistSection('욕실', ['타일', '조명', '문짝', '세면대', '변기', '거울', '수전(수도꼭지)', '수건장', '악세사리세트', '환풍기', '배수', '창문', '방충망'])}</div></div>`
             },
             6: {
                 title: '체크리스트 (2/2)',
@@ -337,16 +368,17 @@
             },
             7: {
                 title: '기타 및 서명',
+                // ✅ [수정] HTML 주석 완전 삭제
                 content: `
                     <div class="space-y-6 h-full flex flex-col">
                         <div><label for="notes" class="form-label block mb-1.5 text-sm font-medium">기타 하자내용</label><textarea id="notes" name="notes" rows="3" class="form-textarea w-full p-3" placeholder="특이사항이나 사진으로 담기 힘든 내용을 기재해주세요."></textarea></div>
                         <div>
                             <label for="photos" class="form-label block mb-1.5 text-sm font-medium">사진 업로드</label>
-                            <input type="file" id="photos" name="photos" multiple accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer">
-                            <p id="photo-upload-desc" class="text-xs text-gray-400 mt-2 transition-colors">하자 부위 사진을 최대 5장까지 첨부할 수 있습니다.</p>
+                            <input type="file" id="photos" name="photos" multiple accept="image/*" class="w-full text-sm">
+                            <p id="photo-upload-desc" class="text-xs text-red-500 mt-2 transition-colors" style="display: none;"></p>
                             <div id="image-preview-container" class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-4"></div>
                         </div>
-                        <div class="flex-grow flex flex-col"><label class="form-label block mb-1.5 text-sm font-medium">서명</label><div class="relative w-full h-32"><canvas id="signature-pad" class="bg-gray-700 rounded-lg w-full h-full"></canvas><button id="clear-signature" type="button" class="absolute top-2 right-2 text-xs bg-gray-800 text-white px-2 py-1 rounded">지우기</button></div></div>
+                        <div class="flex-grow flex flex-col"><label class="form-label block mb-1.5 text-sm font-medium">서명</label><div class="relative w-full h-32"><canvas id="signature-pad" class="bg-gray-100 border border-gray-300 rounded-lg w-full h-full"></canvas><button id="clear-signature" type="button" class="absolute top-2 right-2 text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700">지우기</button></div></div>
                     </div>`
             }
         };
@@ -375,9 +407,9 @@
                         const idxToRemove = parseInt(event.target.dataset.index);
                         uploadedFiles.splice(idxToRemove, 1);
                         renderImagePreviews();
-                        updatePhotoUploadDesc();
+                        updatePhotoUploadDesc(); // ✅ 삭제 시 문구 업데이트
                     });
-                    
+
                     item.appendChild(img);
                     item.appendChild(deleteBtn);
                     previewContainer.appendChild(item);
@@ -386,35 +418,39 @@
             });
         }
 
+        // ✅ [수정] 사진 업로드 문구 로직 변경 -> 에러 메시지만 표시하도록
         function updatePhotoUploadDesc() {
             const photoDesc = document.getElementById('photo-upload-desc');
-             if (uploadedFiles.length > 0) {
-                photoDesc.textContent = `현재 ${uploadedFiles.length}개 첨부됨 (최대 5개)`;
-            } else {
-                photoDesc.textContent = '하자 부위 사진을 최대 5장까지 첨부할 수 있습니다.';
-            }
-            photoDesc.classList.remove('text-red-500');
-            photoDesc.classList.add('text-gray-400');
+             if (!photoDesc) return; // defensive check
+
+             // Clear previous error state first, and hide by default
+             photoDesc.classList.remove('text-red-500');
+             photoDesc.classList.add('text-gray-500'); // Default color (though mostly hidden)
+             photoDesc.style.display = 'none';
+             photoDesc.textContent = ''; // Clear text
         }
-        
+
+        // ✅ [수정] 사진 업로드 리스너 로직 변경 (에러 메시징)
         function addPhotoUploadListener() {
-            const photosInput = document.getElementById('photos'); // ID 'photos'로 변경
+            const photosInput = document.getElementById('photos');
             const photoDesc = document.getElementById('photo-upload-desc');
-            if (photosInput) {
+            if (photosInput && photoDesc) { // Defensive check
                 photosInput.addEventListener('change', (e) => {
                     const newFiles = Array.from(e.target.files);
                     const totalFiles = uploadedFiles.length + newFiles.length;
-                    
+
                     if (totalFiles > 5) {
                         photoDesc.textContent = '사진은 최대 5장까지 업로드할 수 있습니다.';
-                        photoDesc.classList.add('text-red-500');
-                        photoDesc.classList.remove('text-gray-400');
+                        photoDesc.style.display = 'block'; // 에러 메시지는 보이도록 함
+                        photoDesc.classList.add('text-red-500'); // Error color
+                        photoDesc.classList.remove('text-gray-500'); // Remove default color
                     } else {
                         uploadedFiles.push(...newFiles);
-                        updatePhotoUploadDesc();
+                        updatePhotoUploadDesc(); // Clear any previous error message and hide p tag
                         renderImagePreviews();
                     }
-                    e.target.value = ''; // Reset input
+                    // Reset file input value to allow selecting the same file again after deletion
+                    e.target.value = '';
                 });
             }
         }
@@ -431,31 +467,87 @@
 
         function initSignaturePad() {
             signaturePad = document.getElementById('signature-pad');
+             if (!signaturePad) return; // Defensive check
             ctx = signaturePad.getContext('2d');
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
             signaturePad.width = signaturePad.offsetWidth * ratio;
             signaturePad.height = signaturePad.offsetHeight * ratio;
             signaturePad.getContext('2d').scale(ratio, ratio);
-            ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2;
+            ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 2; // Dark stroke
             ['mousedown', 'touchstart'].forEach(evt => signaturePad.addEventListener(evt, startDrawing, { passive: false }));
             ['mouseup', 'touchend'].forEach(evt => signaturePad.addEventListener(evt, stopDrawing, { passive: false }));
             ['mousemove', 'touchmove'].forEach(evt => signaturePad.addEventListener(evt, draw, { passive: false }));
-            document.getElementById('clear-signature').addEventListener('click', () => ctx.clearRect(0, 0, signaturePad.width, signaturePad.height));
+            document.getElementById('clear-signature')?.addEventListener('click', () => {
+              if (ctx && signaturePad) { // Ensure context and pad exist
+                ctx.clearRect(0, 0, signaturePad.width, signaturePad.height);
+              }
+            });
         }
 
         function getEventPos(e) {
+             if (!signaturePad) return { x: 0, y: 0 }; // Defensive check
             const rect = signaturePad.getBoundingClientRect();
             const touch = e.touches ? e.touches[0] : null;
             return { x: (touch || e).clientX - rect.left, y: (touch || e).clientY - rect.top };
         }
 
-        function startDrawing(e) { e.preventDefault(); isDrawing = true; const pos = getEventPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
-        function stopDrawing(e) { e.preventDefault(); isDrawing = false; ctx.beginPath(); }
-        function draw(e) { if (!isDrawing) return; e.preventDefault(); const pos = getEventPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+        function startDrawing(e) { e.preventDefault(); if(!ctx) return; isDrawing = true; const pos = getEventPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+        function stopDrawing(e) { e.preventDefault(); if(!ctx) return; isDrawing = false; ctx.beginPath(); }
+        function draw(e) { if (!isDrawing || !ctx) return; e.preventDefault(); const pos = getEventPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
 
+        // ✅ [추가] 전화번호 자동 하이픈 함수
+        function handlePhoneInput(e) {
+            const input = e.target;
+            let value = input.value.replace(/[^\d]/g, "");
+            const len = value.length;
+            let formattedValue = "";
+
+            if (len < 4) {
+                formattedValue = value;
+            } else if (len <= 7) {
+                formattedValue = `${value.substring(0, 3)}-${value.substring(3)}`;
+            } else if (len <= 11) {
+                formattedValue = `${value.substring(0, 3)}-${value.substring(3, 7)}-${value.substring(7, 11)}`;
+            } else {
+                // Prevent further input beyond 11 digits (formatted as 13 chars)
+                formattedValue = `${value.substring(0, 3)}-${value.substring(3, 7)}-${value.substring(7, 11)}`;
+            }
+            input.value = formattedValue;
+        }
+
+        // ✅ [추가] 엔터 키 이동 함수
+        function setupInputNavigation() {
+            const inputs = [
+                document.getElementById('name'),
+                document.getElementById('phone'),
+                document.getElementById('address'),
+                document.getElementById('villa_name'),
+                document.getElementById('unit_no'), // '호수' 추가
+                document.getElementById('move_in_date')
+            ];
+
+            inputs.forEach((input, index) => {
+                if (input) {
+                    input.addEventListener('keydown', (e) => {
+                        // 'Enter' 키 (PC) 또는 모바일 '이동'/'다음' 키 (keyCode 13)
+                        if (e.key === 'Enter' || e.keyCode === 13) {
+                            if (input.type !== 'textarea') { // 텍스트 영역은 제외
+                                e.preventDefault(); // 기본 엔터 동작 (폼 제출 등) 방지
+                                const nextInput = inputs[index + 1];
+                                if (nextInput) {
+                                    nextInput.focus();
+                                } else {
+                                    input.blur(); // 마지막 입력창이면 키보드 숨김
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        }
 
         // ===== Core Logic Functions (디자인 적용 및 연결) =====
-        
+
         function saveData() {
             const inputs = pageContentEl.querySelectorAll('input, textarea');
             inputs.forEach(input => {
@@ -496,21 +588,28 @@
             pageContentEl.scrollTop = 0; // (디자인 적용)
             progressBar.style.width = `${((currentStep - 1) / (totalSteps - 1)) * 100}%`;
             stepCounter.textContent = `${currentStep} / ${totalSteps}`;
-            prevBtn.style.display = currentStep > 1 ? 'block' : 'none'; // (디자인 적용)
-            nextBtn.style.display = currentStep < totalSteps ? 'block' : 'none'; // (디자인 적용)
-            submitBtn.style.display = currentStep === totalSteps ? 'block' : 'none'; // (디자인 적용)
+            prevBtn.style.display = currentStep > 1 ? 'inline-flex' : 'none'; // Use inline-flex for button
+            nextBtn.style.display = currentStep < totalSteps ? 'inline-flex' : 'none'; // Use inline-flex for button
+            submitBtn.style.display = currentStep === totalSteps ? 'inline-flex' : 'none'; // Use inline-flex for button
+
 
             // (디자인 적용 - UI 로직)
             if (currentStep === 3) addConsentListeners();
+            // ✅ [수정] 4단계 진입 시 리스너 추가
+            if (currentStep === 4) {
+                document.getElementById('phone')?.addEventListener('input', handlePhoneInput);
+                setupInputNavigation();
+            }
             if (currentStep === 7) {
                 initSignaturePad();
                 addPhotoUploadListener();
+                updatePhotoUploadDesc(); // ✅ [추가] 7단계 진입 시 문구 상태 업데이트
             }
 
             loadData();
             validateStep();
         }
-        
+
         // (디자인 적용 - UI 로직)
         function addConsentListeners() {
             document.querySelectorAll('input[name="consent"]').forEach(radio => {
@@ -521,14 +620,14 @@
             });
         }
 
-        // (디자인 적용 - 유효성 검사)
+        // ✅ [수정] 'unit_no' 유효성 검사 추가
         function validateStep() {
             let isValid = false;
             if (currentStep === 3) {
                 const consent = document.querySelector('input[name="consent"]:checked');
                 isValid = consent && consent.value === 'agree';
             } else if (currentStep === 4) {
-                isValid = ['name', 'phone', 'address', 'villa_name', 'move_in_date'].every(id => document.getElementById(id)?.value.trim());
+                isValid = ['name', 'phone', 'address', 'villa_name', 'unit_no', 'move_in_date'].every(id => document.getElementById(id)?.value.trim());
             } else {
                 isValid = true;
             }
@@ -543,11 +642,17 @@
             saveData();
 
             // (디자인 적용 - 서명 및 사진 데이터 수집)
-            const signatureData = signaturePad.toDataURL();
-            const blankCanvas = document.createElement('canvas');
-            blankCanvas.width = signaturePad.width; blankCanvas.height = signaturePad.height;
-            if (signatureData !== blankCanvas.toDataURL()) formData.signature = signatureData;
-            
+            // Ensure signature pad exists before trying to use it
+            if (signaturePad && ctx) {
+                 const signatureData = signaturePad.toDataURL();
+                 const blankCanvas = document.createElement('canvas');
+                 blankCanvas.width = signaturePad.width; blankCanvas.height = signaturePad.height;
+                 if (signatureData !== blankCanvas.toDataURL()) formData.signature = signatureData;
+                 else formData.signature = ""; // Ensure empty if blank
+            } else {
+                formData.signature = ""; // Default to empty if pad wasn't initialized
+            }
+
             const filePromises = uploadedFiles.map(file => new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = e => resolve(e.target.result);
@@ -561,13 +666,14 @@
             const payload = {
                 move_in_date: formData["move_in_date"] || "",
                 villa_name:   formData["villa_name"]   || "",
+                unit_no:      formData["unit_no"]      || "", // ✅ [수정] '호수' 데이터 추가
                 address:      formData["address"]      || "",
                 name:         formData["name"]         || "",
                 phone:        formData["phone"]        || "",
                 checklist:    formData.checklist    || {},
                 notes:        formData["notes"]        || "",
                 photos:       formData.photo_files || [], // (데이터 연결)
-                signature:    formData.signature || ""  // (데이터 연결)
+                signature:    formData.signature || ""   // (데이터 연결)
             };
 
             // (디자인 적용 - 제출 버튼 비활성화)
@@ -580,11 +686,38 @@
 
                 localStorage.removeItem('residentCardDraft');
                 formWizard.classList.add('hidden');
+
+                // ✅ [수정] 신규 제출 성공 시 문구 변경
+                alreadySubmittedEl.querySelector('h2').textContent = "제출 완료";
+                alreadySubmittedEl.querySelector('p').innerHTML = "입주자카드 작성을 완료하셨습니다. <br> 추가 문의는 관리사무소로 연락주시기 바랍니다.";
+                alreadySubmittedEl.querySelector('svg').style.display = 'block'; // 성공 아이콘 표시
+
                 alreadySubmittedEl.classList.remove('hidden');
-                // (성공 문구는 already-submitted HTML에 이미 포함됨)
             } catch (e) {
                 console.error("Submit failed:", e);
-                alert("제출 중 오류가 발생했습니다. 다시 시도해주세요.");
+                /* =========================
+                   2번 수정안: 에러 코드별 안내
+                   ========================= */
+                const code = e?.code || "";
+                const msg  = e?.message || "";
+
+                if (code.includes("already-submitted") || msg.includes("already-submitted") || msg.includes("token-used")) {
+                    // 이미 제출된 토큰 → '이미 제출' 화면으로 전환
+                    formWizard.classList.add('hidden');
+                    alreadySubmittedEl.querySelector('svg').style.display = 'none';
+                    alreadySubmittedEl.classList.remove('hidden');
+                } else if (code.includes("deadline-exceeded") || code.includes("expired") || msg.toLowerCase().includes("expired")) {
+                    alert("링크 사용 기한이 지났습니다. 관리자에게 새 링크를 요청해주세요.");
+                } else if (code.includes("permission-denied") || code.includes("failed-precondition")) {
+                    alert("링크가 유효하지 않거나 사용이 제한되었습니다. 관리자에게 문의해주세요.");
+                } else if (code.includes("invalid-argument")) {
+                    alert("입력값에 문제가 있습니다. 필수 항목을 확인한 뒤 다시 제출해주세요.");
+                } else if (code.includes("resource-exhausted") || code.includes("payload-too-large") || msg.toLowerCase().includes("too large")) {
+                    alert("업로드한 사진/서명 용량이 너무 큽니다. 사진 수를 줄이거나 크기를 줄인 뒤 다시 시도해주세요.");
+                } else {
+                    alert("제출 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+                }
+
                 // (디자인 적용 - 버튼 활성화)
                 submitBtn.disabled = false;
                 submitBtn.textContent = "제출하기";
@@ -607,6 +740,8 @@
         (async () => {
             // *** FIX: Bypassing token check for preview/testing ***
             // In a real environment, the token check is necessary.
+
+            // (토큰 유효성 검사 로직 - 현재는 테스트를 위해 주석 처리됨)
             /*
             if (!token) {
                 alreadySubmittedEl.classList.remove('hidden');
@@ -620,16 +755,16 @@
             */
 
             await ensureAuth();
-            
+
             // We will assume the token is "active" for this preview.
             try {
                 // const v = await verifyToken(); // Bypassed for preview
                 // if (v?.status === "active") { // Assuming active
                     const pre = {}; // Bypassed: v.prefill || {};
                     const draft = JSON.parse(localStorage.getItem('residentCardDraft') || "{}");
-                    
+
                     // (로직 수정: prefill과 draft를 글로벌 formData에 병합)
-                    formData = { 
+                    formData = {
                         ...formData, // 기본값 (photo_files: [], checklist: {})
                         ...pre,      // Firebase prefill
                         ...draft,    // LocalStorage draft
@@ -637,11 +772,13 @@
                     };
                     // 병합된 데이터로 draft 갱신
                     localStorage.setItem('residentCardDraft', JSON.stringify(formData));
-                    
+
                     formWizard.classList.remove('hidden');
                     updateUI(); // updateUI는 이제 글로벌 formData를 읽어옴
                 // } else {
-                //     alreadySubmittedEl.classList.remove('hidden');
+                //    // (토큰이 'used' 또는 'expired'일 때)
+                //    alreadySubmittedEl.querySelector('svg').style.display = 'none'; // 기본 문구(중복)를 보여주되, 체크 표시는 숨김
+                //    alreadySubmittedEl.classList.remove('hidden');
                 // }
             } catch (e) {
                 // This catch block is now mainly for localStorage or other unexpected errors
@@ -653,6 +790,5 @@
             }
         })();
     </script>
-  </body>
+</body>
 </html>
-

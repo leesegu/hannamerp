@@ -1,506 +1,425 @@
 /* src/pages/ResidentCardPage.css */
 
-/* ===== [신규] 디자인 시스템: 변수 정의 ===== */
+/* ===== 디자인 시스템: 변수 정의 ===== */
 :root {
-  --color-primary: #3B82F6; /* [수정] 활기찬 파란색 */
-  --color-primary-dark: #2563EB;
-  --color-primary-light: #EFF6FF; /* 매우 옅은 파란색 배경 */
-  --color-accent-green: #10B981; /* [신규] 사진 아이콘 */
-  --color-accent-amber: #F59E0B; /* [신규] 노트 아이콘 */
-  --color-danger: #d92d20;
-  --color-danger-light: #fef2f2;
-  --color-text: #1f2937; /* 기본 텍스트 */
-  --color-text-light: #6b7280; /* 보조 텍스트 */
-  --color-border: #e5e7eb; /* 연한 테두리 */
-  --color-bg: #f9fafb; /* 페이지 배경 */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
-  --radius-md: .75rem; /* 12px */
-  --radius-lg: 1rem; /* 16px */
+--color-primary: #3B82F6;
+--color-primary-dark: #2563EB;
+--color-primary-light: #EFF6FF;
+--color-accent-green: #10B981;
+--color-accent-amber: #F59E0B;
+--color-danger: #d92d20;
+--color-danger-light: #fef2f2;
+--color-text: #1f2937;
+--color-text-medium: #4b5563;
+--color-text-light: #6b7280;
+--color-border: #e5e7eb;
+--color-border-light: #f3f4f6;
+--color-bg: #f9fafb;
+--color-bg-panel: #ffffff;
+--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+/* ✅ 향상된 그림자 */
+--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.07);
+--shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+--radius-md: .5rem; /* 8px */
+--radius-lg: .75rem; /* 12px */
+--gradient-header: linear-gradient(135deg, #f5f9ff 0%, #ffffff 100%);
 }
 
-/* ===== [신규] 페이지 기본 레이아웃 ===== */
+/* ===== 페이지 기본 레이아웃 ===== */
 .rcp {
-  padding: 2rem;
-  background-color: var(--color-bg);
-  min-height: 100vh;
-  color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+padding: 2rem;
+background-color: var(--color-bg);
+min-height: 100vh;
+color: var(--color-text);
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
-/* [신규] 페이지 헤더 (제목 + 버튼) */
 .rcp .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 1.5rem;
 }
 .rcp .section-title {
-  font-size: 1.5rem; /* [수정] 페이지 타이틀 역할 겸임 */
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0; /* [수정] 기존 여백 제거 */
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+font-size: 1.5rem;
+font-weight: 700;
+color: var(--color-text);
+margin: 0;
+display: flex;
+align-items: center;
+gap: 0.6rem;
 }
 .rcp .section-title svg {
-  color: var(--color-primary);
+color: var(--color-primary);
 }
 
 
-/* ===== [수정] 카드 (공통) ===== */
+/* ===== 카드 (공통) ===== */
 .rcp .card {
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
+background: var(--color-bg-panel);
+border: 1px solid var(--color-border);
+border-radius: var(--radius-lg);
+overflow: hidden; /* Important for table border-radius */
+box-shadow: var(--shadow-md);
 }
 
-/* ===== [삭제] 상단 패널 (JSX에서 제거됨) ===== */
-/* .rcp .panel-top.card { ... } */
 
-
-/* ===== [신규] 버튼 (공통) ===== */
+/* ===== 버튼 (공통) ===== */
 .rcp .btn,
-.rcp .btn-primary {
-  padding: .6rem 1.2rem;
-  border-radius: .5rem;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: .35rem;
-  border: 1px solid transparent;
-  transition: all .2s ease;
-  cursor: pointer;
+.rcp .btn-primary,
+.rcp .btn-sm {
+padding: .5rem 1rem;
+border-radius: var(--radius-md);
+font-weight: 600;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: .35rem;
+border: 1px solid transparent;
+transition: all .15s ease-out;
+cursor: pointer;
+line-height: 1.4;
+}
+.rcp .btn-sm { /* Smaller buttons */
+padding: .35rem .8rem;
+font-size: 0.875rem;
 }
 .rcp .btn:disabled,
-.rcp .btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.rcp .btn-primary:disabled,
+.rcp .btn-sm:disabled {
+opacity: 0.6;
+cursor: not-allowed;
 }
-
-/* [수정] 파란색 (주요) 버튼 */
 .rcp .btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-  box-shadow: var(--shadow-sm);
+background: var(--color-primary);
+color: #fff;
+box-shadow: var(--shadow-sm), 0 1px 1px rgba(0,0,0,0.04);
 }
 .rcp .btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-dark);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+background: var(--color-primary-dark);
+box-shadow: var(--shadow-md), 0 2px 4px rgba(0,0,0,0.06);
+transform: translateY(-1px);
 }
-
-/* [신규] 일반 (보조) 버튼 */
 .rcp .btn {
-  background: #fff;
-  color: var(--color-text-light);
-  border: 1px solid var(--color-border);
+background: var(--color-bg-panel);
+color: var(--color-text-medium);
+border: 1px solid var(--color-border);
 }
 .rcp .btn:hover:not(:disabled) {
-  background: var(--color-bg);
-  border-color: #d1d5db;
-  color: var(--color-text);
+background: #f7f9fc;
+border-color: #d1d5db;
+color: var(--color-text);
 }
 
-/* [수정] 아이콘 버튼 */
+/* 아이콘 버튼 */
 .rcp .icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: 999px; /* 원형 버튼 */
-  padding: .4rem;
-  background: transparent;
-  color: var(--color-text-light);
-  transition: all .2s ease; /* [수정] 호버 애니메이션 */
+display: inline-flex;
+align-items: center;
+justify-content: center;
+border: none;
+border-radius: 999px;
+padding: .4rem;
+background: transparent;
+color: var(--color-text-light);
+transition: all .15s ease-out;
+cursor: pointer;
 }
-.rcp .icon:hover {
-  background: var(--color-bg);
-  border-color: var(--color-border);
-  transform: scale(1.1); /* [신규] 호버 시 확대 */
+.rcp .icon-sm { padding: .3rem; }
+.rcp .icon-sm svg { width: 14px; height: 14px; }
+.rcp .icon:hover:not(:disabled) {
+background: var(--color-primary-light);
+color: var(--color-primary-dark);
+transform: scale(1.1);
 }
-
-/* [신규] 아이콘 색상 커스텀 */
+/* Specific icon colors */
 .rcp .icon.icon-checklist { color: var(--color-primary); }
-.rcp .icon.icon-checklist:hover { color: var(--color-primary-dark); }
-
+.rcp .icon.icon-checklist:hover:not(:disabled) { background: #e0f2fe; color: var(--color-primary-dark); }
 .rcp .icon.icon-notes { color: var(--color-accent-amber); }
-.rcp .icon.icon-notes:hover { color: #D97706; /* Amber dark */ }
-
+.rcp .icon.icon-notes:hover:not(:disabled) { background: #fffbeb; color: #d97706; }
 .rcp .icon.icon-photo { color: var(--color-accent-green); }
-.rcp .icon.icon-photo:hover { color: #059669; /* Green dark */ }
-
-.rcp .icon.danger {
-  color: var(--color-danger);
-  border-color: transparent;
-}
-.rcp .icon.danger:hover {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-  border-color: #fee2e2;
-  transform: scale(1.1); /* [추가] */
-}
-
-/* [수정] 닫기 X 아이콘 (세련되게) */
+.rcp .icon.icon-photo:hover:not(:disabled) { background: #ecfdf5; color: #059669; }
+.rcp .icon.danger { color: var(--color-danger); }
+.rcp .icon.danger:hover:not(:disabled) { background: var(--color-danger-light); color: #b91c1c; }
 .rcp .icon.close {
-  color: var(--color-text-light);
-  padding: 0; /* [신규] 패딩 제거 (아이콘 자체가 큼) */
-  border: none;
-  background: transparent;
+color: var(--color-text-light);
+padding: 0; border: none; background: transparent; border-radius: 99px;
+width: 32px; height: 32px;
 }
 .rcp .icon.close:hover {
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: none;
-  transform: scale(1.05) rotate(90deg); /* [신규] 호버 시 회전 */
+background: var(--color-border-light); color: var(--color-text);
+transform: scale(1.05) rotate(90deg);
 }
 
-/* ===== [신규] 입력창 (공통) ===== */
+/* ===== 입력창 (공통) ===== */
 .rcp .ipt {
-  border: 1px solid var(--color-border);
-  border-radius: .5rem;
-  padding: .6rem .8rem;
-  width: 100%;
-  font-size: .95rem;
-  transition: all .2s ease;
+border: 1px solid var(--color-border);
+border-radius: var(--radius-md);
+padding: .5rem .8rem;
+width: 100%;
+font-size: .9rem;
+transition: all .15s ease-out;
+box-sizing: border-box;
+background-color: var(--color-bg-panel);
+color: var(--color-text);
 }
+.rcp .ipt::placeholder { color: var(--color-text-light); opacity: 0.8; }
 .rcp .ipt:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); /* [수정] 파란색 섀도우 */
+outline: none;
+border-color: var(--color-primary);
+box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
-/* [신규] 작은 입력창 (링크 모달용) */
-.rcp .ipt.ipt-sm {
-  padding: .5rem .75rem; /* [수정] 세로 폭 축소 */
-  font-size: .9rem; /* [수정] 폰트 축소 */
-}
+.rcp .ipt.ipt-sm { padding: .4rem .7rem; font-size: .85rem; }
+/* ✅ Link creation specific input width */
+.rcp .ipt.input-narrow { flex: 1 1 140px; min-width: 100px; } /* Same as IntakeLinkManager */
 
-/* ===== [신규] 테이블 디자인 ===== */
-.rcp .table-wrapper {
-  width: 100%;
-  overflow-x: auto; /* 작은 화면에서 가로 스크롤 */
-}
-.rcp .rcp-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.rcp .rcp-table th, 
+
+/* ===== 테이블 디자인 ===== */
+.rcp .table-wrapper { width: 100%; overflow-x: auto; }
+.rcp .rcp-table { width: 100%; border-collapse: collapse; }
+.rcp .rcp-table th,
 .rcp .rcp-table td {
-  padding: .75rem .75rem;  /* [수정] 세로 폭 줄이기 (1rem -> .75rem) */
-  text-align: center;      /* [수정] 가운데 정렬 */
-  vertical-align: middle;
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+padding: .8rem .75rem; text-align: center; vertical-align: middle;
+border-bottom: 1px solid var(--color-border-light); white-space: nowrap;
+font-size: 0.9rem;
 }
 .rcp .rcp-table th {
-  background: #fff; /* [수정] 깔끔한 흰색 배경 */
-  font-weight: 600;
-  font-size: .85rem; /* [수정] 폰트 한단계 업 (.8rem -> .85rem) */
-  color: var(--color-text); /* [수정] 더 진한 색 */
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  border-bottom-width: 2px; /* [신규] 헤더 하단 강조 */
+background: var(--color-bg); font-weight: 600; font-size: .8rem;
+color: var(--color-text-medium); text-transform: uppercase; letter-spacing: .05em;
+border-bottom: 2px solid var(--color-border);
+position: sticky; top: 0; z-index: 10;
 }
-.rcp .rcp-table tbody tr:last-child td {
-  border-bottom: none;
-}
-.rcp .rcp-table tbody tr:hover {
-  background-color: var(--color-primary-light); /* [수정] 호버 색상 변경 */
-}
+.rcp .rcp-table tbody tr:last-child td { border-bottom: none; }
+.rcp .rcp-table tbody tr:hover { background-color: var(--color-primary-light); }
 .rcp .rcp-table td.truncate {
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+max-width: 180px; white-space: nowrap; overflow: hidden;
+text-overflow: ellipsis; text-align: left;
 }
 
 
-/* ===== [수정] 모달 (공통) - 딤 + 블러 배경 ===== */
+/* ===== 상세 모달 (중앙정렬, 뒷배경 제거, 디자인 개선) ===== */
 @keyframes modal-fade-in {
-  from { opacity: 0; transform: scale(.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+from { opacity: 0; transform: translateY(15px) scale(0.98); }
+to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
-.rcp .modal,
-.rcp-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(17, 24, 39, 0.4);
-  backdrop-filter: blur(4px);
-  display: grid;
-  place-items: center;
-  z-index: 2000;
-  padding: 1rem;
-  overflow-y: auto;
+/* ✅ 뒷배경 투명, 중앙 정렬 */
+.rcp .modal-backdrop {
+position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+z-index: 2000; padding: 1rem; overflow-y: auto;
+background: transparent; /* 뒷배경 투명 */
+backdrop-filter: none; /* 블러 제거 */
 }
-
-/* ===== [수정] 상세 모달 (.modal .panel) - 럭셔리 디자인 ===== */
-.rcp .modal .panel {
-  background: #fff;
-  border: none;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); /* [수정] 더 강한 그림자 */
-  padding: 0; /* [수정] 헤더 분리를 위해 패딩 0 */
-  box-sizing: border-box;
-  margin: auto;
-  width: 100%;
-  max-width: 640px; 
-  animation: modal-fade-in .3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  overflow: hidden; /* [신규] 헤더 radius 적용 */
+/* ✅ 실제 모달 패널 스타일링 */
+.rcp .modal-panel {
+background: var(--color-bg-panel);
+border: none; /* 테두리 제거 */
+border-radius: var(--radius-lg);
+box-shadow: var(--shadow-xl); /* ✅ 더 강조된 그림자 */
+padding: 0; box-sizing: border-box; margin: auto;
+width: 100%; max-width: 560px; /* ✅ 너비 조정 */
+animation: modal-fade-in .25s cubic-bezier(0.4, 0, 0.2, 1);
+overflow: hidden; display: flex; flex-direction: column; max-height: 85vh;
 }
-/* [신규] 모달 헤더 (그라데이션) */
-.rcp .modal .panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
-  background: linear-gradient(135deg, var(--color-primary-light), #fff 70%);
-  border-bottom: 1px solid var(--color-border);
+/* 모달 헤더 */
+.rcp .modal-panel .panel-header {
+display: flex; align-items: center; justify-content: space-between;
+padding: 1rem 1.5rem; background: var(--gradient-header);
+border-bottom: 1px solid var(--color-border-light);
+flex-shrink: 0;
 }
-.rcp .modal .panel-header .modal-title {
-  padding-bottom: 0;
-  margin-bottom: 0;
-  font-size: 1.3rem; /* [수정] 폰트 키움 */
+.rcp .modal-panel .modal-title {
+font-size: 1.1rem; font-weight: 600; padding: 0; margin: 0;
+color: var(--color-text); /* Ensure title color */
 }
-
-/* [신규] 모달 공통 타이틀 (아이콘 포함) */
+/* 모달 공통 타이틀 */
 .rcp .modal-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--color-text);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+font-size: 1.2rem; font-weight: 700; color: var(--color-text);
+display: flex; align-items: center; gap: 0.5rem;
 }
-.rcp .modal-title svg {
-  color: var(--color-primary); /* 타이틀 아이콘은 메인 컬러 */
-}
+.rcp .modal-title svg { color: var(--color-primary); }
 
-/* [수정] 상세 모달 컨텐츠 영역 (패딩 추가) */
-.rcp .modal .modal-content {
-  padding: 1.5rem;
-  max-height: 60dvh; /* [수정] 70dvh -> 60dvh (헤더 크기만큼) */
-  overflow-y: auto;
-  padding-right: .25rem;
+/* 상세 모달 컨텐츠 영역 */
+.rcp .modal-panel .modal-content {
+padding: 1.5rem; overflow-y: auto; flex-grow: 1;
+background-color: var(--color-bg-panel);
 }
-.rcp .checklist-item {
-  background: var(--color-bg);
-  padding: .5rem .75rem;
-  border-radius: .5rem;
-  border: 1px solid var(--color-border);
-}
+.rcp .modal-panel .notes-content { line-height: 1.6; color: var(--color-text-medium); }
+.rcp .modal-panel .text-gray-500 { color: var(--color-text-light); } /* Ensure helper text color */
 
-/* [신규] 하자체크 그룹 디자인 */
-.rcp .checklist-group {
-  margin-bottom: 1rem;
-}
-.rcp .checklist-group:last-child {
-  margin-bottom: 0;
-}
+/* 하자체크 그룹 */
+.rcp .checklist-group { margin-bottom: 1.25rem; }
+.rcp .checklist-group:last-child { margin-bottom: 0; }
 .rcp .checklist-category {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-primary-dark);
-  margin-bottom: 0.75rem;
-  border-bottom: 2px solid var(--color-primary-light);
-  padding-bottom: 0.25rem;
+font-size: .85rem; font-weight: 600; color: var(--color-text-medium);
+margin-bottom: 0.75rem; border-bottom: 1px solid var(--color-border-light);
+padding-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.05em;
 }
-.rcp .checklist-items-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
+.rcp .checklist-items-container { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .rcp .checklist-item-tag {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  padding: 0.25rem 0.6rem;
-  border-radius: 99px;
-  font-size: 0.9rem;
+background: var(--color-bg); border: 1px solid var(--color-border);
+color: var(--color-text-medium); padding: 0.3rem 0.7rem; border-radius: var(--radius-md);
+font-size: 0.85rem; font-weight: 500;
 }
 
-/* [수정] 사진 썸네일 (button) */
+/* 사진 썸네일 */
+.rcp .modal-panel .photo-grid {
+display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem;
+}
 .rcp .photo-thumb {
-  display: block;
-  width: 100%;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  transition: all .2s ease;
-  aspect-ratio: 1 / 1;
-  padding: 0;
-  cursor: pointer;
+display: block; width: 100%; border-radius: var(--radius-md); overflow: hidden;
+border: 1px solid var(--color-border); transition: all .15s ease-out;
+aspect-ratio: 1 / 1; padding: 0; cursor: pointer; background-color: var(--color-bg);
 }
 .rcp .photo-thumb:hover {
-  transform: scale(1.03);
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-primary);
+transform: scale(1.04); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: var(--color-primary);
 }
-.rcp .photo-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.rcp .photo-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-/* ===== [신규] 사진 라이트박스 ===== */
+
+/* ===== 사진 라이트박스 ===== */
 .lightbox {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  display: grid;
-  place-items: center;
-  z-index: 3000; /* 모달보다 위 */
-  padding: 1rem;
-  animation: modal-fade-in .2s ease;
+position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
+display: grid; place-items: center; z-index: 3000; padding: 1rem;
+animation: modal-fade-in .2s ease; cursor: zoom-out;
 }
 .lightbox img {
-  display: block;
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+display: block; max-width: 90vw; max-height: 90vh; object-fit: contain;
+border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+cursor: default;
 }
-.lightbox .icon.close {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 99px;
-  padding: .25rem;
+.lightbox .lightbox-close {
+position: absolute; top: 1.5rem; right: 1.5rem; color: #fff;
+background: rgba(0, 0, 0, 0.4); border-radius: 99px; padding: .25rem;
+width: 36px; height: 36px; cursor: pointer; border: none;
+display: inline-flex; align-items: center; justify-content: center; /* Center icon */
 }
-.lightbox .icon.close:hover {
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  transform: scale(1.1) rotate(90deg);
+.lightbox .lightbox-close:hover {
+background: rgba(0, 0, 0, 0.6); transform: scale(1.1) rotate(90deg);
 }
 
 
-/* ===== [수정] 링크생성/목록 모달 (.rcp-modal .panel) ===== */
-.rcp-modal .panel {
-  background: #fff;
-  border: none;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: 1.5rem; /* [수정] 패딩 축소 */
-  box-sizing: border-box;
-  margin: auto;
-  width: 100%;
-  max-width: 960px; /* [수정] 가로 사이즈 줄이기 (1100px -> 960px) */
-  animation: modal-fade-in .3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+/* ===== 링크 생성/목록 모달 ===== */
+.rcp-modal { /* Backdrop for link modal */
+position: fixed; inset: 0; background: rgba(17, 24, 39, 0.4); backdrop-filter: blur(4px);
+display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 1rem;
+overflow-y: auto;
+}
+.rcp-modal .panel.link-modal-panel { /* Link modal panel */
+background: var(--color-bg-panel); border: none; border-radius: var(--radius-lg);
+box-shadow: var(--shadow-lg); padding: 1.5rem; box-sizing: border-box;
+margin: auto; width: 100%; max-width: 800px; /* ✅ 너비 조정 */
+animation: modal-fade-in .25s cubic-bezier(0.4, 0, 0.2, 1);
+display: flex; flex-direction: column; max-height: 90vh;
 }
 
-/* ===== [수정] 링크 목록 (모달 내부) ===== */
+/* 링크 생성 폼 (Inline Layout) */
+.rcp .link-creation-form {
+display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; /* Allow wrap */
+}
+.rcp .link-creation-form .ipt { margin-bottom: 0; }
+.rcp .link-creation-form .ipt.input-narrow { /* ✅ Narrow inputs */
+flex: 1 1 140px; /* Grow, shrink, base width */
+min-width: 120px; /* Minimum width before wrapping */
+max-width: 180px; /* Optional max width */
+}
+.rcp .link-creation-form .creation-button-inline { /* ✅ Button next to inputs */
+flex-shrink: 0;
+height: calc(0.8rem + 0.7rem + 2px); /* Match ipt-sm height */
+line-height: normal;
+padding: 0.4rem 0.8rem; /* Match btn-sm padding */
+white-space: nowrap; /* Prevent wrap */
+margin-left: auto; /* Push to the right if space allows and wrap=nowrap */
+}
+
+
+/* 모달 내 검색창 */
+.rcp .modal-search-bar { margin-top: 1rem; margin-bottom: 1rem; }
+.rcp .modal-search-bar .ipt { max-width: 350px; padding: .4rem .7rem; font-size: .85rem; }
+
+/* 링크 목록 (모달 내부) */
 .rcp .waiting-list {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: #fff;
+border: 1px solid var(--color-border); border-radius: var(--radius-md);
+overflow: hidden; background: var(--color-bg-panel);
 }
-.rcp .waiting-list .list-body {
-  max-height: 35dvh; /* [수정] 세로 사이즈 줄이기 (40dvh -> 35dvh) */
-  overflow-y: auto;
-}
+.rcp .waiting-list .list-body { max-height: 35vh; overflow-y: auto; } /* ✅ 높이 조정 */
 
 .rcp .waiting-list .list-head,
 .rcp .waiting-list .row {
-  display: grid;
-  grid-template-columns:
-    clamp(140px, 16vw, 180px)
-    clamp(140px, 18vw, 220px)
-    clamp(90px,  10vw, 110px)
-    clamp(130px, 16vw, 180px)
-    minmax(0, 1fr)
-    clamp(60px,  8vw,  90px);
-  gap: .5rem;
-  align-items: center;
+display: grid;
+/* ✅ Adjusted grid columns for modal list */
+grid-template-columns: 120px 1fr 60px 110px 1.5fr 60px;
+gap: .75rem; align-items: center; padding: .5rem 1rem;
 }
-
 .rcp .waiting-list .list-head {
-  padding: .6rem 1rem; /* [수정] 패딩 축소 */
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
-  font-weight: 600;
-  color: var(--color-text-light);
-  font-size: .7rem; /* [수정] 폰트 축소 */
-  text-transform: uppercase;
+background: var(--color-bg); border-bottom: 1px solid var(--color-border);
+font-weight: 600; color: var(--color-text-medium); font-size: .75rem;
+text-transform: uppercase; position: sticky; top: 0; z-index: 1;
 }
-.rcp .waiting-list .list-head .c { white-space:nowrap; }
-
 .rcp .waiting-list .row {
-  padding: .6rem 1rem; /* [수정] 패딩 축소 */
-  border-bottom: 1px solid #f3f5fa;
-  transition: background .15s;
+border-bottom: 1px solid var(--color-border-light); font-size: 0.875rem;
 }
 .rcp .waiting-list .row:last-child { border-bottom: none; }
-.rcp .waiting-list .row:hover { background: #fcfcfc; }
-
-.rcp .waiting-list .c { 
-  min-width: 0; 
-  font-size: .875rem; /* [수정] 폰트 축소 */
-}
-
-.rcp .waiting-list .link {
-  display: inline-flex; 
-  align-items: center; 
-  gap: .25rem;
-  color: var(--color-primary-dark); /* [수정] 테마색 적용 */
-  text-decoration: none;
-  font-weight: 500;
-  white-space: nowrap;
-  max-width: 100%;
-}
+.rcp .waiting-list .row:hover { background: var(--color-primary-light); }
+.rcp .waiting-list .c { min-width: 0; display: flex; align-items: center; }
+.rcp .waiting-list .c.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcp .waiting-list .c-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* Use for URL column */
+.rcp .waiting-list .link { color: var(--color-primary-dark); text-decoration: none; font-weight: 500; }
 .rcp .waiting-list .link:hover { text-decoration: underline; }
-
-.rcp .waiting-list .c-act { display:flex; align-items:center; justify-content: center; }
+.rcp .waiting-list .c-act { justify-content: center; }
 .rcp .waiting-list .empty { padding: 2.5rem 1rem; text-align:center; color: var(--color-text-light); }
 
-/* [수정] 목록 푸터 (새로고침 버튼 영역) */
 .rcp .waiting-list .list-footer.hint {
-  padding: .6rem 1rem; /* [수정] 패딩 축소 */
-  background: var(--color-primary-light); /* [수정] 테마색 적용 */
-  border-top: 1px solid var(--color-border); /* [수정] 테마색 적용 */
-  color: var(--color-primary-dark); /* [수정] 테마색 적용 */
-  font-size: .8rem; /* [수정] 폰트 축소 */
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+padding: .6rem 1rem; background: var(--color-bg); border-top: 1px solid var(--color-border);
+color: var(--color-text-light); font-size: .8rem; display: flex;
+align-items: center; justify-content: space-between;
+}
+
+
+/* ===== 제출 내역 검색창 스타일 ===== */
+.rcp .rcp-search-wrapper {
+padding: .5rem 1rem; /* ✅ 패딩 줄임 */
+border-bottom: 1px solid var(--color-border);
+background: #fff; display: flex; justify-content: flex-end;
+}
+.rcp .rcp-search-input {
+max-width: 320px; /* ✅ 너비 줄임 */
+width: 100%;
+padding: .4rem .7rem; /* ✅ 패딩 줄임 */
+font-size: .85rem; /* ✅ 폰트 줄임 */
 }
 
 /* --- 작은 화면 보정 --- */
-@media (max-width: 1120px) {
-  .rcp .waiting-list .list-head { padding:.6rem .75rem }
-  .rcp .waiting-list .row { padding:.6rem .75rem }
+@media (max-width: 1120px) { /* Adjust responsiveness for link list grid */
+.rcp .waiting-list .list-head, .rcp .waiting-list .row {
+grid-template-columns: 100px 1fr 50px 100px 1fr 50px; /* Adjust grid for medium screens */
+gap: 0.5rem; padding: .5rem .75rem;
+}
 }
 
 @media (max-width: 768px) {
-  .rcp {
-    padding: 1rem;
-  }
-  .rcp .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .rcp .section-title {
-    font-size: 1.25rem;
-  }
-  /* [삭제] .panel-top.card (제거됨) */
+.rcp { padding: 1rem; }
+.rcp .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.rcp .section-title { font-size: 1.25rem; }
 
-  .rcp .modal-title {
-    font-size: 1.15rem;
-  }
-  .rcp-modal .panel {
-    padding: 1rem;
-  }
-  .rcp .modal .panel .grid-cols-3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.rcp .modal-panel { max-width: 95%; max-height: 90vh; }
+.rcp .modal-panel .panel-header { padding: 0.8rem 1rem; }
+.rcp .modal-panel .modal-title { font-size: 1.1rem; }
+.rcp .modal-panel .modal-content { padding: 1rem; }
+.rcp .modal-panel .photo-grid { gap: 0.5rem; }
+
+.rcp-modal .panel.link-modal-panel { padding: 1rem; max-width: 95%; }
+.rcp .link-creation-form { flex-direction: column; align-items: stretch; }
+.rcp .link-creation-form .ipt { margin-bottom: 0.5rem; flex-basis: auto; max-width: none; } /* Reset flex basis, max-width */
+.rcp .link-creation-form .creation-button-inline { align-self: flex-end; width: auto; margin-top: 0.5rem; }
+
+.rcp .modal-search-bar .ipt { max-width: none; }
+
+.rcp .waiting-list .list-head, .rcp .waiting-list .row {
+/* Adjust grid for really small screens, potentially hiding columns */
+grid-template-columns: 70px 1fr 40px 80px 1fr 40px;
+font-size: 0.8rem; padding: 0.4rem 0.5rem; gap: 0.3rem;
+}
+.rcp .waiting-list .list-body { max-height: 40vh; }
+
+.rcp .rcp-search-wrapper { padding: .6rem 1rem; justify-content: flex-start; }
+.rcp .rcp-search-input { max-width: 100%; font-size: .85rem; padding: .45rem .7rem; }
 }

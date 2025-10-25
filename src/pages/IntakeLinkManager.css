@@ -1,8 +1,222 @@
-.ilm .btn-primary{background:#d4af37;color:#111;padding:.5rem 1rem;border-radius:.5rem;font-weight:700}
-.ilm .btn{background:#eee;color:#333;padding:.5rem 1rem;border-radius:.5rem}
-.ilm .card{background:#fff;border:1px solid #e5e7eb;border-radius:.75rem;overflow:hidden}
-.ilm table th, .ilm table td {border-bottom:1px solid #f0f2f5;padding:.75rem .75rem;text-align:left}
+/* src/pages/IntakeLinkManager.css */
+.ilm .btn-primary{background:#d4af37;color:#111;padding:.5rem 1rem;border-radius:.5rem;font-weight:700; cursor: pointer; border: none;}
+.ilm .btn{background:#eee;color:#333;padding:.5rem 1rem;border-radius:.5rem; cursor: pointer; border: none;}
+.ilm .btn:disabled, .ilm .btn-primary:disabled { opacity: 0.6; cursor: not-allowed;} /* Add disabled styles */
+
+.ilm .card{background:#fff;border:1px solid #e5e7eb;border-radius:.75rem;overflow:hidden; margin-top: 1rem;} /* Add margin top to card */
+.ilm table th, .ilm table td {border-bottom:1px solid #f0f2f5;padding:.75rem .75rem;text-align:left; vertical-align: middle;} /* Add vertical align */
+.ilm table .truncate { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* Adjust truncate width if needed */
+.ilm table .text-center { text-align: center; }
+.ilm table .text-blue-600 { color: #2563eb; }
+.ilm table .underline { text-decoration: underline; }
+.ilm table .text-gray-400 { color: #9ca3af; }
+.ilm table .text-gray-500 { color: #6b7280; }
+.ilm table .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+
 .ilm .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000}
-.ilm .panel{background:#fff;border-radius:1rem;min-width:320px;max-width:640px;width:96%;padding:1.25rem}
-.ilm .panel .title{font-weight:800;margin-bottom:.75rem}
-.ilm .ipt{border:1px solid #dcdfe4;border-radius:.5rem;padding:.5rem .75rem}
+.ilm .panel{background:#fff;border-radius:1rem;min-width:320px;max-width:640px;width:96%;padding:1.25rem; box-sizing: border-box;}
+.ilm .modal-panel-large { max-width: 800px; } /* Optional: Larger panel for list */
+.ilm .panel .title{font-weight:800;margin-bottom:1rem;} /* Adjusted margin */
+.ilm .ipt{border:1px solid #dcdfe4;border-radius:.5rem;padding:.5rem .75rem; width: 100%; box-sizing: border-box;}
+
+/* ===== 검색창 스타일 ===== */
+.ilm .search-bar {
+margin-bottom: 1rem; /* Space below search bar */
+}
+.ilm .search-bar .ipt {
+max-width: 400px; /* Limit search bar width */
+width: 100%; /* Ensure it takes available space up to max-width */
+}
+
+/* ===== 모달 내 생성 영역 레이아웃 ===== */
+.ilm .modal .creation-area {
+display: flex; /* Use flexbox for layout */
+align-items: flex-end; /* Align items to the bottom */
+gap: 0.75rem; /* Space between inputs and button */
+margin-bottom: 1rem; /* Space below this area */
+flex-wrap: nowrap; /* Prevent wrapping by default */
+}
+.ilm .modal .creation-inputs {
+flex-grow: 1; /* Allow input area to take available space */
+display: flex;
+/* gap: 0.5rem; /* Space between inputs */
+/* Remove column direction if inputs are inline */
+gap: 0.75rem; /* Adjust gap for inline inputs */
+align-items: flex-end; /* Align inputs to the bottom */
+}
+/* ✅ 입력창 가로 사이즈 줄이기 */
+.ilm .modal .creation-inputs .ipt.input-narrow {
+/* width: 150px; Remove fixed width */
+flex: 1 1 140px; /* Allow shrinking but prefer 140px base */
+min-width: 100px; /* Minimum width */
+}
+.ilm .modal .creation-button {
+flex-shrink: 0; /* Prevent button from shrinking */
+padding: .5rem 1rem; /* Match input padding */
+/* Adjust height calculation if needed, or rely on padding */
+height: calc(1rem + 1rem + 2px); /* Based on padding .5rem * 2 + border * 2 */
+line-height: 1rem; /* Match font size for vertical center */
+margin-bottom: 0; /* Align with bottom */
+white-space: nowrap; /* Prevent button text wrapping */
+}
+
+/* ===== 모달 내 검색창 (생성 영역 아래) ===== */
+.ilm .modal .modal-search-bar {
+margin-bottom: 1rem;
+}
+.ilm .modal .modal-search-bar .ipt {
+width: 100%; /* Full width inside modal */
+max-width: 350px; /* Adjust max width as needed */
+padding: .4rem .7rem; /* Slightly smaller padding */
+font-size: 0.85rem;
+}
+
+
+/* ===== 모달 내 링크 목록 스타일 ===== */
+.ilm .modal .modal-link-list {
+border: 1px solid #eee;
+border-radius: 0.5rem;
+max-height: 40vh; /* Limit height and allow scrolling */
+overflow-y: auto;
+margin-bottom: 1rem;
+font-size: 0.85rem; /* Base font size for list */
+}
+/* Header for the list */
+.ilm .modal .modal-list-header {
+display: grid;
+grid-template-columns: 100px 1fr 60px 110px 80px 1fr 60px; /* Match row columns */
+gap: 0.75rem;
+padding: 0.6rem 0.75rem;
+border-bottom: 1px solid #ddd; /* Stronger header separator */
+background-color: #f8f9fa; /* Light header background */
+font-weight: 600;
+font-size: 0.75rem; /* Smaller header font */
+color: #555;
+position: sticky; /* Make header sticky */
+top: 0;
+z-index: 1;
+}
+
+.ilm .modal .modal-list-row {
+display: grid; /* Use grid for columns */
+/* Adjust widths slightly, ensure total matches header */
+grid-template-columns: 100px 1fr 60px 110px 80px 1fr 60px;
+gap: 0.75rem;
+padding: 0.5rem 0.75rem;
+border-bottom: 1px solid #f0f2f5;
+align-items: center;
+}
+.ilm .modal .modal-list-row:last-child {
+border-bottom: none;
+}
+.ilm .modal .modal-list-row:hover {
+background-color: #fafdff; /* Subtle hover */
+}
+
+.ilm .modal .list-col {
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+display: flex; /* Center content vertically in cell */
+align-items: center;
+}
+.ilm .modal .list-col.date { font-size: 0.8rem; color: #666; }
+.ilm .modal .list-col.status { font-weight: 500; }
+.ilm .modal .list-col.action { justify-content: center; } /* Center button */
+
+.ilm .modal .btn-copy-modal {
+padding: 0.2rem 0.5rem;
+font-size: 0.75rem;
+background: #f0f0f0;
+color: #555;
+border: 1px solid #ddd;
+border-radius: 4px; /* Slightly rounded */
+cursor: pointer;
+}
+.ilm .modal .btn-copy-modal:hover:not(:disabled) {
+background: #e9e9e9;
+border-color: #ccc;
+}
+.ilm .modal .btn-copy-modal:disabled {
+background: #f9f9f9;
+color: #bbb;
+border-color: #eee;
+cursor: not-allowed;
+}
+.ilm .modal .empty-list-message {
+text-align: center;
+color: #888;
+padding: 1.5rem;
+font-size: 0.9rem;
+}
+
+
+/* Adjust close button area if needed */
+.ilm .modal .modal-close-area {
+margin-top: 0; /* Reset margin-top as creation area now has margin-bottom */
+}
+
+/* --- Responsive Adjustments for Modal --- */
+@media (max-width: 768px) { /* Adjust breakpoint if needed */
+.ilm .modal .creation-area {
+flex-direction: column; /* Stack button below inputs on small screens */
+align-items: stretch; /* Stretch items to full width */
+gap: 0.5rem; /* Adjust gap for column layout */
+}
+.ilm .modal .creation-inputs {
+flex-direction: column; /* Stack inputs vertically */
+}
+.ilm .modal .creation-inputs .ipt.input-narrow {
+width: 100%; /* Full width on small screens */
+max-width: none;
+}
+.ilm .modal .creation-button {
+align-self: flex-end; /* Keep button to the right */
+width: auto; /* Allow button to size based on content */
+margin-top: 0.5rem; /* Add space above button */
+height: auto; /* Reset height */
+line-height: 1.4; /* Ensure text fits */
+}
+.ilm .modal .modal-close-area {
+margin-top: 1.25rem; /* Add back margin if needed */
+}
+/* Adjust modal list grid for smaller screens if needed */
+.ilm .modal .modal-list-header,
+.ilm .modal .modal-list-row {
+grid-template-columns: 80px 1fr 50px 100px 70px 1fr 50px; /* Adjust grid */
+font-size: 0.8rem;
+padding: 0.4rem 0.5rem;
+gap: 0.4rem;
+}
+.ilm .modal .modal-list-header { font-size: 0.7rem; }
+.ilm .modal .btn-copy-modal {
+padding: 0.15rem 0.4rem;
+font-size: 0.7rem;
+}
+}
+
+/* Tailwind-like utility classes (if not using Tailwind) */
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.text-xl { font-size: 1.25rem; }
+.font-bold { font-weight: 700; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.flex { display: flex; }
+.w-full { width: 100%; }
+.table-fixed { table-layout: fixed; }
+.w-40 { width: 10rem; } /* 160px */
+.w-24 { width: 6rem; } /* 96px */
+.w-32 { width: 8rem; } /* 128px */
+.w-20 { width: 5rem; } /* 80px */
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.md\:grid-cols-3 { /* Apply styles starting from md breakpoint (768px) */
+@media (min-width: 768px) {
+grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+}
+.gap-3 { gap: 0.75rem; }
+.mt-5 { margin-top: 1.25rem; }
+.justify-end { justify-content: flex-end; }
