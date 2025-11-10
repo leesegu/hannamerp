@@ -18,6 +18,9 @@ import { getStorage, ref as sRef, uploadBytes, getBytes } from "firebase/storage
 /* ✅ 캡쳐용 */
 import * as htmlToImage from "html-to-image";
 
+/* ✅ [추가] 카드지출 팝업 */
+import CardExpenseModal from "./CardExpenseModal";
+
 /** ====== 상수/공통 ====== */
 const INITIAL_ROWS = 20;
 const LS_KEY = "ExpensePage:WIP:v1";
@@ -707,6 +710,9 @@ export default function ExpensePage() {
   // 출금현황 모달
   const [outModalOpen, setOutModalOpen] = useState(false);
 
+  /* ✅ [추가] 카드지출 팝업 상태 */
+  const [cardModalOpen, setCardModalOpen] = useState(false);
+
   // ✅ 검색 관련 상태
   const [searchQ, setSearchQ] = useState("");
   const [searching, setSearching] = useState(false);
@@ -1295,6 +1301,21 @@ export default function ExpensePage() {
             </div>
           </div>
 
+          {/* ✅ [추가] 카드지출 버튼 — 검색창과 날짜 패널 사이 */}
+          <button
+            className="xp-btn"
+            onClick={() => setCardModalOpen(true)}
+            title="카드지출"
+            style={{
+              height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
+              background: "linear-gradient(135deg,#6C8CF5 0%,#4F73EA 100%)",
+               marginLeft: 40,
+              marginRight: 8
+            }}
+          >
+            <i className="ri-bank-card-line" /> 카드지출
+          </button>
+
           {/* 9) 지출일자/합계 패널 — 더 크게 + 오른쪽 정렬 고정 */}
           <div
             className="xp-side fancy-panel narrow mini"
@@ -1391,7 +1412,7 @@ export default function ExpensePage() {
             <div style={{
               padding: "6px 10px", borderRadius: 999,
               background: "linear-gradient(135deg,#dcfce7,#bbf7d0)",
-              fontWeight: 800, color: "#064e3b", fontSize: 12,
+              fontWeight: 800, color: "#065f46", fontSize: 12,
             }}>
               완료 합계&nbsp;<span style={{ color: "#047857" }}>₩{fmtComma(outBreak.totalDone)}</span>
             </div>
@@ -1547,6 +1568,9 @@ export default function ExpensePage() {
           onClose={() => setHoldOpen(false)}
         />
       </Modal>
+
+      {/* ✅ [추가] 카드지출 팝업 렌더 */}
+      <CardExpenseModal open={cardModalOpen} onClose={() => setCardModalOpen(false)} />
     </div>
   );
 }

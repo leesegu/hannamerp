@@ -1,0 +1,316 @@
+/* src/pages/CardExpenseModal.css */
+.cemodal{position:fixed;inset:0;z-index:10040;font-family:"Pretendard",system-ui,-apple-system,"Segoe UI",sans-serif}
+.cemodal__backdrop{position:absolute;inset:0;background:radial-gradient(1400px 900px at 80% 0%, rgba(108,140,245,.18), transparent 60%), radial-gradient(1000px 700px at 10% 100%, rgba(120,160,255,.12), transparent 60%), rgba(15,18,32,.55);backdrop-filter:blur(2px)}
+/* ⬇️ 드롭다운 옵션 클리핑 방지: overflow visible */
+.cemodal__panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1600px,96vw);height:min(900px,92vh);background:linear-gradient(180deg,#ffffff 0%, #f8faff 100%);border:1px solid #e3e8f3;border-radius:24px;box-shadow:0 18px 48px rgba(15,18,32,.22), 0 2px 0 rgba(255,255,255,.6) inset;display:flex;flex-direction:column;overflow:visible}
+
+/* Header (재배치 스타일) */
+.cemodal .cemodal__header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 22px;border-bottom:1px solid #e6ebf5;background:linear-gradient(180deg,#f7f9ff 0%, #ffffff 100%)}
+.cemodal .cemodal__title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:#0e1322}
+.cemodal .cemodal__badge{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;color:#31407a;background:linear-gradient(180deg,#e7eeff 0%, #cfe0ff 100%);border:1px solid #d7e2ff;border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+
+/* 우측 컨트롤 */
+.cemodal .cemodal__header-right{display:flex;align-items:center;gap:8px}
+.cemodal .cemodal__btn-close{margin-left:4px}
+
+/* 공통 입력 래퍼 */
+.cemodal .inputwrap{position:relative;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d6ddf0;border-radius:12px;padding:0 12px;height:38px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 4px 10px rgba(56,76,136,.06);background-image:linear-gradient(180deg,#ffffff 0%, #f5f8ff 100%);transition:border-color .2s, box-shadow .2s}
+.cemodal .inputwrap:focus-within{outline:none;border-color:#6c8cf5;box-shadow:0 0 0 3px rgba(108,140,245,.25), inset 0 1px 0 rgba(255,255,255,.95)}
+.cemodal .inputicon{display:inline-flex;color:#2a3465;opacity:.9;flex-shrink:0}
+.cemodal .inputwrap>input,.cemodal .inputwrap>select{flex:1;border:0;outline:none;background:transparent;height:100%;padding:0 4px;font-size:14px;min-width:80px}
+
+/* 검색창 */
+.cemodal .searchwrap--header{flex:0 0 280px;min-width:220px;max-width:520px}
+.cemodal .searchwrap .search{height:100%;min-width:120px}
+.cemodal .matchcounter{min-width:56px;text-align:right;color:#2a3465;font-weight:700;opacity:.9}
+.cemodal .matchcounter.is-empty{opacity:.4}
+
+/* 달력 네이티브 인디케이터 제거 */
+.cemodal .fancy-picker-alt::-webkit-calendar-picker-indicator{display:none;opacity:0;pointer-events:none}
+.cemodal .fancy-picker-alt{cursor:pointer}
+
+/* 날짜칩 */
+.cemodal .datechip{border:1px solid #cdd6ff;background:linear-gradient(180deg,#f8f9ff 0%, #eef2ff 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 6px 14px rgba(116,132,255,.12)}
+.cemodal .datechip:focus-within{border-color:#7e8cff;box-shadow:0 0 0 3px rgba(126,140,255,.25), inset 0 1px 0 rgba(255,255,255,.98)}
+.cemodal .datechip .inputicon{color:#4651b7}
+.cemodal .datechip .fancy-picker-alt{font-weight:800;letter-spacing:.2px;color:#1a2050}
+
+/* 버튼 */
+.cemodal .btn{height:38px;padding:0 14px;border-radius:12px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;letter-spacing:.2px;cursor:pointer;white-space:nowrap;transition:.2s ease}
+.cemodal .btn.primary{background:linear-gradient(180deg,#6c8cf5 0%, #4f73ea 100%);color:#fff;border-color:#4e71e3;box-shadow:0 6px 16px rgba(94,126,242,.28)}
+.cemodal .btn.primary:hover{filter:brightness(1.05)}
+.cemodal .btn.outline{background:#fff;border-color:#cfd8ee;color:#2a3465}
+.cemodal .btn.ghost{background:transparent;border-color:#e5eaf6;color:#2a3465}
+.cemodal .btn.ghost:not(:disabled):hover{background:#f0f5ff;border-color:#dbe4ff}
+.cemodal .btn.close{background:#eff3ff;border-color:#e0e7ff;color:#2a3465}
+.cemodal .btn:disabled{opacity:.45;cursor:not-allowed}
+.cemodal .btn.center{justify-content:center}
+.cemodal .btn.edit{background:linear-gradient(180deg,#a6b9ff 0%, #6e8bff 100%);color:#0e1322;border:1px solid #7e91ff;box-shadow:0 10px 24px rgba(110,139,255,.28), inset 0 1px 0 rgba(255,255,255,.9)}
+.cemodal .btn.edit:hover{filter:brightness(1.02);box-shadow:0 12px 28px rgba(110,139,255,.34), inset 0 1px 0 rgba(255,255,255,.95)}
+.cemodal .btn.edit:active{transform:translateY(1px)}
+.cemodal .btn.danger{background:#e53e3e;color:#fff;border-color:#c53030;box-shadow:0 6px 16px rgba(229,62,62,.25)}
+.cemodal .btn.danger:hover{background:#c53030;filter:brightness(1.05)}
+
+/* 통계/차트 — Luxe */
+.cemodal .btn.luxe{
+  position:relative;
+  background:linear-gradient(90deg,#6c5ce7 0%, #4ac0ff 100%);
+  color:#fff;border:1px solid rgba(110,139,255,.65);
+  box-shadow:0 10px 28px rgba(80,120,255,.28), inset 0 1px 0 rgba(255,255,255,.85);
+}
+.cemodal .btn.luxe::after{
+  content:"";
+  position:absolute;inset:0;border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.45),rgba(255,255,255,0) 40%);
+  pointer-events:none;
+}
+.cemodal .btn.luxe:hover{filter:brightness(1.05)}
+.cemodal .btn.luxe:active{transform:translateY(1px)}
+
+/* Stats */
+.cemodal .cemodal__stats{display:grid;grid-template-columns:220px 240px 1fr 1fr;gap:12px;padding:14px 20px;border-bottom:1px solid #eef2fa;background:#f7f9fc}
+.cemodal .stat{background:#fff;border:1px solid #eef2f9;border-radius:16px;padding:12px 16px;box-shadow:0 4px 12px rgba(15,18,32,.04)}
+.cemodal .stat__label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#55608a;margin-bottom:4px}
+.cemodal .stat__value{font-size:24px;font-weight:800;color:#0e1322;line-height:1.2}
+.cemodal .stat__unit{font-size:15px;font-weight:600;color:#333;margin-left:4px}
+.cemodal .stat--pill .stat__list{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.cemodal .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbe4ff;color:#2a3465;font-size:13px;font-weight:500}
+.cemodal .pill b{margin-left:6px;color:#0e1322;font-weight:700}
+.cemodal .pill svg{opacity:.8}
+
+/* 신규 입력 폼 */
+.cemodal .cemodal__newform{display:grid;grid-template-columns:160px 160px 160px 160px 160px 2fr 2fr 120px;gap:8px;align-items:center;padding:12px 20px;border-bottom:1px solid #eef2fa;background:linear-gradient(180deg,#ffffff 0%, #f9fbff 100%)}
+.cemodal .input-center{text-align:center}
+
+/* 테이블 */
+.cemodal .cemodal__tablewrap{flex:1;overflow:auto;background:linear-gradient(180deg,#ffffff 0%, #f9fbff 100%)}
+.cemodal .cemodal__table{width:100%;border-collapse:separate;border-spacing:0}
+/* ✅ 헤더는 모두 가운데 정렬 */
+.cemodal .cemodal__table thead th{position:sticky;top:0;background:linear-gradient(180deg,#f5f8ff 0%, #eaf0ff 100%);border-bottom:1px solid #dce4f7;color:#2a3465;font-weight:800;text-align:center;padding:10px 12px;letter-spacing:.2px}
+/* ✅ 바디 기본 가운데 정렬 */
+.cemodal .cemodal__table tbody td{text-align:center;border-bottom:1px solid #eef2fa;padding:6px 12px;font-size:14px;color:#0e1322;vertical-align:middle}
+/* ✅ 내용/비고는 바디에서만 좌측 정렬 */
+.cemodal .cemodal__table tbody td.col-desc,
+.cemodal .cemodal__table tbody td.col-memo{ text-align:left; }
+.cemodal .cemodal__table tbody td.col-desc .inputwrap>input,
+.cemodal .cemodal__table tbody td.col-memo .inputwrap>input{ text-align:left; }
+
+.cemodal .cemodal__table tbody tr>td:has(.inputwrap){padding:4px 8px}
+.cemodal .cemodal__table td.muted{color:#5d667b}
+.cemodal .cemodal__table td.num{text-align:center;font-variant-numeric:tabular-nums}
+.cemodal .cemodal__table tbody tr:hover{background:linear-gradient(180deg,#ffffff 0%, #f0f5ff 100%)}
+.cemodal .empty{padding:40px 0;text-align:center;color:#68719a}
+.cemodal .actions{display:flex;gap:6px}
+.cemodal .cemodal__table td.edit-mode-amount .inputwrap{max-width:140px;margin:0 auto}
+
+/* 검색 하이라이트 */
+.cemodal .row--highlight{animation:rowPulse 1.2s ease}
+@keyframes rowPulse{
+  0%{box-shadow:inset 0 0 0 0 rgba(108,140,245,0)}
+  30%{box-shadow:inset 0 0 0 9999px rgba(108,140,245,.12)}
+  100%{box-shadow:inset 0 0 0 0 rgba(108,140,245,0)}
+}
+
+/* 페이징 */
+.cemodal .cemodal__pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px;border-top:1px solid #e6e9f5;background:linear-gradient(180deg,#ffffff 0%, #f7faff 100%)}
+.cemodal .cemodal__pager .btn.ghost{background:#fff;border-color:#dbe4ff;box-shadow:0 4px 10px rgba(56,76,136,.05);min-width:80px}
+.cemodal .cemodal__pager .btn.ghost:not(:disabled):hover{background:#f0f5ff}
+.cemodal .cemodal__pager .btn.ghost:disabled{background:#f8faff;opacity:.6}
+.cemodal .pageinfo{min-width:80px;text-align:center;color:#2a3465;font-weight:700}
+
+/* 삭제 확인 모달 */
+.cemodal .cemodal__confirm-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:10050;animation:fadeIn .2s ease}
+.cemodal .cemodal__confirm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:#fff;border-radius:16px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.1);z-index:10051;width:min(400px,90vw);animation:zoomIn .2s ease}
+.cemodal .cemodal__confirm-title{font-size:18px;font-weight:700;color:#0e1322;margin:0 0 12px;display:flex;align-items:center}
+.cemodal .cemodal__confirm-message{font-size:14px;color:#333;margin:0 0 24px;line-height:1.5}
+.cemodal .cemodal__confirm-actions{display:flex;gap:10px;justify-content:flex-end}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes zoomIn{from{opacity:0;transform:translate(-50%, -50%) scale(.9)}to{opacity:1;transform:translate(-50%, -50%) scale(1)}}
+
+/* 헤더용 보조 아이콘 */
+.cemodal .thicon{display:inline-flex;vertical-align:middle;margin-right:6px;color:#2a3465;opacity:.95}
+
+/* 커스텀 월 선택기 (스코프) */
+.cemodal .mp-wrap{position:relative;z-index:150}
+.cemodal .mp-trigger{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:12px;border:1px solid #d6ddf0;background-image:linear-gradient(180deg,#ffffff 0%, #f5f8ff 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 4px 10px rgba(56,76,136,.06);color:#0e1322;font-weight:800;cursor:pointer;transition:.12s transform,.12s box-shadow,.12s border-color;font-size:14px}
+.cemodal .mp-trigger:hover{transform:translateY(-1px);border-color:#6c8cf5;box-shadow:0 0 0 3px rgba(108,140,245,.25), inset 0 1px 0 rgba(255,255,255,.95)}
+.cemodal .mp-trigger .caret{margin-left:4px;color:#8b95c7;font-size:12px}
+.cemodal .mp-pop{position:absolute;right:0;top:42px;width:320px;border-radius:14px;background:#fff;border:1px solid #e6e9f5;box-shadow:0 20px 40px rgba(33,48,120,.10);padding:10px;z-index:200;transform-origin:100% 0%;animation:mpIn .12s ease-out}
+@keyframes mpIn{0%{opacity:0;transform:scale(.98)}100%{opacity:1;transform:scale(1)}}
+.cemodal .mp-head{position:relative;padding-top:2px;padding-bottom:8px;min-height:34px;display:flex;justify-content:center;align-items:center}
+.cemodal .mp-head .yr{text-align:center;font-weight:900;color:#2e2a7b;font-size:20px;flex-grow:1}
+.cemodal .mp-head .nav{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:8px;border:1px solid #e6e9f5;background:#fff;color:#4b3fe7;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.cemodal .mp-head .nav:hover{background:#f7f9ff}
+.cemodal .mp-head .nav.nav-prev{left:0}
+.cemodal .mp-head .nav.nav-next{right:0}
+.cemodal .mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cemodal .mm{height:44px;border-radius:10px;border:1px solid #eceffd;background:linear-gradient(0deg,#ffffff,#f7f8ff);color:#2a236e;font-weight:900;cursor:pointer;transition:.12s transform,.12s box-shadow,.12s border-color,.12s background;font-size:13px}
+.cemodal .mm:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(33,48,120,.08);border-color:#dfe5ff}
+.cemodal .mm.is-picked{border-color:transparent;background:linear-gradient(90deg,#7b5cff,#4fb7ff);color:#fff;box-shadow:0 10px 20px rgba(79,183,255,.2)}
+.cemodal .mp-foot{display:flex;justify-content:flex-end;margin-top:10px}
+.cemodal .mp-close{font-size:12px;height:34px;padding:0 12px}
+
+/* 커스텀 드롭다운 (스코프) */
+.cemodal .csel{position:relative;display:flex;align-items:center;width:100%}
+.cemodal .csel-trigger{position:relative;z-index:1;display:flex;align-items:center;gap:8px;width:100%;height:34px;padding:0 8px;border:0;background:transparent;color:#0e1322;font-weight:600;cursor:pointer}
+.cemodal .csel-caret{margin-left:auto;color:#8b95c7;font-size:12px}
+.cemodal .csel-value{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cemodal .csel-overlay{position:absolute;inset:0;z-index:2;cursor:pointer}
+.cemodal .csel-pop{position:absolute;left:0;top:40px;min-width:180px;max-width:320px;background:#fff;border:1px solid #e6e9f5;border-radius:12px;box-shadow:0 18px 40px rgba(17,24,39,.12), 0 4px 10px rgba(17,24,39,.06);padding:6px;z-index:300;animation:cselIn .12s ease;backdrop-filter:saturate(1.2)}
+@keyframes cselIn{from{opacity:.6;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.cemodal .csel-item{padding:10px 12px;border-radius:10px;font-size:14px;color:#1a2240;display:flex;align-items:center;gap:8px}
+.cemodal .csel-item:hover{background:linear-gradient(90deg,#eef2ff,#f7f9ff);box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}
+.cemodal .csel-item.is-active{background:linear-gradient(90deg,#7b5cff,#4fb7ff);color:#fff}
+
+/* 팝업 공용 (스코프) */
+.cemodal .pop-overlay{position:fixed;inset:0;background:rgba(10,12,20,.55);backdrop-filter:blur(3px);z-index:10060;display:flex;align-items:center;justify-content:center}
+.cemodal .pop-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cemodal .pop-title{font-size:18px;font-weight:800;color:#0e1322}
+
+/* 통계 패널 */
+.cemodal .stats-panel{
+  width:min(1200px,96vw);height:min(780px,90vh);
+  background:#fff;border:1px solid #e7eaf5;border-radius:18px;
+  box-shadow:0 18px 48px rgba(20,24,40,.25);padding:16px;
+  /* ✅ 드롭다운 목록이 가려지지 않도록 */
+  position:relative;z-index:101;overflow:visible;
+}
+.cemodal .stats-layout{display:grid;grid-template-columns:320px 1fr;gap:14px;height:calc(100% - 56px);overflow:visible}
+.cemodal .stats-filters{background:linear-gradient(180deg,#fbfcff,#f4f7ff);border:1px solid #e6ebf5;border-radius:14px;padding:12px;overflow:visible}
+.cemodal .filter-block + .filter-block{margin-top:12px}
+.cemodal .filter-title{font-weight:800;color:#2a3465;margin-bottom:8px}
+.cemodal .year-row{position:relative;z-index:102}
+.cemodal .year-row .stats-year-select{
+  width:100%;height:36px;border:1px solid #d6ddf0;border-radius:10px;padding:0 10px;
+  position:relative;z-index:103;font-weight:700;letter-spacing:.1px;
+}
+.cemodal .months-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cemodal .month-pill{height:32px;border-radius:10px;border:1px solid #e0e6ff;background:#fff;cursor:pointer}
+.cemodal .month-pill.is-on{background:#eef2ff;border-color:#d4dcff;color:#2a2f6f;font-weight:700}
+.cemodal .payer-list{display:flex;flex-wrap:wrap;gap:6px}
+.cemodal .payer-pill{height:32px;border-radius:999px;border:1px solid #e0e6ff;background:#fff;padding:0 10px;cursor:pointer}
+.cemodal .payer-pill.is-on{background:#f1eaff;border-color:#dbc8ff;color:#3d2a7a;font-weight:700}
+
+/* 통계 표 */
+.cemodal .stats-tablewrap{background:#fff;border:1px solid #e6ebf5;border-radius:14px;padding:10px;overflow:auto}
+.cemodal .stats-table{width:100%;border-collapse:separate;border-spacing:0}
+.cemodal .stats-table thead th{position:sticky;top:0;background:linear-gradient(180deg,#f5f8ff,#eaf0ff);border-bottom:1px solid #dce4f7;color:#2a3465;font-weight:800;text-align:center;padding:8px 10px}
+.cemodal .stats-table td{border-bottom:1px solid #eef2fa;padding:8px 10px;color:#0e1322;text-align:center}
+.cemodal .stats-table td.mcell{font-weight:700;color:#2a2f6f}
+.cemodal .stats-table .strong{font-weight:800}
+
+/* 차트 패널 */
+.cemodal .charts-panel{
+  width:min(1200px,96vw);height:min(780px,90vh);
+  background:#11131a;border:1px solid #252a3b;border-radius:18px;
+  box-shadow:0 18px 48px rgba(10,12,20,.35);padding:16px;color:#e7e9f6;
+  /* ⬇️ 드롭다운 가려짐 방지용 스택/오버플로 보강 */
+  position:relative;z-index:101;overflow:visible;
+}
+.cemodal .charts-panel .pop-title{color:#e7e9f6}
+.cemodal .charts-head{align-items:center;position:relative;z-index:102;overflow:visible}
+.cemodal .charts-head-left{display:flex;align-items:center;gap:10px}
+.cemodal .year-select{
+  height:36px;border-radius:10px;border:1px solid #3a4160;background:#161a26;color:#e7e9f6;padding:0 10px;
+  position:relative;z-index:103; /* ⬅️ 드롭다운 최상단 노출 */
+  font-weight:700;letter-spacing:.1px;min-width:96px;
+}
+.cemodal .year-select.inline{margin-left:2px}
+.cemodal .year-select option{color:#0e1322;background:#ffffff}
+
+/* 4분할 그리드 */
+.cemodal .charts-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:minmax(240px,auto);gap:16px;height:calc(100% - 56px)}
+.cemodal .charts-grid-quad{grid-template-columns:1fr 1fr}
+.cemodal .chart-card{background:#1a1e2a;border:1px solid #2a3146;border-radius:16px;padding:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.cemodal .chart-title{font-weight:800;margin-bottom:10px}
+
+/* === 차트 막대 (Premium & High-Contrast) === */
+.cemodal .bars.vstack{display:flex;flex-direction:column;gap:12px}
+.cemodal .bar-row{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px}
+.cemodal .bar-label{color:#d6dcff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;letter-spacing:.1px}
+
+/* 트랙: 기본(다른 화면) — 유리광택 + 약한 그리드 */
+.cemodal .bar-track{
+  position:relative;height:18px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0)),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 6px,transparent 6px 12px),
+    #0f1320;
+  border-radius:999px;overflow:hidden;border:1px solid #2a3146;max-width:100%;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.02);
+}
+
+/* ⬇️ 차트 패널 안에서는 체크 느낌 제거: 그리드 패턴 제거하고 깔끔한 유리광택만 */
+.cemodal .charts-panel .bar-track{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0)),
+    #0f1320;
+}
+
+/* 필: 그라디언트 + 스트라이프 + 글로우 */
+.cemodal .bar-fill{
+  position:absolute;left:0;top:0;bottom:0;max-width:100%;
+  background:linear-gradient(90deg,#58e1ff 0%, #7b5cff 60%, #4fd1ff 100%);
+  border-radius:999px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.15) inset,
+    0 6px 14px rgba(100,130,255,.28),
+    0 1px 0 rgba(255,255,255,.2) inset;
+  transition:width .35s ease;
+}
+.cemodal .bar-fill.pink{
+  background:linear-gradient(90deg,#ff77d9 0%, #ff5c8a 55%, #ff9acb 100%);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.15) inset,
+    0 6px 14px rgba(255,120,200,.28),
+    0 1px 0 rgba(255,255,255,.2) inset;
+}
+
+/* 필 내부 광택 라인 + 사선 스트라이프 */
+.cemodal .bar-fill::before{
+  content:"";
+  position:absolute;inset:0;
+  background:
+    linear-gradient(120deg,rgba(255,255,255,.0) 0%,rgba(255,255,255,.22) 10%,rgba(255,255,255,.0) 22%) 0 0/160px 100% no-repeat,
+    repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 2px,rgba(255,255,255,0) 2px 6px);
+  mix-blend-mode:screen;
+  animation:barShine 2.4s linear infinite;
+  pointer-events:none;border-radius:999px;
+}
+
+/* 값: 작은 캡슐 */
+.cemodal .bar-value{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  font-weight:900;color:#0e1225;font-size:12px;letter-spacing:.2px;
+  background:linear-gradient(180deg,#ffffff 0%, #f5f7ff 100%);
+  border:1px solid rgba(230,235,255,.7);
+  padding:2px 8px;border-radius:999px;
+  box-shadow:0 3px 8px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.9);
+  max-width:95%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* 진행 광택 애니메이션 */
+@keyframes barShine{
+  0%{background-position:-160px 0, 0 0}
+  100%{background-position:160px 0, 0 0}
+}
+
+/* 저폭 대비 보강 */
+@media (prefers-reduced-motion: reduce){
+  .cemodal .bar-fill{transition:none}
+  .cemodal .bar-fill::before{animation:none}
+}
+
+/* 팝업 닫기 버튼 */
+.cemodal .pop-close{min-width:72px}
+
+/* 반응형 */
+@media (max-width:1400px){
+  .cemodal .cemodal__newform{grid-template-columns:1fr 1fr 1fr 1fr 1fr 2fr 2fr 120px}
+}
+@media (max-width:900px){
+  .cemodal .cemodal__panel{width:96vw;height:92vh;border-radius:20px}
+  .cemodal .cemodal__stats{grid-template-columns:1fr 1fr}
+  .cemodal .cemodal__newform{grid-template-columns:1fr 1fr}
+  .cemodal .stats-layout{grid-template-columns:1fr}
+}

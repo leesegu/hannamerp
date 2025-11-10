@@ -69,6 +69,43 @@ import "./App.css";
 import { auth } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
+/* ✅ [추가] 카드지출 팝업 컴포넌트 import (src/pages/CardExpenseModal.jsx) */
+import CardExpenseModal from "./pages/CardExpenseModal";
+
+/* ✅ [추가] 증명서 발급 페이지 라우트용 import (새 파일) */
+import CertificateIssuePage from "./pages/CertificateIssuePage";
+
+/* ✅ [추가] 라우트에서 사용할 카드지출 래퍼 컴포넌트
+   - 페이지로 직접 접근했을 때도 팝업을 띄울 수 있도록 최소 구현
+   - 기존 페이지에는 영향 없음
+*/
+function CardExpensePageWrapper() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ padding: 16 }}>
+      <button
+        className="btn primary"
+        onClick={() => setOpen(true)}
+        style={{
+          height: 36,
+          padding: "0 12px",
+          borderRadius: 10,
+          border: "1px solid transparent",
+          fontWeight: 600,
+          cursor: "pointer",
+          background:
+            "linear-gradient(180deg,#6C8CF5 0%, #4F73EA 100%)",
+          color: "#fff",
+          boxShadow: "0 6px 16px rgba(94,126,242,.28)",
+        }}
+      >
+        카드지출 열기
+      </button>
+      <CardExpenseModal open={open} onClose={() => setOpen(false)} />
+    </div>
+  );
+}
+
 function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, isAuthReady, authUser }) {
   const navigate = useNavigate();
 
@@ -312,6 +349,31 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/addon/resident-card"
         element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ResidentCardPage />}
+      />
+
+      {/* ✅ (추가) 관리비회계 · 카드지출 (직접 URL 접근용 라우트)
+          - 기존 코드에 영향 없이, 로그인 상태에서 접근 시 버튼 → 팝업 */}
+      <Route
+        path="/accounting/card-expense"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          ) : (
+            <CardExpensePageWrapper />
+          )
+        }
+      />
+
+      {/* ✅ (추가) 증명서 발급 페이지 라우트 */}
+      <Route
+        path="/certificates"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          ) : (
+            <CertificateIssuePage />
+          )
+        }
       />
 
       {/* 와일드카드 */}

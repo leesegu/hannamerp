@@ -12,6 +12,9 @@ import DataTable from "../components/DataTable";
 import PageTitle from "../components/PageTitle";
 import GenericEditModal from "../components/GenericEditModal";
 
+/* ✅ [추가] 모달 컴포넌트 임포트 */
+import CertificateIssuePage from "./CertificateIssuePage";
+
 // ✅ 유틸: 날짜를 YYYY-MM-DD로 정규화 (저장 시 적용)
 function normalizeToYYYYMMDD(input) {
   if (!input && input !== 0) return "";
@@ -120,11 +123,28 @@ function calcAgeFromRRN(rrn) {
   return age >= 0 ? age : "";
 }
 
+/* ❌ [삭제] 새창 팝업 함수
+function openCertificatePopup() {
+  const url = `${window.location.origin}/certificates`;
+  const w = 940, h = 1200;
+  const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
+  const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
+  window.open(
+    url,
+    "certificate_issue",
+    `popup=yes,width=${w},height=${h},left=${x},top=${y},resizable=yes,scrollbars=yes`
+  );
+}
+*/
+
 export default function EmployeePage() {
   const [employees, setEmployees] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
   const [origId, setOrigId] = useState(null);
+
+  /* ✅ [추가] 증명서 발급 모달 on/off */
+  const [openCert, setOpenCert] = useState(false);
 
   // 실시간 구독
   useEffect(() => {
@@ -149,7 +169,7 @@ export default function EmployeePage() {
       "position",
       "empNo",
       "resRegNo",
-      "age",            // 폼에 표시하되 읽기전용으로 잠금
+      "age", // 폼에 표시하되 읽기전용으로 잠금
       "gender",
       "employmentType",
       "joinDate",
@@ -185,11 +205,11 @@ export default function EmployeePage() {
     accountNo: "text",
     resRegNo: "text",
     joinDate: "text",
-    age: "number",         // 읽기전용으로 잠글 예정
+    age: "number", // 읽기전용으로 잠글 예정
     dept: "select",
     position: "select",
     employmentType: "select",
-    gender: "select",      // ✅ 성별 드롭다운
+    gender: "select", // ✅ 성별 드롭다운
   };
 
   const selectOptions = {
@@ -249,7 +269,10 @@ export default function EmployeePage() {
       position: src.position || "",
       empNo: src.empNo || src.id || "",
       resRegNo: src.resRegNo || "",
-      age: (src.age !== "" && src.age != null) ? src.age : calcAgeFromRRN(src.resRegNo), // ✅ 계산값
+      age:
+        src.age !== "" && src.age != null
+          ? src.age
+          : calcAgeFromRRN(src.resRegNo), // ✅ 계산값
       gender: src.gender || "",
       employmentType: src.employmentType || "",
       joinDate: src.joinDate || "",
@@ -321,6 +344,53 @@ export default function EmployeePage() {
     <div className="page-wrapper">
       <PageTitle>사원정보</PageTitle>
 
+      {/* ✅ 상단 왼쪽: "증명서 발급" 버튼(모달 토글) */}
+      <div
+        style={{
+          height: 24,
+          marginBottom: -22,
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={() => setOpenCert(true)}  /* ✅ 새창 X, 모달 on */
+          title="증명서 발급을 모달로 엽니다."
+          style={{
+            position: "absolute",
+            left: 0, top: 0,
+            height: 40,
+            padding: "0 16px 0 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.2)",
+            background:
+              "linear-gradient(180deg,#6C8CF5 0%, #4F73EA 100%), radial-gradient(800px 400px at 100% 0%, rgba(255,255,255,0.18), transparent 60%)",
+            color: "#fff",
+            fontWeight: 700,
+            letterSpacing: ".02em",
+            cursor: "pointer",
+            boxShadow:
+              "0 8px 20px rgba(79,115,234,.35), 0 2px 6px rgba(15,18,32,.18)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            zIndex: 2,
+          }}
+          className="btn primary"
+        >
+          <svg
+            width="18" height="18"
+            viewBox="0 0 24 24" aria-hidden="true"
+            style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,.25))" }}
+          >
+            <path
+              fill="currentColor"
+              d="M5 2h10l6 6v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm9 1.5V8h4.5L14 3.5ZM7 12h10v2H7v-2Zm0 4h10v2H7v-2ZM7 8h5v2H7V8Z"
+            />
+          </svg>
+          증명서 발급
+        </button>
+      </div>
+
       <DataTable
         columns={[
           { key: "name", label: "성명", editable: true },
@@ -389,6 +459,14 @@ export default function EmployeePage() {
           types={types}
           selectOptions={selectOptions}
           formatters={formatters}
+        />
+      )}
+
+      {/* ✅ [추가] 증명서 발급 모달 실제 렌더링 (새창 X) */}
+      {openCert && (
+        <CertificateIssuePage
+          onClose={() => setOpenCert(false)}
+          employeeList={employees}
         />
       )}
     </div>

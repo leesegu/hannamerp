@@ -1,14 +1,9 @@
 /* ==================================
-IncomeImportPage.css
-
-* 폭 조정: 구분(더 줄임) / 메모(더 늘림)
-* 헤더가 본문 위에 항상 떠 있도록 수정
-* '입금만/수정모드' 토글 퍼플 스타일 추가
-* 삭제모드 UI(전체선택/행체크) 스타일 추가
-* 스크롤 색상 퍼플로統一
+IncomeImportPage.css (scoped to .income-page)
 ================================== */
 
-:root {
+/* 페이지 스코프 변수 */
+.income-page {
   --ink: #1f2330;
   --muted: #6b7280;
   --line: #e8eaf1;
@@ -22,11 +17,6 @@ IncomeImportPage.css
   --danger-on: #ef4444;
   --danger-on2: #dc2626;
   --danger-border: #fca5a5;
-
-  /* Scrollbar */
-  --scrollbar-track: #ecebff;
-  --scrollbar-thumb: #6d5efc;
-  --scrollbar-thumb-hover: #5847ff;
 }
 
 .income-page {
@@ -35,188 +25,199 @@ IncomeImportPage.css
 }
 
 /* 툴바 */
-.toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.toolbar.tight { margin-top:0; }
-.toolbar .left, .toolbar .mid, .toolbar .right { display:flex; align-items:center; gap:10px; }
+.income-page .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.income-page .toolbar.tight { margin-top:0; }
+.income-page .toolbar .left,
+.income-page .toolbar .mid,
+.income-page .toolbar .right { display:flex; align-items:center; gap:10px; }
 
 /* 버튼/입력 공통 */
-.btn {
+.income-page .btn {
   height:30px; padding:0 12px; border:1px solid var(--line-strong);
   background:#fff; border-radius:10px; cursor:pointer; font-size:12px;
   transition: box-shadow .15s, transform .06s, background .15s, color .15s, border-color .15s;
 }
-.btn:hover { box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 0 0 4px var(--primary-weak); }
-.btn:active { transform: translateY(1px); }
-.btn:disabled { opacity:.5; cursor:not-allowed; }
+.income-page .btn:hover { box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 0 0 4px var(--primary-weak); }
+.income-page .btn:active { transform: translateY(1px); }
+.income-page .btn:disabled { opacity:.5; cursor:not-allowed; }
 
 /* 아이콘+라벨 보조 */
-.btn .ico{ display:inline-flex; align-items:center; }
-.btn .btn-label{ white-space:nowrap; }
+.income-page .btn .ico{ display:inline-flex; align-items:center; }
+.income-page .btn .btn-label{ white-space:nowrap; }
 
 /* 버튼 변형 */
-.btn.excel{
+.income-page .btn.excel{
   border:none; color:#fff; font-weight:700;
   background: linear-gradient(135deg, #53c78b, #2aa06b);
   border-radius:12px; display:inline-flex; align-items:center; gap:6px;
 }
-.btn.unconf{
+.income-page .btn.unconf{
   border:none; color:#fff; font-weight:700;
   background: linear-gradient(135deg,#9b59ff,#6d5efc);
   border-radius:12px; display:inline-flex; align-items:center; gap:6px;
 }
-.btn.add{
+.income-page .btn.add{
   border:none; color:#fff; font-weight:700;
   background: linear-gradient(135deg,#00b4d8,#0077b6);
   border-radius:12px;
 }
 
-/* ✅ 확인 버튼(보라) — Modal confirmVariant="primary" 대응 */
-.btn.primary{
+/* ✅ 추가: 어제 버튼 */
+.income-page .btn.yesterday{
+  border:1px solid #cfd6ff;
+  background: linear-gradient(180deg,#f7f9ff,#eef2ff);
+  color:#334155;
+  font-weight:700;
+  border-radius:10px;
+}
+
+/* ✅ 확인 버튼(보라) */
+.income-page .btn.primary{
   border:none; color:#fff; font-weight:800;
   background: linear-gradient(135deg, #7b66ff, #5b46f0);
   border-radius:12px;
   box-shadow: 0 6px 18px rgba(109,94,252,.25);
 }
-.btn.primary:hover{
+.income-page .btn.primary:hover{
   box-shadow: 0 8px 22px rgba(109,94,252,.35);
   filter: brightness(1.02);
 }
 
 /* 삭제모드 버튼 - 켜짐(위험 톤, 진한 레드) */
-.btn.danger{
+.income-page .btn.danger{
   border:none; color:#fff; font-weight:800;
   background: linear-gradient(135deg, #ef4444, #dc2626);
   border-radius:12px;
 }
 
 /* 삭제모드 버튼 - 기본(꺼짐, 연한 레드 톤) */
-.toolbar .btn[title^="삭제모드"]{
+.income-page .toolbar .btn[title^="삭제모드"]{
   position:relative;
-  padding-left:30px; /* 아이콘 여백 */
-  color:#b4232c;                           /* 텍스트: 어두운 레드 */
-  border-color:#f9c2c8;                    /* 테두리: 연한 레드 */
-  background:linear-gradient(180deg,#fff5f6,#ffe1e4); /* 배경: 아주 연한 레드 */
+  padding-left:30px;
+  color:#b4232c;
+  border-color:#f9c2c8;
+  background:linear-gradient(180deg,#fff5f6,#ffe1e4);
   font-weight:800;
 }
-.toolbar .btn[title^="삭제모드"]::before{
+.income-page .toolbar .btn[title^="삭제모드"]::before{
   content:"";
   position:absolute; left:10px; top:50%; transform:translateY(-50%);
   width:14px; height:14px;
-  /* 아이콘: 휴지통(어두운 레드) */
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='%23b4232c'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0 0 1 14.7 23H9.3a3 3 0  0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0 0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='%23b4232c'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0  0 1 14.7 23H9.3a3 3 0  0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0  0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
 }
 /* 켜짐(위험)일 때는 아이콘을 흰색으로 */
-.toolbar .btn.danger[title^="삭제모드"]{
+.income-page .toolbar .btn.danger[title^="삭제모드"]{
   color:#fff; border-color:transparent;
 }
-.toolbar .btn.danger[title^="삭제모드"]::before{
+.income-page .toolbar .btn.danger[title^="삭제모드"]::before{
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='white'><path d='M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.1l-1.2 12.4A3 3 0  0 1 14.7 23H9.3a3 3 0  0 1-2.99-2.6L5.1 7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2h4V4h-4v1Zm-2.9 2 1.1 11.4A1 1 0  0 0 9.3 20h5.4a1 1 0 0 0 .99-.9L16.8 7H7.1Z'/></svg>") no-repeat center/14px 14px;
 }
 
-.search { height:30px; min-width:200px; padding:0 10px; border:1px solid var(--line-strong); border-radius:10px; outline:none; font-size:12px; background:#fff; }
-.page-size { height:30px; border:1px solid var(--line-strong); border-radius:10px; background:#fff; padding:0 8px; font-size:12px; }
+/* 입력 */
+.income-page .search { height:30px; min-width:200px; padding:0 10px; border:1px solid var(--line-strong); border-radius:10px; outline:none; font-size:12px; background:#fff; }
+.income-page .page-size { height:30px; border:1px solid var(--line-strong); border-radius:10px; background:#fff; padding:0 8px; font-size:12px; }
 
 /* 기간 */
-.range-pickers { display:flex; align-items:center; gap:8px; background:var(--card); padding:6px 8px; border:1px solid var(--line); border-radius:10px; }
-.range-pickers select{ height:28px; font-size:12px; border:1px solid var(--line-strong); border-radius:8px; background:#fff; padding:0 8px; }
-.date-triple{ display:flex; gap:6px; }
+.income-page .range-pickers { display:flex; align-items:center; gap:8px; background:var(--card); padding:6px 8px; border:1px solid var(--line); border-radius:10px; }
+.income-page .range-pickers select{ height:28px; font-size:12px; border:1px solid var(--line-strong); border-radius:8px; background:#fff; padding:0 8px; }
+.income-page .date-triple{ display:flex; gap:6px; }
 
 /* 통계 카드 */
-.stats-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.stat-card{
+.income-page .stats-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.income-page .stat-card{
   display:flex; align-items:center; gap:8px; padding:6px 10px;
   border-radius:12px; background:#fff; border:1px solid var(--line);
   box-shadow: 0 3px 10px rgba(0,0,0,.04); min-width:140px;
 }
-.stat-card .icon{ font-size:16px; }
-.stat-card .meta .label{ font-size:11px; color:#6b7280; }
-.stat-card .meta .value{ font-size:13px; font-weight:800; color:#1f2330; }
+.income-page .stat-card .icon{ font-size:16px; }
+.income-page .stat-card .meta .label{ font-size:11px; color:#6b7280; }
+.income-page .stat-card .meta .value{ font-size:13px; font-weight:800; color:#1f2330; }
 
 /* 테이블 */
-.table-wrap{
+.income-page .table-wrap{
   border:1px solid var(--line);
   border-radius:14px;
   background: var(--card);
-  overflow: auto;                /* 내부 스크롤 컨테이너 */
+  overflow: auto;
   max-height: calc(100vh - 240px);
 }
-/* 퍼플 스크롤바 (테이블/모달/리스트 공통) */
-.table-wrap,
-.modal-body.scrollable,
-.unconf-list {
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); /* Firefox */
+/* 퍼플 스크롤바 */
+.income-page .table-wrap,
+.income-page .modal-body.scrollable,
+.income-page .unconf-list {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
-.table-wrap::-webkit-scrollbar,
-.modal-body.scrollable::-webkit-scrollbar,
-.unconf-list::-webkit-scrollbar{
+.income-page .table-wrap::-webkit-scrollbar,
+.income-page .modal-body.scrollable::-webkit-scrollbar,
+.income-page .unconf-list::-webkit-scrollbar{
   width: 10px; height: 10px;
 }
-.table-wrap::-webkit-scrollbar-track,
-.modal-body.scrollable::-webkit-scrollbar-track,
-.unconf-list::-webkit-scrollbar-track{
+.income-page .table-wrap::-webkit-scrollbar-track,
+.income-page .modal-body.scrollable::-webkit-scrollbar-track,
+.income-page .unconf-list::-webkit-scrollbar-track{
   background: var(--scrollbar-track);
   border-radius: 10px;
 }
-.table-wrap::-webkit-scrollbar-thumb,
-.modal-body.scrollable::-webkit-scrollbar-thumb,
-.unconf-list::-webkit-scrollbar-thumb{
+.income-page .table-wrap::-webkit-scrollbar-thumb,
+.income-page .modal-body.scrollable::-webkit-scrollbar-thumb,
+.income-page .unconf-list::-webkit-scrollbar-thumb{
   background: var(--scrollbar-thumb);
   border-radius: 10px;
 }
-.table-wrap::-webkit-scrollbar-thumb:hover,
-.modal-body.scrollable::-webkit-scrollbar-thumb:hover,
-.unconf-list::-webkit-scrollbar-thumb:hover{
+.income-page .table-wrap::-webkit-scrollbar-thumb:hover,
+.income-page .modal-body.scrollable::-webkit-scrollbar-thumb:hover,
+.income-page .unconf-list::-webkit-scrollbar-thumb:hover{
   background: var(--scrollbar-thumb-hover);
 }
 
-.dense.modern{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12.5px; }
-.dense.modern thead th{
+.income-page .dense.modern{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12.5px; }
+.income-page .dense.modern thead th{
   position:sticky; top:0; z-index:10;
   background:linear-gradient(180deg,#fbfbff 0%,#f2f4ff 100%);
   border-bottom:1px solid var(--line);
   padding:8px; text-align:center; white-space:nowrap; height:32px; font-weight:700; color:#2a2f45; cursor:pointer;
   box-shadow: 0 2px 0 rgba(0,0,0,.03);
 }
-.dense.modern thead th.num{ text-align:right; }
-.dense.modern tbody td{
+.income-page .dense.modern thead th.num{ text-align:right; }
+.income-page .dense.modern tbody td{
   border-bottom:1px solid var(--line);
   padding:6px 8px; height:30px; vertical-align:middle; background:#fff;
   position:relative; z-index:0;
 }
-.dense.modern tbody tr:nth-child(even) td{ background:#fcfdff; }
-.dense.modern tbody tr:hover td{ background:#f8f9ff; }
-.dense.modern th.num, .dense.modern td.num{ text-align:right; font-variant-numeric: tabular-nums; }
-.dense.modern td.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; color:#2e3348; }
-.dense.modern td.clip{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.center{ text-align:center; }
-.muted{ color:#9aa0b2; }
+.income-page .dense.modern tbody tr:nth-child(even) td{ background:#fcfdff; }
+.income-page .dense.modern tbody tr:hover td{ background:#f8f9ff; }
+.income-page .dense.modern th.num, .income-page .dense.modern td.num{ text-align:right; font-variant-numeric: tabular-nums; }
+.income-page .dense.modern td.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; color:#2e3348; }
+.income-page .dense.modern td.clip{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.income-page .center{ text-align:center; }
+.income-page .muted{ color:#9aa0b2; }
 
 /* 구분(첫 번째 컬럼) 중앙 정렬 */
-.dense.modern tbody td:first-child{ text-align:center; }
-.dense.modern tbody td:first-child .type-badge{ margin-left:auto; margin-right:auto; }
-.dense.modern tbody td:first-child .category-select-wrap{ justify-content:center; }
+.income-page .dense.modern tbody td:first-child{ text-align:center; }
+.income-page .dense.modern tbody td:first-child .type-badge{ margin-left:auto; margin-right:auto; }
+.income-page .dense.modern tbody td:first-child .category-select-wrap{ justify-content:center; }
 
 /* 폭 가이드 */
-.col-type{ width:110px; }   /* 구분 더 줄임 */
-.col-account{ width:150px; }
-.col-date{ width:96px; }
-.col-time{ width:80px; }
-.col-in{ width:92px; }
-.col-out{ width:92px; }
-.col-record{ width:120px; }
-.col-memo{ width:340px; }  /* 메모 더 늘림 */
+.income-page .col-type{ width:110px; }
+.income-page .col-account{ width:150px; }
+.income-page .col-date{ width:96px; }
+.income-page .col-time{ width:80px; }
+.income-page .col-in{ width:92px; }
+.income-page .col-out{ width:92px; }
+.income-page .col-record{ width:120px; }
+.income-page .col-memo{ width:340px; }
 
 /* 배지 */
-.type-badge{
+.income-page .type-badge{
   display:inline-block; min-width:44px; padding:2px 10px; line-height:18px;
   font-weight:700; text-align:center; border-radius:6px; border:1px solid var(--line);
   background:#f7f8ff; font-size:12px;
 }
-.type-badge.in{ color:#0ea05a; border-color:#bfe8d2; background:#f2fbf6; }
-.type-badge.out{ color:#c2412d; border-color:#f6c1b9; background:#fff4f2; }
+.income-page .type-badge.in{ color:#0ea05a; border-color:#bfe8d2; background:#f2fbf6; }
+.income-page .type-badge.out{ color:#c2412d; border-color:#f6c1b9; background:#fff4f2; }
 
 /* 카테고리 배지(구분 색) */
-.type-badge.cat{
+.income-page .type-badge.cat{
   color: var(--cat-color, #4b2acf);
   border-color: var(--cat-border, #cfc7ff);
   background: linear-gradient(180deg, var(--cat-bg-top, #f6f3ff) 0%, var(--cat-bg-bot, #f0edff) 100%);
@@ -224,113 +225,103 @@ IncomeImportPage.css
 }
 
 /* 드롭다운 */
-.category-select-wrap{ display:flex; align-items:center; justify-content:center; width:100%; }
-.pretty-select{
+.income-page .category-select-wrap{ display:flex; align-items:center; justify-content:center; width:100%; }
+.income-page .pretty-select{
   appearance:none;
   background:
     linear-gradient(180deg, #fff 0%, #f6f7ff 100%),
     url("data:image/svg+xml;utf8,<svg fill='%236b7280' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M5.5 7.5l4.5 4 4.5-4'/></svg>") no-repeat right 8px center/12px;
   border:1px solid var(--line-strong); border-radius:8px; padding:0 26px 0 10px; height:28px; font-size:12px; outline:none; box-shadow: 0 1px 0 rgba(0,0,0,.06);
 }
-.pretty-select.rich{ height:30px; font-weight:700; border:1px solid #cfd2ff; color:#3a2fb0; }
-.pretty-select.wide{ width:100%; max-width:100%; }
-.type-select{ width:100%; }
+.income-page .pretty-select.rich{ height:30px; font-weight:700; border:1px solid #cfd2ff; color:#3a2fb0; }
+.income-page .pretty-select.wide{ width:100%; max-width:100%; }
+.income-page .type-select{ width:100%; }
 
 /* 메모 & 미확인(수정모드) */
-.memo-wrap{ display:flex; align-items:center; gap:10px; justify-content:flex-start; }
-.edit-input{ height:28px; border:1px solid var(--line-strong); border-radius:8px; padding:0 8px; font-size:12px; background:#fff; outline:none; }
-/* 메모 인풋 폭 확장 */
-.memo-input{ width:auto; flex: 1 1 100%; min-width: 220px; }
+.income-page .memo-wrap{ display:flex; align-items:center; gap:10px; justify-content:flex-start; }
+.income-page .edit-input{ height:28px; border:1px solid var(--line-strong); border-radius:8px; padding:0 8px; font-size:12px; background:#fff; outline:none; }
+.income-page .memo-input{ width:auto; flex: 1 1 100%; min-width: 220px; }
 
 /* 미확인 토글(레드) */
-.chk.mi2{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
-.chk.mi2 input{ position:absolute; opacity:0; width:0; height:0; }
-.chk.mi2 .box{
+.income-page .chk.mi2{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.income-page .chk.mi2 input{ position:absolute; opacity:0; width:0; height:0; }
+.income-page .chk.mi2 .box{
   width:34px; height:20px; border-radius:9999px;
   background: linear-gradient(180deg, #fdecec, #fde5e5);
   border:1px solid #f3c6c6; position:relative; transition: all .2s ease;
   box-shadow: inset 0 1px 3px rgba(0,0,0,.06);
 }
-.chk.mi2 .box::after{
+.income-page .chk.mi2 .box::after{
   content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
   background:#fff; box-shadow: 0 1px 1px rgba(0,0,0,.15);
   transition: transform .22s ease;
 }
-.chk.mi2 input:checked + .box{
+.income-page .chk.mi2 input:checked + .box{
   background: linear-gradient(180deg, var(--danger-on), var(--danger-on2)); border-color: var(--danger-border);
 }
-.chk.mi2 input:checked + .box::after{ transform: translateX(14px); }
-.chk.mi2 .lbl{ font-weight:800; color: var(--danger-text); font-size:12px; }
+.income-page .chk.mi2 input:checked + .box::after{ transform: translateX(14px); }
+.income-page .chk.mi2 .lbl{ font-weight:800; color: var(--danger-text); font-size:12px; }
 
 /* 퍼플 토글 (입금만/수정모드) */
-.chk.purple{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer; user-select:none; }
-.chk.purple input{ position:absolute; opacity:0; width:0; height:0; }
-.chk.purple .switch{
+.income-page .chk.purple{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer; user-select:none; }
+.income-page .chk.purple input{ position:absolute; opacity:0; width:0; height:0; }
+.income-page .chk.purple .switch{
   width:34px; height:20px; border-radius:9999px;
   background: linear-gradient(180deg, #edeafe, #e3e0ff);
   border:1px solid #d1cdfc; position:relative; transition: all .2s ease;
   box-shadow: inset 0 1px 3px rgba(0,0,0,.06);
 }
-.chk.purple .switch::after{
+.income-page .chk.purple .switch::after{
   content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
   background:#fff; box-shadow: 0 1px 1px rgba(0,0,0,.15);
   transition: transform .22s ease;
 }
-.chk.purple input:checked + .switch{
+.income-page .chk.purple input:checked + .switch{
   background: linear-gradient(180deg, #6d5efc, #4b3fd1); border-color: #6d5efc;
 }
-.chk.purple input:checked + .switch::after{ transform: translateX(14px); }
-.chk.purple .lbl{ font-weight:800; color:#4b3fd1; font-size:12px; }
+.income-page .chk.purple input:checked + .switch::after{ transform: translateX(14px); }
+.income-page .chk.purple .lbl{ font-weight:800; color:#4b3fd1; font-size:12px; }
 
 /* 페이지네이션 */
-.pagination{ display:flex; align-items:center; gap:8px; justify-content:center; padding:2px 0 2px; }
-.pageinfo{ font-size:12px; color:var(--muted); }
+.income-page .pagination{ display:flex; align-items:center; gap:8px; justify-content:center; padding:2px 0 2px; }
+.income-page .pageinfo{ font-size:12px; color:var(--muted); }
 
-/* 모달 */
-.modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index:50; }
-.modal-card{ width:min(680px, 92vw); background:#fff; border-radius:14px; border:1px solid #ececf2; box-shadow:0 10px 40px rgba(0,0,0,.15); overflow:hidden; }
-/* ✅ 좁은 모달(항목추가 전용): variant="narrow" → class="sm" */
-.modal-card.sm{ width:min(460px, 94vw); }  /* 가로 사이즈 축소 */
-.modal-card.lg{ width:min(1080px, 96vw); }
-.modal-head{ padding:10px 12px; border-bottom:1px solid #f2f2f7; display:flex; align-items:center; justify-content:space-between; }
-.modal-title{ font-weight:700; color:#333; font-size:14px; }
-.modal-title.nowrap{ white-space:nowrap; }
-.modal-body.scrollable{ padding:12px; color:#333; font-size:13px; max-height:70vh; overflow:auto; }
-.modal-foot{ padding:10px 12px; border-top:1px solid #f2f2f7; display:flex; gap:8px; justify-content:flex-end; }
-.dup-list{ margin:8px 0 0 18px; }
-
-/* 모달 닫기(X) 버튼(호환용) */
-.modal-x{
-  border:none; background:transparent; font-size:18px; line-height:1;
-  width:28px; height:28px; border-radius:8px; cursor:pointer; color:#6b7280;
-}
-.modal-x:hover{ background:#f3f4f6; color:#111827; }
+/* 모달 (이 페이지 전용 모달 스코프) */
+.income-page .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index:50; }
+.income-page .modal-card{ width:min(680px, 92vw); background:#fff; border-radius:14px; border:1px solid #ececf2; box-shadow:0 10px 40px rgba(0,0,0,.15); overflow:hidden; }
+.income-page .modal-card.sm{ width:min(460px, 94vw); }
+.income-page .modal-card.lg{ width:min(1080px, 96vw); }
+.income-page .modal-head{ padding:10px 12px; border-bottom:1px solid #f2f2f7; display:flex; align-items:center; justify-content:space-between; }
+.income-page .modal-title{ font-weight:700; color:#333; font-size:14px; }
+.income-page .modal-title.nowrap{ white-space:nowrap; }
+.income-page .modal-body.scrollable{ padding:12px; color:#333; font-size:13px; max-height:70vh; overflow:auto; }
+.income-page .modal-foot{ padding:10px 12px; border-top:1px solid #f2f2f7; display:flex; gap:8px; justify-content:flex-end; }
 
 /* 미확인 리스트 */
-.unconf-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
-.unconf-summary{ display:flex; gap:16px; font-weight:600; }
-.unconf-search{ min-width:220px; }
-.unconf-list{ max-height:48vh; overflow:auto; }
-.dense.mini{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
-.dense.mini thead th{ background:#f8f9ff; border-bottom:1px solid var(--line); height:28px; text-align:center; white-space:nowrap; }
-.dense.mini td{ border-bottom:1px solid var(--line); padding:6px 8px; height:28px; vertical-align:middle; }
-.dense.mini thead th:nth-child(7){ width:56px; min-width:56px; max-width:72px; white-space:nowrap; }
+.income-page .unconf-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.income-page .unconf-summary{ display:flex; gap:16px; font-weight:600; }
+.income-page .unconf-search{ min-width:220px; }
+.income-page .unconf-list{ max-height:48vh; overflow:auto; }
+.income-page .dense.mini{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
+.income-page .dense.mini thead th{ background:#f8f9ff; border-bottom:1px solid var(--line); height:28px; text-align:center; white-space:nowrap; }
+.income-page .dense.mini td{ border-bottom:1px solid var(--line); padding:6px 8px; height:28px; vertical-align:middle; }
+.income-page .dense.mini thead th:nth-child(7){ width:56px; min-width:56px; max-width:72px; white-space:nowrap; }
 
 /* 수동 추가 모달 폼 */
-.add-form{ display:grid; grid-template-columns: 120px 1fr; gap:10px 12px; }
-.add-row{ display:contents; }
-.add-row > label{ align-self:center; color:#334155; font-weight:700; }
+.income-page .add-form{ display:grid; grid-template-columns: 120px 1fr; gap:10px 12px; }
+.income-page .add-row{ display:contents; }
+.income-page .add-row > label{ align-self:center; color:#334155; font-weight:700; }
 
 /* 삭제모드 UI */
-.cell-flex{ display:flex; align-items:center; justify-content:flex-start; gap:8px; }
-.del-chk{ width:16px; height:16px; margin-right:6px; cursor:pointer; }
-label.del-all{ display:inline-flex; align-items:center; gap:6px; margin-left:8px; font-weight:700; color:#4b3fd1; }
-label.del-all input{ width:14px; height:14px; cursor:pointer; }
-label.del-all .del-all-lbl{ font-size:11px; color:#4b3fd1; }
-label.del-all:hover .del-all-lbl{ text-decoration: underline; }
+.income-page .cell-flex{ display:flex; align-items:center; justify-content:flex-start; gap:8px; }
+.income-page .del-chk{ width:16px; height:16px; margin-right:6px; cursor:pointer; }
+.income-page label.del-all{ display:inline-flex; align-items:center; gap:6px; margin-left:8px; font-weight:700; color:#4b3fd1; }
+.income-page label.del-all input{ width:14px; height:14px; cursor:pointer; }
+.income-page label.del-all .del-all-lbl{ font-size:11px; color:#4b3fd1; }
+.income-page label.del-all:hover .del-all-lbl{ text-decoration: underline; }
 
-/* 오류 메시지(호환용) */
-.error{
+/* 오류 메시지 */
+.income-page .error{
   white-space:pre-wrap; padding:8px 10px; border-radius:10px;
   background:#fff0f0; color:#b4232c; border:1px solid #f9c2c8;
   font-size:12px;

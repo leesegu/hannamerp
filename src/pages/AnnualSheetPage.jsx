@@ -315,18 +315,77 @@ export default function AnnualSheetPage() {
   const [incomeRows, setIncomeRows] = useState([]);
   const [expenseRows, setExpenseRows] = useState([]);
 
+  /* =========================
+     ✅ 버킷 경계 생성 로직 수정 (요청 사항 반영)
+     규칙:
+     - 각 "라벨 월" m의 시작일 = (해당 월의 anchorDay가 존재하면 anchorDay, 없으면 그 달의 말일)
+     - m의 종료일 = (다음 라벨 월의 "시작일 후보")의 전날.
+       단, "다음 라벨 월"이 anchorDay를 갖지 못해 시작일 후보가 말일로 "잘린" 경우엔
+       종료일을 그 말일(포함)로 설정.
+     - 또한 겹침 방지를 위해 실제 시작일은 항상 (직전 종료일 + 1일) 이상이 되도록 보정.
+     이렇게 하면 예:
+       • anchor=1  → 달력월(1~말일) 그대로
+       • anchor=2  → 1/2~2/1, 2/2~3/1, …
+       • anchor=11 → 1/11~2/10, 2/11~3/10, …
+       • anchor=31 → 1/31~2/28(29), 3/1~3/30, 3/31~4/30, …
+  ========================== */
   const bucketBoundaries = useMemo(() => {
-    const bd = [];
+    const lastDay = (y, m) => daysInMonth(y, m);
+    // 1) 라벨 월의 "명목 시작일" 목록과, 다음 라벨 월이 anchor를 갖지 못하는지(잘림) 여부
+    const nominalStarts = [];
+    const nextTruncFlags = []; // i+1 라벨 월의 잘림 여부 판단용
     for (let m = 1; m <= 12; m++) {
-      const startDay = Math.min(anchorDay, daysInMonth(year, m));
-      const nextMonth = m === 12 ? 1 : m + 1;
-      const nextYear = m === 12 ? year + 1 : year;
-      const nextStartDay = Math.min(anchorDay, daysInMonth(nextYear, nextMonth));
+      const ld = lastDay(year, m);
+      const d = anchorDay <= ld ? anchorDay : ld; // anchor 있으면 anchor, 없으면 말일
+      nominalStarts.push(new Date(year, m - 1, d, 0, 0, 0, 0));
+    }
+    // 13번째(다음해 1월) 명목 시작일도 준비
+    {
+      const ldNextJan = lastDay(year + 1, 1);
+      const dNextJan = anchorDay <= ldNextJan ? anchorDay : ldNextJan;
+      nominalStarts.push(new Date(year + 1, 0, dNextJan, 0, 0, 0, 0));
+    }
+    // i+1 라벨 월이 잘리는지 플래그 (anchorDay > 그 달 말일)
+    for (let m = 1; m <= 12; m++) {
+      nextTruncFlags.push(anchorDay > lastDay(year, m));
+    }
+    nextTruncFlags.push(anchorDay > lastDay(year + 1, 1)); // 다음해 1월
 
-      const start = new Date(year, m - 1, startDay, 0, 0, 0, 0);
-      const end = new Date(nextYear, nextMonth - 1, nextStartDay, 0, 0, 0, 0);
-      end.setDate(end.getDate() - 1);
+    // 2) 실제 버킷 생성 (겹치지 않도록 시작일 보정)
+    const bd = [];
+    let prevEnd = null;
+    for (let i = 0; i < 12; i++) {
+      // 시작일: 라벨 월의 명목 시작일을 기본으로, 직전 종료일+1 보정
+      let start = nominalStarts[i];
+      if (prevEnd && start <= prevEnd) {
+        const s = new Date(prevEnd);
+        s.setDate(s.getDate() + 1);
+        start = s;
+      }
+
+      // 종료일 계산:
+      //   기본: 다음 라벨 월의 "명목 시작일" - 1
+      //   단, 다음 라벨 월이 anchor를 갖지 못해 잘린 경우 → 다음 라벨 월의 말일(포함)
+      const nextStart = nominalStarts[i + 1];
+      const nextIsTruncated = nextTruncFlags[i + 1];
+
+      let end;
+      if (nextIsTruncated) {
+        // 다음 라벨 월의 말일 (포함)
+        const y = nextStart.getFullYear();
+        const m = nextStart.getMonth() + 1; // 1-12
+        end = new Date(y, m - 1, lastDay(y, m), 0, 0, 0, 0);
+      } else {
+        // 다음 라벨 월 anchor 전날
+        end = new Date(nextStart);
+        end.setDate(end.getDate() - 1);
+      }
+
+      // 혹시라도 end < start 가 되면 start로 맞춤
+      if (end < start) end = new Date(start);
+
       bd.push({ start, end });
+      prevEnd = end;
     }
     return bd;
   }, [year, anchorDay]);
@@ -352,6 +411,7 @@ export default function AnnualSheetPage() {
         const months = Array.from({ length: 12 }, (_, i) => i + 1);
         const incPromises = months.map((m) => readJson(storage, `acct_income_json/${toMonthKey(year, m)}.json`));
         const expPromises = months.map((m) => readJson(storage, `acct_expense_json/${toMonthKey(year, m)}.json`));
+        // ✅ 다음해 1월 JSON까지 읽어, 경계 포함 케이스(예: anchor=31) 커버
         incPromises.push(readJson(storage, `acct_income_json/${toMonthKey(year + 1, 1)}.json`));
         expPromises.push(readJson(storage, `acct_expense_json/${toMonthKey(year + 1, 1)}.json`));
 

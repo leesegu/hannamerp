@@ -395,7 +395,7 @@ async function readMonthJSON(monthKey) {
     return { meta: obj.meta || {}, items: obj.items || {} };
   } catch (e) {
     const code = e?.code || "";
-       const msg = String(e?.message || "");
+    const msg = String(e?.message || "");
     const notFound =
       code === "storage/object-not-found" ||
       msg.includes("object-not-found") ||
@@ -474,6 +474,9 @@ export default function IncomeImportPage() {
   const [unconfOpen, setUnconfOpen] = useState(false);
   const [unconfQuery, setUnconfQuery] = useState("");
   const [unconfDraft, setUnconfDraft] = useState({});
+  const [unconfReload, setUnconfReload] = useState(0);
+  /** ✅ 변경: 로딩 제어 개선 */
+  const [unconfLoading, setUnconfLoading] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -507,7 +510,6 @@ export default function IncomeImportPage() {
   const [dTo,   setDTo]   = useState(today.d);
 
   const clampRange = useCallback((nyF, nmF, ndF, nyT, nmT, ndT) => {
-    // NOTE: ymdToDate는 month-1을 내부에서 처리하므로 여기서는 그대로 전달
     const start = ymdToDate(nyF, nmF, ndF);
     const end = ymdToDate(nyT, nmT, ndT);
     if (start > end) return [nyF, nmF, ndF, nyF, nmF, ndF];
@@ -682,7 +684,7 @@ export default function IncomeImportPage() {
     if (!store[mk]) store[mk] = { loaded: true, meta: {}, items: {}, dirty: false, timer: null };
 
     const prevObj = store[mk].items[id] || cur;
-    const nextObj = { ...prevObj, ...patch }; // ✅ 문법 오류 수정 (const 누락)
+    const nextObj = { ...prevObj, ...patch };
 
     if (nextObj.record != null) nextObj.record = trimField(nextObj.record);
     if (nextObj.memo != null)   nextObj.memo   = trimField(nextObj.memo);
@@ -756,11 +758,49 @@ export default function IncomeImportPage() {
     });
   }, [rows]);
 
-  const unconfirmedList = useMemo(() => rows.filter((r) => r.unconfirmed), [rows]);
+  /* ====== 미확인 목록: 모달 오픈 시 로딩 안내 표시 (개선) ====== */
+  useEffect(() => {
+    if (!unconfOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setUnconfLoading(true);               // 🔹 로딩 시작: 먼저 표시
+        // 최신 시점까지 로드 필요 월 키 계산
+        const now = new Date();
+        const yTo = now.getFullYear();
+        const mTo = now.getMonth() + 1;
+        const keys = toMonthKeys(2024, 1, yTo, mTo);
+
+        await loadMonthsIfNeeded(keys);       // 🔹 필요한 월 전부 로드
+        if (!cancelled) {
+          setUnconfReload((n) => n + 1);      // 🔹 로드 후 목록 재계산 트리거
+        }
+      } finally {
+        if (!cancelled) {
+          setUnconfLoading(false);            // 🔹 목록이 준비된 뒤에만 로딩 종료
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [unconfOpen, loadMonthsIfNeeded]);
+
+  const unconfirmedList = useMemo(() => {
+    // ✅ 선택된 기간 무시하고, 로드된 모든 월에서 미확인만 추출
+    const store = monthsRef.current || {};
+    const all = Object.values(store).flatMap((b) => Object.values(b?.items || {}));
+    return all.filter((r) => r.unconfirmed);
+  }, [unconfReload]);
+
   const unconfirmedTotalInAmt = useMemo(
     () => unconfirmedList.reduce((sum, r) => sum + toNumber(r.inAmt), 0),
     [unconfirmedList]
   );
+
+  // ❌ (삭제) 목록 변화에 맞춰 로딩 종료하던 로직 — 로딩 종료는 위 effect에서만 관리
+  // useEffect(() => {
+  //   if (unconfOpen) setUnconfLoading(false);
+  // }, [unconfOpen, unconfirmedList]);
+
   useEffect(() => {
     if (unconfOpen) {
       const initial = {};
@@ -777,16 +817,21 @@ export default function IncomeImportPage() {
   }, [unconfOpen, unconfirmedList]);
 
   const modalList = useMemo(() => {
+    // 🔹 필터
     const q = s(unconfQuery).toLowerCase();
-    if (!q) return unconfirmedList;
+    const base = unconfirmedList;
     const qNum = toNumber(q);
-    return unconfirmedList.filter((r) => {
+    const filtered = !q ? base : base.filter((r) => {
       const draftMemo = unconfDraft[r._id]?.memo ?? r.memo ?? "";
       const bag = [r.record, draftMemo].join("\n").toLowerCase();
       const textHit = bag.includes(q);
       const amtHit = qNum > 0 && (toNumber(r.inAmt) === qNum || fmtComma(r.inAmt).includes(q));
       return textHit || amtHit;
     });
+
+    // 🔹 정렬: 날짜(최근 위) — datetime 문자열 기준 내림차순
+    const sorted = [...filtered].sort((a, b) => s(b.datetime).localeCompare(s(a.datetime)));
+    return sorted;
   }, [unconfQuery, unconfirmedList, unconfDraft]);
 
   const setDraftMemo = (id, memo) =>
@@ -1237,6 +1282,17 @@ export default function IncomeImportPage() {
     }
   };
 
+  /* ===== 어제 버튼 핸들러 (실제 현재 시각 기준) ===== */
+  const setYesterday = useCallback(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);            // 실제 현재에서 어제
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    setYFrom(y); setMFrom(m); setDFrom(day);
+    setYTo(y);   setMTo(m);   setDTo(day);
+  }, []);
+
   return (
     <div className="income-page">
       {/* === 툴바 1 === */}
@@ -1314,6 +1370,8 @@ export default function IncomeImportPage() {
             <DateTriple y={yFrom} m={mFrom} d={dFrom} onY={(v) => setYFrom(v)} onM={(v) => setMFrom(v)} onD={(v) => setDFrom(v)} />
             <span className="dash">—</span>
             <DateTriple y={yTo} m={mTo} d={dTo} onY={(v) => setYTo(v)} onM={(v) => setMTo(v)} onD={(v) => setDTo(v)} />
+            {/* ✅ 추가: 어제 버튼 (우측) */}
+            <button className="btn yesterday" onClick={setYesterday} title="어제 날짜로 맞추기">어제</button>
           </div>
         </div>
 
@@ -1581,78 +1639,85 @@ export default function IncomeImportPage() {
           </div>
           <input
             className="search unconf-search"
-            placeholder="미확인 내역 검색 (금액/거래기록/메모)"
+            placeholder="미확인 내역 검색"
             value={unconfQuery}
             onChange={(e) => setUnconfQuery(e.target.value)}
           />
         </div>
 
         <div className="unconf-list">
-          <table className="dense mini">
-            <colgroup>
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "32%" }} />
-              <col style={{ width: "6%" }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>날짜</th><th>시간</th><th>구분</th><th className="num">입금</th><th>거래기록</th><th>메모</th><th>미확인</th>
-              </tr>
-            </thead>
-            <tbody>
-              {modalList.length === 0 ? (
-                <tr><td colSpan={7} className="center muted">검색 결과가 없습니다.</td></tr>
-              ) : (
-                modalList.map((r) => {
-                  const catDraft = unconfDraft[r._id]?.category ?? r.category ?? "";
-                  const autoCat = autoCategoryByAccount(r.accountNo);
-                  const displayCat = catDraft || autoCat || (incomeCategories[0] || "");
-                  const hasDisplayInList = incomeCategories.includes(displayCat);
-                  return (
-                    <tr key={`u_${r._id}`}>
-                      <td className="center mono">{r.date}</td>
-                      <td className="center mono">{r.time}</td>
-                      <td className="center">
-                        <select
-                          className="pretty-select"
-                          style={selectStyle(displayCat)}
-                          value={displayCat}
-                          onChange={(e) => setDraftCategory(r._id, e.target.value)}
-                        >
-                          {!hasDisplayInList && displayCat && <option value={displayCat}>{displayCat}</option>}
-                          {incomeCategories.map((name) => (
-                            <option key={name} value={name}>{name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="num">{fmtComma(r.inAmt)}</td>
-                      <td className="center">{r.record}</td>
-                      <td>
-                        <input
-                          className="edit-input"
-                          style={{ width: "100%" }}
-                          value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
-                          onChange={(e) => setDraftMemo(r._id, e.target.value)}
-                          placeholder=""
-                        />
-                      </td>
-                      <td className="center">
-                        <input
-                          type="checkbox"
-                          checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
-                          onChange={(e) => setDraftFlag(r._id, e.target.checked)}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          {/* ✅ 로딩 중 표시 (강화) */}
+          {unconfLoading ? (
+            <div className="center muted" style={{ padding: "24px 0" }}>
+              미확인 목록을 불러오는 중…
+            </div>
+          ) : (
+            <table className="dense mini">
+              <colgroup>
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "6%" }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>날짜</th><th>시간</th><th>구분</th><th className="num">입금</th><th>거래기록</th><th>메모</th><th>미확인</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modalList.length === 0 ? (
+                  <tr><td colSpan={7} className="center muted">검색 결과가 없습니다.</td></tr>
+                ) : (
+                  modalList.map((r) => {
+                    const catDraft = unconfDraft[r._id]?.category ?? r.category ?? "";
+                    const autoCat = autoCategoryByAccount(r.accountNo);
+                    const displayCat = catDraft || autoCat || (incomeCategories[0] || "");
+                    const hasDisplayInList = incomeCategories.includes(displayCat);
+                    return (
+                      <tr key={`u_${r._id}`}>
+                        <td className="center mono">{r.date}</td>
+                        <td className="center mono">{r.time}</td>
+                        <td className="center">
+                          <select
+                            className="pretty-select"
+                            style={selectStyle(displayCat)}
+                            value={displayCat}
+                            onChange={(e) => setDraftCategory(r._id, e.target.value)}
+                          >
+                            {!hasDisplayInList && displayCat && <option value={displayCat}>{displayCat}</option>}
+                            {incomeCategories.map((name) => (
+                              <option key={name} value={name}>{name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="num">{fmtComma(r.inAmt)}</td>
+                        <td className="center">{r.record}</td>
+                        <td>
+                          <input
+                            className="edit-input"
+                            style={{ width: "100%" }}
+                            value={unconfDraft[r._id]?.memo ?? r.memo ?? ""}
+                            onChange={(e) => setDraftMemo(r._id, e.target.value)}
+                            placeholder=""
+                          />
+                        </td>
+                        <td className="center">
+                          <input
+                            type="checkbox"
+                            checked={!!(unconfDraft[r._id]?.unconfirmed ?? r.unconfirmed)}
+                            onChange={(e) => setDraftFlag(r._id, e.target.checked)}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </Modal>
 
@@ -1675,17 +1740,16 @@ export default function IncomeImportPage() {
         <div className="add-form">
           <div className="add-row">
             <label>거래일</label>
-<input
-  type="date"
-  className="edit-input date-input"
-  value={addForm.date}
-  onChange={(e) => changeAdd("date", e.target.value)}
-  onMouseDown={(e) => {
-    e.preventDefault();
-    try { e.currentTarget.showPicker?.(); } catch {}
-  }}
-/>
-
+            <input
+              type="date"
+              className="edit-input date-input"
+              value={addForm.date}
+              onChange={(e) => changeAdd("date", e.target.value)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                try { e.currentTarget.showPicker?.(); } catch {}
+              }}
+            />
           </div>
           <div className="add-row">
             <label>구분</label>
@@ -1739,9 +1803,9 @@ export default function IncomeImportPage() {
 /* ===== 내부: DateTriple ===== */
 function DateTriple({ y, m, d, onY, onM, onD }) {
   const yearOptions = useMemo(() => {
-    const thisYear = new Date().getFullYear();
+    // ✅ 2024년 ~ 2035년만 표시
     const arr = [];
-    for (let yy = thisYear; yy >= thisYear - 10; yy--) arr.push(yy);
+    for (let yy = 2035; yy >= 2024; yy--) arr.push(yy);
     return arr;
   }, []);
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
