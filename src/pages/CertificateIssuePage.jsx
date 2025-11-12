@@ -1,33 +1,32 @@
 // src/pages/CertificateIssuePage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./CertificateIssuePage.css";
-/* html → image 저장 */
 import * as htmlToImage from "html-to-image";
+import sealImg from "../assets/seal-square.png";
 
-/**
- * - 모달 컴포넌트 (새창 X)
- * - props: onClose, employeeList
- * - 드롭다운: 증명서 종류 / 사원선택
- */
-
+/* ===== 상수 ===== */
 const CERT_TYPES = [
-  { value: "contract", label: "표준근로계약서" },
   { value: "employment", label: "재직증명서" },
   { value: "career", label: "경력증명서" },
   { value: "retire", label: "퇴직증명서" },
 ];
 
-// 🔧 BIZ 정보
 const BIZ = {
   name: "한남주택관리",
   bizNo: "763-03-01741",
   ceo: "이세구",
-  sealText: "인",
   address: "대전광역시 서구 탄방동 86-27번지 3층",
   tel: "042-489-8555",
 };
 
-// YYYY-MM-DD
+/* ===== 유틸 ===== */
+const todayStr = () => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}년 ${mm}월 ${dd}일`;
+};
 const fmtDate = (s) => {
   if (!s) return "";
   const d = new Date(s);
@@ -37,16 +36,10 @@ const fmtDate = (s) => {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 };
-
-// 오늘: 숫자 없이 "년  월  일" 만
-const todayK = () => "년  월  일";
-
-// 근속기간
 function calcSpan(from, to) {
   const a = new Date(from);
   const b = new Date(to);
   if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "";
-  b.setDate(b.getDate() + 1);
   let years = b.getFullYear() - a.getFullYear();
   let months = b.getMonth() - a.getMonth();
   let days = b.getDate() - a.getDate();
@@ -62,10 +55,78 @@ function calcSpan(from, to) {
   const parts = [];
   if (years > 0) parts.push(`${years}년`);
   if (months > 0) parts.push(`${months}개월`);
-  if (days > 0) parts.push(`${days}일`);
-  return parts.length > 0 ? parts.join(" ") : "1일";
+  if (parts.length === 0) parts.push("0개월");
+  return parts.join(" ");
 }
 
+/* ===== 발급번호/발급내역(로컬) ===== */
+const ISSUE_COUNTER_KEY = "cert:issueCounterByDate";
+const ISSUE_LOG_KEY = "cert:issueLog";
+function nextIssueNo() {
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+  const map = JSON.parse(localStorage.getItem(ISSUE_COUNTER_KEY) || "{}");
+  const next = (map[ymd] || 0) + 1;
+  map[ymd] = next;
+  localStorage.setItem(ISSUE_COUNTER_KEY, JSON.stringify(map));
+  return `${ymd}-${String(next).padStart(3, "0")}`;
+}
+function appendIssueLog(row) {
+  const arr = JSON.parse(localStorage.getItem(ISSUE_LOG_KEY) || "[]");
+  arr.unshift(row);
+  localStorage.setItem(ISSUE_LOG_KEY, JSON.stringify(arr));
+}
+function readIssueLog() {
+  return JSON.parse(localStorage.getItem(ISSUE_LOG_KEY) || "[]");
+}
+function writeIssueLog(arr) {
+  localStorage.setItem(ISSUE_LOG_KEY, JSON.stringify(arr));
+}
+
+/* ===== 인라인 편집(더블클릭, Enter 확정) ===== */
+function EditableCell({ value, onChange, placeholder = "", className = "" }) {
+  const [editing, setEditing] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (editing && ref.current) {
+      const el = ref.current;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      el.focus();
+    }
+  }, [editing]);
+  return (
+    <span
+      ref={ref}
+      role="textbox"
+      suppressContentEditableWarning
+      contentEditable={editing}
+      onDoubleClick={() => setEditing(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={(e) => {
+        setEditing(false);
+        onChange?.(e.currentTarget.innerText.trim());
+      }}
+      className={`editable ${className} ${editing ? "is-editing" : ""}`}
+      title="더블클릭하여 입력"
+    >
+      {value || placeholder || "더블클릭하여 입력"}
+    </span>
+  );
+}
+
+/* ===== 메인 컴포넌트 ===== */
 export default function CertificateIssuePage({ onClose, employeeList = [] }) {
   const [certType, setCertType] = useState(CERT_TYPES[0].value);
   const [employees, setEmployees] = useState(employeeList);
@@ -73,7 +134,45 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
   const emp = useMemo(() => employees.find((x) => x.id === empId), [employees, empId]);
   const paperRef = useRef(null);
 
-  // 외부 목록 변경 동기화
+  const [vals, setVals] = useState({
+    dept: "",
+    position: "",
+    purpose: "",
+    duty: "",
+    retireReason: "",
+    retireDate: "",
+    careerEnd: "", // ✅ 경력증명서 근무연한의 ~ 뒤 입력값
+  });
+
+  /* 발급부서(사무팀만) */
+  const officeOptions = useMemo(
+    () => employees.filter((e) => (e.dept || "").includes("사무팀")),
+    [employees]
+  );
+  const [issuerId, setIssuerId] = useState(officeOptions[0]?.id || "");
+  const issuer = useMemo(
+    () => officeOptions.find((x) => x.id === issuerId),
+    [officeOptions, issuerId]
+  );
+  const [issuerInfo, setIssuerInfo] = useState({
+    dept: "",
+    position: "",
+    name: "",
+    phone: BIZ.tel,
+  });
+
+  /* 발급번호/발급내역 */
+  const [issueNo] = useState(() => nextIssueNo());
+  const [showLog, setShowLog] = useState(false);
+  const [logs, setLogs] = useState(() => readIssueLog());
+  const deleteLog = (idx) => {
+    const arr = [...logs];
+    arr.splice(idx, 1);
+    setLogs(arr);
+    writeIssueLog(arr);
+  };
+
+  /* 동기화 */
   useEffect(() => {
     setEmployees(employeeList);
     const exists = employeeList.some((e) => e.id === empId);
@@ -81,53 +180,93 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
     else if (employeeList.length === 0) setEmpId("");
   }, [employeeList, empId]);
 
+  useEffect(() => {
+    if (!emp) return;
+    setVals((p) => ({
+      ...p,
+      dept: emp.dept || p.dept,
+      position: emp.position || p.position,
+    }));
+  }, [emp]);
+
+  useEffect(() => {
+    if (!issuer) return;
+    setIssuerInfo({
+      dept: issuer.dept || "",
+      position: issuer.position || "",
+      name: issuer.name || "",
+      phone: BIZ.tel,
+    });
+  }, [issuer]);
+
+  /* 파일명 */
   const filename = useMemo(() => {
-    // 파일명은 선택한 사원이 있을 때만 이름 포함 (계약서는 드롭다운 비활성화/빈옵션)
-    const e = employees.find((x) => x.id === empId);
-    const name = e?.name ? `_${e.name}` : "";
+    const name = emp?.name ? `_${emp.name}` : "";
     const label = CERT_TYPES.find((c) => c.value === certType)?.label || "증명서";
     const d = new Date();
     const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
       d.getDate()
     ).padStart(2, "0")}`;
     return `${label}${name}_${ymd}.png`;
-  }, [certType, empId, employees]);
+  }, [certType, emp]);
 
+  /* 발급내역 기록 */
+  function recordIssue(kind /* '이미지저장' | '인쇄' */) {
+    const row = {
+      발급일자: todayStr(),
+      구분: CERT_TYPES.find((c) => c.value === certType)?.label || "",
+      발급번호: issueNo,
+      부서명: vals.dept || "",
+      직위: vals.position || "",
+      발급용도: vals.purpose || "",
+      발급방법: kind,
+    };
+    appendIssueLog(row);
+    setLogs((prev) => [row, ...prev]);
+  }
+
+  /* 저장/인쇄 */
   const saveAsImage = async () => {
     if (!paperRef.current) return;
     try {
       const dataUrl = await htmlToImage.toPng(paperRef.current, {
         pixelRatio: 2,
         backgroundColor: "#ffffff",
+        canvasWidth: paperRef.current.offsetWidth,
+        canvasHeight: paperRef.current.offsetHeight,
       });
       const a = document.createElement("a");
       a.href = dataUrl;
       a.download = filename;
       a.click();
+      recordIssue("이미지저장");
     } catch (e) {
       console.error("이미지 저장 실패:", e);
       alert("이미지 저장에 실패했습니다.");
     }
   };
+  const handlePrint = () => {
+    recordIssue("인쇄");
+    window.print();
+  };
 
-  const handlePrint = () => window.print();
-
-  // 오버레이 클릭 → 닫기
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) onClose();
   };
 
-  // 사원 드롭다운 옵션 생성 로직
-  const employeeOptions = useMemo(() => {
-    if (certType === "contract") {
-      // 계약서일 때는 목록을 비워서 아무 내용도 나오지 않게
-      return [];
-    }
-    // 그 외는 "이름만" 표시 (괄호/숫자 제거)
-    return employees.map((e) => ({ value: e.id, label: e.name || "" }));
-  }, [certType, employees]);
+  const employeeOptions = useMemo(
+    () => employees.map((e) => ({ value: e.id, label: e.name || "" })),
+    [employees]
+  );
 
-  const isContract = certType === "contract";
+  const commonProps = {
+    emp,
+    BIZ,
+    vals,
+    setVals,
+    issueNo,
+    issuerInfo,
+  };
 
   return (
     <div className="cert-modal-overlay" onClick={handleOverlayClick}>
@@ -138,7 +277,11 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
             <div className="row">
               <div className="field">
                 <label>증명서 종류</label>
-                <select value={certType} onChange={(e) => setCertType(e.target.value)}>
+                <select
+                  value={certType}
+                  onChange={(e) => setCertType(e.target.value)}
+                  className="w-sm"
+                >
                   {CERT_TYPES.map((ct) => (
                     <option key={ct.value} value={ct.value}>
                       {ct.label}
@@ -152,9 +295,7 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                 <select
                   value={empId}
                   onChange={(e) => setEmpId(e.target.value)}
-                  disabled={isContract}
-                  className={isContract ? "disabled" : ""}
-                  title={isContract ? "" : ""}
+                  className="w-sm"
                 >
                   {employeeOptions.map((op) => (
                     <option key={op.value} value={op.value}>
@@ -164,8 +305,22 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                 </select>
               </div>
 
+              <div className="field">
+                <label>발급부서(사무팀)</label>
+                <select
+                  value={issuerId}
+                  onChange={(e) => setIssuerId(e.target.value)}
+                  className="w-sm"
+                >
+                  {officeOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="spacer" />
-              {/* 버튼 디자인 업그레이드 + 프린터 아이콘 변경 */}
               <button className="btn luxe" onClick={saveAsImage}>
                 <span className="btn-ico">
                   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -182,6 +337,9 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                 </span>
                 인쇄
               </button>
+              <button className="btn history" onClick={() => setShowLog(true)}>
+                발급내역
+              </button>
               <button className="btn btn-close" onClick={onClose} title="닫기">×</button>
             </div>
           </div>
@@ -189,328 +347,321 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
           {/* 증명서 영역 */}
           <div className="paper-a4-scroll">
             <div className="paper-a4" ref={paperRef}>
-              <div className="doc-logo-watermark" />
-              {certType === "contract" && <ContractTemplate emp={emp} BIZ={BIZ} />}
-              {certType === "employment" && <EmploymentTemplate emp={emp} BIZ={BIZ} />}
-              {certType === "career" && <CareerTemplate emp={emp} BIZ={BIZ} />}
-              {certType === "retire" && <RetireTemplate emp={emp} BIZ={BIZ} />}
+              {certType === "employment" && <EmploymentTemplate {...commonProps} />}
+              {certType === "career" && <CareerTemplate {...commonProps} />}
+              {certType === "retire" && <RetireTemplate {...commonProps} />}
             </div>
           </div>
         </div>
       </div>
+
+      {/* 발급내역 모달 */}
+      {showLog && (
+        <div className="history-modal" onClick={(e) => e.target === e.currentTarget && setShowLog(false)}>
+          <div className="history-panel">
+            <div className="history-head">
+              <div className="h-title">발급내역</div>
+              <button className="btn btn-close" onClick={() => setShowLog(false)}>×</button>
+            </div>
+            <div className="history-body">
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>발급일자</th>
+                    <th>구분</th>
+                    <th>발급번호</th>
+                    <th>부서명</th>
+                    <th>직위</th>
+                    <th>발급용도</th>
+                    <th>발급방법</th>
+                    <th>삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.발급일자}</td>
+                      <td>{r.구분}</td>
+                      <td>{r.발급번호}</td>
+                      <td>{r.부서명}</td>
+                      <td>{r.직위}</td>
+                      <td>{r.발급용도}</td>
+                      <td>{r.발급방법}</td>
+                      <td>
+                        <button className="btn btn-mini danger" onClick={() => deleteLog(i)}>
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {logs.length === 0 && (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: "center", color: "#6b7280" }}>
+                        발급내역이 없습니다.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ============ 템플릿: 표준근로계약서 (요구사항 반영) ============ */
-function ContractTemplate({ emp, BIZ }) {
-  const Check = ({ checked }) => (
-    <span className={`chk ${checked ? "on" : ""}`} aria-hidden />
-  );
-
+/* ===== 템플릿: 재직 ===== */
+function EmploymentTemplate({ emp, BIZ, vals, setVals, issueNo, issuerInfo }) {
   return (
-    <div className="doc contract">
-      <div className="doc-title">표준 근로계약서</div>
+    <div className="doc">
+      <div className="doc-title">재직증명서</div>
+      <div className="doc-subhead"><span className="issue-no">발급번호 : {issueNo}</span></div>
 
-      {/* 상단 당사자 표시 */}
-      <div className="contract-topline">
-        <div className="ct-left">
-          <div className="ct-box">
-            <div className="ct-name">한남주택관리</div>
-            <div className="ct-caption"> (이하 “사업주”라 함)과</div>
-          </div>
-        </div>
-        <div className="ct-right">
-          {/* 이 줄(근로자 표기)만 밑줄 유지 */}
-          <div className="ct-blank" />
-          <div className="ct-caption"> (이하 “근로자”라 함)은</div>
-        </div>
-      </div>
-      <p className="contract-desc">다음과 같이 근로계약을 체결한다.</p>
-
-      {/* 본문 표 (1~11항) — 숫자 뒤 점(.) 제거, 모든 기입칸 밑줄 제거 */}
-      <table className="contract-table">
+      {/* 인적사항 */}
+      <table className="kv">
         <tbody>
-          {/* 1 근로개시일 → '년 월 일' 형태 + 각 단위 앞 간격 6글자 */}
-          <tr>
-            <th className="no">1</th>
-            <th className="head">근로개시일</th>
-            <td colSpan={3}>
-              <span className="gap6" />년
-              <span className="gap6" />월
-              <span className="gap6" />일
-            </td>
-          </tr>
-
-          {/* 2 근무장소 */}
-          <tr>
-            <th className="no">2</th>
-            <th className="head">근무장소</th>
-            <td colSpan={3} />
-          </tr>
-
-          {/* 3 업무의 내용 */}
-          <tr>
-            <th className="no">3</th>
-            <th className="head">업무의 내용</th>
-            <td colSpan={3} />
-          </tr>
-
-          {/* 4 근무시간 + 휴게시간 (각 '시/분' 앞 6글자 간격) */}
-          <tr>
-            <th className="no">4</th>
-            <th className="head">근무시간</th>
-            <td colSpan={3} className="grid-4col">
-              <div className="sub nowrap">
-                근무시간:
-                <span className="gap6" />시
-                <span className="gap6" />분부터
-                <span className="gap6" />시
-                <span className="gap6" />분까지
-              </div>
-              <div className="sub nowrap">
-                휴게시간:
-                <span className="gap6" />시
-                <span className="gap6" />분부터
-                <span className="gap6" />시
-                <span className="gap6" />분
-              </div>
-            </td>
-          </tr>
-
-          {/* 5 근무일/휴일 → '요일' 앞 6글자 간격 */}
-          <tr>
-            <th className="no">5</th>
-            <th className="head">근무일/휴일</th>
-            <td colSpan={3}>
-              <div className="sub nowrap">
-                근무일: 매주 <span className="gap6" />요일 &nbsp;&nbsp;|&nbsp;&nbsp; 주휴일 <span className="gap6" />요일
-              </div>
-            </td>
-          </tr>
-
-          {/* 6 임금 (② 계산방법 삭제, 간격 조정, 줄바꿈 금지) */}
-          <tr>
-            <th className="no">6</th>
-            <th className="head">임금</th>
-            <td colSpan={3} className="wage-wrap">
-              <div className="wage-row">
-                <div className="w-title">① 임금</div>
-                <div className="w-body">
-                  <div className="nowrap">기본급 <span className="gap10" />원</div>
-                  <div className="nowrap">
-                    상여금 <Check /> 있음 <Check /> 없음 <span className="gap10" />원
-                  </div>
-                  <div className="nowrap">
-                    기타수당 <Check /> 있음 <Check /> 없음 <span className="gap10" />원
-                  </div>
-                </div>
-              </div>
-
-              {/* ② 계산방법 — 삭제 */}
-
-              <div className="wage-row">
-                <div className="w-title">③ 지급일</div>
-                <div className="w-body nowrap">
-                  매월(매주 또는 매일)<span className="gap3" />일 (휴일의 경우는 전일 지급)
-                </div>
-              </div>
-
-              <div className="wage-row">
-                <div className="w-title">④ 지급방법</div>
-                <div className="w-body nowrap">
-                  <Check /> 근로자에게 직접지급 &nbsp;/&nbsp; <Check /> 근로자 명의 예금통장에 입금
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          {/* 7 연차유급휴가 */}
-          <tr>
-            <th className="no">7</th>
-            <th className="head">연차유급휴가</th>
-            <td colSpan={3}>연차유급휴가는 근로기준법에서 정하는 바에 따라 부여함</td>
-          </tr>
-
-          {/* 8 사회보험 */}
-          <tr>
-            <th className="no">8</th>
-            <th className="head">사회보험 적용여부</th>
-            <td colSpan={3}>
-              <label className="chkline"><Check /> 고용보험</label>
-              <label className="chkline"><Check /> 산재보험</label>
-              <label className="chkline"><Check /> 국민연금</label>
-              <label className="chkline"><Check /> 건강보험</label>
-            </td>
-          </tr>
-
-          {/* 9 교부 */}
-          <tr>
-            <th className="no">9</th>
-            <th className="head">근로계약서 교부</th>
-            <td colSpan={3}>
-              사업주는 근로계약을 체결함과 동시에 본 계약서를 사본하여 근로자에게 교부함
-              <span className="muted"> (근로기준법 제17조 이행)</span>
-            </td>
-          </tr>
-
-          {/* 10 제목 줄바꿈 */}
-          <tr>
-            <th className="no">10</th>
-            <th className="head">
-              근로계약 취업규칙<br/>이행
-            </th>
-            <td colSpan={3}>
-              사업주와 근로자는 각자 근로계약, 취업규칙, 단체협약을 지키고 성실하게 이행하여야 함
-            </td>
-          </tr>
-
-          {/* 11 기타 */}
-          <tr>
-            <th className="no">11</th>
-            <th className="head">기타</th>
-            <td colSpan={3}>이 계약에 정함이 없는 사항은 근로기준법령에 의함</td>
-          </tr>
+          <tr><th rowSpan={3}>인적사항</th><th>성명</th><td>{emp?.name || ""}</td></tr>
+          <tr><th>주민등록번호</th><td>{emp?.ssn || emp?.resRegNo || ""}</td></tr>
+          <tr><th>주소</th><td>{emp?.address || ""}</td></tr>
         </tbody>
       </table>
 
-      {/* 날짜 (숫자 없이, 각 단위 앞 5글자 간격) */}
-      <div className="date-line">
-        <span className="gap5" />년
-        <span className="gap5" />월
-        <span className="gap5" />일
-      </div>
-
-      {/* 서명/표기 — 도장 삭제, 정렬/간격/줄바꿈 제어 */}
-      <div className="sign-area">
-        <div className="sign-col business">
-          <div className="sign-title">사업주</div>
-          <div className="sign-kv sign-grid">
-            <div className="row"><span className="key">상호</span><span className="val">{BIZ.name}</span></div>
-            <div className="row nowrap"><span className="key">주소</span><span className="val no-wrap">{BIZ.address}</span></div>
-            <div className="row"><span className="key">전화</span><span className="val">{BIZ.tel}</span></div>
-            <div className="row"><span className="key">대표자</span><span className="val">이세구</span></div>
-          </div>
-        </div>
-
-        <div className="sign-col">
-          <div className="sign-title">근로자</div>
-          <div className="sign-kv sign-grid">
-            <div className="row"><span className="key">주소</span><span className="val" /></div>
-            <div className="row"><span className="key">연락처</span><span className="val" /></div>
-            <div className="row"><span className="key">성명</span><span className="val" /></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============ 템플릿: 재직증명서 ============ */
-function EmploymentTemplate({ emp, BIZ }) {
-  return (
-    <div className="doc">
-      <div className="doc-title">재 직 증 명 서</div>
-
+      {/* 재직사항 */}
       <table className="kv">
         <tbody>
-          <tr><th>성명</th><td>{emp?.name || ""}</td></tr>
-          <tr><th>주민등록번호</th><td>{emp?.ssn || emp?.resRegNo || ""}</td></tr>
-          <tr><th>주소</th><td>{emp?.address || ""}</td></tr>
-          <tr><th>회사명</th><td>{BIZ.name}</td></tr>
+          <tr><th rowSpan={6}>재직사항</th><th>회사명</th><td>{BIZ.name}</td></tr>
           <tr><th>사업자등록번호</th><td>{BIZ.bizNo}</td></tr>
-          <tr><th>부서명</th><td>{emp?.dept || ""}</td></tr>
-          <tr><th>직위</th><td>{emp?.position || ""}</td></tr>
+          <tr><th>부서명</th><td><EditableCell value={vals.dept || emp?.dept || ""} onChange={(v) => setVals((p) => ({ ...p, dept: v }))} /></td></tr>
           <tr><th>입사일</th><td>{fmtDate(emp?.joinDate)}</td></tr>
-          <tr><th>발급용도</th><td>재직확인</td></tr>
+          <tr><th>직위</th><td><EditableCell value={vals.position || emp?.position || ""} onChange={(v) => setVals((p) => ({ ...p, position: v }))} /></td></tr>
+          <tr><th>근속기간</th><td>{emp?.joinDate ? calcSpan(emp.joinDate, new Date()) : ""}</td></tr>
         </tbody>
       </table>
 
-      <p className="para center">상기인은 현재 위와 같이 당사에 재직하고 있음을 증명합니다.</p>
-      <div className="date-line">{todayK()}</div>
+      {/* 발급부서 */}
+      <table className="kv">
+        <tbody>
+          <tr><th rowSpan={4}>발급부서</th><th>부서명</th><td>{issuerInfo.dept}</td></tr>
+          <tr><th>직위</th><td>{issuerInfo.position}</td></tr>
+          <tr><th>성명</th><td>{issuerInfo.name}</td></tr>
+          <tr><th>전화번호</th><td>{issuerInfo.phone}</td></tr>
+        </tbody>
+      </table>
 
-      <div className="issuer">
-        <div className="issuer-text">
-          <div className="company">{BIZ.name}</div>
-          <div className="ceo">대표 {BIZ.ceo}</div>
-        </div>
-        <div className="seal-stamp">
-          <span>한남주택관리</span>
-        </div>
-      </div>
+      {/* 발급용도 (안내 포함) */}
+      <table className="kv">
+        <tbody>
+          <tr>
+            <th>발급용도</th>
+            <td>
+              <div className="hint">※ 빈 칸을 <strong>더블클릭</strong>하여 입력한 뒤 <strong>Enter</strong>로 확정하세요.</div>
+              <EditableCell
+                value={vals.purpose}
+                onChange={(v) => setVals((p) => ({ ...p, purpose: v }))}
+                placeholder="더블클릭하여 입력"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <BottomIssuer />
     </div>
   );
 }
 
-/* ============ 템플릿: 경력증명서 ============ */
-function CareerTemplate({ emp, BIZ }) {
-  const span = emp?.joinDate && emp?.leaveDate ? calcSpan(emp.joinDate, emp.leaveDate) : "재직 중";
+/* ===== 템플릿: 경력 ===== */
+function CareerTemplate({ emp, BIZ, vals, setVals, issueNo, issuerInfo }) {
+  const to = emp?.leaveDate ? new Date(emp.leaveDate) : new Date();
+  const span = emp?.joinDate ? calcSpan(emp.joinDate, to) : "";
+  const careerEndValue = vals.careerEnd || fmtDate(emp?.leaveDate) || "현재";
   return (
     <div className="doc">
-      <div className="doc-title">경 력 증 명 서</div>
+      <div className="doc-title">경력증명서</div>
+      <div className="doc-subhead"><span className="issue-no">발급번호 : {issueNo}</span></div>
 
+      {/* 인적사항 */}
       <table className="kv">
         <tbody>
-          <tr><th>성명</th><td>{emp?.name || ""}</td></tr>
+          <tr><th rowSpan={3}>인적사항</th><th>성명</th><td>{emp?.name || ""}</td></tr>
           <tr><th>주민등록번호</th><td>{emp?.ssn || emp?.resRegNo || ""}</td></tr>
           <tr><th>주소</th><td>{emp?.address || ""}</td></tr>
-          <tr><th>회사명</th><td>{BIZ.name}</td></tr>
+        </tbody>
+      </table>
+
+      {/* 경력사항 */}
+      <table className="kv">
+        <tbody>
+          <tr><th rowSpan={6}>경력사항</th><th>회사명</th><td>{BIZ.name}</td></tr>
           <tr><th>사업자등록번호</th><td>{BIZ.bizNo}</td></tr>
-          <tr><th>근무부서</th><td>{emp?.dept || ""}</td></tr>
-          <tr><th>직위</th><td>{emp?.position || ""}</td></tr>
-          <tr><th>담당업무</th><td /></tr>
+          <tr><th>근무부서</th><td><EditableCell value={vals.dept || emp?.dept || ""} onChange={(v) => setVals((p) => ({ ...p, dept: v }))} /></td></tr>
+          <tr><th>직위</th><td><EditableCell value={vals.position || emp?.position || ""} onChange={(v) => setVals((p) => ({ ...p, position: v }))} /></td></tr>
+          <tr>
+            <th>담당업무</th>
+            <td>
+              <div className="hint">※ 더블클릭하여 입력하고 Enter로 확정</div>
+              <EditableCell value={vals.duty} onChange={(v) => setVals((p) => ({ ...p, duty: v }))} placeholder="더블클릭하여 입력" />
+            </td>
+          </tr>
           <tr>
             <th>근무연한</th>
             <td>
-              {fmtDate(emp?.joinDate)} ~ {fmtDate(emp?.leaveDate) || "현재"} {span && ` ( ${span} )`}
+              {fmtDate(emp?.joinDate)} &nbsp;~&nbsp;
+              <EditableCell
+                value={careerEndValue}
+                onChange={(v) => setVals((p) => ({ ...p, careerEnd: v }))}
+                placeholder="더블클릭하여 입력"
+              />
+              {span && ` ( ${span} )`}
             </td>
           </tr>
-          <tr><th>발급용도</th><td /></tr>
         </tbody>
       </table>
 
-      <p className="para center">위와 같이 경력을 증명합니다.</p>
-      <div className="date-line">{todayK()}</div>
+      {/* 발급부서 */}
+      <table className="kv">
+        <tbody>
+          <tr><th rowSpan={4}>발급부서</th><th>부서명</th><td>{issuerInfo.dept}</td></tr>
+          <tr><th>직위</th><td>{issuerInfo.position}</td></tr>
+          <tr><th>성명</th><td>{issuerInfo.name}</td></tr>
+          <tr><th>전화번호</th><td>{issuerInfo.phone}</td></tr>
+        </tbody>
+      </table>
 
-      <div className="issuer">
-        <div className="issuer-text">
-          <div className="company">{BIZ.name}</div>
-          <div className="ceo">대표 {BIZ.ceo}</div>
-        </div>
-        <div className="seal-stamp">
-          <span>한남주택관리</span>
-        </div>
-      </div>
+      {/* 발급용도 */}
+      <table className="kv">
+        <tbody>
+          <tr>
+            <th>발급용도</th>
+            <td>
+              <div className="hint">※ 더블클릭하여 입력하고 Enter로 확정</div>
+              <EditableCell
+                value={vals.purpose}
+                onChange={(v) => setVals((p) => ({ ...p, purpose: v }))}
+                placeholder="더블클릭하여 입력"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <BottomIssuer />
     </div>
   );
 }
 
-/* ============ 템플릿: 퇴직증명서 ============ */
-function RetireTemplate({ emp, BIZ }) {
-  const span = emp?.joinDate && emp?.leaveDate ? calcSpan(emp.joinDate, emp.leaveDate) : "";
+/* ===== 템플릿: 퇴직 ===== */
+function RetireTemplate({ emp, BIZ, vals, setVals, issueNo, issuerInfo }) {
+  const retireDate = vals.retireDate || emp?.leaveDate || "";
+  const span = emp?.joinDate && retireDate ? calcSpan(emp.joinDate, new Date(retireDate)) : "";
   return (
     <div className="doc">
-      <div className="doc-title">퇴 직 증 명 서</div>
+      <div className="doc-title">퇴직증명서</div>
+      <div className="doc-subhead"><span className="issue-no">발급번호 : {issueNo}</span></div>
 
+      {/* 인적사항 */}
       <table className="kv">
         <tbody>
-          <tr><th>성명</th><td>{emp?.name || ""}</td></tr>
+          <tr><th rowSpan={3}>인적사항</th><th>성명</th><td>{emp?.name || ""}</td></tr>
           <tr><th>주민등록번호</th><td>{emp?.ssn || emp?.resRegNo || ""}</td></tr>
           <tr><th>주소</th><td>{emp?.address || ""}</td></tr>
-          <tr><th>회사명</th><td>{BIZ.name}</td></tr>
-          <tr><th>사업자등록번호</th><td>{BIZ.bizNo}</td></tr>
-          <tr><th>부서명</th><td>{emp?.dept || ""}</td></tr>
-          <tr><th>직위</th><td>{emp?.position || ""}</td></tr>
-          <tr><th>입사일</th><td>{fmtDate(emp?.joinDate)}</td></tr>
-          <tr><th>퇴사일</th><td>{fmtDate(emp?.leaveDate) || "____-__-__"}</td></tr>
-          <tr><th>근속기간</th><td>{span || "___년 __개월 __일"}</td></tr>
-          <tr><th>퇴직사유</th><td /></tr>
-          <tr><th>발급용도</th><td /></tr>
         </tbody>
       </table>
 
-      <p className="para center">위와 같이 경력을 증명합니다.</p>
-      <div className="date-line">{todayK()}</div>
+      {/* 재직사항 */}
+      <table className="kv">
+        <tbody>
+          <tr><th rowSpan={7}>재직사항</th><th>회사명</th><td>{BIZ.name}</td></tr>
+          <tr><th>사업자등록번호</th><td>{BIZ.bizNo}</td></tr>
+          <tr><th>부서명</th><td><EditableCell value={vals.dept || emp?.dept || ""} onChange={(v) => setVals((p) => ({ ...p, dept: v }))} /></td></tr>
+          <tr><th>직위</th><td><EditableCell value={vals.position || emp?.position || ""} onChange={(v) => setVals((p) => ({ ...p, position: v }))} /></td></tr>
+          <tr><th>입사일</th><td>{fmtDate(emp?.joinDate)}</td></tr>
+          <tr>
+            <th>퇴사일</th>
+            <td>
+              <div className="hint">※ 더블클릭하여 입력하고 Enter로 확정</div>
+              <EditableCell value={retireDate} onChange={(v) => setVals((p) => ({ ...p, retireDate: v }))} placeholder="YYYY-MM-DD · 더블클릭하여 입력" />
+            </td>
+          </tr>
+          <tr><th>근속기간</th><td>{span || ""}</td></tr>
+        </tbody>
+      </table>
+
+      {/* 발급부서 */}
+      <table className="kv">
+        <tbody>
+          <tr><th rowSpan={4}>발급부서</th><th>부서명</th><td>{issuerInfo.dept}</td></tr>
+          <tr><th>직위</th><td>{issuerInfo.position}</td></tr>
+          <tr><th>성명</th><td>{issuerInfo.name}</td></tr>
+          <tr><th>전화번호</th><td>{issuerInfo.phone}</td></tr>
+        </tbody>
+      </table>
+
+      {/* 퇴직사유/발급용도 */}
+      <table className="kv">
+        <tbody>
+          <tr>
+            <th>퇴직사유</th>
+            <td>
+              <div className="hint">※ 더블클릭하여 입력하고 Enter로 확정</div>
+              <EditableCell
+                value={vals.retireReason}
+                onChange={(v) => setVals((p) => ({ ...p, retireReason: v }))}
+                placeholder="더블클릭하여 입력"
+              />
+            </td>
+          </tr>
+          <tr>
+            <th>발급용도</th>
+            <td>
+              <div className="hint">※ 더블클릭하여 입력하고 Enter로 확정</div>
+              <EditableCell
+                value={vals.purpose}
+                onChange={(v) => setVals((p) => ({ ...p, purpose: v }))}
+                placeholder="더블클릭하여 입력"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <BottomIssuer />
+    </div>
+  );
+}
+
+/* ===== 하단: 날짜/회사/대표만 가운데, 도장은 오른쪽에 붙이기 ===== */
+function BottomIssuer() {
+  const textRef = useRef(null);
+  const [offset, setOffset] = useState(0); // 텍스트 절반 너비
+
+  useEffect(() => {
+    const update = () => {
+      if (textRef.current) setOffset(textRef.current.offsetWidth / 2);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return (
+    <div className="issuer">
+      {/* 가운데 정렬되는 텍스트 블록 */}
+      <div className="issuer-text" ref={textRef}>
+        <div className="issued-date">{todayStr()}</div>
+        <div className="company">한남주택관리</div>
+        <div className="ceo">대표 이세구</div>
+      </div>
+
+      {/* 도장 이미지는 가운데 텍스트 기준으로 우측에 배치 (겹치지 않도록 8px 간격) */}
+      <img
+        className="seal-inline"
+        src={sealImg}
+        alt=""
+        aria-hidden
+        style={{ left: `calc(50% + ${offset + 8}px)` }}
+      />
     </div>
   );
 }

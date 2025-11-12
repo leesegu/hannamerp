@@ -75,6 +75,9 @@ import CardExpenseModal from "./pages/CardExpenseModal";
 /* ✅ [추가] 증명서 발급 페이지 라우트용 import (새 파일) */
 import CertificateIssuePage from "./pages/CertificateIssuePage";
 
+/* ✅ [추가] 급여대장 페이지 라우트용 import */
+import PayrollBook from "./pages/PayrollBook";
+
 /* ✅ [추가] 라우트에서 사용할 카드지출 래퍼 컴포넌트
    - 페이지로 직접 접근했을 때도 팝업을 띄울 수 있도록 최소 구현
    - 기존 페이지에는 영향 없음
@@ -372,6 +375,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
             <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
           ) : (
             <CertificateIssuePage />
+          )
+        }
+      />
+
+      {/* ✅ (추가) 급여대장 라우트 */}
+      <Route
+        path="/payroll-book"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          ) : (
+            <PayrollBook />
           )
         }
       />

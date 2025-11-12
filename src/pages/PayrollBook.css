@@ -1,0 +1,115 @@
+/* src/pages/PayrollBook.css */
+
+:root{
+  --ink:#0b1220;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --bg:#f7f9fc;
+  --brand:#4F73EA;
+  --orange:#fde4b3;      /* 기본 자동 입력(인적사항) 배경 */
+  --blue:#e8f2ff;        /* 자동 계산(합계) 배경 */
+  --gray:#f3f4f6;        /* 공제 합계 등 중립 */
+  --yellow:#fff3bf;      /* 차인지급액 강조 */
+  --shadow:0 10px 24px rgba(0,0,0,.08);
+}
+
+.pb-wrap{
+  width:100%;
+  min-height:100%;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  padding:20px;
+  background:var(--bg);
+}
+
+.pb-toolbar{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  box-shadow: var(--shadw);
+}
+.pb-controls{display:flex;align-items:center;gap:10px}
+.pb-label{font-weight:600;color:#374151}
+.pb-select{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;background:#fff}
+.pb-months{display:flex;gap:6px;margin-left:8px}
+.pb-month{height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}
+.pb-month.on{background:var(--brand);color:#fff}
+.pb-actions{display:flex;gap:8px}
+.pb-btn{height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600}
+.pb-btn.stats{background:linear-gradient(180deg,#10b981 0,#059669); color:#fff; box-shadow:0 8px 20px rgba(16,185,129,.25)}
+
+.pb-paper{
+  width: min(1400px, 96vw);
+  margin: 0 auto;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:12px;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+.pb-title{
+  text-align:center;
+  font-size:28px;
+  font-weight:800;
+  margin-bottom:14px;
+}
+
+/* Table */
+.pb-table{ width:100%; border-collapse:collapse; }
+.pb-table th, .pb-table td{
+  border:1px solid var(--line);
+  padding:8px 10px;
+  font-size:13px;
+}
+.pb-table thead th{
+  background:#e8eaf6;
+  text-align:center;
+  font-weight:700;
+}
+.pb-table .hdr-1 th{ background:#e5e7eb; }
+.pb-table .hdr-2 th{ background:#f3f4f6; font-weight:600; }
+
+.pb-table th.idx, .pb-table td.idx{ width:40px; text-align:center; }
+
+.pb-table th.hdr-block{ background:#dbeafe; font-weight:800 }
+.pb-table th.pay{ background:#ffe5c2 }
+.pb-table th.ded{ background:#f1f5f9 }
+
+.cell{ min-height:30px; display:flex; align-items:center; }
+.cell-text{ flex:1; }
+.cell-input{ width:100%; border:none; outline:none; font:inherit; padding:0; background:#fff; }
+.cell .placeholder{ color:#c0c4cc; }
+
+.auto{ background: var(--orange); }
+.edit{ background:#fff; }
+.pay{ background:#fff7e6 }
+.ded{ background:#f9fafb }
+.sum{ font-weight:800; text-align:right; }
+.sum.gross{ background: var(--blue); }
+.sum.net{ background: var(--yellow); }
+.sum-cell{ text-align:right; background:#f8fafc; font-weight:700 }
+.sum-cell.gray{ background:#f1f5f9 }
+.sign{ width:110px; }
+
+.pb-table-wrap{ overflow:auto; border:1px solid var(--line); border-radius:8px; }
+
+/* Year stats modal */
+.pb-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1500}
+.pb-modal-panel{width:min(1100px,96vw);max-height:85vh;background:#fff;border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.pb-modal-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:#f8fafc}
+.pb-modal-title{font-weight:800}
+.pb-close{width:36px;height:36px;border:none;background:#fff;border-radius:8px;font-size:20px;cursor:pointer}
+.pb-close:hover{background:#f3f4f6}
+.pb-modal-body{padding:16px;overflow:auto}
+.pb-stats-table{width:100%;border-collapse:collapse}
+.pb-stats-table th,.pb-stats-table td{border:1px solid var(--line);padding:10px;text-align:center}
+.pb-stats-table td.num{text-align:right}
+.pb-stats-table td.hi{background:var(--yellow);font-weight:800}
+.pb-stats-table .bar{height:10px;background:#f3f4f6;border-radius:6px;overflow:hidden}
+.pb-stats-table .bar .bar-fill{height:100%;background:#60a5fa}
+

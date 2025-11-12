@@ -14,6 +14,8 @@ import GenericEditModal from "../components/GenericEditModal";
 
 /* ✅ [추가] 모달 컴포넌트 임포트 */
 import CertificateIssuePage from "./CertificateIssuePage";
+/* ✅ [추가] 라우팅용 훅 */
+import { useNavigate } from "react-router-dom";
 
 // ✅ 유틸: 날짜를 YYYY-MM-DD로 정규화 (저장 시 적용)
 function normalizeToYYYYMMDD(input) {
@@ -42,8 +44,8 @@ function normalizeToYYYYMMDD(input) {
   if (parts.length === 3) {
     let [yy, mm, dd] = parts;
     if (yy.length === 2) yy = `20${yy}`;
-    mm = mm.padStart(2, "0");
-    dd = dd.padStart(2, "0");
+    mm = (mm + "").padStart(2, "0");
+    dd = (dd + "").padStart(2, "0");
     if (/^\d{4}$/.test(yy) && /^\d{2}$/.test(mm) && /^\d{2}$/.test(dd)) {
       return `${yy}-${mm}-${dd}`;
     }
@@ -80,12 +82,12 @@ function formatKoreanPhoneInput(v) {
   return digits;
 }
 
-// ✅ 주민등록번호 → 생년월일(Date) 파싱(세기 판별: 1/2=1900s, 3/4=2000s, 5/6=1900s 외국인, 7/8=2000s 외국인)
+// ✅ 주민등록번호 → 생년월일(Date) 파싱
 function parseBirthFromRRN(rrn) {
   const digits = String(rrn || "").replace(/\D/g, "");
   if (digits.length < 7) return null;
   const yy = digits.slice(0, 2);
-  const mm = digits.slice(2, 4);
+  const mm = digits.slice(2, 4); // ★ 오타 수정: digits slice → digits.slice
   const dd = digits.slice(4, 6);
   const centuryCode = digits[6];
 
@@ -95,22 +97,16 @@ function parseBirthFromRRN(rrn) {
   else return null;
 
   const year = century + Number(yy);
-  const month = Number(mm) - 1; // JS Date: 0~11
+  const month = Number(mm) - 1;
   const day = Number(dd);
-
   const date = new Date(year, month, day);
-  // 간단 유효성 체크
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month ||
-    date.getDate() !== day
-  ) {
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
     return null;
   }
   return date;
 }
 
-// ✅ 국제식 나이 계산(생일 지났는지 반영)
+// ✅ 국제식 나이 계산
 function calcAgeFromRRN(rrn) {
   const birth = parseBirthFromRRN(rrn);
   if (!birth) return "";
@@ -123,20 +119,6 @@ function calcAgeFromRRN(rrn) {
   return age >= 0 ? age : "";
 }
 
-/* ❌ [삭제] 새창 팝업 함수
-function openCertificatePopup() {
-  const url = `${window.location.origin}/certificates`;
-  const w = 940, h = 1200;
-  const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
-  const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
-  window.open(
-    url,
-    "certificate_issue",
-    `popup=yes,width=${w},height=${h},left=${x},top=${y},resizable=yes,scrollbars=yes`
-  );
-}
-*/
-
 export default function EmployeePage() {
   const [employees, setEmployees] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -145,6 +127,9 @@ export default function EmployeePage() {
 
   /* ✅ [추가] 증명서 발급 모달 on/off */
   const [openCert, setOpenCert] = useState(false);
+
+  /* ✅ [추가] 라우팅 훅 */
+  const navigate = useNavigate();
 
   // 실시간 구독
   useEffect(() => {
@@ -159,7 +144,7 @@ export default function EmployeePage() {
   const deptOptions = ["사무팀", "A/S팀"];
   const positionOptions = ["사원", "실장", "팀장", "부장"];
   const employmentTypeOptions = ["일용직", "계약직", "정규직"];
-  const genderOptions = ["남자", "여자"]; // ✅ 성별 드롭다운
+  const genderOptions = ["남자", "여자"];
 
   // 필드 정의
   const fields = useMemo(
@@ -169,12 +154,11 @@ export default function EmployeePage() {
       "position",
       "empNo",
       "resRegNo",
-      "age", // 폼에 표시하되 읽기전용으로 잠금
+      "age",
       "gender",
-      "employmentType",
       "joinDate",
-      "phone",
       "address",
+      "phone",
       "email",
       "bank",
       "accountNo",
@@ -190,7 +174,6 @@ export default function EmployeePage() {
     resRegNo: "주민등록번호",
     age: "나이",
     gender: "성별",
-    employmentType: "고용형태",
     joinDate: "입사일",
     phone: "전화번호",
     address: "주소",
@@ -205,31 +188,26 @@ export default function EmployeePage() {
     accountNo: "text",
     resRegNo: "text",
     joinDate: "text",
-    age: "number", // 읽기전용으로 잠글 예정
+    age: "number",
     dept: "select",
     position: "select",
-    employmentType: "select",
-    gender: "select", // ✅ 성별 드롭다운
+    gender: "select",
   };
 
   const selectOptions = {
     dept: deptOptions,
     position: positionOptions,
     employmentType: employmentTypeOptions,
-    gender: genderOptions, // ✅ 성별 드롭다운 옵션
+    gender: genderOptions,
   };
 
   const safeDocId = (raw) =>
     String(raw || "").trim().replace(/\//g, "∕").slice(0, 1500);
 
-  // 표시용: 나이를 주민번호로 자동 계산(저장된 age가 없으면 계산값 사용)
   const displayEmployees = useMemo(() => {
     return employees.map((e) => {
       const computed = calcAgeFromRRN(e.resRegNo);
-      return {
-        ...e,
-        age: e.age !== "" && e.age != null ? e.age : computed,
-      };
+      return { ...e, age: e.age !== "" && e.age != null ? e.age : computed };
     });
   }, [employees]);
 
@@ -246,9 +224,8 @@ export default function EmployeePage() {
       position: "",
       empNo: "",
       resRegNo: "",
-      age: "", // 폼엔 표시되지만 저장 시 주민번호로 자동 계산됨
+      age: "",
       gender: "",
-      employmentType: "",
       joinDate: "",
       phone: "",
       address: "",
@@ -260,7 +237,7 @@ export default function EmployeePage() {
     setShowModal(true);
   };
 
-  // 수정 (원본으로 열되, 나이는 계산값으로 채워서 보여줌)
+  // 수정
   const handleEdit = (row) => {
     const src = byId[row.id] || row;
     setEditData({
@@ -269,10 +246,7 @@ export default function EmployeePage() {
       position: src.position || "",
       empNo: src.empNo || src.id || "",
       resRegNo: src.resRegNo || "",
-      age:
-        src.age !== "" && src.age != null
-          ? src.age
-          : calcAgeFromRRN(src.resRegNo), // ✅ 계산값
+      age: src.age !== "" && src.age != null ? src.age : calcAgeFromRRN(src.resRegNo),
       gender: src.gender || "",
       employmentType: src.employmentType || "",
       joinDate: src.joinDate || "",
@@ -288,32 +262,28 @@ export default function EmployeePage() {
 
   // 저장
   const handleSaveFromModal = async (form) => {
-    const newId = safeDocId(form.empNo);
+    const newId = safeDocId(form.empNo); // ★ safe → safeDocId
     if (!newId) {
       alert("사원번호는 필수입니다.");
       return;
     }
-
-    // ✅ 저장 시 나이는 주민번호로 항상 재계산
-    const ageComputed = calcAgeFromRRN(form.resRegNo);
-
+    const ageComputed = calcAgeFromRRN(form.resRegNo); // ★ 함수명 수정
     const dataToSave = {
       name: (form.name || "").trim(),
       dept: (form.dept || "").trim(),
       position: (form.position || "").trim(),
       empNo: (form.empNo || "").trim(),
       resRegNo: (form.resRegNo || "").trim(),
-      age: ageComputed, // ✅ form.age 무시
+      age: ageComputed,
       gender: (form.gender || "").trim(),
       employmentType: (form.employmentType || "").trim(),
-      joinDate: normalizeToYYYYMMDD(form.joinDate || ""), // 저장 시 YYYY-MM-DD
+      joinDate: normalizeToYYYYMMDD(form.joinDate || ""),
       phone: (form.phone || "").trim(),
       address: (form.address || "").trim(),
       email: (form.email || "").trim(),
       bank: (form.bank || "").trim(),
       accountNo: (form.accountNo || "").trim(),
     };
-
     if (origId && origId !== newId) {
       await setDoc(doc(db, "employees", newId), dataToSave, { merge: true });
       await deleteDoc(doc(db, "employees", origId));
@@ -321,7 +291,6 @@ export default function EmployeePage() {
       const targetId = origId || newId;
       await setDoc(doc(db, "employees", targetId), dataToSave, { merge: true });
     }
-
     setShowModal(false);
     setEditData(null);
     setOrigId(null);
@@ -334,52 +303,60 @@ export default function EmployeePage() {
     await deleteDoc(doc(db, "employees", row.id));
   };
 
-  // ✅ 입력단계 자동포맷(주민번호/전화번호) 모달로 전달
+  // 입력단계 자동포맷
   const formatters = {
     resRegNo: formatRRNInput,
     phone: formatKoreanPhoneInput,
+  };
+
+  /* ✅ 급여대장 모달 열기 (새 창 없이, 페이지 위에 모달만 표시) */
+  const [payrollOpen, setPayrollOpen] = useState(false);
+  const openPayrollPopup = () => {
+    setPayrollOpen(true);
   };
 
   return (
     <div className="page-wrapper">
       <PageTitle>사원정보</PageTitle>
 
-      {/* ✅ 상단 왼쪽: "증명서 발급" 버튼(모달 토글) */}
+      {/* ✅ 상단 왼쪽: 버튼 영역 (기존 유지 + 급여대장 버튼 추가) */}
       <div
         style={{
           height: 24,
           marginBottom: -22,
           position: "relative",
+          display: "flex",
+          gap: 8,
         }}
       >
         <button
-          onClick={() => setOpenCert(true)}  /* ✅ 새창 X, 모달 on */
+          onClick={() => setOpenCert(true)}
           title="증명서 발급을 모달로 엽니다."
           style={{
-            position: "absolute",
-            left: 0, top: 0,
             height: 40,
-            padding: "0 16px 0 12px",
+            padding: "0 16px",                 // 중앙 정렬을 위해 수직 패딩 균등
             borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.2)",
             background:
-              "linear-gradient(180deg,#6C8CF5 0%, #4F73EA 100%), radial-gradient(800px 400px at 100% 0%, rgba(255,255,255,0.18), transparent 60%)",
+              "linear-gradient(180deg,#6C8CF5 0%, #4F73EA 100%), radial-gradient(800px 400px at 100% 0%, rgba(255,255,255,.18), transparent 60%)",
             color: "#fff",
             fontWeight: 700,
             letterSpacing: ".02em",
             cursor: "pointer",
-            boxShadow:
-              "0 8px 20px rgba(79,115,234,.35), 0 2px 6px rgba(15,18,32,.18)",
+            boxShadow: "0 8px 20px rgba(79,115,234,.35),0 2px 6px rgba(15,18,32,.18)",
             display: "inline-flex",
-            alignItems: "center",
+            alignItems: "center",              // 세로 중앙
+            justifyContent: "center",          // 가로 중앙
             gap: 8,
             zIndex: 2,
           }}
           className="btn primary"
         >
           <svg
-            width="18" height="18"
-            viewBox="0 0 24 24" aria-hidden="true"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
             style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,.25))" }}
           >
             <path
@@ -389,6 +366,27 @@ export default function EmployeePage() {
           </svg>
           증명서 발급
         </button>
+
+        {/* ✅ 추가: 급여대장 버튼 (페이지 내 모달로 열기) */}
+        <button
+          onClick={openPayrollPopup}
+          title="급여대장 페이지를 모달로 엽니다"
+          style={{
+            height: 40,
+            padding: "0 16px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.2)",
+            background:
+              "linear-gradient(180deg,#f59e0b 0%, #f97316 100%), radial-gradient(800px 400px at 100% 0%, rgba(255,255,255,.18), transparent 60%)",
+            color: "#1f2937",
+            fontWeight: 800,
+            letterSpacing: ".02em",
+            cursor: "pointer",
+            boxShadow: "0 8px 20px rgba(245,158,11,.35),0 2px 6px rgba(15,18,32,.18)",
+          }}
+        >
+          급여대장
+        </button>
       </div>
 
       <DataTable
@@ -397,9 +395,8 @@ export default function EmployeePage() {
           { key: "dept", label: "부서명", editable: true },
           { key: "position", label: "직위", editable: true },
           { key: "empNo", label: "사원번호", editable: true },
-          // ✅ 마스킹 없이 원본 그대로 표시
           { key: "resRegNo", label: "주민등록번호", editable: true },
-          { key: "age", label: "나이", editable: false }, // 계산값 표시만
+          { key: "age", label: "나이", editable: false },
           { key: "gender", label: "성별", editable: true },
           { key: "employmentType", label: "고용형태", editable: true },
           { key: "joinDate", label: "입사일", editable: true },
@@ -451,10 +448,9 @@ export default function EmployeePage() {
           onSave={handleSaveFromModal}
           villa={editData}
           headerKeys={[]}
-          // ✅ 나이는 입력/수정 창에서 비활성화
           readOnlyKeys={["age"]}
           fields={fields}
-          gridClass="modal-grid-3"
+          gridClass="modal-modern-grid"
           labels={labels}
           types={types}
           selectOptions={selectOptions}
@@ -462,12 +458,88 @@ export default function EmployeePage() {
         />
       )}
 
-      {/* ✅ [추가] 증명서 발급 모달 실제 렌더링 (새창 X) */}
+      {/* ✅ 증명서 발급 모달 */}
       {openCert && (
         <CertificateIssuePage
           onClose={() => setOpenCert(false)}
           employeeList={employees}
         />
+      )}
+
+      {/* ✅ 급여대장 모달 (새 창 없이 페이지 내 오버레이) */}
+      {payrollOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="급여대장"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPayrollOpen(false);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10040,
+            background:
+              "radial-gradient(1400px 900px at 80% 0%, rgba(108,140,245,.18), transparent 60%), radial-gradient(1000px 700px at 10% 100%, rgba(120,160,255,.12), transparent 60%), rgba(15,18,32,.55)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "fadeIn .12s ease-out",
+          }}
+        >
+          <div
+            style={{
+              width: "min(1600px, 96vw)",
+              height: "min(950px, 94vh)",
+              background: "linear-gradient(180deg,#ffffff 0%, #f8faff 100%)",
+              border: "1px solid #e3e8f3",
+              borderRadius: 24,
+              boxShadow: "0 18px 48px rgba(15,18,32,.22), 0 2px 6px rgba(15,18,32,.14)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: 56,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0 16px",
+                borderBottom: "1px solid #e8ecf5",
+                background: "linear-gradient(180deg,#f9fbff 0%, #f5f7ff 100%)",
+              }}
+            >
+              <div style={{ fontWeight: 800, letterSpacing: ".02em", color: "#1f2937" }}>
+                급여대장
+              </div>
+              <button
+                onClick={() => setPayrollOpen(false)}
+                style={{
+                  height: 32,
+                  padding: "0 12px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  fontWeight: 700,
+                  color: "#111827",
+                }}
+              >
+                닫기
+              </button>
+            </div>
+            <div style={{ flex: "1 1 auto" }}>
+              <iframe
+                title="급여대장"
+                src="/payroll-book"
+                style={{ width: "100%", height: "100%", border: 0 }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
