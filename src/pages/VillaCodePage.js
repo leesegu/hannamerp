@@ -6,6 +6,8 @@ import {
   getDocs,
   deleteDoc,
   doc,
+  setDoc,            // ✅ 관리종료 컬렉션에 복사용
+  serverTimestamp,   // ✅ 삭제 시각 기록용
 } from "firebase/firestore";
 
 import DataTable from "../components/DataTable";
@@ -74,15 +76,38 @@ export default function VillaCodePage() {
   };
 
   // ✅ 삭제 버튼 클릭
+  //   1) 현재 villas 문서 전체를 villas_end 컬렉션에 그대로 저장(관리종료)
+  //   2) 저장 성공 후에만 villas 컬렉션에서 삭제
   const handleDelete = async (row) => {
-    if (window.confirm(`${row.name} (${row.code}) 항목을 삭제하시겠습니까?`)) {
-      try {
-        await deleteDoc(doc(db, "villas", row.id));
-        setData((prev) => prev.filter((item) => item.id !== row.id));
-      } catch (error) {
-        console.error("🔥 삭제 실패:", error);
-        alert("삭제에 실패했습니다.");
-      }
+    if (!window.confirm(`${row.name} (${row.code}) 항목을 관리종료 처리하시겠습니까?`)) {
+      return;
+    }
+
+    if (!row.id) {
+      alert("관리종료 저장을 위해 문서 id가 필요합니다. 관리자에게 문의해주세요.");
+      console.error("관리종료 처리 실패: row.id 없음", row);
+      return;
+    }
+
+    try {
+      const { id, ...rest } = row;
+
+      // ✅ 1단계: 관리종료 컬렉션에 전체 스냅샷 저장
+      // - villas_end/문서ID (문서ID는 기존 villas 문서 id 그대로 사용)
+      await setDoc(doc(db, "villas_end", id), {
+        ...rest,                // 코드번호, 빌라명, 주소, telco/elevator/… 모든 필드 그대로
+        originalId: id,         // 원본 문서 id 기록(필요시 추적용)
+        deletedAt: serverTimestamp(), // 삭제(관리종료) 시각
+      });
+
+      // ✅ 2단계: 원본 컬렉션에서 실제 삭제
+      await deleteDoc(doc(db, "villas", id));
+
+      // ✅ 3단계: 화면 목록에서도 제거
+      setData((prev) => prev.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error("🔥 삭제/관리종료 처리 실패:", error);
+      alert("관리종료 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
     }
   };
 

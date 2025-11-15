@@ -49,6 +49,9 @@ import UpdatesModal from "../components/UpdatesModal";
 /* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
 import ResidentCardPage from "../pages/ResidentCardPage";
 
+/* ✅ 추가: 관리종료 페이지 (빌라정보 메뉴용) */
+import VillaEndPage from "../pages/VillaEndPage";
+
 /* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
@@ -158,6 +161,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
         공용전기: <PublicElectricPage />,
         건물청소: <CleaningPage />,
         CCTV: <CctvPage />,
+        관리종료: <VillaEndPage />, // ✅ URL 쿼리로도 관리종료 진입 가능
       };
       setActiveContent(pages[sub] ?? <ComingSoon title={`빌라정보 · ${sub}`} />);
       return;
@@ -324,6 +328,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                       "공용전기",
                       "건물청소",
                       "CCTV",
+                      "관리종료", // ✅ CCTV 아래 관리종료 추가
                     ]}
                     activeMenu={activeMenu}
                     onClick={(item) => {
@@ -339,6 +344,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                         공용전기: <PublicElectricPage />,
                         건물청소: <CleaningPage />,
                         CCTV: <CctvPage />,
+                        관리종료: <VillaEndPage />, // ✅ 서브메뉴 → 관리종료 페이지 연결
                       };
                       handleNavigate(pages[item] ?? <ComingSoon title={item} />, item);
                     }}
@@ -415,7 +421,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                         "공용전기 계산": <PublicElectricCalcPage />,
                         "입주자카드": <ResidentCardPage />, // ✅ 추가: 부가서비스 > 입주자카드
                       };
-                      handleNavigate(pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />, item);
+                      handleNavigate(
+                        pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />,
+                        item
+                      );
                     }}
                   />
                 </>
