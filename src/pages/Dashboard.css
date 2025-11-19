@@ -1,3 +1,5 @@
+/* src/pages/Dashboard.css */
+
 /* ===== Dashboard Theme ===== */
 :root {
   --dash-purple: #7c3aed;          /* 보라 포인트 */
@@ -173,6 +175,14 @@
 .dash-list__item:first-child { border-top: 0; }
 .dash-list__item:hover { background: var(--dash-purple-50); }
 .dash-list__item:active { background: var(--dash-purple-100); transform: translateY(0.5px); }
+
+/* ✅ 우클릭으로 확인 체크된 항목: 회색 음영 하이라이트 (좀 더 진한 회색) */
+.dash-list__item--checked {
+  background: #e5e7eb;   /* 더 진한 회색 */
+}
+.dash-list__item--checked:hover {
+  background: #d1d5db;   /* hover 시 한 단계 더 진한 회색 */
+}
 
 /* 클릭 가능 변형(하단 패널 라인 전용) */
 .dash-list__item--clickable { cursor: pointer; }

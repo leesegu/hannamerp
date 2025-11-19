@@ -2,6 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./CertificateIssuePage.css";
 import sealImg from "../assets/seal-square.png";
+/* ✅ PDF 저장용 */
+import * as htmlToImage from "html-to-image";
+import { jsPDF } from "jspdf";
 
 /* ===== 상수 ===== */
 const CERT_TYPES = [
@@ -134,13 +137,17 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
   /* 수정 모드 */
   const [editing, setEditing] = useState(false);
 
+  /* PDF 저장 상태 (saving / done / error) */
+  const [pdfStatus, setPdfStatus] = useState(null);
+
   /* 동기화 */
   useEffect(() => {
     setEmployees(employeeList);
-    const exists = employeeList.some((e) => e.id === empId);
-    if (employeeList.length > 0 && !exists) setEmpId(employeeList[0].id);
-    else if (employeeList.length === 0) setEmpId("");
-  }, [employeeList, empId]);
+    const exists = employees.some((e) => e.id === empId);
+    if (employees.length > 0 && !exists) setEmpId(employees[0].id);
+    else if (employees.length === 0) setEmpId("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeList]);
 
   useEffect(() => {
     if (!emp) return;
@@ -161,8 +168,8 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
     });
   }, [issuer]);
 
-  /* 발급내역 기록 (이제 '내용수정'만 사용) */
-  function recordIssue(kind /* '내용수정' 등 */) {
+  /* 발급내역 기록 */
+  function recordIssue() {
     const row = {
       발급일자: todayStr(),
       구분: CERT_TYPES.find((c) => c.value === certType)?.label || "",
@@ -170,7 +177,6 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
       부서명: vals.dept || "",
       직위: vals.position || "",
       발급용도: vals.purpose || "",
-      발급방법: kind,
     };
     appendIssueLog(row);
     setLogs((prev) => [row, ...prev]);
@@ -198,9 +204,73 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
   const handleToggleEdit = () => {
     // 수정 모드 → 종료 시 기록
     if (editing) {
-      recordIssue("내용수정");
+      recordIssue();
     }
     setEditing((prev) => !prev);
+  };
+
+  /* ✅ PDF 저장 핸들러: .doc 영역만 캡쳐하고, 폭+높이 둘 다 고려해서 항상 페이지 안에 맞춤 */
+  const handlePdfSave = async () => {
+    if (!paperRef.current) {
+      alert("증명서 내용을 찾을 수 없습니다.");
+      return;
+    }
+    try {
+      setPdfStatus("saving");
+
+      // 캡쳐 대상: 실제 증명서 내용(.doc)
+      const container = paperRef.current;
+      const node = container.querySelector(".doc") || container;
+
+      // 레이아웃이 안정된 다음 프레임에서 캡쳐
+      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+      const dataUrl = await htmlToImage.toPng(node, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const margin = 10; // 사방 여백 10mm
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const imgWidthPx = imgProps.width;
+      const imgHeightPx = imgProps.height;
+
+      // ✅ 폭/높이 둘 다 고려해서 더 작은 쪽에 맞춤 → 위/아래도 잘리지 않게 약간 더 작게
+      const scale = Math.min(
+        usableWidth / imgWidthPx,
+        usableHeight / imgHeightPx
+      );
+      const imgWidthMm = imgWidthPx * scale;
+      const imgHeightMm = imgHeightPx * scale;
+
+      // 중앙 정렬 (좌우/상하 모두 가운데)
+      const x = (pageWidth - imgWidthMm) / 2;
+      const y = (pageHeight - imgHeightMm) / 2;
+
+      pdf.addImage(dataUrl, "PNG", x, y, imgWidthMm, imgHeightMm);
+
+      const certLabel =
+        CERT_TYPES.find((c) => c.value === certType)?.label || "증명서";
+      const name = emp?.name || "이름미상";
+      pdf.save(`${certLabel}_${name}.pdf`);
+
+      // 발급내역 추가
+      recordIssue();
+      setPdfStatus("done");
+      setTimeout(() => setPdfStatus(null), 2000);
+    } catch (err) {
+      console.error("PDF 저장 실패:", err);
+      alert("PDF 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      setPdfStatus("error");
+      setTimeout(() => setPdfStatus(null), 2500);
+    }
   };
 
   return (
@@ -257,7 +327,7 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
 
               <div className="spacer" />
 
-              {/* ✅ 수정 버튼 */}
+              {/* 수정 버튼 */}
               <button className="btn edit" onClick={handleToggleEdit}>
                 {editing ? "수정완료" : "수정"}
               </button>
@@ -267,13 +337,18 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                 발급내역
               </button>
 
+              {/* PDF 저장 버튼 */}
+              <button className="btn pdf" onClick={handlePdfSave}>
+                PDF 저장
+              </button>
+
               <button className="btn btn-close" onClick={onClose} title="닫기">
                 ×
               </button>
             </div>
           </div>
 
-          {/* 증명서 영역 (스크롤 시 상단 잘리지 않도록 상단 정렬) */}
+          {/* 증명서 영역 */}
           <div className="paper-a4-scroll">
             <div className="paper-a4" ref={paperRef}>
               {certType === "employment" && <EmploymentTemplate {...commonProps} />}
@@ -307,7 +382,6 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                     <th>부서명</th>
                     <th>직위</th>
                     <th>발급용도</th>
-                    <th>발급방법</th>
                     <th>삭제</th>
                   </tr>
                 </thead>
@@ -320,7 +394,6 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                       <td>{r.부서명}</td>
                       <td>{r.직위}</td>
                       <td>{r.발급용도}</td>
-                      <td>{r.발급방법}</td>
                       <td>
                         <button
                           className="btn btn-mini danger"
@@ -333,7 +406,7 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
                   ))}
                   {logs.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: "center", color: "#6b7280" }}>
+                      <td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>
                         발급내역이 없습니다.
                       </td>
                     </tr>
@@ -342,6 +415,23 @@ export default function CertificateIssuePage({ onClose, employeeList = [] }) {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* PDF 저장 상태 토스트 (상단 표시) */}
+      {pdfStatus && (
+        <div
+          className={
+            pdfStatus === "saving"
+              ? "cert-toast cert-toast--saving"
+              : pdfStatus === "done"
+              ? "cert-toast cert-toast--done"
+              : "cert-toast cert-toast--error"
+          }
+        >
+          {pdfStatus === "saving" && "PDF 파일을 저장 중입니다..."}
+          {pdfStatus === "done" && "PDF 파일이 저장되었습니다."}
+          {pdfStatus === "error" && "PDF 파일 저장 중 오류가 발생했습니다."}
         </div>
       )}
     </div>
@@ -444,7 +534,7 @@ function EmploymentTemplate({ emp, BIZ, vals, setVals, issueNo, issuerInfo, edit
                   onChange={(e) =>
                     setVals((p) => ({
                       ...p,
-                      purpose: e.target.value,
+                      purpose: e.target. value,
                     }))
                   }
                   placeholder="발급용도를 입력하세요."
@@ -556,7 +646,6 @@ function CareerTemplate({ emp, BIZ, vals, setVals, issueNo, issuerInfo, editing 
               ) : (
                 careerEndValue
               )}
-              {span && ` ( ${span} )`}
             </td>
           </tr>
         </tbody>

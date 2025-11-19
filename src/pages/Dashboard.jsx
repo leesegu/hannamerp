@@ -232,6 +232,9 @@ function computeSepticReviewDate(workDate) {
   return isNaN(base.getTime()) ? null : base;
 }
 
+/** ✅ 확인 체크 상태 로컬스토리지 키 */
+const CHECK_LS_KEY = "Dashboard:checkedMap:v1";
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -247,6 +250,66 @@ export default function Dashboard() {
   // ✅ 일정(어제/오늘 미완료)
   const [todoSchedules, setTodoSchedules] = useState([]);
   const [openTodoPop, setOpenTodoPop] = useState(false);
+
+  /** ✅ 패널별 '확인 체크' 상태 (섹션키 → { [id]: true })
+   *  - 로컬스토리지에 저장해서 새로고침/페이지 이동 후에도 유지
+   */
+  const [checkedMap, setCheckedMap] = useState(() => {
+    try {
+      if (typeof window === "undefined") return {};
+      const raw = window.localStorage.getItem(CHECK_LS_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
+
+  /** ✅ checkedMap 변경 시 로컬스토리지에 저장 */
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(CHECK_LS_KEY, JSON.stringify(checkedMap));
+    } catch {
+      // 저장 실패해도 대시보드 동작에는 영향 없도록 무시
+    }
+  }, [checkedMap]);
+
+  /** ✅ 우클릭 시 확인 여부 / 확인 취소 여부 묻기 */
+  const handleItemContextMenu = (e, sectionKey, rowId) => {
+    e.preventDefault();
+    const section = checkedMap[sectionKey] || {};
+    const isAlreadyChecked = !!section[rowId];
+
+    if (isAlreadyChecked) {
+      const msgCancel = "이미 확인된 내역입니다.\n확인 체크를 취소하시겠습니까?";
+      if (window.confirm(msgCancel)) {
+        setCheckedMap((prev) => {
+          const prevSection = prev[sectionKey] || {};
+          const { [rowId]: _, ...rest } = prevSection;
+          return {
+            ...prev,
+            [sectionKey]: rest,
+          };
+        });
+      }
+    } else {
+      const msg = "해당 내역을 확인하셨나요?\n확인 체크하시겠습니까?";
+      if (window.confirm(msg)) {
+        setCheckedMap((prev) => {
+          const prevSection = prev[sectionKey] || {};
+          return {
+            ...prev,
+            [sectionKey]: {
+              ...prevSection,
+              [rowId]: true,
+            },
+          };
+        });
+      }
+    }
+  };
 
   useEffect(() => {
     const qV = query(collection(db, "villas"), orderBy("name", "asc"));
@@ -408,7 +471,7 @@ export default function Dashboard() {
         return d0.getTime() <= today0.getTime();
       })
       .sort((a, b) => String(a.villaName).localeCompare(String(b.villaName)));
-  }, [moveouts]);
+  }, [moveouts, today0]);
 
   const sectionMoveoutDeposit = useMemo(() => {
     const items = moveouts
@@ -551,74 +614,97 @@ export default function Dashboard() {
   );
 
   /** 카드 컴포넌트 (CSS 적용) */
-  const TopCard = ({ title, icon, items, summary, isTelco, secKey }) => (
-    <div className="dash-card">
-      <div className="dash-card__head">
-        <i className={`${icon} dash-card__icon`} />
-        <span className="dash-card__title">{title}</span>
-        <span className="dash-card__meta text-[13.5px] font-semibold">
-          {isTelco && summary ? summary : `${items.length}건`}
-        </span>
+  const TopCard = ({ title, icon, items, summary, isTelco, secKey }) => {
+    const sectionChecked = checkedMap[secKey] || {};
+    const uncheckedItems = items.filter((it) => !sectionChecked[it.id]);
+    const checkedItems = items.filter((it) => sectionChecked[it.id]);
+    const displayItems = uncheckedItems.concat(checkedItems);
+
+    return (
+      <div className="dash-card">
+        <div className="dash-card__head">
+          <i className={`${icon} dash-card__icon`} />
+          <span className="dash-card__title">{title}</span>
+          <span className="dash-card__meta text-[13.5px] font-semibold">
+            {isTelco && summary ? summary : `${items.length}건`}
+          </span>
+        </div>
+        <ul className="dash-list">
+          {displayItems.map((it) => (
+            <li
+              key={it.id}
+              className={
+                "dash-list__item" +
+                (sectionChecked[it.id] ? " dash-list__item--checked" : "")
+              }
+              onClick={() => onItemClick(secKey, it.id)}
+              onContextMenu={(e) => handleItemContextMenu(e, secKey, it.id)}
+              title="클릭하여 해당 페이지로 이동"
+            >
+              <div className="dash-item__left min-w-0">
+                <div className="title">{it.villaName || "-"}</div>
+                <div className="sub">
+                  {(it.district || "") + (it.address ? ` · ${it.address}` : "")}
+                </div>
+              </div>
+              <div className="dash-item__right">
+                <div className="date">
+                  {format(it.date, "yyyy-MM-dd (EEE)", { locale: ko })}
+                </div>
+                {isTelco ? (
+                  <div className={ddClassTelco(it.diff)}>{ddTextTelco(it.diff)}</div>
+                ) : (
+                  <div className={ddClassDefault(it.diff)}>{ddTextDefault(it.diff)}</div>
+                )}
+              </div>
+            </li>
+          ))}
+          {!displayItems.length && <li className="dash-empty">표시할 항목이 없습니다.</li>}
+        </ul>
       </div>
-      <ul className="dash-list">
-        {items.map((it) => (
-          <li
-            key={it.id}
-            className="dash-list__item"
-            onClick={() => onItemClick(secKey, it.id)}
-            title="클릭하여 해당 페이지로 이동"
-          >
-            <div className="dash-item__left min-w-0">
-              <div className="title">{it.villaName || "-"}</div>
-              <div className="sub">
-                {(it.district || "") + (it.address ? ` · ${it.address}` : "")}
-              </div>
-            </div>
-            <div className="dash-item__right">
-              <div className="date">
-                {format(it.date, "yyyy-MM-dd (EEE)", { locale: ko })}
-              </div>
-              {isTelco ? (
-                <div className={ddClassTelco(it.diff)}>{ddTextTelco(it.diff)}</div>
-              ) : (
-                <div className={ddClassDefault(it.diff)}>{ddTextDefault(it.diff)}</div>
-              )}
-            </div>
-          </li>
-        ))}
-        {!items.length && <li className="dash-empty">표시할 항목이 없습니다.</li>}
-      </ul>
-    </div>
-  );
+    );
+  };
 
   /** 하단 카드 */
-  const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null, onRowClick }) => (
-    <div className="dash-card">
-      <div
-        className={
-          "dash-card__head " +
-          (tone === "blue" ? "dash-head--blue" : tone === "amber" ? "dash-head--amber" : "")
-        }
-      >
-        <span className="dash-card__title">{title}</span>
-        {amountText && <span className="dash-head-sum">{amountText}</span>}
-        <span className="dash-card__meta text-[13.5px] font-semibold">{items.length}건</span>
+  const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null, onRowClick, secKey }) => {
+    const sectionChecked = checkedMap[secKey] || {};
+    const uncheckedItems = items.filter((it) => !sectionChecked[it.id]);
+    const checkedItems = items.filter((it) => sectionChecked[it.id]);
+    const displayItems = uncheckedItems.concat(checkedItems);
+
+    return (
+      <div className="dash-card">
+        <div
+          className={
+            "dash-card__head " +
+            (tone === "blue" ? "dash-head--blue" : tone === "amber" ? "dash-head--amber" : "")
+          }
+        >
+          <span className="dash-card__title">{title}</span>
+          {amountText && <span className="dash-head-sum">{amountText}</span>}
+          <span className="dash-card__meta text-[13.5px] font-semibold">{items.length}건</span>
+        </div>
+        <ul className="dash-list">
+          {displayItems.map((it) => (
+            <li
+              key={it.id}
+              className={
+                "dash-list__item" +
+                (onRowClick ? " dash-list__item--clickable" : "") +
+                (sectionChecked[it.id] ? " dash-list__item--checked" : "")
+              }
+              onClick={onRowClick ? () => onRowClick(it) : undefined}
+              onContextMenu={(e) => handleItemContextMenu(e, secKey, it.id)}
+              title={onRowClick ? "클릭하여 해당 페이지로 이동" : undefined}
+            >
+              {renderRow(it)}
+            </li>
+          ))}
+          {!displayItems.length && <li className="dash-empty">표시할 항목이 없습니다.</li>}
+        </ul>
       </div>
-      <ul className="dash-list">
-        {items.map((it) => (
-          <li
-            key={it.id}
-            className={`dash-list__item ${onRowClick ? "dash-list__item--clickable" : ""}`}
-            onClick={onRowClick ? () => onRowClick(it) : undefined}
-            title={onRowClick ? "클릭하여 해당 페이지로 이동" : undefined}
-          >
-            {renderRow(it)}
-          </li>
-        ))}
-        {!items.length && <li className="dash-empty">표시할 항목이 없습니다.</li>}
-      </ul>
-    </div>
-  );
+    );
+  };
 
   /** 배지 */
   const Badge = ({ children, kind }) => (
@@ -664,6 +750,7 @@ export default function Dashboard() {
           title="이사정산대기"
           items={sectionMoveoutWait}
           tone="amber"
+          secKey="moveoutWait"
           onRowClick={(m) => {
             const effectiveGo = "이사정산 조회";
             const params = new URLSearchParams({ go: effectiveGo, villa: m.villaName || "" });
@@ -702,6 +789,7 @@ export default function Dashboard() {
           items={sectionMoveoutDeposit.items}
           tone="blue"
           amountText={`${fmtComma(sectionMoveoutDeposit.sum)}원`}
+          secKey="moveoutDeposit"
           onRowClick={(m) => {
             const effectiveGo = "이사정산 조회";
             const params = new URLSearchParams({ go: effectiveGo, villa: m.villaName || "" });
@@ -737,6 +825,7 @@ export default function Dashboard() {
         <BottomCard
           title="입주청소 접수확인"
           items={sectionCleaningUnconfirmed}
+          secKey="cleaningUnconfirmed"
           onRowClick={(c) => {
             navigate(`/main?go=${encodeURIComponent("입주청소")}&row=${encodeURIComponent(c.id)}`);
           }}
@@ -756,6 +845,7 @@ export default function Dashboard() {
           title="미수금"
           items={sectionReceivables.items}
           amountText={`${fmtComma(sectionReceivables.sum)}원`}
+          secKey="receivables"
           onRowClick={(r) => {
             navigate(`/main?go=${encodeURIComponent("영수증발행")}&row=${encodeURIComponent(r.id)}`);
           }}
