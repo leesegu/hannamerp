@@ -2,7 +2,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  where,
+  doc,
+  setDoc,
+  deleteDoc,
+} from "firebase/firestore";
 import { format, parseISO, isValid, differenceInDays, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import "./Dashboard.css";
@@ -41,14 +50,24 @@ const DATE_SECTIONS = [
     title: "승강기 검사만료",
     icon: "ri-bar-chart-line",
     route: "/elevator",
-    paths: ["regularExpire", "elevator.regularExpire", "elevatorInspectionExpire", "elevatorInspectionDate"],
+    paths: [
+      "regularExpire",
+      "elevator.regularExpire",
+      "elevatorInspectionExpire",
+      "elevatorInspectionDate",
+    ],
   },
   {
     key: "elevInsurance",
     title: "승강기 보험만료",
     icon: "ri-shield-check-line",
     route: "/elevator",
-    paths: ["contractEnd", "elevator.insuranceExpire", "elevatorInsuranceExpiry", "elevatorContractEnd"],
+    paths: [
+      "contractEnd",
+      "elevator.insuranceExpire",
+      "elevatorInsuranceExpiry",
+      "elevatorContractEnd",
+    ],
   },
   {
     key: "septic",
@@ -63,14 +82,26 @@ const DATE_SECTIONS = [
     title: "소방교육 만료",
     icon: "ri-fire-line",
     route: "/fire-safety",
-    paths: ["fireSafetyTrainingDate", "fire.trainingDate", "fire.trainingExpire", "fireTrainingDate", "fireTrainingExpiry"],
+    paths: [
+      "fireSafetyTrainingDate",
+      "fire.trainingDate",
+      "fire.trainingExpire",
+      "fireTrainingDate",
+      "fireTrainingExpiry",
+    ],
   },
 ];
 
 /** 다양한 타입의 날짜를 Date로 안전 변환 */
 function toDateSafe(v) {
   if (!v) return null;
-  if (v?.toDate) { try { return v.toDate(); } catch { return null; } }
+  if (v?.toDate) {
+    try {
+      return v.toDate();
+    } catch {
+      return null;
+    }
+  }
   if (typeof v === "number") {
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d;
@@ -101,7 +132,9 @@ function toDateSafe(v) {
 
 /** a.b.c 경로 접근 */
 function getByPath(obj, path) {
-  return path.split(".").reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj);
+  return path
+    .split(".")
+    .reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj);
 }
 
 /** ✅ 불리언 체크 통합 */
@@ -171,7 +204,15 @@ function getVillaName(obj) {
   return "-";
 }
 function getRestAddress(obj) {
-  const candidates = ["restAddress","addressRest","addr2","address2","detailAddress","나머지주소","추가주소"];
+  const candidates = [
+    "restAddress",
+    "addressRest",
+    "addr2",
+    "address2",
+    "detailAddress",
+    "나머지주소",
+    "추가주소",
+  ];
   for (const p of candidates) {
     const v = getByPath(obj, p);
     if (v) return String(v);
@@ -179,7 +220,15 @@ function getRestAddress(obj) {
   return "";
 }
 function getFullAddress(obj) {
-  const candidates = ["address","addr","fullAddress","address1","주소","buildingAddress","addr1"];
+  const candidates = [
+    "address",
+    "addr",
+    "fullAddress",
+    "address1",
+    "주소",
+    "buildingAddress",
+    "addr1",
+  ];
   for (const p of candidates) {
     const v = getByPath(obj, p);
     if (v) return String(v);
@@ -195,8 +244,10 @@ const fmtComma = (n) => {
 };
 
 /* ===== 🔹 이사정산 총액 계산 유틸(입금확인 카드용) ===== */
-const toNum = (v) => (v === "" || v == null ? 0 : (Number(String(v).replace(/[,\s]/g, "")) || 0));
-const sumExtrasFromArray = (extras) => (extras || []).reduce((acc, it) => acc + (Number(it?.amount || 0) || 0), 0);
+const toNum = (v) =>
+  v === "" || v == null ? 0 : Number(String(v).replace(/[,\s]/g, "")) || 0;
+const sumExtrasFromArray = (extras) =>
+  (extras || []).reduce((acc, it) => acc + (Number(it?.amount || 0) || 0), 0);
 const getExtraTotal = (x) => {
   const sx = Array.isArray(x.extras) ? sumExtrasFromArray(x.extras) : 0;
   return sx || toNum(x.extraAmount);
@@ -212,10 +263,10 @@ const sumMoveoutTotal = (x) =>
 
 /* === 일정 유틸 ===================== */
 const pad2 = (n) => String(n).padStart(2, "0");
-const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const ymd = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 /* === ✅ 정화조 ‘작업검토일’ 계산 전용 유틸 ===================== */
-/** 작업날짜 후보(원본 작업일) 가져오기: nextWorkDate는 제외 (검토일은 작업일 +1년 -1일 기준) */
 function getSepticWorkDate(villa) {
   const candidates = ["septicDate", "septic.workDate", "septicWorkDate"];
   for (const p of candidates) {
@@ -224,16 +275,19 @@ function getSepticWorkDate(villa) {
   }
   return null;
 }
-/** 작업검토일 = 작업날짜 + 1년 - 1일 */
 function computeSepticReviewDate(workDate) {
   if (!workDate) return null;
-  const base = new Date(workDate.getFullYear() + 1, workDate.getMonth(), workDate.getDate());
+  const base = new Date(
+    workDate.getFullYear() + 1,
+    workDate.getMonth(),
+    workDate.getDate()
+  );
   base.setDate(base.getDate() - 1);
   return isNaN(base.getTime()) ? null : base;
 }
 
-/** ✅ 확인 체크 상태 로컬스토리지 키 */
-const CHECK_LS_KEY = "Dashboard:checkedMap:v1";
+/** ✅ Firestore 공유 체크 컬렉션 이름 */
+const CHECK_COLLECTION = "dashboardChecks";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -252,39 +306,39 @@ export default function Dashboard() {
   const [openTodoPop, setOpenTodoPop] = useState(false);
 
   /** ✅ 패널별 '확인 체크' 상태 (섹션키 → { [id]: true })
-   *  - 로컬스토리지에 저장해서 새로고침/페이지 이동 후에도 유지
+   *  - Firestore 컬렉션을 통해 모든 사용자와 실시간 공유
    */
-  const [checkedMap, setCheckedMap] = useState(() => {
-    try {
-      if (typeof window === "undefined") return {};
-      const raw = window.localStorage.getItem(CHECK_LS_KEY);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch {
-      return {};
-    }
-  });
+  const [checkedMap, setCheckedMap] = useState({});
 
-  /** ✅ checkedMap 변경 시 로컬스토리지에 저장 */
+  /** ✅ Firestore에서 체크 상태 실시간 구독 (모든 사용자 공유) */
   useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      window.localStorage.setItem(CHECK_LS_KEY, JSON.stringify(checkedMap));
-    } catch {
-      // 저장 실패해도 대시보드 동작에는 영향 없도록 무시
-    }
-  }, [checkedMap]);
+    const colRef = collection(db, CHECK_COLLECTION);
+    const unsub = onSnapshot(colRef, (snap) => {
+      const next = {};
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const { sectionKey, rowId, checked } = data || {};
+        if (!sectionKey || !rowId || checked === false) return;
+        if (!next[sectionKey]) next[sectionKey] = {};
+        next[sectionKey][rowId] = true;
+      });
+      setCheckedMap(next);
+    });
+    return () => unsub();
+  }, []);
 
-  /** ✅ 우클릭 시 확인 여부 / 확인 취소 여부 묻기 */
-  const handleItemContextMenu = (e, sectionKey, rowId) => {
+  /** ✅ 우클릭 시 확인 여부 / 확인 취소 여부 묻기 + Firestore 반영 */
+  const handleItemContextMenu = async (e, sectionKey, rowId) => {
     e.preventDefault();
     const section = checkedMap[sectionKey] || {};
     const isAlreadyChecked = !!section[rowId];
+    const docId = `${sectionKey}__${rowId}`;
+    const ref = doc(db, CHECK_COLLECTION, docId);
 
     if (isAlreadyChecked) {
       const msgCancel = "이미 확인된 내역입니다.\n확인 체크를 취소하시겠습니까?";
       if (window.confirm(msgCancel)) {
+        // 낙관적 업데이트 + Firestore 삭제
         setCheckedMap((prev) => {
           const prevSection = prev[sectionKey] || {};
           const { [rowId]: _, ...rest } = prevSection;
@@ -293,20 +347,29 @@ export default function Dashboard() {
             [sectionKey]: rest,
           };
         });
+        try {
+          await deleteDoc(ref);
+        } catch (err) {
+          // 에러가 나도 onSnapshot이 다시 동기화해 줄 것이라 별도 처리 없이 둠
+          console.error("deleteDoc failed", err);
+        }
       }
     } else {
       const msg = "해당 내역을 확인하셨나요?\n확인 체크하시겠습니까?";
       if (window.confirm(msg)) {
-        setCheckedMap((prev) => {
-          const prevSection = prev[sectionKey] || {};
-          return {
-            ...prev,
-            [sectionKey]: {
-              ...prevSection,
-              [rowId]: true,
-            },
-          };
-        });
+        // 낙관적 업데이트 + Firestore 저장
+        setCheckedMap((prev) => ({
+          ...prev,
+          [sectionKey]: {
+            ...(prev[sectionKey] || {}),
+            [rowId]: true,
+          },
+        }));
+        try {
+          await setDoc(ref, { sectionKey, rowId, checked: true }, { merge: true });
+        } catch (err) {
+          console.error("setDoc failed", err);
+        }
       }
     }
   };
@@ -345,7 +408,8 @@ export default function Dashboard() {
   // ✅ 일정(어제/오늘) 미완료
   useEffect(() => {
     const today = new Date();
-    const y = new Date(today); y.setDate(today.getDate() - 1);
+    const y = new Date(today);
+    y.setDate(today.getDate() - 1);
     const ymdToday = ymd(today);
     const ymdYesterday = ymd(y);
     const col = collection(db, "schedules");
@@ -355,8 +419,13 @@ export default function Dashboard() {
       where("completed", "==", false)
     );
     const unsub = onSnapshot(qSch, (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || "").localeCompare(String(b.time || "")));
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort(
+          (a, b) =>
+            String(a.date).localeCompare(String(b.date)) ||
+            String(a.time || "").localeCompare(String(b.time || ""))
+        );
       setTodoSchedules(rows);
     });
     return () => unsub();
@@ -368,7 +437,12 @@ export default function Dashboard() {
 
   const dateSections = useMemo(() => {
     const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const UPCOMING_ONLY_KEYS = new Set(["elevInspect", "elevInsurance", "septic", "fireTraining"]);
+    const UPCOMING_ONLY_KEYS = new Set([
+      "elevInspect",
+      "elevInsurance",
+      "septic",
+      "fireTraining",
+    ]);
 
     return DATE_SECTIONS.map((sec) => {
       const items = [];
@@ -377,22 +451,27 @@ export default function Dashboard() {
         let dateForSection = null;
 
         if (sec.key === "septic") {
-          // ✅ 정화조는 '작업검토일'을 기준으로 표시/정렬/임박판정
-          const work = getSepticWorkDate(v);                 // 원본 작업날짜
-          const review = computeSepticReviewDate(work);      // 작업검토 = +1년 -1일
+          const work = getSepticWorkDate(v);
+          const review = computeSepticReviewDate(work);
           if (review) dateForSection = review;
         } else {
-          // 기존 로직 유지: 섹션 paths 중 첫 유효 날짜
           for (const p of sec.paths) {
             const raw = getByPath(v, p);
             const d = toDateSafe(raw);
-            if (d) { dateForSection = d; break; }
+            if (d) {
+              dateForSection = d;
+              break;
+            }
           }
         }
 
         if (!dateForSection) return;
 
-        const d0 = new Date(dateForSection.getFullYear(), dateForSection.getMonth(), dateForSection.getDate());
+        const d0 = new Date(
+          dateForSection.getFullYear(),
+          dateForSection.getMonth(),
+          dateForSection.getDate()
+        );
         const diff = differenceInDays(d0, today0);
         const isOverdue = diff < 0;
         const isToday = diff === 0;
@@ -403,7 +482,7 @@ export default function Dashboard() {
         if (sec.key === "telco") {
           include = (isOverdue || isToday || diff > 0) && withinHorizon;
         } else if (UPCOMING_ONLY_KEYS.has(sec.key)) {
-          include = (diff >= 0) && withinHorizon;
+          include = diff >= 0 && withinHorizon;
         }
 
         if (include) {
@@ -412,7 +491,7 @@ export default function Dashboard() {
             villaName: v.name || v.villaName || "",
             district: v.district || "",
             address: v.address || "",
-            date: dateForSection,   // ✅ 정화조는 작업검토일로 저장
+            date: dateForSection,
             diff,
             isOverdue,
             isToday,
@@ -452,10 +531,20 @@ export default function Dashboard() {
 
   const isFirstAndExclude = (m) => {
     const firstOk = truthyByPaths(m, [
-      "firstSettlement", "firstSettle", "first", "isFirstSettlement", "firstCheck", "정산1차", "flags.firstSettlement",
+      "firstSettlement",
+      "firstSettle",
+      "first",
+      "isFirstSettlement",
+      "firstCheck",
+      "정산1차",
+      "flags.firstSettlement",
     ]);
     const excludeOk = truthyByPaths(m, [
-      "excludeDeposit", "withoutDeposit", "depositExcluded", "보증금제외", "flags.excludeDeposit",
+      "excludeDeposit",
+      "withoutDeposit",
+      "depositExcluded",
+      "보증금제외",
+      "flags.excludeDeposit",
     ]);
     return firstOk && excludeOk;
   };
@@ -476,7 +565,9 @@ export default function Dashboard() {
   const sectionMoveoutDeposit = useMemo(() => {
     const items = moveouts
       .filter((m) => (m.progress || m.status || "").trim() === "입금대기")
-      .sort((a, b) => String(a.moveDate || "").localeCompare(String(b.movedate || "")));
+      .sort((a, b) =>
+        String(a.moveDate || "").localeCompare(String(b.movedate || ""))
+      );
     const sum = items.reduce((acc, m) => acc + getAmount(m), 0);
     return { items, sum };
   }, [moveouts]);
@@ -484,7 +575,10 @@ export default function Dashboard() {
   const sectionCleaningUnconfirmed = useMemo(() => {
     return cleanings
       .filter((c) => (c.progress || c.status || "").trim() === "미접수")
-      .sort((a, b) => String(a.createdAt || 0) - String(b.createdAt || 0));
+      .sort(
+        (a, b) =>
+          String(a.createdAt || 0) - String(b.createdAt || 0)
+      );
   }, [cleanings]);
 
   const sectionReceivables = useMemo(() => {
@@ -507,11 +601,20 @@ export default function Dashboard() {
     return { items, sum };
   }, [receipts]);
 
-  const ddTextTelco = (diff) => (diff < 0 ? `D+${Math.abs(diff)}` : diff === 0 ? "D-Day" : `D-${diff}`);
+  const ddTextTelco = (diff) =>
+    diff < 0 ? `D+${Math.abs(diff)}` : diff === 0 ? "D-Day" : `D-${diff}`;
   const ddClassTelco = (diff) =>
-    diff === 0 ? "dash-dd dash-dd--day" : diff < 0 ? "dash-dd dash-dd--plus" : "dash-dd dash-dd--minus";
-  const ddTextDefault = (diff) => (diff === 0 ? "D-Day" : `D-${diff}`);
-  const ddClassDefault = (diff) => (diff === 0 ? "dash-dd dash-dd--day" : "dash-dd dash-dd--minus");
+    diff === 0
+      ? "dash-dd dash-dd--day"
+      : diff < 0
+      ? "dash-dd dash-dd--plus"
+      : "dash-dd dash-dd--minus";
+  const ddTextDefault = (diff) =>
+    diff === 0 ? "D-Day" : `D-${diff}`;
+  const ddClassDefault = (diff) =>
+    diff === 0
+      ? "dash-dd dash-dd--day"
+      : "dash-dd dash-dd--minus";
 
   /** 상단 항목 클릭(빌라기반) → 빌라정보로 */
   const onItemClick = (secKey, villaId) => {
@@ -524,7 +627,11 @@ export default function Dashboard() {
     };
     const m = map[secKey];
     if (!m) return;
-    const url = `/main?go=${encodeURIComponent(m.go)}&sub=${encodeURIComponent(m.sub)}&villa=${encodeURIComponent(villaId)}`;
+    const url = `/main?go=${encodeURIComponent(
+      m.go
+    )}&sub=${encodeURIComponent(m.sub)}&villa=${encodeURIComponent(
+      villaId
+    )}`;
     navigate(url);
   };
 
@@ -551,8 +658,14 @@ export default function Dashboard() {
       >
         <i className="ri-equalizer-line" />
         기준
-        <span className="ml-2 font-semibold text-gray-800">{horizonDays}일</span>
-        <i className={`ri-arrow-down-s-line ml-1 transition-transform ${openMenu ? "rotate-180" : ""}`} />
+        <span className="ml-2 font-semibold text-gray-800">
+          {horizonDays}일
+        </span>
+        <i
+          className={`ri-arrow-down-s-line ml-1 transition-transform ${
+            openMenu ? "rotate-180" : ""
+          }`}
+        />
       </button>
 
       {openMenu && (
@@ -566,14 +679,20 @@ export default function Dashboard() {
               role="option"
               aria-selected={horizonDays === d}
               className={`px-3 py-2.5 text-[13px] cursor-pointer flex items-center justify-between
-                hover:bg-purple-50 ${horizonDays === d ? "bg-purple-50 font-semibold text-gray-900" : "text-gray-700"}`}
+                hover:bg-purple-50 ${
+                  horizonDays === d
+                    ? "bg-purple-50 font-semibold text-gray-900"
+                    : "text-gray-700"
+                }`}
               onClick={() => {
                 setHorizonDays(d);
                 setOpenMenu(false);
               }}
             >
               <span>{d}일</span>
-              {horizonDays === d && <i className="ri-check-line text-purple-600 text-[16px]" />}
+              {horizonDays === d && (
+                <i className="ri-check-line text-purple-600 text-[16px]" />
+              )}
             </div>
           ))}
         </div>
@@ -583,15 +702,19 @@ export default function Dashboard() {
 
   /** 상단 라인 미니 칩(일정 미완료만 유지) */
   const InlineChipSchedule = () => (
-    <div className="mini-chip" onClick={() => setOpenTodoPop((v) => !v)} title="어제/오늘 미완료 일정">
+    <div
+      className="mini-chip"
+      onClick={() => setOpenTodoPop((v) => !v)}
+      title="어제/오늘 미완료 일정"
+    >
       <i className="ri-calendar-check-line mini-icon" />
       <span className="mini-label">일정 미완료</span>
       <span className="mini-count">{todoSchedules.length}건</span>
       {openTodoPop && (
         <div
           className="chip-pop"
-          onMouseDown={(e)=>e.stopPropagation()}
-          onClick={(e)=>e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="chip-pop-head">어제/오늘 추가 · 미완료</div>
           <ul className="chip-pop-list">
@@ -600,14 +723,22 @@ export default function Dashboard() {
             ) : (
               todoSchedules.slice(0, 12).map((s) => (
                 <li key={s.id} className="item">
-                  <span className="date">{s.date.slice(5)}</span>
-                  <span className="time">{s.time || "—"}</span>
-                  <span className="title" title={s.title}>{s.title}</span>
+                  <span className="date">
+                    {s.date.slice(5)}
+                  </span>
+                  <span className="time">
+                    {s.time || "—"}
+                  </span>
+                  <span
+                    className="title"
+                    title={s.title}
+                  >
+                    {s.title}
+                  </span>
                 </li>
               ))
             )}
           </ul>
-          {/* 이동 버튼 제거: 표시만 합니다 */}
         </div>
       )}
     </div>
@@ -638,35 +769,54 @@ export default function Dashboard() {
                 (sectionChecked[it.id] ? " dash-list__item--checked" : "")
               }
               onClick={() => onItemClick(secKey, it.id)}
-              onContextMenu={(e) => handleItemContextMenu(e, secKey, it.id)}
+              onContextMenu={(e) =>
+                handleItemContextMenu(e, secKey, it.id)
+              }
               title="클릭하여 해당 페이지로 이동"
             >
               <div className="dash-item__left min-w-0">
                 <div className="title">{it.villaName || "-"}</div>
                 <div className="sub">
-                  {(it.district || "") + (it.address ? ` · ${it.address}` : "")}
+                  {(it.district || "") +
+                    (it.address ? ` · ${it.address}` : "")}
                 </div>
               </div>
               <div className="dash-item__right">
                 <div className="date">
-                  {format(it.date, "yyyy-MM-dd (EEE)", { locale: ko })}
+                  {format(it.date, "yyyy-MM-dd (EEE)", {
+                    locale: ko,
+                  })}
                 </div>
                 {isTelco ? (
-                  <div className={ddClassTelco(it.diff)}>{ddTextTelco(it.diff)}</div>
+                  <div className={ddClassTelco(it.diff)}>
+                    {ddTextTelco(it.diff)}
+                  </div>
                 ) : (
-                  <div className={ddClassDefault(it.diff)}>{ddTextDefault(it.diff)}</div>
+                  <div className={ddClassDefault(it.diff)}>
+                    {ddTextDefault(it.diff)}
+                  </div>
                 )}
               </div>
             </li>
           ))}
-          {!displayItems.length && <li className="dash-empty">표시할 항목이 없습니다.</li>}
+          {!displayItems.length && (
+            <li className="dash-empty">표시할 항목이 없습니다.</li>
+          )}
         </ul>
       </div>
     );
   };
 
   /** 하단 카드 */
-  const BottomCard = ({ title, items, renderRow, tone = "default", amountText = null, onRowClick, secKey }) => {
+  const BottomCard = ({
+    title,
+    items,
+    renderRow,
+    tone = "default",
+    amountText = null,
+    onRowClick,
+    secKey,
+  }) => {
     const sectionChecked = checkedMap[secKey] || {};
     const uncheckedItems = items.filter((it) => !sectionChecked[it.id]);
     const checkedItems = items.filter((it) => sectionChecked[it.id]);
@@ -677,12 +827,20 @@ export default function Dashboard() {
         <div
           className={
             "dash-card__head " +
-            (tone === "blue" ? "dash-head--blue" : tone === "amber" ? "dash-head--amber" : "")
+            (tone === "blue"
+              ? "dash-head--blue"
+              : tone === "amber"
+              ? "dash-head--amber"
+              : "")
           }
         >
           <span className="dash-card__title">{title}</span>
-          {amountText && <span className="dash-head-sum">{amountText}</span>}
-          <span className="dash-card__meta text-[13.5px] font-semibold">{items.length}건</span>
+          {amountText && (
+            <span className="dash-head-sum">{amountText}</span>
+          )}
+          <span className="dash-card__meta text-[13.5px] font-semibold">
+            {items.length}건
+          </span>
         </div>
         <ul className="dash-list">
           {displayItems.map((it) => (
@@ -694,13 +852,19 @@ export default function Dashboard() {
                 (sectionChecked[it.id] ? " dash-list__item--checked" : "")
               }
               onClick={onRowClick ? () => onRowClick(it) : undefined}
-              onContextMenu={(e) => handleItemContextMenu(e, secKey, it.id)}
-              title={onRowClick ? "클릭하여 해당 페이지로 이동" : undefined}
+              onContextMenu={(e) =>
+                handleItemContextMenu(e, secKey, it.id)
+              }
+              title={
+                onRowClick ? "클릭하여 해당 페이지로 이동" : undefined
+              }
             >
               {renderRow(it)}
             </li>
           ))}
-          {!displayItems.length && <li className="dash-empty">표시할 항목이 없습니다.</li>}
+          {!displayItems.length && (
+            <li className="dash-empty">표시할 항목이 없습니다.</li>
+          )}
         </ul>
       </div>
     );
@@ -708,7 +872,13 @@ export default function Dashboard() {
 
   /** 배지 */
   const Badge = ({ children, kind }) => (
-    <span className={`tag ${kind === "first" ? "tag--first" : "tag--exclude"}`}>{children}</span>
+    <span
+      className={`tag ${
+        kind === "first" ? "tag--first" : "tag--exclude"
+      }`}
+    >
+      {children}
+    </span>
   );
 
   return (
@@ -718,7 +888,7 @@ export default function Dashboard() {
         html, body, #root { background: #ffffff !important; }
       `}</style>
 
-      {/* 상단: 기준 + 미니 칩들 (출금대조 불일치 칩 제거) */}
+      {/* 상단: 기준 + 미니 칩들 */}
       <div className="dash-topbar mb-3">
         <div className="dash-topbar-left">
           <InlineChipSchedule />
@@ -735,8 +905,12 @@ export default function Dashboard() {
             key={sec.key}
             title={sec.title}
             icon={sec.icon}
-            items={dateSections.find((s) => s.key === sec.key)?.items || []}
-            summary={dateSections.find((s) => s.key === sec.key)?.summary}
+            items={
+              dateSections.find((s) => s.key === sec.key)?.items || []
+            }
+            summary={
+              dateSections.find((s) => s.key === sec.key)?.summary
+            }
             isTelco={sec.key === "telco"}
             secKey={sec.key}
           />
@@ -753,7 +927,10 @@ export default function Dashboard() {
           secKey="moveoutWait"
           onRowClick={(m) => {
             const effectiveGo = "이사정산 조회";
-            const params = new URLSearchParams({ go: effectiveGo, villa: m.villaName || "" });
+            const params = new URLSearchParams({
+              go: effectiveGo,
+              villa: m.villaName || "",
+            });
             navigate(`/main?${params.toString()}`);
           }}
           renderRow={(m) => {
@@ -767,17 +944,21 @@ export default function Dashboard() {
                     {showBadges && (
                       <>
                         {" "}
-                        <Badge kind="first">1차정산</Badge>
-                        {" "}
+                        <Badge kind="first">1차정산</Badge>{" "}
                         <Badge kind="exclude">보증금제외</Badge>
                       </>
                     )}
                   </div>
                   <div className="sub">
-                    {String(m.moveDate || m.movedate || "").slice(0, 10)}
+                    {String(m.moveDate || m.movedate || "").slice(
+                      0,
+                      10
+                    )}
                   </div>
                 </div>
-                <span className="text-amber-700 font-medium text-[13px]">정산대기</span>
+                <span className="text-amber-700 font-medium text-[13px]">
+                  정산대기
+                </span>
               </div>
             );
           }}
@@ -788,11 +969,16 @@ export default function Dashboard() {
           title="이사정산 입금확인"
           items={sectionMoveoutDeposit.items}
           tone="blue"
-          amountText={`${fmtComma(sectionMoveoutDeposit.sum)}원`}
+          amountText={`${fmtComma(
+            sectionMoveoutDeposit.sum
+          )}원`}
           secKey="moveoutDeposit"
           onRowClick={(m) => {
             const effectiveGo = "이사정산 조회";
-            const params = new URLSearchParams({ go: effectiveGo, villa: m.villaName || "" });
+            const params = new URLSearchParams({
+              go: effectiveGo,
+              villa: m.villaName || "",
+            });
             navigate(`/main?${params.toString()}`);
           }}
           renderRow={(m) => {
@@ -807,15 +993,18 @@ export default function Dashboard() {
                     {showBadges && (
                       <>
                         {" "}
-                        <Badge kind="first">1차정산</Badge>
-                        {" "}
+                        <Badge kind="first">1차정산</Badge>{" "}
                         <Badge kind="exclude">보증금제외</Badge>
                       </>
                     )}
                   </div>
-                  <div className="sub">총 이사정산금액: {fmtComma(total)}원</div>
+                  <div className="sub">
+                    총 이사정산금액: {fmtComma(total)}원
+                  </div>
                 </div>
-                <span className="text-blue-700 font-medium text-[13px]">입금대기</span>
+                <span className="text-blue-700 font-medium text-[13px]">
+                  입금대기
+                </span>
               </div>
             );
           }}
@@ -827,15 +1016,25 @@ export default function Dashboard() {
           items={sectionCleaningUnconfirmed}
           secKey="cleaningUnconfirmed"
           onRowClick={(c) => {
-            navigate(`/main?go=${encodeURIComponent("입주청소")}&row=${encodeURIComponent(c.id)}`);
+            navigate(
+              `/main?go=${encodeURIComponent(
+                "입주청소"
+              )}&row=${encodeURIComponent(c.id)}`
+            );
           }}
           renderRow={(c) => (
             <div className="flex items-center justify-between gap-3 w-full">
               <div className="min-w-0">
-                <div className="title">{c.villaName || "-"}</div>
-                <div className="sub">{c.unitNumber || "-"}</div>
+                <div className="title">
+                  {c.villaName || "-"}
+                </div>
+                <div className="sub">
+                  {c.unitNumber || "-"}
+                </div>
               </div>
-              <span className="text-red-600 font-medium text-[13px]">미접수</span>
+              <span className="text-red-600 font-medium text-[13px]">
+                미접수
+              </span>
             </div>
           )}
         />
@@ -844,16 +1043,23 @@ export default function Dashboard() {
         <BottomCard
           title="미수금"
           items={sectionReceivables.items}
-          amountText={`${fmtComma(sectionReceivables.sum)}원`}
+          amountText={`${fmtComma(
+            sectionReceivables.sum
+          )}원`}
           secKey="receivables"
           onRowClick={(r) => {
-            navigate(`/main?go=${encodeURIComponent("영수증발행")}&row=${encodeURIComponent(r.id)}`);
+            navigate(
+              `/main?go=${encodeURIComponent(
+                "영수증발행"
+              )}&row=${encodeURIComponent(r.id)}`
+            );
           }}
           renderRow={(r) => (
             <div className="flex items-center justify-between gap-3 w-full">
               <div className="min-w-0">
                 <div className="title">
-                  {r.villaName}{r.restAddr ? ` ${r.restAddr}` : ""}
+                  {r.villaName}
+                  {r.restAddr ? ` ${r.restAddr}` : ""}
                 </div>
                 <div className="sub">
                   {r.fullAddr || "-"}

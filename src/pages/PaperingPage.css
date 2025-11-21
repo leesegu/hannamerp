@@ -1,0 +1,660 @@
+/* src/pages/PaperingPage.css */
+
+.mic-page {
+  padding-bottom: 32px;
+  overflow: hidden;
+}
+
+.mic-card {
+  margin-top: 12px;
+  padding: 18px 20px 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(900px 600px at 0% 0%, rgba(129, 140, 248, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 100% 100%, rgba(167, 139, 250, 0.16), transparent 60%),
+    #ffffff;
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(148, 163, 184, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* ===== 툴바 ===== */
+.mic-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mic-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mic-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mic-toolbar-select {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background-color: #f3f4f6;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  min-width: 120px;
+}
+
+.mic-toolbar-select:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.28);
+}
+
+.mic-search {
+  position: relative;
+  min-width: 200px;
+}
+
+.mic-search::before {
+  content: "🔍";
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.mic-search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 30px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  font-size: 13px;
+  color: #111827;
+  outline: none;
+}
+
+.mic-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.mic-search-input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.25);
+}
+
+/* ===== 버튼 공통 ===== */
+.mic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.06s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
+  outline: none;
+  white-space: nowrap;
+}
+
+.mic-btn:active {
+  transform: translateY(1px);
+}
+
+.mic-btn-primary {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.35);
+}
+
+.mic-btn-primary:hover {
+  background: linear-gradient(135deg, #4338ca, #4f46e5);
+}
+
+.mic-btn-secondary {
+  background-color: #eef2ff;
+  color: #4338ca;
+  border-color: #e0e7ff;
+}
+
+.mic-btn-secondary:hover {
+  background-color: #e0e7ff;
+}
+
+.mic-btn-ghost {
+  background-color: #ffffff;
+  border-color: #e5e7eb;
+  color: #374151;
+}
+
+.mic-btn-ghost:hover {
+  background-color: #f9fafb;
+}
+
+/* ===== 테이블 ===== */
+.mic-table-wrapper {
+  border-radius: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: radial-gradient(
+      600px 400px at 100% 0%,
+      rgba(129, 140, 248, 0.06),
+      transparent 60%
+    ),
+    #ffffff;
+  overflow: hidden;
+}
+
+.mic-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.mic-th {
+  padding: 8px 6px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: #4b5563;
+  background: linear-gradient(180deg, #f9fafb, #edf2ff);
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.mic-th:last-child {
+  border-right: none;
+}
+
+.mic-th-actions {
+  width: 70px;
+}
+
+.mic-th-sortable {
+  cursor: pointer;
+}
+
+.mic-th-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.mic-sort-indicator {
+  font-size: 10px;
+}
+
+/* 행 스타일 */
+.mic-tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.mic-tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.mic-tr:hover {
+  background: #eef2ff;
+}
+
+.mic-td {
+  padding: 3px 4px;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  height: 30px;
+  max-height: 30px;
+  vertical-align: middle;
+  font-size: 12px;
+}
+
+.mic-td:last-child {
+  border-right: none;
+}
+
+.mic-td-left {
+  text-align: left;
+}
+
+.mic-td-actions {
+  padding: 3px 4px;
+}
+
+.mic-empty {
+  text-align: center;
+  padding: 18px 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* 인라인 입력 - 높이/라인 고정 */
+.mic-table-input {
+  width: 100%;
+  height: 22px;
+  max-height: 22px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: 0 4px;
+  font-size: 11px;
+  color: #111827;
+  background-color: transparent;
+  outline: none;
+  text-align: center;
+  box-sizing: border-box;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mic-table-input-left {
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.mic-table-input::placeholder {
+  color: #9ca3af;
+}
+
+/* 포커스 스타일 (날짜 버튼은 아래에서 별도 처리) */
+.mic-table-input:focus,
+.mic-table-select:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.38);
+  background-color: #ffffff;
+}
+
+.mic-table-input:hover,
+.mic-table-select:hover {
+  background-color: rgba(255, 255, 255, 0.65);
+}
+
+.mic-table-input-number {
+  text-align: center;
+}
+
+/* 인라인 DatePicker 버튼 */
+.mic-table-input-date-inline {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 16px;
+  max-height: 18px;
+  padding: 0 24px;
+  border-radius: 999px;
+
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.mic-table-input-date-inline:hover,
+.mic-table-input-date-inline:focus,
+.mic-table-input-date-inline:focus-visible {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.25);
+  background-color: #ffffff;
+  outline: none;
+}
+
+/* 값 있을 때는 텍스트처럼 보이도록 */
+.mic-table-input-date-inline--has-value,
+.mic-table-input-date-inline--has-value:hover,
+.mic-table-input-date-inline--has-value:focus,
+.mic-table-input-date-inline--has-value:focus-visible {
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  outline: none;
+}
+
+/* 인라인 select */
+.mic-table-select {
+  padding: 0 4px;
+  height: 22px;
+  max-height: 22px;
+  line-height: 22px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  background-image: none;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
+
+/* 삭제 버튼 */
+.mic-row-delete-btn {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background-color: rgba(254, 242, 242, 0.9);
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.mic-row-delete-btn:hover {
+  background-color: #fee2e2;
+  border-color: rgba(239, 68, 68, 0.7);
+}
+
+/* 진행현황 스타일 */
+.mic-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.mic-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.mic-status-icon {
+  font-size: 12px;
+}
+
+/* ===== 페이지네이션 ===== */
+.mic-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.mic-pagination-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.mic-pagination-main strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.mic-status-summary {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.mic-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mic-page-btn {
+  min-width: 30px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #ffffff, #f3f4ff);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 8px;
+  box-shadow: 0 1px 2px rgba(148, 163, 184, 0.3);
+}
+
+.mic-page-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e5e7ff, #eef2ff);
+}
+
+.mic-page-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ===== 폼 공통 ===== */
+.mic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mic-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mic-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mic-form-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.mic-input {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
+  color: #111827;
+  outline: none;
+  background-color: #ffffff;
+}
+
+.mic-input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.22);
+}
+
+.mic-input-text {
+  text-align: left;
+}
+
+.mic-input-number {
+  text-align: right;
+}
+
+.mic-input-date {
+  width: 100%;
+  height: 40px;
+  border-radius: 9px;
+  border: 1px solid #e5e7eb;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.mic-input-select {
+  padding-right: 24px;
+  background-color: #ffffff;
+  border-color: #d1d5db;
+  background-image: none;
+  appearance: none;
+}
+
+.mic-input-readonly {
+  background-color: #f9fafb !important;
+  color: #6b7280;
+  cursor: default;
+}
+
+.mic-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.mic-form-actions-right {
+  justify-content: flex-end;
+}
+
+/* ===== 모달 ===== */
+.mic-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mic-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1200px 800px at 0% 0%, rgba(79, 70, 229, 0.28), transparent 60%),
+    radial-gradient(900px 700px at 100% 100%, rgba(236, 72, 153, 0.22), transparent 60%),
+    rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(3px);
+}
+
+.mic-modal-panel {
+  position: relative;
+  width: min(780px, 96vw);
+  max-height: 92vh;
+  background: radial-gradient(
+      1000px 900px at 0% 0%,
+      rgba(129, 140, 248, 0.24),
+      transparent 60%
+    ),
+    #f9fafb;
+  border-radius: 20px;
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.48),
+    0 0 0 1px rgba(148, 163, 184, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  overflow: hidden;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+}
+
+.mic-modal-panel--sm {
+  width: min(460px, 94vw);
+}
+
+.mic-modal-header {
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #312e81, #4f46e5);
+  color: #e5e7eb;
+}
+
+.mic-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mic-modal-header-right {
+  font-size: 12px;
+}
+
+.mic-modal-body {
+  padding: 16px 18px 16px;
+  overflow: hidden;
+}
+
+/* ===== 차액 모달 카드 ===== */
+.mic-sum-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mic-sum-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.mic-sum-card {
+  padding: 10px 10px 9px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  text-align: center;
+}
+
+.mic-sum-card--accent {
+  background: linear-gradient(135deg, #4f46e5, #818cf8);
+  color: #eef2ff;
+  border-color: rgba(129, 140, 248, 0.9);
+}
+
+.mic-sum-label {
+  font-size: 11px;
+  color: inherit;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.mic-sum-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 반응형 */
+@media (max-width: 900px) {
+  .mic-form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mic-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mic-toolbar-right {
+    justify-content: flex-end;
+  }
+
+  .mic-sum-cards {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
