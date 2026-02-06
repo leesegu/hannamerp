@@ -52,6 +52,9 @@ import ResidentCardPage from "../pages/ResidentCardPage";
 /* ✅ 추가: 관리종료 페이지 (빌라정보 메뉴용) */
 import VillaEndPage from "../pages/VillaEndPage";
 
+/* ✅ 추가: 정산하자체크 페이지 (부가서비스 · 도배 아래) */
+import SettlementDefectCheckPage from "../pages/SettlementDefectCheckPage";
+
 /* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
@@ -410,13 +413,21 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                 <>
                   <div className="hn-divider my-1.5" />
                   <SidebarSubmenu
-                    items={["입주청소", "도배", "전기요금 추출", "공용전기 계산", "입주자카드"]}
+                    items={[
+                      "입주청소",
+                      "도배",
+                      "정산 하자 체크", // ✅ 메뉴 제목 띄어쓰기 반영
+                      "전기요금 추출",
+                      "공용전기 계산",
+                      "입주자카드",
+                    ]}
                     activeMenu={activeMenu}
                     onClick={(item) => {
                       setActiveMenu(item);
                       const pages = {
                         입주청소: <MoveInCleaningPage />,
                         도배: <PaperingPage />,
+                        "정산 하자 체크": <SettlementDefectCheckPage />,
                         "전기요금 추출": <MessageExtractor />,
                         "공용전기 계산": <PublicElectricCalcPage />,
                         "입주자카드": <ResidentCardPage />, // ✅ 추가: 부가서비스 > 입주자카드
@@ -447,7 +458,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               {openMenu === "accounting" && (
                 <>
                   <div className="hn-divider my-1.5" />
-                  {/* ✅ 순서 변경: 대금결제 관리 → 연간시트 아래로 이동 */}
                   <SidebarSubmenu
                     items={["수입정리", "지출정리", "일마감", "월마감", "연간시트", "대금결제 관리"]}
                     activeMenu={activeMenu}

@@ -15,7 +15,7 @@
 .xp-top.slim{grid-template-columns:1fr max-content}
 .xp-top.fancy{margin-bottom:2px}
 .xp-actions{
-  display:inline-grid;grid-auto-flow:column;grid-auto-columns:max-content;gap:10px;align-items:center;justify-content:start;
+  display:inline-grid;grid-auto-flow:column;grid-auto-columns:max-content;gap:6px;align-items:center;justify-content:start;
   /* ▼ 패널 고정 기준이 될 컨테이너 기준점 */
   position:relative;
 
@@ -86,7 +86,7 @@
 .xp-actions .xp-side.narrow.mini{width:480px !important}
 
 /* ★ 검색창과 패널 사이 간격 더 주기 */
-.xp-actions .xp-search{margin-right:100px !important}
+.xp-actions .xp-search{margin-right:2px !important}
 
 /* 패널 내부 블록 */
 .xp-side-row{display:flex;align-items:center;gap:10px;padding:0;border:0;font-size:14px;min-width:0}
@@ -313,3 +313,22 @@
 /* ===== 검색 하이라이트 ===== */
 @keyframes xpPulse{0%{box-shadow:0 0 0 0 rgba(124,58,237,.35)}100%{box-shadow:0 0 0 8px rgba(124,58,237,0)}}
 .xp-hit{position:relative;background:linear-gradient(0deg,rgba(255,245,157,.9),rgba(255,255,255,0)) !important;animation:xpPulse 1.4s ease-out 0s 3;outline:2px solid rgba(124,58,237,.35);outline-offset:-2px}
+
+/* ✅ [추가] 검색 년도 드롭다운 */
+.xp-year-select{
+  height:38px;
+  padding:0 10px;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  background:#fff;
+  font-size:13px;
+  font-weight:800;
+  color:#111827;
+  box-shadow:inset 0 1px 0 rgba(0,0,0,.02);
+}
+.xp-year-select:hover{border-color:#a78bfa}
+.xp-year-select:focus{
+  outline:none;
+  border-color:#a78bfa;
+  box-shadow:0 0 0 3px rgba(167,139,250,.22)
+}

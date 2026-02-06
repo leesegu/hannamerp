@@ -14,7 +14,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-import { getStorage, ref as sRef, uploadBytes, getBytes } from "firebase/storage";
+import { getStorage, ref as sRef, uploadBytes, getBytes, listAll } from "firebase/storage";
 /* ✅ 캡쳐용 */
 import * as htmlToImage from "html-to-image";
 
@@ -720,6 +720,14 @@ export default function ExpensePage() {
   const [hitIdx, setHitIdx] = useState(-1);
   const [highlight, setHighlight] = useState(null); // { ymd, rowIdx, fields, q }
 
+  // ✅ [추가] 검색 년도 드롭다운 (기본: 현재년도)
+  const YEAR_OPTIONS = useMemo(() => {
+    const ys = [];
+    for (let y = 2024; y <= 2030; y++) ys.push(String(y));
+    return ys;
+  }, []);
+  const [searchYear, setSearchYear] = useState(() => String(new Date().getFullYear()));
+
   // ✅ Firestore 실시간 구독: acct_expense_hold/current
   useEffect(() => {
     const ref = doc(db, "acct_expense_hold", "current");
@@ -772,7 +780,7 @@ export default function ExpensePage() {
       try {
         const qsPay = await getDocs(collection(db, "acct_payment_methods"));
         const pays = qsPay.docs
-          .map((d) => ({ id: d.id, ...(d.data() || {}) })) // ✅ 문법 수정 반영
+          .map((d) => ({ id: d.id, ...(d.data() || {}) }))
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           .map((x) => ({ id: x.id, name: x.name || x.title || "" }));
         setPayMethods(pays);
@@ -1031,7 +1039,7 @@ export default function ExpensePage() {
   };
 
   /** =========================
-   *  🔎 검색(해당 연도 전역) - 자동검색 + Enter로 다음
+   *  🔎 검색(선택년도 범위) - 자동검색 + Enter로 다음
    * ========================= */
   const tableWrapRef = useRef(null);
   const lastSearchQRef = useRef("");
@@ -1054,10 +1062,37 @@ export default function ExpensePage() {
     return fields;
   };
 
-  const runYearSearch = async (q, baseYMD) => {
-    const year = String(baseYMD).slice(0, 4);
+  // Storage에 저장된 "모든 월(YYYY-MM.json)"을 목록화
+  const listAllMonthKeys = async () => {
+    const baseRef = sRef(storage, EXPENSE_BASE);
+    const res = await listAll(baseRef);
+    const keys = (res.items || [])
+      .map((it) => String(it.name || ""))
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => name.replace(/\.json$/i, ""))
+      .filter((mk) => /^\d{4}-\d{2}$/.test(mk))
+      .sort();
+    return keys;
+  };
+
+  // ✅ [수정] 드롭다운에서 선택된 "년도"만 검색
+  const runYearSearch = async (q, selectedYear) => {
     const qLower = q.toLowerCase();
-    const mkList = Array.from({ length: 12 }, (_, i) => `${year}-${pad2(i + 1)}`);
+
+    let mkList = [];
+    try {
+      mkList = await listAllMonthKeys();
+    } catch {
+      // (실패 시) 선택년도 12개월 fallback
+      mkList = Array.from({ length: 12 }, (_, i) => `${selectedYear}-${pad2(i + 1)}`);
+    }
+
+    // ✅ 선택년도만 필터링
+    mkList = (mkList || []).filter((mk) => String(mk).startsWith(`${selectedYear}-`));
+    // 선택년도에 파일이 하나도 없으면 fallback(그래도 12개월 검색 시도)
+    if (mkList.length === 0) {
+      mkList = Array.from({ length: 12 }, (_, i) => `${selectedYear}-${pad2(i + 1)}`);
+    }
 
     const monthPromises = mkList.map(async (mk) => {
       try {
@@ -1075,7 +1110,9 @@ export default function ExpensePage() {
     monthsDays.forEach((days) => {
       const dayKeys = Object.keys(days);
       for (const ymd of dayKeys) {
-        if (!String(ymd).startsWith(`${year}-`)) continue;
+        // ✅ 안전하게 해당 년도만
+        if (!String(ymd).startsWith(`${selectedYear}-`)) continue;
+
         const pack = days[ymd];
         const rlist = Array.isArray(pack?.rows) ? pack.rows : [];
         rlist.forEach((row, idx) => {
@@ -1117,6 +1154,7 @@ export default function ExpensePage() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  // ✅ [수정] searchQ 뿐 아니라 searchYear 변경 시에도 재검색
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     const q = s(searchQ);
@@ -1129,7 +1167,8 @@ export default function ExpensePage() {
     debounceTimerRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const hits = await runYearSearch(q, todayYMD());
+        const year = String(searchYear || new Date().getFullYear());
+        const hits = await runYearSearch(q, year);
         setSearchHits(hits);
         lastSearchQRef.current = q;
         if (hits.length) {
@@ -1147,7 +1186,7 @@ export default function ExpensePage() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [searchQ]); // eslint-disable-line
+  }, [searchQ, searchYear]); // ✅ year 포함
 
   const onSearchKeyDown = async (e) => {
     if (e.key !== "Enter") return;
@@ -1301,6 +1340,20 @@ export default function ExpensePage() {
             </div>
           </div>
 
+          {/* ✅ [추가] 검색창 오른쪽: 년도 드롭다운 (2024~2030, 기본 현재년도) */}
+          <select
+            className="xp-year-select"
+            value={searchYear}
+            onChange={(e) => setSearchYear(e.target.value)}
+            title="검색 년도"
+            onMouseDown={(e)=>e.stopPropagation()}
+            onClick={(e)=>e.stopPropagation()}
+          >
+            {YEAR_OPTIONS.map((y) => (
+              <option key={y} value={y}>{y}년</option>
+            ))}
+          </select>
+
           {/* ✅ [추가] 카드지출 버튼 — 검색창과 날짜 패널 사이 */}
           <button
             className="xp-btn"
@@ -1309,7 +1362,7 @@ export default function ExpensePage() {
             style={{
               height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
               background: "linear-gradient(135deg,#6C8CF5 0%,#4F73EA 100%)",
-               marginLeft: 40,
+              marginLeft: 40,
               marginRight: 8
             }}
           >
@@ -1323,17 +1376,17 @@ export default function ExpensePage() {
             title="날짜 선택"
             onClick={() => setDateModalOpen(true)}
             style={{
-              width: 560,          // 440 → 560 (조금 더 크게)
-              padding: 10,         // 8 → 10
-              gap: 10,             // 8 → 10
-              marginLeft: "auto",  // 패널을 라인 우측 끝으로
-              marginRight: 0,      // 테이블 우측 끝과 시각적으로 맞춤
+              width: 560,
+              padding: 10,
+              gap: 10,
+              marginLeft: "auto",
+              marginRight: 0,
             }}
           >
             <div
               className="xp-side-row xp-side-date"
               style={{
-                transform: "scale(0.92)", // 0.85 → 0.92 (내부 콘텐츠 살짝 키움)
+                transform: "scale(0.92)",
                 transformOrigin: "right center",
                 padding: "4px 10px",
                 minWidth: 220
@@ -1362,7 +1415,7 @@ export default function ExpensePage() {
             <div
               className="xp-side-row xp-side-sum"
               style={{
-                transform: "scale(0.92)", // 0.85 → 0.92
+                transform: "scale(0.92)",
                 transformOrigin: "right center",
                 padding: "8px 12px",
                 minWidth: 220
@@ -1381,9 +1434,8 @@ export default function ExpensePage() {
         open={outModalOpen}
         onClose={() => setOutModalOpen(false)}
         title="출금현황"
-        width={640}  // 760 → 640
+        width={640}
       >
-        {/* 헤더 리치 영역 */}
         <div
           style={{
             borderRadius: 16,
@@ -1426,7 +1478,6 @@ export default function ExpensePage() {
           </div>
         </div>
 
-        {/* 테이블 */}
         <div
           className="xp-out-table"
           role="table"
@@ -1441,7 +1492,7 @@ export default function ExpensePage() {
               fontWeight: 900,
               borderBottom: "1px solid #e9d5ff",
               display: "grid",
-              gridTemplateColumns: "1fr 120px 120px 120px", // 계좌 / 대기 / 완료 / 합계
+              gridTemplateColumns: "1fr 120px 120px 120px",
               gap: 8,
               alignItems: "center",
               padding: "6px 10px",
@@ -1481,7 +1532,6 @@ export default function ExpensePage() {
           )}
         </div>
 
-        {/* 푸터 그라데이션 라인 */}
         <div style={{
           marginTop: 12,
           height: 8,
@@ -1531,8 +1581,6 @@ export default function ExpensePage() {
           </tbody>
         </table>
       </div>
-
-      {/* ▼▼▼ 하단 +10줄/오늘 버튼은 상단으로 이동하여 제거했습니다 ▼▼▼ */}
 
       {/* 달력 모달 */}
       <CalendarModal

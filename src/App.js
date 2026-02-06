@@ -63,6 +63,9 @@ import ScheduleManager from "./pages/ScheduleManager";
 /* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
 import ResidentCardPage from "./pages/ResidentCardPage";
 
+/* ✅ [추가] 정산하자체크 페이지 import */
+import SettlementDefectCheckPage from "./pages/SettlementDefectCheckPage";
+
 import "./App.css";
 
 /* ✅ Firebase Auth 상태도 함께 인지해서 모바일 로그인과 동작 일치 */
@@ -352,6 +355,18 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/addon/resident-card"
         element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ResidentCardPage />}
+      />
+
+      {/* ✅ (추가) 부가서비스 · 정산하자체크 (직접 URL 접근용 라우트) */}
+      <Route
+        path="/addon/settlement-defect-check"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          ) : (
+            <SettlementDefectCheckPage />
+          )
+        }
       />
 
       {/* ✅ (추가) 관리비회계 · 카드지출 (직접 URL 접근용 라우트)
