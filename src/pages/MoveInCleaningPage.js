@@ -233,7 +233,7 @@ function EditForm({ initial, onCancel, onSaved }) {
       updatedAt: serverTimestamp(),
     };
 
-  try {
+    try {
       if (form.id) {
         await updateDoc(doc(db, "moveInCleanings", form.id), payload);
       } else {
@@ -485,6 +485,7 @@ export default function MoveInCleaningPage() {
 
   const editableKeys = [
     "receivedDate",
+    "completedDate", // ✅ 완료날짜도 인라인 편집/네비 대상
     "villaName",
     "unitNumber",
     "depositIn",
@@ -548,6 +549,7 @@ export default function MoveInCleaningPage() {
               depositor: s(x.depositor),
               vendor: s(x.vendor),
               status: s(x.status),
+              completedDate: fmtDate(x.completedDate), // ✅ 완료날짜
               note: s(x.note),
               sourceMoveoutId: s(x.sourceMoveoutId || ""),
               __depositNum: deposit,
@@ -662,9 +664,10 @@ export default function MoveInCleaningPage() {
   }, [sumMonth]);
 
   /* 검색 + 상태 필터 적용 */
-  // ✅ 검색 대상: 접수날짜, 빌라명, 호수, 입금금액, 출금금액, 입금자, 거래처, 비고
+  // ✅ 검색 대상: 접수날짜, 완료날짜, 빌라명, 호수, 입금금액, 출금금액, 입금자, 거래처, 비고
   const searchableKeys = [
     "receivedDate",
+    "completedDate",
     "villaName",
     "unitNumber",
     "depositIn",
@@ -712,6 +715,8 @@ export default function MoveInCleaningPage() {
         return row.__settleNum || 0;
       case "receivedDate":
         return dateToNum(row.receivedDate);
+      case "completedDate":
+        return dateToNum(row.completedDate);
       case "depositIn":
         return row.__depositNum || 0;
       case "payoutOut":
@@ -766,7 +771,7 @@ export default function MoveInCleaningPage() {
     if (!sortedRows.length) return;
 
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(
+       const todayStr = `${today.getFullYear()}-${String(
       today.getMonth() + 1
     ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const todayNum = dateToNum(todayStr);
@@ -933,6 +938,11 @@ export default function MoveInCleaningPage() {
           return next;
         }
 
+        if (key === "completedDate") {
+          next.completedDate = value;
+          return next;
+        }
+
         return next;
       })
     );
@@ -948,6 +958,7 @@ export default function MoveInCleaningPage() {
     const payload = {
       settleDate: s(row.settleDate),
       receivedDate: s(row.receivedDate),
+      completedDate: s(row.completedDate), // ✅ 완료날짜 저장
       villaName: s(row.villaName),
       unitNumber: s(row.unitNumber),
       depositIn: parseNumber(row.depositIn),
@@ -1093,7 +1104,8 @@ export default function MoveInCleaningPage() {
     { key: "diff", label: "차액", width: 90 },
     { key: "depositor", label: "입금자", width: 90 },
     { key: "vendor", label: "거래처", width: 90 },
-    { key: "status", label: "진행현황", width: 90 },
+    { key: "status", label: "진행현황", width: 90 },      // ✅ 진행현황 먼저
+    { key: "completedDate", label: "완료날짜", width: 90 }, // ✅ 진행현황 오른쪽
     { key: "note", label: "비고", width: 260, align: "left" },
   ];
 
@@ -1171,6 +1183,59 @@ export default function MoveInCleaningPage() {
               e.preventDefault();
               handleInlineChange(row.id, "receivedDate", "");
               handleInlineSave(row.id, { receivedDate: "" });
+            } else {
+              handleKeyDown(e, row.id, key, rowIndex, colIndex);
+            }
+          }}
+          calendarClassName="!text-xs"
+          popperPlacement="bottom"
+        />
+      );
+    }
+
+    // ✅ 완료날짜: 접수날짜와 동일하게 DatePicker + 상태 자동 변경
+    if (key === "completedDate") {
+      return (
+        <DatePicker
+          locale={ko}
+          dateFormat="yyyy-MM-dd"
+          selected={strToDate(row.completedDate)}
+          onChange={(d) => {
+            const v = d ? fmtDate(d) : "";
+            let newStatus = row.status || "미접수";
+
+            if (v) {
+              // 날짜를 선택하면 자동으로 청소완료
+              newStatus = "청소완료";
+            } else {
+              // (이론상 여기 올 일은 거의 없음. 삭제는 onKeyDown에서 처리)
+              newStatus = row.receivedDate ? "접수완료" : "미접수";
+            }
+
+            handleInlineChange(row.id, "completedDate", v);
+            handleInlineChange(row.id, "status", newStatus);
+            handleInlineSave(row.id, {
+              completedDate: v,
+              status: newStatus,
+            });
+          }}
+          customInput={
+            <InlineDateInput
+              value={row.completedDate || ""}
+              ref={(el) => setCellRef(row.id, key, el)}
+            />
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Backspace" || e.key === "Delete") {
+              // ✅ 완료날짜만 삭제했을 때 상태 자동 변경
+              e.preventDefault();
+              const newStatus = row.receivedDate ? "접수완료" : "미접수";
+              handleInlineChange(row.id, "completedDate", "");
+              handleInlineChange(row.id, "status", newStatus);
+              handleInlineSave(row.id, {
+                completedDate: "",
+                status: newStatus,
+              });
             } else {
               handleKeyDown(e, row.id, key, rowIndex, colIndex);
             }

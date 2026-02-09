@@ -501,6 +501,7 @@ export default function PaperingPage() {
 
   const editableKeys = [
     "receivedDate",
+    "completedDate", // ✅ 완료날짜도 인라인 편집/네비 대상
     "villaName",
     "unitNumber",
     "depositIn",
@@ -565,6 +566,7 @@ export default function PaperingPage() {
               depositor: s(x.depositor),
               vendor: s(x.vendor),
               status: s(x.status),
+              completedDate: fmtDate(x.completedDate), // ✅ 완료날짜
               note: s(x.note),
               sourceMoveoutId: s(x.sourceMoveoutId || ""),
               __depositNum: deposit,
@@ -684,6 +686,7 @@ export default function PaperingPage() {
   /* 검색 + 상태 필터 적용 */
   const searchableKeys = [
     "receivedDate",
+    "completedDate",
     "villaName",
     "unitNumber",
     "depositIn",
@@ -730,6 +733,8 @@ export default function PaperingPage() {
         return row.__settleNum || 0;
       case "receivedDate":
         return dateToNum(row.receivedDate);
+      case "completedDate":
+        return dateToNum(row.completedDate);
       case "depositIn":
         return row.__depositNum || 0;
       case "payoutOut":
@@ -926,6 +931,11 @@ export default function PaperingPage() {
           return next;
         }
 
+        if (key === "completedDate") {
+          next.completedDate = value;
+          return next;
+        }
+
         return next;
       })
     );
@@ -940,6 +950,7 @@ export default function PaperingPage() {
     const payload = {
       settleDate: s(row.settleDate),
       receivedDate: s(row.receivedDate),
+      completedDate: s(row.completedDate), // ✅ 완료날짜 저장
       villaName: s(row.villaName),
       unitNumber: s(row.unitNumber),
       depositIn: parseNumber(row.depositIn),
@@ -1073,7 +1084,7 @@ export default function PaperingPage() {
     }
   };
 
-  /* 테이블 컬럼 정의 (MoveInCleaning 구조 그대로) */
+  /* 테이블 컬럼 정의 (완료날짜 포함: 진행현황 오른쪽) */
   const columns = [
     { key: "settleDate", label: "정산날짜", width: 90 },
     { key: "receivedDate", label: "접수날짜", width: 90 },
@@ -1085,6 +1096,7 @@ export default function PaperingPage() {
     { key: "depositor", label: "입금자", width: 90 },
     { key: "vendor", label: "거래처", width: 90 },
     { key: "status", label: "진행현황", width: 90 },
+    { key: "completedDate", label: "완료날짜", width: 90 }, // ✅ 진행현황 오른쪽
     { key: "note", label: "비고", width: 260, align: "left" },
   ];
 
@@ -1183,6 +1195,59 @@ export default function PaperingPage() {
               e.preventDefault();
               handleInlineChange(row.id, "receivedDate", "");
               handleInlineSave(row.id, { receivedDate: "" });
+            } else {
+              handleKeyDown(e, row.id, key, rowIndex, colIndex);
+            }
+          }}
+          calendarClassName="!text-xs"
+          popperPlacement="bottom"
+        />
+      );
+    }
+
+    // ✅ 완료날짜: 날짜 선택 시 도배완료, 삭제 시 접수완료/미접수 자동
+    if (key === "completedDate") {
+      return (
+        <DatePicker
+          locale={ko}
+          dateFormat="yyyy-MM-dd"
+          selected={strToDate(row.completedDate)}
+          onChange={(d) => {
+            const v = d ? fmtDate(d) : "";
+            let newStatus = row.status || "미접수";
+
+            if (v) {
+              // 날짜 선택 → 도배완료
+              newStatus = "도배완료";
+            } else {
+              // (이론상 여기 들어올 일은 거의 없음, 삭제는 onKeyDown 처리)
+              newStatus = row.receivedDate ? "접수완료" : "미접수";
+            }
+
+            handleInlineChange(row.id, "completedDate", v);
+            handleInlineChange(row.id, "status", newStatus);
+            handleInlineSave(row.id, {
+              completedDate: v,
+              status: newStatus,
+            });
+          }}
+          customInput={
+            <InlineDateInput
+              value={row.completedDate || ""}
+              ref={(el) => setCellRef(row.id, key, el)}
+            />
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Backspace" || e.key === "Delete") {
+              // 완료날짜 삭제 → 접수날짜 유무에 따라 상태 변경
+              e.preventDefault();
+              const newStatus = row.receivedDate ? "접수완료" : "미접수";
+              handleInlineChange(row.id, "completedDate", "");
+              handleInlineChange(row.id, "status", newStatus);
+              handleInlineSave(row.id, {
+                completedDate: "",
+                status: newStatus,
+              });
             } else {
               handleKeyDown(e, row.id, key, rowIndex, colIndex);
             }
