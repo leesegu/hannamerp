@@ -771,7 +771,7 @@ export default function MoveInCleaningPage() {
     if (!sortedRows.length) return;
 
     const today = new Date();
-       const todayStr = `${today.getFullYear()}-${String(
+    const todayStr = `${today.getFullYear()}-${String(
       today.getMonth() + 1
     ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const todayNum = dateToNum(todayStr);
@@ -1136,7 +1136,11 @@ export default function MoveInCleaningPage() {
         <select
           className="mic-table-input mic-table-select"
           value={row.status || "미접수"}
-          onChange={(e) => handleInlineChange(row.id, "status", e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value; // ✅ 변경 즉시 저장(필터 변경으로 blur가 안 잡혀도 반영되도록)
+            handleInlineChange(row.id, "status", v);
+            handleInlineSave(row.id, { status: v });
+          }}
           ref={(el) => setCellRef(row.id, key, el)}
           {...commonProps}
         >
