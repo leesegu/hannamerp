@@ -188,8 +188,10 @@
 .cemodal .month-pill{height:32px;border-radius:10px;border:1px solid #e0e6ff;background:#fff;cursor:pointer}
 .cemodal .month-pill.is-on{background:#eef2ff;border-color:#d4dcff;color:#2a2f6f;font-weight:700}
 .cemodal .payer-list{display:flex;flex-wrap:wrap;gap:6px}
-.cemodal .payer-pill{height:32px;border-radius:999px;border:1px solid #e0e6ff;background:#fff;padding:0 10px;cursor:pointer}
-.cemodal .payer-pill.is-on{background:#f1eaff;border-color:#dbc8ff;color:#3d2a7a;font-weight:700}
+
+/* ✅ 결제자 버튼을 월 선택 버튼과 완전히 동일하게 맞춤 */
+.cemodal .met{height:32px;border-radius:10px;border:1px solid #e0e6ff;background:#fff;cursor:pointer;padding:0 10px}
+.cemodal .met.is-on{background:#eef2ff;border-color:#d4dcff;color:#2a2f6f;font-weight:700}
 
 /* 통계 표 */
 .cemodal .stats-tablewrap{background:#fff;border:1px solid #e6ebf5;border-radius:14px;padding:10px;overflow:auto}

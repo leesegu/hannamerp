@@ -234,19 +234,23 @@ function distinct(arr) { return Array.from(new Set((arr || []).filter(Boolean)))
 const MONTH_LABELS = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 
 const StatsModal = ({ rows, onClose }) => {
-  const allYears = distinct((rows || []).map(r => String(r.date || "").slice(0,4)));
+  const allYears = Array.from({ length: 11 }, (_, i) => String(2025 + i));
   const CY = String(new Date().getFullYear());
-  const initialYear = allYears.includes(CY) ? CY : (allYears[0] || CY);
+  const initialYear = allYears.includes(CY) ? CY : "2025";
   const [year, setYear] = useState(initialYear);
   const [months, setMonths] = useState(() => new Set(MONTH_LABELS));
   const payers = distinct((rows || []).map(r => r.payer));
+  const [payFilter, setPayFilter] = useState(() => new Set(payers));
+
+  useEffect(() => {
+    setPayFilter(new Set(payers));
+  }, [rows]);
 
   const toggleMonth = (ml) => {
     const n = new Set(months);
     n.has(ml) ? n.delete(ml) : n.add(ml);
     setMonths(n);
   };
-  const [payFilter, setPayFilter] = useState(new Set());
   const toggleP = (p) => {
     const n = new Set(payFilter);
     n.has(p) ? n.delete(p) : n.add(p);
@@ -259,7 +263,7 @@ const StatsModal = ({ rows, onClose }) => {
       if (y !== year) return false;
       const mIdx = (new Date(r.date)).getMonth();
       if (!months.has(MONTH_LABELS[mIdx])) return false;
-      if (payFilter.size && !payFilter.has(r.payer)) return false;
+      if (!payFilter.has(r.payer)) return false;
       return true;
     });
   }, [rows, year, months, payFilter]);
@@ -302,9 +306,13 @@ const StatsModal = ({ rows, onClose }) => {
               <div className="filter-title">월 선택</div>
               <div className="months-grid">
                 {MONTH_LABELS.map(ml => (
-                  <button key={ml}
-                          className={`month-pill ${months.has(ml) ? "is-on":""}`}
-                          onClick={()=>toggleMonth(ml)}>{ml}</button>
+                  <button
+                    key={ml}
+                    className={`month-pill ${months.has(ml) ? "is-on":""}`}
+                    onClick={()=>toggleMonth(ml)}
+                  >
+                    {ml}
+                  </button>
                 ))}
               </div>
             </div>
@@ -313,9 +321,13 @@ const StatsModal = ({ rows, onClose }) => {
               <div className="filter-title">결제자</div>
               <div className="payer-list">
                 {payers.map(p => (
-                  <button key={p}
-                          className={`met ${payFilter.has(p) ? "is-on":""}`}
-                          onClick={()=>toggleP(p)}>{p}</button>
+                  <button
+                    key={p}
+                    className={`met ${payFilter.has(p) ? "is-on":""}`}
+                    onClick={()=>toggleP(p)}
+                  >
+                    {p}
+                  </button>
                 ))}
               </div>
             </div>
@@ -357,9 +369,9 @@ const StatsModal = ({ rows, onClose }) => {
 
 /* ================= 차트 모달 (막대 그래프 UI) ================= */
 const ChartsModal = ({ rows, onClose }) => {
-  const allYears = distinct((rows || []).map(r => String(r.date || "").slice(0,4)));
+  const allYears = Array.from({ length: 11 }, (_, i) => String(2025 + i));
   const CY = String(new Date().getFullYear());
-  const initialYear = allYears.includes(CY) ? CY : (allYears[0] || CY);
+  const initialYear = allYears.includes(CY) ? CY : "2025";
   const [year, setYear] = useState(initialYear);
 
   const yrRows = useMemo(() => (rows || []).filter(r => String(r.date||"").startsWith(year)), [rows, year]);
@@ -468,6 +480,7 @@ export default function CardExpenseModal({ open, onClose }) {
   /* 데이터 */
   const [rows, setRows] = useState([]);
   const [yearRows, setYearRows] = useState([]);
+  const [statsRows, setStatsRows] = useState([]);
   const yearIndexRef = useRef(new Map());
   const [monthKey, setMonthKey] = useState(() => new Date().toISOString().slice(0, 7));
 
@@ -564,7 +577,7 @@ export default function CardExpenseModal({ open, onClose }) {
     return () => { if (unsub) unsub(); };
   }, [open, monthKey]); // eslint-disable-line
 
-  /* 🔁 실시간 구독: 연도 전체 */
+  /* 🔁 실시간 구독: 현재 선택 월의 연도 전체 */
   useEffect(() => {
     if (!open) return;
     const y = yearOf(monthKey);
@@ -588,6 +601,20 @@ export default function CardExpenseModal({ open, onClose }) {
 
     return () => { if (unsub) unsub(); };
   }, [open, monthKey]); // eslint-disable-line
+
+  /* 🔁 실시간 구독: 통계/차트용 전체 연도 */
+  useEffect(() => {
+    if (!open) return;
+
+    const qPrimary = query(colRef, orderBy("date", "desc"));
+    const qFallback = query(colRef);
+
+    const unsub = subscribeWithFallback(qPrimary, qFallback, (list) => {
+      setStatsRows(list.slice().sort(byDateDesc));
+    });
+
+    return () => { if (unsub) unsub(); };
+  }, [open]); // eslint-disable-line
 
   /* 파생 */
   const monthFiltered = rows;
@@ -645,6 +672,7 @@ export default function CardExpenseModal({ open, onClose }) {
         setYearRows((p) => upsertByIdDesc(p, optimistic));
         yearIndexRef.current.set(ref.id, optimistic);
       }
+      setStatsRows((p) => upsertByIdDesc(p, optimistic));
       if (mk !== monthKey) setMonthKey(mk);
 
       setNewRow((v) => ({ ...v, date: dateStr, amount: "", desc: "", memo: "" }));
@@ -695,6 +723,7 @@ export default function CardExpenseModal({ open, onClose }) {
         setYearRows((p) => removeById(p, editId));
         yearIndexRef.current.delete(editId);
       }
+      setStatsRows((p) => upsertByIdDesc(removeById(p, editId), optimistic));
 
       if (mk !== monthKey) setMonthKey(mk);
 
@@ -713,6 +742,7 @@ export default function CardExpenseModal({ open, onClose }) {
         await deleteDoc(doc(db, "card_expenses", rowToDelete));
         setRows((p)      => removeById(p, rowToDelete));
         setYearRows((p)  => removeById(p, rowToDelete));
+        setStatsRows((p) => removeById(p, rowToDelete));
         yearIndexRef.current.delete(rowToDelete);
       } catch (e) {
         console.error("deleteDoc failed:", e);
@@ -919,7 +949,7 @@ export default function CardExpenseModal({ open, onClose }) {
               <CustomSelect
                 value={newRow.payer}
                 onChange={(v) => setNewRow((x) => ({ ...x, payer: v }))}
-                options={["최슬기", "김성은", "이승준", "이한솔", "이세구"]}
+                options={["최슬기", "김성은", "이용진", "이한솔", "이세구", "이승준"]}
                 renderIcon={IconUser}
               />
             </div>
@@ -1036,7 +1066,7 @@ export default function CardExpenseModal({ open, onClose }) {
                             <CustomSelect
                               value={editDraft.payer}
                               onChange={(v) => setEditDraft((x) => ({ ...x, payer: v }))}
-                              options={["최슬기", "김성은", "이승준", "이한솔", "이세구"]}
+                              options={["최슬기", "김성은", "이용진", "이한솔", "이세구", "이승준"]}
                               renderIcon={IconUser}
                             />
                           </div>
@@ -1129,8 +1159,8 @@ export default function CardExpenseModal({ open, onClose }) {
         )}
 
         {/* 통계/차트 모달 */}
-        {showStats && <StatsModal rows={yearRows} onClose={()=>setShowStats(false)} />}
-        {showCharts && <ChartsModal rows={yearRows} onClose={()=>setShowCharts(false)} />}
+        {showStats && <StatsModal rows={statsRows} onClose={()=>setShowStats(false)} />}
+        {showCharts && <ChartsModal rows={statsRows} onClose={()=>setShowCharts(false)} />}
       </div>
     </>
   );
