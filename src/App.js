@@ -63,6 +63,9 @@ import ScheduleManager from "./pages/ScheduleManager";
 /* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
 import ResidentCardPage from "./pages/ResidentCardPage";
 
+/* ✅ 추가: 자재비관리대장 페이지 */
+import MaterialCostPage from "./pages/MaterialCostPage";
+
 /* ✅ [추가] 정산하자체크 페이지 import */
 import SettlementDefectCheckPage from "./pages/SettlementDefectCheckPage";
 
@@ -355,6 +358,12 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/addon/resident-card"
         element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ResidentCardPage />}
+      />
+
+      {/* ✅ (추가) 부가서비스 · 자재비관리대장 (직접 URL 접근용 라우트) */}
+      <Route
+        path="/addon/material-cost"
+        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MaterialCostPage />}
       />
 
       {/* ✅ (추가) 부가서비스 · 정산하자체크 (직접 URL 접근용 라우트) */}

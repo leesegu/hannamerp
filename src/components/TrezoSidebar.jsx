@@ -49,6 +49,9 @@ import UpdatesModal from "../components/UpdatesModal";
 /* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
 import ResidentCardPage from "../pages/ResidentCardPage";
 
+/* ✅ 추가: 자재비관리대장 페이지 (부가서비스 메뉴용) */
+import MaterialCostPage from "../pages/MaterialCostPage";
+
 /* ✅ 추가: 관리종료 페이지 (빌라정보 메뉴용) */
 import VillaEndPage from "../pages/VillaEndPage";
 
@@ -164,7 +167,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
         공용전기: <PublicElectricPage />,
         건물청소: <CleaningPage />,
         CCTV: <CctvPage />,
-        관리종료: <VillaEndPage />, // ✅ URL 쿼리로도 관리종료 진입 가능
+        관리종료: <VillaEndPage />,
       };
       setActiveContent(pages[sub] ?? <ComingSoon title={`빌라정보 · ${sub}`} />);
       return;
@@ -203,7 +206,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
         .hn-divider{ height:1px; background: linear-gradient(90deg, transparent, #eceef7, transparent); }
       `}</style>
 
-      {/* 사이드바 */}
       <aside
         className="w-60 h-full bg-[radial-gradient(1200px_600px_at_top_left,var(--hn-grad-a),transparent_60%),linear-gradient(180deg,var(--hn-grad-b),var(--hn-grad-c))]
                    border-r border-[var(--hn-border)] flex flex-col shadow-[var(--hn-softshadow)]"
@@ -213,12 +215,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
           onClick={goHome}
           title="대시보드로 이동"
         >
-          {/* ⬆ 요청: 로고 사이즈 확대 */}
           <div className="w-12 h-12 rounded-xl bg-white shadow-[var(--hn-shadow)] grid place-items-center ring-1 ring-white/60">
             <img src={HNLogo} alt="HN Logo" className="w-10 h-10 object-contain" />
           </div>
           <div className="flex flex-col leading-tight">
-            {/* ⬆ 요청: 회사이름 폰트 사이즈 확대 */}
             <span className="font-extrabold text-[17px] tracking-tight text-slate-800">
               한남주택관리
             </span>
@@ -226,7 +226,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
           </div>
         </div>
 
-        {/* ✅ 로그인/로그아웃 영역 (이름 중앙정렬만 적용) */}
         <div className="px-5 py-4 border-b border-[var(--hn-border)]">
           <div
             className="relative rounded-2xl p-4
@@ -234,11 +233,9 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                        ring-1 ring-[#e8eaff]
                        shadow-[0_1px_0_rgba(255,255,255,.7),0_10px_24px_rgba(23,27,44,.06)]"
           >
-            {/* 상단 얇은 하이라이트 */}
             <span className="pointer-events-none absolute left-4 right-4 top-2 h-px bg-white/70" />
 
             <div className="flex items-center justify-between gap-3">
-              {/* 좌측: 아이콘 박스 + 사용자명 */}
               <div className="min-w-0 flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-xl bg-white/80 backdrop-blur ring-1 ring-[#eceefe]
@@ -258,13 +255,11 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                   )}
                 </div>
 
-                {/* ⬆ 요청: 이름과 배지를 중앙정렬 */}
                 <div className="min-w-0 text-center">
                   <div className="font-semibold text-slate-800 text-[14px] leading-tight tracking-tight truncate whitespace-nowrap">
                     {userName}
                   </div>
 
-                  {/* 상태 배지: 중앙 정렬 */}
                   <div className="mt-1 flex justify-center">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px]
                                      bg-gradient-to-r from-[#ecfff7] via-[#f3fff9] to-[#f7fffd]
@@ -300,7 +295,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
           </div>
         </div>
 
-        {/* ▼▼▼ 이하 메뉴/콘텐츠 – (요청 반영: 일정관리 추가, 회계 순서 조정) ▼▼▼ */}
         <div className="flex-1 overflow-y-auto px-3 py-3 sidebar-scroll">
           <nav className="space-y-0.5">
             <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
@@ -331,7 +325,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                       "공용전기",
                       "건물청소",
                       "CCTV",
-                      "관리종료", // ✅ CCTV 아래 관리종료 추가
+                      "관리종료",
                     ]}
                     activeMenu={activeMenu}
                     onClick={(item) => {
@@ -347,7 +341,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                         공용전기: <PublicElectricPage />,
                         건물청소: <CleaningPage />,
                         CCTV: <CctvPage />,
-                        관리종료: <VillaEndPage />, // ✅ 서브메뉴 → 관리종료 페이지 연결
+                        관리종료: <VillaEndPage />,
                       };
                       handleNavigate(pages[item] ?? <ComingSoon title={item} />, item);
                     }}
@@ -383,7 +377,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               />
             </div>
 
-            {/* ✅ 추가: 캘린더 아래 '일정관리' 메뉴 */}
             <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
               <SidebarItem
                 icon="ri-calendar-check-line"
@@ -416,10 +409,11 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                     items={[
                       "입주청소",
                       "도배",
-                      "정산 하자 체크", // ✅ 메뉴 제목 띄어쓰기 반영
+                      "정산 하자 체크",
                       "전기요금 추출",
                       "공용전기 계산",
                       "입주자카드",
+                      "자재비관리대장",
                     ]}
                     activeMenu={activeMenu}
                     onClick={(item) => {
@@ -430,7 +424,8 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                         "정산 하자 체크": <SettlementDefectCheckPage />,
                         "전기요금 추출": <MessageExtractor />,
                         "공용전기 계산": <PublicElectricCalcPage />,
-                        "입주자카드": <ResidentCardPage />, // ✅ 추가: 부가서비스 > 입주자카드
+                        입주자카드: <ResidentCardPage />,
+                        자재비관리대장: <MaterialCostPage />,
                       };
                       handleNavigate(
                         pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />,
@@ -574,7 +569,6 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               )}
             </div>
 
-            {/* ✅ 최하단: 업데이트 (모달 띄우기) */}
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
               <SidebarItem
                 icon="ri-rocket-line"
@@ -582,7 +576,7 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                 onClick={() => {
                   setOpenMenu("");
                   setActiveMenu("업데이트");
-                  setUpdatesOpen(true); // 페이지 전환 없이 모달만 오픈
+                  setUpdatesOpen(true);
                 }}
                 active={activeMenu === "업데이트"}
               />
@@ -591,12 +585,10 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
         </div>
       </aside>
 
-      {/* 메인 콘텐츠 */}
       <main className="flex-1 p-6 bg-[linear-gradient(180deg,#fafbff,white)] overflow-auto">
         {activeContent || <Dashboard userId={userId} userName={userName} />}
       </main>
 
-      {/* ✅ 업데이트 모달(전역) */}
       <UpdatesModal
         isOpen={updatesOpen}
         onClose={() => setUpdatesOpen(false)}
