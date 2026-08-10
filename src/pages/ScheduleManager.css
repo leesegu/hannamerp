@@ -1,654 +1,2687 @@
 /* src/pages/ScheduleManager.css */
+
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
-/* ✅ 외부 스크롤 확실히 차단 (권장 전역 설정) */
-html, body, #root { height: 100%; overflow: hidden; }
 
-/* …(상단 공통 설정 동일: 생략 없이 그대로 두세요)… */
-.schedule-app{
-  --bg-color:#F8F9FA;
-  --primary-white:#FFFFFF;
-  --border-color:#E5E7EB;
-  --text-color:#2F3438;
-  --text-light-color:#868E96;
+/* ✅ 외부 스크롤 확실히 차단 */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
 
-  /* ✅ 포인트 컬러: 금색 → 은은한 블루 톤으로 변경 (화이트 컨셉 유지) */
-  --accent-color:#6C8CF5;
-  --accent-grad-1:#E7EEFF;
-  --accent-grad-2:#6C8CF5;
 
-  --personal-color:#5D76A9;
-  --shared-color:#6AAB9C;
+.schedule-app {
+  --bg-color: #F8F9FA;
+  --primary-white: #FFFFFF;
+  --border-color: #E5E7EB;
+  --text-color: #2F3438;
+  --text-light-color: #868E96;
 
-  --font-family:'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans KR',Arial,sans-serif;
-  --shadow-sm:0 4px 6px rgba(0,0,0,.06);
-  --shadow-md:0 10px 22px rgba(0,0,0,.1);
+  --accent-color: #6C8CF5;
+  --accent-grad-1: #E7EEFF;
+  --accent-grad-2: #6C8CF5;
 
-  --border-radius:14px;
+  --personal-color: #5D76A9;
+  --shared-color: #6AAB9C;
 
-  /* ✅ 사이드바 폭(필요시 조절: 240~280px 권장) */
+  --font-family:
+    'Poppins',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Noto Sans KR',
+    Arial,
+    sans-serif;
+
+  --shadow-sm: 0 4px 6px rgba(0, 0, 0, .06);
+  --shadow-md: 0 10px 22px rgba(0, 0, 0, .1);
+
+  --border-radius: 14px;
+
+  /* ✅ 사이드바 폭 */
   --sidebar-width: 260px;
 
-  /* ✅ 좌측으로 살짝 당기기 위한 보정량(원하는 만큼 조절) */
-  --sidebar-gap: 20px; /* ← 20px만큼 좌측으로 이동 */
+  /* ✅ 좌측 보정 */
+  --sidebar-gap: 20px;
 
-  /* ✅ 가용 컨텐츠 폭 계산 (좌우 패딩 보정 포함) */
-  --content-max: calc(100vw - var(--sidebar-width) + var(--sidebar-gap) - 4.4rem);
+  /* ✅ 가용 컨텐츠 폭 */
+  --content-max:
+    calc(
+      100vw
+      - var(--sidebar-width)
+      + var(--sidebar-gap)
+      - 4.4rem
+    );
 
-  /* ✅ 전체 달력 상단 컨트롤 공통 사이즈(검색/오늘/닫기 세로 동일) */
-  --cal-ctl-h: 40px;         /* 세로 높이 통일 */
-  --cal-ctl-minw: 96px;      /* 오늘/닫기 버튼 최소 가로폭 통일 */
-  --cal-ctl-gap: 8px;        /* 컨트롤 간격 */
+  /* ✅ 전체 달력 상단 컨트롤 */
+  --cal-ctl-h: 40px;
+  --cal-ctl-minw: 96px;
+  --cal-ctl-gap: 8px;
 
-  font-family:var(--font-family);
-  background:#fff;
-  color:var(--text-color);
+  font-family: var(--font-family);
+  background: #fff;
+  color: var(--text-color);
 
-  /* ✅ 사이드바 영역 덮지 않도록 + 살짝 좌측으로 붙임 */
-  position:fixed;
-  top:0;
-  left:calc(var(--sidebar-width) - var(--sidebar-gap));
-  right:0;
-  bottom:0;
-  height:auto;
+  position: fixed;
 
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  box-sizing:border-box;
+  top: 0;
 
-  /* ✅ 좌측 패딩을 줄여 시각적으로 더 붙게 */
-  padding:1.8rem 2.2rem 2rem 1.2rem;
-}
+  left:
+    calc(
+      var(--sidebar-width)
+      - var(--sidebar-gap)
+    );
 
-/* ✅ 백드롭: 사이드바를 피해서만 흰색으로 덮음(보정 동일 적용) */
-.schedule-app::before{
-  content:"";
-  position:fixed;
-  top:0; 
-  right:0; 
-  bottom:0; 
-  left:calc(var(--sidebar-width) - var(--sidebar-gap));
-  background:#fff;
-  z-index:-1; /* 본문 뒤에 배치 -> 사이드바는 그대로 노출 */
-}
+  right: 0;
+  bottom: 0;
 
-.schedule-app *{ box-sizing:border-box; }
+  height: auto;
 
-.schedule-app *::-webkit-scrollbar{width:8px;height:8px}
-.schedule-app *::-webkit-scrollbar-track{background:var(--bg-color)}
-.schedule-app *::-webkit-scrollbar-thumb{background:#cfcfcf;border-radius:4px}
-.schedule-app *::-webkit-scrollbar-thumb:hover{background:#bdbdbd}
+  display: flex;
+  flex-direction: column;
 
-/* 레이아웃 (컨텐츠 폭 제어는 유지) */
-.schedule-app{
-  /* ✅ 1400px 상한 제거 */
-  max-width: none; 
-  width: 100%;
-  margin:0 auto;
-}
-.schedule-app .app-header{
-  display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:1.1rem;
-  flex:0 0 auto;
-
-  /* ✅ 가용영역 내 중앙 정렬 + 과도한 우측 쏠림 방지 */
-  max-width: min(1280px, var(--content-max));
-  margin-left:auto;
-  margin-right:auto;
-  width:100%;
-}
-.schedule-app .app-title{display:flex;align-items:center;gap:.55rem;font-size:2.2rem;font-weight:700;margin:0;color:var(--text-color)}
-/* ✅ 누락된 점 보정 */
-.schedule-app .title-icon{display:inline-flex;align-items:center;justify-content:center}
-
-.schedule-app .calendar-toggle-btn{
-  display:flex;align-items:center;gap:.5rem;
-  padding:.56rem 1rem;
-  background:linear-gradient(145deg,var(--primary-white),#f6f6f6);
-  border:1px solid var(--border-color);border-radius:12px;color:var(--text-color);
-  font-size:.93rem;font-weight:600;cursor:pointer;transition:all .25s ease;box-shadow:var(--shadow-sm);
-  -webkit-appearance:none;appearance:none;
-}
-.schedule-app .calendar-toggle-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--accent-color);color:var(--accent-color)}
-.schedule-app .btn-icon{display:inline-flex;align-items:center;justify-content:center}
-
-/* 메인 그리드 — ✅ 패널 가로폭 반응형 전환 */
-.schedule-app .main-view{
-  display:grid;
-  /* ✅ 3→2→1 자동 줄바꿈 */
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap:1.3rem;
-  flex:1 1 auto;
-  min-height:0;
-  align-items:start;
-
-  /* ✅ x축 잘림 방지 + 왼쪽부터 꽉 채우기 */
   overflow: hidden;
+
+  box-sizing: border-box;
+
+  padding:
+    1.8rem
+    2.2rem
+    2rem
+    1.2rem;
+
+  max-width: none;
+
   width: 100%;
 
-  /* ✅ 가용영역 내 중앙 정렬 (우측 쏠림 방지) */
-  max-width: min(1380px, var(--content-max));
-  margin-left:auto;
-  margin-right:auto;
+  margin: 0 auto;
 }
 
-/* ✅ “오른쪽으로 밀기”는 padding 대신 margin 사용 → 폭 손실 없음 */
-.schedule-app .app-header.shift-right{ margin-left:120px; }
-.schedule-app .main-view.shift-right{  margin-left:120px; }
 
-/* ⬇️ 어제/오늘/내일 패널 — 화이트톤 럭셔리 리뉴얼 */
-.schedule-app .schedule-column{
-  background:linear-gradient(180deg,#ffffff,#fcfcfe);
-  border-radius:16px;
-  padding:.9rem 1rem .9rem;
-  box-shadow:0 8px 24px rgba(20,20,40,.06);
-  border:1px solid rgba(0,0,0,.25);
-  display:flex;flex-direction:column;
-  min-height:0;
-  height:calc(100% - 48px);
-  backdrop-filter:saturate(1.1);
-}
-.schedule-app .schedule-column.taller{
-  min-height:0;
-  height:calc(100% - 48px);
+/* ✅ 백드롭 */
+.schedule-app::before {
+  content: "";
+
+  position: fixed;
+
+  top: 0;
+  right: 0;
+  bottom: 0;
+
+  left:
+    calc(
+      var(--sidebar-width)
+      - var(--sidebar-gap)
+    );
+
+  background: #fff;
+
+  z-index: -1;
 }
 
-.schedule-app .column-title{
-  font-size:1.12rem;
-  font-weight:800;
-  margin:0 0 .6rem;
-  display:flex;align-items:baseline;gap:.5rem;
-  letter-spacing:.2px;
+
+.schedule-app * {
+  box-sizing: border-box;
 }
-.schedule-app .column-title .column-date{font-size:.86rem;font-weight:600;color:#9aa3ad}
+
+
+.schedule-app *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.schedule-app *::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+.schedule-app *::-webkit-scrollbar-thumb {
+  background: #cfcfcf;
+  border-radius: 4px;
+}
+
+.schedule-app *::-webkit-scrollbar-thumb:hover {
+  background: #bdbdbd;
+}
+
+
+/* =========================
+   헤더
+========================= */
+
+.schedule-app .app-header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 1.1rem;
+
+  flex: 0 0 auto;
+
+  max-width:
+    min(
+      1280px,
+      var(--content-max)
+    );
+
+  margin-left: auto;
+
+  margin-right: auto;
+
+  width: 100%;
+}
+
+
+.schedule-app .app-title {
+  display: flex;
+
+  align-items: center;
+
+  gap: .55rem;
+
+  font-size: 2.2rem;
+
+  font-weight: 700;
+
+  margin: 0;
+
+  color: var(--text-color);
+}
+
+
+.schedule-app .title-icon {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+}
+
+
+.schedule-app .calendar-toggle-btn {
+  display: flex;
+
+  align-items: center;
+
+  gap: .5rem;
+
+  padding: .56rem 1rem;
+
+  background:
+    linear-gradient(
+      145deg,
+      var(--primary-white),
+      #f6f6f6
+    );
+
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 12px;
+
+  color: var(--text-color);
+
+  font-size: .93rem;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: all .25s ease;
+
+  box-shadow: var(--shadow-sm);
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .calendar-toggle-btn:hover {
+  transform: translateY(-2px);
+
+  box-shadow: var(--shadow-md);
+
+  border-color: var(--accent-color);
+
+  color: var(--accent-color);
+}
+
+
+.schedule-app .btn-icon {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+}
+
+
+/* =========================
+   메인 그리드
+========================= */
+
+.schedule-app .main-view {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(360px, 1fr)
+    );
+
+  gap: 1.3rem;
+
+  flex: 1 1 auto;
+
+  min-height: 0;
+
+  align-items: start;
+
+  overflow: hidden;
+
+  width: 100%;
+
+  max-width:
+    min(
+      1380px,
+      var(--content-max)
+    );
+
+  margin-left: auto;
+
+  margin-right: auto;
+}
+
+
+/* 오른쪽으로 이동 */
+.schedule-app .app-header.shift-right {
+  margin-left: 120px;
+}
+
+.schedule-app .main-view.shift-right {
+  margin-left: 120px;
+}
+
+
+/* =========================
+   일정 컬럼
+========================= */
+
+.schedule-app .schedule-column {
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #fcfcfe
+    );
+
+  border-radius: 16px;
+
+  padding:
+    .9rem
+    1rem
+    .9rem;
+
+  box-shadow:
+    0 8px 24px
+    rgba(20, 20, 40, .06);
+
+  border:
+    1px solid
+    rgba(0, 0, 0, .25);
+
+  display: flex;
+
+  flex-direction: column;
+
+  min-height: 0;
+
+  height: calc(100% - 48px);
+
+  backdrop-filter: saturate(1.1);
+}
+
+
+.schedule-app .schedule-column.taller {
+  min-height: 0;
+
+  height: calc(100% - 48px);
+}
+
+
+.schedule-app .column-title {
+  font-size: 1.12rem;
+
+  font-weight: 800;
+
+  margin: 0 0 .6rem;
+
+  display: flex;
+
+  align-items: baseline;
+
+  gap: .5rem;
+
+  letter-spacing: .2px;
+}
+
+
+.schedule-app .column-title .column-date {
+  font-size: .86rem;
+
+  font-weight: 600;
+
+  color: #9aa3ad;
+}
+
 
 /* 리스트 */
-.schedule-app .schedule-list{flex:1;overflow-y:auto;padding-right:8px;margin-right:-8px}
-.schedule-app .no-schedules{color:var(--text-light-color);text-align:center;padding-top:.8rem}
+.schedule-app .schedule-list {
+  flex: 1;
 
-/* 아이템 — 화이트/글라스 카드화 */
-.schedule-app .schedule-item{
-  display:flex;align-items:center;gap:.56rem;
-  padding:.46rem .68rem;
-  background:linear-gradient(180deg,#ffffff,#fbfbff);
-  border-radius:12px;
-  margin-bottom:.46rem;
-  border:1px solid rgba(0,0,0,.05);
-  transition:all .2s ease;position:relative;cursor:grab;
-  box-shadow:0 2px 8px rgba(15,15,30,.04);
-}
-.schedule-app .schedule-item.compact{
-  padding:.42rem .62rem;
-  margin-bottom:.4rem;
-}
-.schedule-app .schedule-item:active{cursor:grabbing}
-.schedule-app .schedule-item:hover{
-  transform:translateX(3px);
-  box-shadow:0 6px 18px rgba(15,15,30,.08);
-  border-color:rgba(108,140,245,.35);
-}
-.schedule-app .schedule-item.completed{opacity:.55}
+  overflow-y: auto;
 
-/* ✅ 누락된 점 보정 */
-.schedule-app .schedule-details{flex:1}
-.schedule-app .schedule-title{margin:0 0 .14rem;font-weight:700;font-size:.7rem;color:#1f2430}
-.schedule-app .schedule-title.small{font-size:.86rem}
-.schedule-app .schedule-meta{display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:#8a93a3}
-.schedule-app .schedule-meta.smaller{font-size:.72rem}
-.schedule-app .schedule-time{display:flex;align-items:center;gap:.22rem}
-.schedule-app .schedule-type{padding:.12rem .46rem;border-radius:999px;font-size:.66rem;font-weight:800;color:#fff;letter-spacing:.2px}
-.schedule-app .schedule-type.personal{background:#5670b4}
-.schedule-app .schedule-type.shared{background:#5ea796}
-.schedule-app .schedule-actions{display:flex;gap:.26rem;opacity:0;transition:opacity .18s ease}
-.schedule-app .schedule-item:hover .schedule-actions{opacity:1}
-.schedule-app .action-btn{background:none;border:none;padding:.14rem;cursor:pointer;color:#9aa3ad;-webkit-appearance:none;appearance:none;}
-.schedule-app .action-btn:hover{color:#6C8CF5}
+  padding-right: 8px;
 
-/* 체크박스 — 화이트/블루 경량화 */
-.schedule-app .checkbox-container{position:relative}
-.schedule-app .checkbox-container input[type="checkbox"]{display:none}
-.schedule-app .checkbox-container label{
-  display:inline-block;width:24px;height:24px;
-  border:2px solid #dfe4ea;border-radius:50%;cursor:pointer;
-  transition:all .2s ease;position:relative;background:#fff;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
-}
-.schedule-app .checkbox-container label:hover{
-  border-color:#cfd7e5;
-}
-.schedule-app .checkbox-container input[type="checkbox"]:checked + label{
-  background:var(--accent-color);border-color:var(--accent-color);
-  box-shadow:0 6px 14px rgba(108,140,245,.28) inset;
-}
-.schedule-app .checkbox-container input[type="checkbox"]:checked + label::after{
-  content:'✓';font-size:14px;color:#fff;position:absolute;top:50%;left:50%;transform:translate(-50%,-54%)
+  margin-right: -8px;
 }
 
-/* FAB · 모달 · 캘린더 영역(이하 동일) */
-.schedule-app .add-schedule-fab{
-  position:fixed;bottom:3.4rem;right:5.4rem;width:60px;height:60px;border-radius:50%;
-  background:linear-gradient(180deg,var(--accent-grad-1),var(--accent-grad-2));
-  border:none;color:#fff;box-shadow:0 10px 20px rgba(108,140,245,.28);
-  cursor:pointer;display:flex;justify-content:center;align-items:center;transition:all .25s ease;
-  z-index:1000; /* ✅ 레이어 명시 (겹침 이슈 예방) */
-  -webkit-appearance:none;appearance:none;
-}
-.schedule-app .add-schedule-fab:hover{transform:translateY(-4px) scale(1.04);box-shadow:0 12px 24px rgba(108,140,245,.35)}
 
-.schedule-app .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);display:flex;justify-content:center;align-items:center;z-index:1002;animation:fadeIn .25s ease}
-.schedule-app .modal-content{
-  background:#fff;border-radius:16px;box-shadow:var(--shadow-md);width:100%;position:relative;animation:slideInUp .28s ease;
-  /* ✅ 팝업이 부모에 잘리지 않도록 */
+.schedule-app .no-schedules {
+  color: var(--text-light-color);
+
+  text-align: center;
+
+  padding-top: .8rem;
+}
+
+
+/* =========================
+   일정 아이템
+========================= */
+
+.schedule-app .schedule-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: .56rem;
+
+  padding: .46rem .68rem;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #fbfbff
+    );
+
+  border-radius: 12px;
+
+  margin-bottom: .46rem;
+
+  border:
+    1px solid
+    rgba(0, 0, 0, .05);
+
+  transition: all .2s ease;
+
+  position: relative;
+
+  cursor: grab;
+
+  box-shadow:
+    0 2px 8px
+    rgba(15, 15, 30, .04);
+}
+
+
+.schedule-app .schedule-item.compact {
+  padding: .42rem .62rem;
+
+  margin-bottom: .4rem;
+}
+
+
+.schedule-app .schedule-item:active {
+  cursor: grabbing;
+}
+
+
+.schedule-app .schedule-item:hover {
+  transform: translateX(3px);
+
+  box-shadow:
+    0 6px 18px
+    rgba(15, 15, 30, .08);
+
+  border-color:
+    rgba(108, 140, 245, .35);
+}
+
+
+.schedule-app .schedule-item.completed {
+  opacity: .55;
+}
+
+
+.schedule-app .schedule-details {
+  flex: 1;
+}
+
+
+.schedule-app .schedule-title {
+  margin: 0 0 .14rem;
+
+  font-weight: 700;
+
+  font-size: .7rem;
+
+  color: #1f2430;
+}
+
+
+.schedule-app .schedule-title.small {
+  font-size: .86rem;
+}
+
+
+.schedule-app .schedule-meta {
+  display: flex;
+
+  align-items: center;
+
+  gap: .5rem;
+
+  font-size: .75rem;
+
+  color: #8a93a3;
+}
+
+
+.schedule-app .schedule-meta.smaller {
+  font-size: .72rem;
+}
+
+
+.schedule-app .schedule-time {
+  display: flex;
+
+  align-items: center;
+
+  gap: .22rem;
+}
+
+
+.schedule-app .schedule-type {
+  padding: .12rem .46rem;
+
+  border-radius: 999px;
+
+  font-size: .66rem;
+
+  font-weight: 800;
+
+  color: #fff;
+
+  letter-spacing: .2px;
+}
+
+
+.schedule-app .schedule-type.personal {
+  background: #5670b4;
+}
+
+
+.schedule-app .schedule-type.shared {
+  background: #5ea796;
+}
+
+
+.schedule-app .schedule-actions {
+  display: flex;
+
+  gap: .26rem;
+
+  opacity: 0;
+
+  transition: opacity .18s ease;
+}
+
+
+.schedule-app .schedule-item:hover .schedule-actions {
+  opacity: 1;
+}
+
+
+.schedule-app .action-btn {
+  background: none;
+
+  border: none;
+
+  padding: .14rem;
+
+  cursor: pointer;
+
+  color: #9aa3ad;
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .action-btn:hover {
+  color: #6C8CF5;
+}
+
+
+/* =========================
+   체크박스
+========================= */
+
+.schedule-app .checkbox-container {
+  position: relative;
+}
+
+
+.schedule-app
+.checkbox-container
+input[type="checkbox"] {
+  display: none;
+}
+
+
+.schedule-app
+.checkbox-container
+label {
+  display: inline-block;
+
+  width: 24px;
+
+  height: 24px;
+
+  border:
+    2px solid
+    #dfe4ea;
+
+  border-radius: 50%;
+
+  cursor: pointer;
+
+  transition: all .2s ease;
+
+  position: relative;
+
+  background: #fff;
+
+  box-shadow:
+    inset
+    0 1px 0
+    rgba(255, 255, 255, .8);
+}
+
+
+.schedule-app
+.checkbox-container
+label:hover {
+  border-color: #cfd7e5;
+}
+
+
+.schedule-app
+.checkbox-container
+input[type="checkbox"]:checked
++ label {
+  background: var(--accent-color);
+
+  border-color: var(--accent-color);
+
+  box-shadow:
+    0 6px 14px
+    rgba(108, 140, 245, .28)
+    inset;
+}
+
+
+.schedule-app
+.checkbox-container
+input[type="checkbox"]:checked
++ label::after {
+  content: '✓';
+
+  font-size: 14px;
+
+  color: #fff;
+
+  position: absolute;
+
+  top: 50%;
+
+  left: 50%;
+
+  transform:
+    translate(
+      -50%,
+      -54%
+    );
+}
+
+
+/* =========================
+   FAB
+========================= */
+
+.schedule-app .add-schedule-fab {
+  position: fixed;
+
+  bottom: 3.4rem;
+
+  right: 5.4rem;
+
+  width: 60px;
+
+  height: 60px;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--accent-grad-1),
+      var(--accent-grad-2)
+    );
+
+  border: none;
+
+  color: #fff;
+
+  box-shadow:
+    0 10px 20px
+    rgba(108, 140, 245, .28);
+
+  cursor: pointer;
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  transition: all .25s ease;
+
+  z-index: 1000;
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .add-schedule-fab:hover {
+  transform:
+    translateY(-4px)
+    scale(1.04);
+
+  box-shadow:
+    0 12px 24px
+    rgba(108, 140, 245, .35);
+}
+
+
+/* =========================
+   모달
+========================= */
+
+.schedule-app .modal-backdrop {
+  position: fixed;
+
+  inset: 0;
+
+  background: rgba(0, 0, 0, .5);
+
+  backdrop-filter: blur(6px);
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  z-index: 1002;
+
+  animation:
+    fadeIn
+    .25s ease;
+}
+
+
+.schedule-app .modal-content {
+  background: #fff;
+
+  border-radius: 16px;
+
+  box-shadow: var(--shadow-md);
+
+  width: 100%;
+
+  position: relative;
+
+  animation:
+    slideInUp
+    .28s ease;
+
   overflow: visible;
 }
-.schedule-app .modal-content.modal-tall-narrow{
-  max-width:480px;   /* 520px → 480px (요청대로 축소 유지) */
-  min-height:70vh;
-  display:flex;
-  flex-direction:column;
+
+
+.schedule-app
+.modal-content.modal-tall-narrow {
+  max-width: 480px;
+
+  min-height: 70vh;
+
+  display: flex;
+
+  flex-direction: column;
 }
 
-/* ✅ 일정추가 창: 레이아웃 유지, 색상만 화이트/라이트 블루로 */
-.schedule-app .modal-head.gradient{
-  /* 기존 금색 → 화이트/라이트 블루 */
-  background:linear-gradient(135deg,#ffffff 0%, #f6f9ff 40%, #eaf1ff 100%);
-  border-top-left-radius:16px;border-top-right-radius:16px;
-  padding:.6rem .9rem .62rem
-}
-.schedule-app .modal-head.gradient h2{
-  margin:0;font-size:1.06rem;font-weight:900;letter-spacing:.2px;color:#2f2f2f;text-shadow:0 1px 0 rgba(255,255,255,.6)
+
+/* =========================
+   모달 헤더
+========================= */
+
+.schedule-app .modal-head.gradient {
+  background:
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #f6f9ff 40%,
+      #eaf1ff 100%
+    );
+
+  border-top-left-radius: 16px;
+
+  border-top-right-radius: 16px;
+
+  padding: .6rem .9rem .62rem;
 }
 
-/* 그리드/폼 기본 */
-.schedule-app .modal-grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px;
-  /* ✅ 달력/시간 팝업이 겹쳐도 보이도록 */
+
+.schedule-app
+.modal-head.gradient
+h2 {
+  margin: 0;
+
+  font-size: 1.06rem;
+
+  font-weight: 900;
+
+  letter-spacing: .2px;
+
+  color: #2f2f2f;
+
+  text-shadow:
+    0 1px 0
+    rgba(255, 255, 255, .6);
+}
+
+
+/* =========================
+   폼 그리드
+========================= */
+
+.schedule-app .modal-grid {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 12px;
+
+  padding: 14px;
+
   overflow: visible;
 }
-.schedule-app .mt-header-gap{margin-top:4px}
-.schedule-app .span-2{grid-column:1 / span 2}
 
-.schedule-app .schedule-form .form-group{display:flex;flex-direction:column}
-.schedule-app .schedule-form label{
-  display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem;
-  font-weight:800;font-size:.86rem;color:#2f3438;line-height:1.2;
-  min-height:22px; /* ✅ 라벨 높이 균일화 */
-}
-.schedule-app .label-icon{display:inline-flex;align-items:center;justify-content:center}
 
-.schedule-app .schedule-form input[type="text"],
-.schedule-app .memo-input{
-  width:100%;
-  padding:.6rem .8rem;border:1px solid var(--border-color);border-radius:10px;
-  font-size:.96rem;background:#fff;
-  transition:border-color .25s,box-shadow .25s;
-}
-.schedule-app .schedule-form input:focus,
-.schedule-app .memo-input:focus{
-  outline:none;border-color:var(--accent-color);box-shadow:0 0 0 3px rgba(108,140,245,.18)
+.schedule-app .mt-header-gap {
+  margin-top: 4px;
 }
 
-/* ✅ 날짜/시간 픽커 행 정렬 고정 */
-.schedule-app .picker-wrap{
-  position:relative;
-  /* ✅ 팝업이 잘리지 않도록 */
+
+.schedule-app .span-2 {
+  grid-column: 1 / span 2;
+}
+
+
+.schedule-app
+.schedule-form
+.form-group {
+  display: flex;
+
+  flex-direction: column;
+}
+
+
+.schedule-app
+.schedule-form
+label {
+  display: flex;
+
+  align-items: center;
+
+  gap: .4rem;
+
+  margin-bottom: .3rem;
+
+  font-weight: 800;
+
+  font-size: .86rem;
+
+  color: #2f3438;
+
+  line-height: 1.2;
+
+  min-height: 22px;
+}
+
+
+.schedule-app .label-icon {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+}
+
+
+.schedule-app
+.schedule-form
+input[type="text"],
+.schedule-app
+.memo-input {
+  width: 100%;
+
+  padding: .6rem .8rem;
+
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 10px;
+
+  font-size: .96rem;
+
+  background: #fff;
+
+  transition:
+    border-color .25s,
+    box-shadow .25s;
+}
+
+
+.schedule-app
+.schedule-form
+input:focus,
+.schedule-app
+.memo-input:focus {
+  outline: none;
+
+  border-color: var(--accent-color);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(108, 140, 245, .18);
+}
+
+
+/* =========================
+   날짜/시간 선택
+========================= */
+
+.schedule-app .picker-wrap {
+  position: relative;
+
   overflow: visible;
 }
-.schedule-app .picker-input{
-  width:100%;min-height:38px;
-  padding:.6rem .78rem;border:1px solid var(--border-color);border-radius:10px;
-  font-size:.96rem;display:flex;align-items:center; /* 수직중앙 */
-  background:linear-gradient(180deg,#fff,#fafafa);
-  cursor:pointer;transition:box-shadow .2s,border-color .2s;
-}
-.schedule-app .picker-input:focus{outline:none;border-color:var(--accent-color);box-shadow:0 0 0 3px rgba(108,140,245,.18)}
-.schedule-app .picker-compact{min-height:36px;padding:.58rem .74rem}
 
-/* ✅ 토글/버튼 계열 기본화 방지 (appearance 리셋) */
+
+.schedule-app .picker-input {
+  width: 100%;
+
+  min-height: 38px;
+
+  padding: .6rem .78rem;
+
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 10px;
+
+  font-size: .96rem;
+
+  display: flex;
+
+  align-items: center;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fff,
+      #fafafa
+    );
+
+  cursor: pointer;
+
+  transition:
+    box-shadow .2s,
+    border-color .2s;
+}
+
+
+.schedule-app .picker-input:focus {
+  outline: none;
+
+  border-color: var(--accent-color);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(108, 140, 245, .18);
+}
+
+
+.schedule-app .picker-compact {
+  min-height: 36px;
+
+  padding: .58rem .74rem;
+}
+
+
+/* =========================
+   appearance 리셋
+========================= */
+
 .schedule-app .seg-btn,
 .schedule-app .time-btn,
 .schedule-app .nav-btn,
 .schedule-app .form-submit-btn,
 .schedule-app .form-cancel-btn,
 .schedule-app .calendar-close-text,
-.schedule-app .calendar-today-btn{
-  -webkit-appearance:none;
-  appearance:none;
+.schedule-app .calendar-today-btn {
+  -webkit-appearance: none;
+
+  appearance: none;
 }
 
-/* 토글 스위치 */
-.schedule-app .toggle-switch.xsmall label{cursor:pointer;text-indent:-9999px;width:68px;height:28px;background:#dcdcdc;display:block;border-radius:999px;position:relative;margin:0}
-.schedule-app .toggle-switch.xsmall input{height:0;width:0;visibility:hidden}
-.schedule-app .toggle-switch.xsmall label:after{content:'';position:absolute;top:3px;left:3px;width:24px;height:22px;background:#fff;border-radius:999px;transition:.22s}
-.schedule-app .toggle-switch.xsmall input:checked + label{background:linear-gradient(180deg,var(--accent-grad-1),var(--accent-grad-2))}
-.schedule-app .toggle-switch.xsmall input:checked + label:after{left:calc(100% - 3px);transform:translateX(-100%)}
-
-.schedule-app .notify-inline{display:flex;flex-direction:row;align-items:center;gap:10px;margin-top:0}
-.schedule-app .notify-inline > label{margin:0}
-
-.schedule-app .segmented{
-  display:inline-grid;grid-auto-flow:column;gap:0;background:linear-gradient(180deg,#fff,#f6f6f6);border:1px solid #ececec;border-radius:12px;overflow:hidden;
-  box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 #f2f2f2
-}
-.schedule-app .seg-btn{padding:.5rem 1rem;font-weight:900;font-size:.92rem;color:#666;border:none;background:transparent;cursor:pointer;transition:color .15s,background .2s}
-.schedule-app .seg-btn:not(.active):hover{color:var(--text-color);background:#f7f7f7}
-.schedule-app .seg-btn.active{color:#2c2c2c;background:linear-gradient(180deg,#eef3ff,#dfe8ff);box-shadow:inset 0 0 0 2px rgba(108,140,245,.25)}
-
-.schedule-app .form-actions{display:flex;justify-content:flex-end}
-.schedule-app .form-actions.dual{gap:8px}
-.schedule-app .form-actions.dual .form-submit-btn.small,
-.schedule-app .form-actions.dual .form-cancel-btn.small{padding:.68rem .88rem;font-size:.95rem;border-radius:9px;min-width:110px}
-.schedule-app .form-submit-btn{padding:.82rem .98rem;font-size:1rem;font-weight:900;color:#fff;background:linear-gradient(180deg,var(--accent-grad-1),var(--accent-grad-2));border:none;border-radius:10px;cursor:pointer;transition:transform .1s,box-shadow .2s}
-.schedule-app .form-submit-btn:hover{transform:translateY(-1px);box-shadow:0 10px 18px rgba(108,140,245,.28)}
-.schedule-app .form-cancel-btn{padding:.68rem .88rem;font-size:.95rem;font-weight:900;color:#333;background:#fff;border:1px solid var(--border-color);border-radius:9px;cursor:pointer;transition:transform .1s,box-shadow .2s}
-.schedule-app .form-cancel-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 
 /* =========================
-   ✅ 날짜 선택 팝업 (달력) 재정비
+   토글
 ========================= */
-.schedule-app .pop-calendar{
-  position:absolute;top:calc(100% + 8px);left:0;
-  z-index:2005; /* ↑ 다른 요소 위로 */
-  width:320px;max-width:90vw;
-  background:#fff;
-  border:1px solid #e8ebf2;
-  border-radius:14px;
-  box-shadow:0 16px 40px rgba(20,20,40,.14);
-  padding:.9rem .9rem .8rem;
-}
-.schedule-app .pop-cal-head{
-  display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem
-}
-.schedule-app .ym-pill{
-  padding:.36rem .8rem;border-radius:999px;
-  background:linear-gradient(180deg,#ffffff,#f6f9ff);
-  border:1px solid #e9eefc;
-  font-weight:900;color:#2f3440
-}
-.schedule-app .nav-btn{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:34px;height:34px;border-radius:10px;
-  background:linear-gradient(180deg,#ffffff,#f4f7ff);
-  border:1px solid #e6ebfb;cursor:pointer;
-  transition:transform .2s,box-shadow .2s,border-color .2s;
-  -webkit-appearance:none;appearance:none;
-}
-.schedule-app .nav-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);border-color:#cfd7ff}
-.schedule-app .nav-btn.ghost{background:#fff}
 
-.schedule-app .pop-cal-grid{
-  display:grid;grid-template-columns:repeat(7,1fr);gap:6px
-}
-.schedule-app .pop-cal-grid.head{margin:.2rem 0 .2rem}
-.schedule-app .dow{
-  text-align:center;font-weight:900;color:#96a0b3;font-size:.84rem;padding:.12rem 0
-}
-.schedule-app .pop-day{
-  height:40px; /* 고정 높이로 정렬 안정화 */
-  border-radius:10px;border:1px solid #eef1f6;background:#fff;
-  cursor:pointer;font-weight:800;
-  transition:background .15s,border-color .15s,transform .1s
-}
-.schedule-app .pop-day:hover{background:#f6f9ff;border-color:#d9e2ff;transform:translateY(-1px)}
-.schedule-app .pop-day.selected{border:2px solid var(--accent-color);background:#eef3ff}
-.schedule-app .pop-day.empty{visibility:hidden}
+.schedule-app
+.toggle-switch.xsmall
+label {
+  cursor: pointer;
 
-/* =========================
-   ✅ 시간 선택 팝업 재정비
-========================= */
-.schedule-app .pop-time{
-  position:absolute;top:calc(100% + 8px);left:0;
-  z-index:2005;
-  width:380px;max-width:92vw;
-  background:#fff;border:1px solid #e8ebf2;border-radius:14px;
-  box-shadow:0 16px 40px rgba(20,20,40,.14);
-  padding:.8rem;
-}
-.schedule-app .pop-time.align-right{left:auto;right:0}
-.schedule-app .pop-time-head{
-  font-weight:900;font-size:.92rem;margin:0 0 .6rem .1rem;color:#3b3f45
-}
-.schedule-app .ampm-row{display:inline-grid;grid-auto-flow:column;gap:.5rem;margin:0 0 .6rem}
-.schedule-app .ampm-btn{
-  padding:.36rem .76rem;border-radius:10px;border:1px solid #e6ebf6;background:#fff;
-  font-weight:900;cursor:pointer;
-  -webkit-appearance:none;appearance:none;
-}
-.schedule-app .ampm-btn.active{border-color:#cfd7ff;background:#eef3ff}
+  text-indent: -9999px;
 
-.schedule-app .time-columns{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
-.schedule-app .time-col{display:flex;flex-direction:column;gap:.46rem;min-width:0}
-.schedule-app .col-title{font-size:.82rem;font-weight:900;color:#586070;margin-left:.1rem}
-.schedule-app .col-list{
-  display:grid;
-  /* → 아이템 폭이 고르게 꽉 차도록 자동 맞춤 */
-  grid-template-columns:repeat(auto-fill, minmax(56px, 1fr));
-  gap:.42rem;
-  max-height:180px;overflow:auto;padding-right:2px;
-}
-.schedule-app .col-item{
-  padding:.42rem .5rem;border:1px solid #e6ebf6;border-radius:10px;background:#fff;
-  cursor:pointer;font-weight:900;text-align:center;
-  transition:border-color .15s,background .15s,transform .12s;
-  -webkit-appearance:none;appearance:none;
-}
-.schedule-app .col-item:hover{background:#f7f9ff;border-color:#d9e2ff;transform:translateY(-1px)}
-.schedule-app .col-item.selected{border-color:var(--accent-color);background:#eef3ff}
+  width: 68px;
 
-.schedule-app .time-actions{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.7rem}
-.schedule-app .time-btn{
-  padding:.46rem .86rem;border-radius:10px;border:1px solid #e6ebf6;background:#fff;font-weight:900;cursor:pointer;
-  -webkit-appearance:none;appearance:none;
-}
-.schedule-app .time-btn.ghost{background:#fff}
-.schedule-app .time-btn.primary{
-  border-color:var(--accent-color);
-  background:linear-gradient(180deg,var(--accent-grad-1),var(--accent-grad-2));color:#fff
-}
-.schedule-app .time-btn.primary.small{padding:.42rem .72rem;border-radius:9px}
+  height: 28px;
 
-/* ===================== 달력 모달 ===================== */
-.schedule-app .calendar-backdrop{ z-index:1001; }
-schedule-app .calendar-view{ background:#fff;border-radius:18px;box-shadow:var(--shadow-md);animation:slideInUp .28s ease;position:relative; }
-.schedule-app .calendar-view{
-  width:1400px;height:900px;
-  padding:12px 14px 14px;
-  display:flex;flex-direction:column;min-height:0;overflow:hidden;
-  background:#fff; /* 🔒 화이트 바탕 고정 */
-  position:relative;
-}
-.schedule-app .calendar-view.fixed-size.bigger{width:1400px;height:900px}
+  background: #dcdcdc;
 
-/* ✅ 상단 컨트롤: 닫기 / 오늘 / 검색 */
-.schedule-app .calendar-close-text,
-.schedule-app .calendar-today-btn{
-  position:absolute;top:12px;
-  height:var(--cal-ctl-h);
-  min-width:var(--cal-ctl-minw);
-  padding:0 16px;
-  display:flex;align-items:center;justify-content:center;
-  border:1px solid var(--border-color);
-  border-radius:10px;
-  font-weight:800;
-  cursor:pointer;
-  box-shadow:var(--shadow-sm);
-  z-index:6;
-  background:#fff;
+  display: block;
+
+  border-radius: 999px;
+
+  position: relative;
+
+  margin: 0;
 }
 
-/* 닫기 버튼(오른쪽 끝) */
-.schedule-app .calendar-close-text{
-  right:12px;
-}
-.schedule-app .calendar-close-text:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
 
-/* 오늘 버튼(닫기 왼쪽) — 고급/럭셔리 스타일 */
-.schedule-app .calendar-today-btn{
-  right:calc(12px + var(--cal-ctl-minw) + var(--cal-ctl-gap));
-  color:#fff;
-  border:1px solid transparent;
+.schedule-app
+.toggle-switch.xsmall
+input {
+  height: 0;
+
+  width: 0;
+
+  visibility: hidden;
+}
+
+
+.schedule-app
+.toggle-switch.xsmall
+label:after {
+  content: '';
+
+  position: absolute;
+
+  top: 3px;
+
+  left: 3px;
+
+  width: 24px;
+
+  height: 22px;
+
+  background: #fff;
+
+  border-radius: 999px;
+
+  transition: .22s;
+}
+
+
+.schedule-app
+.toggle-switch.xsmall
+input:checked
++ label {
   background:
-    linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,0)) padding-box,
-    linear-gradient(135deg, #e7eeff, #6c8cf5) border-box,
-    linear-gradient(180deg, #e7eeff, #6c8cf5) padding-box;
-  background-clip: padding-box, border-box, padding-box;
-}
-.schedule-app .calendar-today-btn:hover{
-  transform:translateY(-1px);
-  box-shadow:0 10px 18px rgba(108,140,245,.28);
+    linear-gradient(
+      180deg,
+      var(--accent-grad-1),
+      var(--accent-grad-2)
+    );
 }
 
-/* ✅ 검색창: 오늘/닫기 버튼 왼쪽에 절대배치 (가로폭 유지, 세로높이 동일) */
-.schedule-app .calendar-search-abs{
-  position:absolute;
-  top:12px;
-  right:calc(
+
+.schedule-app
+.toggle-switch.xsmall
+input:checked
++ label:after {
+  left: calc(100% - 3px);
+
+  transform: translateX(-100%);
+}
+
+
+.schedule-app .notify-inline {
+  display: flex;
+
+  flex-direction: row;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin-top: 0;
+}
+
+
+.schedule-app
+.notify-inline
+> label {
+  margin: 0;
+}
+
+
+/* =========================
+   공유/개인
+========================= */
+
+.schedule-app .segmented {
+  display: inline-grid;
+
+  grid-auto-flow: column;
+
+  gap: 0;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fff,
+      #f6f6f6
+    );
+
+  border:
+    1px solid
+    #ececec;
+
+  border-radius: 12px;
+
+  overflow: hidden;
+
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 #f2f2f2;
+}
+
+
+.schedule-app .seg-btn {
+  padding: .5rem 1rem;
+
+  font-weight: 900;
+
+  font-size: .92rem;
+
+  color: #666;
+
+  border: none;
+
+  background: transparent;
+
+  cursor: pointer;
+
+  transition:
+    color .15s,
+    background .2s;
+}
+
+
+.schedule-app
+.seg-btn:not(.active):hover {
+  color: var(--text-color);
+
+  background: #f7f7f7;
+}
+
+
+.schedule-app .seg-btn.active {
+  color: #2c2c2c;
+
+  background:
+    linear-gradient(
+      180deg,
+      #eef3ff,
+      #dfe8ff
+    );
+
+  box-shadow:
+    inset 0 0 0 2px
+    rgba(108, 140, 245, .25);
+}
+
+
+/* =========================
+   저장/취소
+========================= */
+
+.schedule-app .form-actions {
+  display: flex;
+
+  justify-content: flex-end;
+}
+
+
+.schedule-app .form-actions.dual {
+  gap: 8px;
+}
+
+
+.schedule-app
+.form-actions.dual
+.form-submit-btn.small,
+.schedule-app
+.form-actions.dual
+.form-cancel-btn.small {
+  padding: .68rem .88rem;
+
+  font-size: .95rem;
+
+  border-radius: 9px;
+
+  min-width: 110px;
+}
+
+
+.schedule-app .form-submit-btn {
+  padding: .82rem .98rem;
+
+  font-size: 1rem;
+
+  font-weight: 900;
+
+  color: #fff;
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--accent-grad-1),
+      var(--accent-grad-2)
+    );
+
+  border: none;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  transition:
+    transform .1s,
+    box-shadow .2s;
+}
+
+
+.schedule-app .form-submit-btn:hover {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 10px 18px
+    rgba(108, 140, 245, .28);
+}
+
+
+.schedule-app .form-cancel-btn {
+  padding: .68rem .88rem;
+
+  font-size: .95rem;
+
+  font-weight: 900;
+
+  color: #333;
+
+  background: #fff;
+
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 9px;
+
+  cursor: pointer;
+
+  transition:
+    transform .1s,
+    box-shadow .2s;
+}
+
+
+.schedule-app .form-cancel-btn:hover {
+  transform: translateY(-1px);
+
+  box-shadow: var(--shadow-sm);
+}
+
+
+/* =========================
+   날짜 선택 팝업
+========================= */
+
+.schedule-app .pop-calendar {
+  position: absolute;
+
+  top: calc(100% + 8px);
+
+  left: 0;
+
+  z-index: 2005;
+
+  width: 320px;
+
+  max-width: 90vw;
+
+  background: #fff;
+
+  border:
+    1px solid
+    #e8ebf2;
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 16px 40px
+    rgba(20, 20, 40, .14);
+
+  padding: .9rem .9rem .8rem;
+}
+
+
+.schedule-app .pop-cal-head {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: .5rem;
+}
+
+
+.schedule-app .ym-pill {
+  padding: .36rem .8rem;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #f6f9ff
+    );
+
+  border:
+    1px solid
+    #e9eefc;
+
+  font-weight: 900;
+
+  color: #2f3440;
+}
+
+
+.schedule-app .nav-btn {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 34px;
+
+  height: 34px;
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #f4f7ff
+    );
+
+  border:
+    1px solid
+    #e6ebfb;
+
+  cursor: pointer;
+
+  transition:
+    transform .2s,
+    box-shadow .2s,
+    border-color .2s;
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .nav-btn:hover {
+  transform: translateY(-1px);
+
+  box-shadow: var(--shadow-sm);
+
+  border-color: #cfd7ff;
+}
+
+
+.schedule-app .nav-btn.ghost {
+  background: #fff;
+}
+
+
+.schedule-app .pop-cal-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(7, 1fr);
+
+  gap: 6px;
+}
+
+
+.schedule-app .pop-cal-grid.head {
+  margin: .2rem 0 .2rem;
+}
+
+
+.schedule-app .dow {
+  text-align: center;
+
+  font-weight: 900;
+
+  color: #96a0b3;
+
+  font-size: .84rem;
+
+  padding: .12rem 0;
+}
+
+
+.schedule-app .pop-day {
+  height: 40px;
+
+  border-radius: 10px;
+
+  border:
+    1px solid
+    #eef1f6;
+
+  background: #fff;
+
+  cursor: pointer;
+
+  font-weight: 800;
+
+  transition:
+    background .15s,
+    border-color .15s,
+    transform .1s;
+}
+
+
+.schedule-app .pop-day:hover {
+  background: #f6f9ff;
+
+  border-color: #d9e2ff;
+
+  transform: translateY(-1px);
+}
+
+
+.schedule-app .pop-day.selected {
+  border:
+    2px solid
+    var(--accent-color);
+
+  background: #eef3ff;
+}
+
+
+.schedule-app .pop-day.empty {
+  visibility: hidden;
+}
+
+
+/* =========================
+   시간 선택
+========================= */
+
+.schedule-app .pop-time {
+  position: absolute;
+
+  top: calc(100% + 8px);
+
+  left: 0;
+
+  z-index: 2005;
+
+  width: 380px;
+
+  max-width: 92vw;
+
+  background: #fff;
+
+  border:
+    1px solid
+    #e8ebf2;
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 16px 40px
+    rgba(20, 20, 40, .14);
+
+  padding: .8rem;
+}
+
+
+.schedule-app .pop-time.align-right {
+  left: auto;
+
+  right: 0;
+}
+
+
+.schedule-app .pop-time-head {
+  font-weight: 900;
+
+  font-size: .92rem;
+
+  margin: 0 0 .6rem .1rem;
+
+  color: #3b3f45;
+}
+
+
+.schedule-app .ampm-row {
+  display: inline-grid;
+
+  grid-auto-flow: column;
+
+  gap: .5rem;
+
+  margin: 0 0 .6rem;
+}
+
+
+.schedule-app .ampm-btn {
+  padding: .36rem .76rem;
+
+  border-radius: 10px;
+
+  border:
+    1px solid
+    #e6ebf6;
+
+  background: #fff;
+
+  font-weight: 900;
+
+  cursor: pointer;
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .ampm-btn.active {
+  border-color: #cfd7ff;
+
+  background: #eef3ff;
+}
+
+
+.schedule-app .time-columns {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: .9rem;
+}
+
+
+.schedule-app .time-col {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: .46rem;
+
+  min-width: 0;
+}
+
+
+.schedule-app .col-title {
+  font-size: .82rem;
+
+  font-weight: 900;
+
+  color: #586070;
+
+  margin-left: .1rem;
+}
+
+
+.schedule-app .col-list {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(56px, 1fr)
+    );
+
+  gap: .42rem;
+
+  max-height: 180px;
+
+  overflow: auto;
+
+  padding-right: 2px;
+}
+
+
+.schedule-app .col-item {
+  padding: .42rem .5rem;
+
+  border:
+    1px solid
+    #e6ebf6;
+
+  border-radius: 10px;
+
+  background: #fff;
+
+  cursor: pointer;
+
+  font-weight: 900;
+
+  text-align: center;
+
+  transition:
+    border-color .15s,
+    background .15s,
+    transform .12s;
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .col-item:hover {
+  background: #f7f9ff;
+
+  border-color: #d9e2ff;
+
+  transform: translateY(-1px);
+}
+
+
+.schedule-app .col-item.selected {
+  border-color: var(--accent-color);
+
+  background: #eef3ff;
+}
+
+
+.schedule-app .time-actions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: .5rem;
+
+  margin-top: .7rem;
+}
+
+
+.schedule-app .time-btn {
+  padding: .46rem .86rem;
+
+  border-radius: 10px;
+
+  border:
+    1px solid
+    #e6ebf6;
+
+  background: #fff;
+
+  font-weight: 900;
+
+  cursor: pointer;
+
+  -webkit-appearance: none;
+
+  appearance: none;
+}
+
+
+.schedule-app .time-btn.ghost {
+  background: #fff;
+}
+
+
+.schedule-app .time-btn.primary {
+  border-color: var(--accent-color);
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--accent-grad-1),
+      var(--accent-grad-2)
+    );
+
+  color: #fff;
+}
+
+
+.schedule-app .time-btn.primary.small {
+  padding: .42rem .72rem;
+
+  border-radius: 9px;
+}
+
+
+/* =========================
+   달력 모달
+========================= */
+
+.schedule-app .calendar-backdrop {
+  z-index: 1001;
+}
+
+
+.schedule-app .calendar-view {
+  background: #fff;
+
+  border-radius: 18px;
+
+  box-shadow: var(--shadow-md);
+
+  animation:
+    slideInUp
+    .28s ease;
+
+  position: relative;
+
+  width: 1400px;
+
+  height: 900px;
+
+  padding:
     12px
-    + var(--cal-ctl-minw) + var(--cal-ctl-gap)   /* 닫기 왼쪽: 오늘 버튼 */
-    + var(--cal-ctl-minw) + var(--cal-ctl-gap)   /* 맨 오른쪽: 닫기 버튼 */
-  );
-  z-index:6;
-  max-width:calc(100% - 24px - (var(--cal-ctl-minw)*2) - (var(--cal-ctl-gap)*2));
-}
-.schedule-app .calendar-search-abs input{
-  width:clamp(180px, 26vw, 280px);   /* ← 기존 가로폭 유지 */
-  height:var(--cal-ctl-h);           /* ← 세로 높이 통일 */
-  padding:0 .76rem;                  /* 수직 패딩 제거해 정확히 맞춤 */
-  border:1px solid var(--border-color);
-  border-radius:10px;
-  background:#fff;
-  font-size:.95rem;
-  outline:none;
-  display:flex;align-items:center;
-  transition:border-color .2s, box-shadow .2s;
-}
-.schedule-app .calendar-search-abs input:focus{
-  border-color:var(--accent-color);
-  box-shadow:0 0 0 3px rgba(108,140,245,.18);
+    14px
+    14px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  min-height: 0;
+
+  overflow: hidden;
 }
 
-/* 타이틀 영역(디자인 유지) */
-.schedule-app .calendar-header{display:flex;justify-content:center;align-items:center;margin-bottom:.35rem;flex:none}
-.schedule-app .calendar-header.compact{margin-bottom:.3rem}
-.schedule-app .cal-title-group{display:inline-grid;grid-auto-flow:column;gap:.6rem;align-items:center;padding:.22rem .5rem;border-radius:999px;background:linear-gradient(180deg,#ffffff,#f7faff);border:1px solid #ededed;box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 #f3f3f3,0 6px 14px rgba(0,0,0,.04)}
-.schedule-app .cal-title{display:flex;align-items:center;gap:.4rem;margin:0;font-size:1.22rem;font-weight:900;letter-spacing:.3px;padding:.16rem .36rem;background:linear-gradient(90deg,#2b2b2b,#3c4a9b);-webkit-background-clip:text;background-clip:text;color:transparent}
 
-/* 달력 그리드 */
-.schedule-app .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;flex:1;min-height:0}
-.schedule-app .calendar-grid.fixed-rows{grid-template-rows:auto repeat(6, 1fr);height:100%}
-.schedule-app .day-name{text-align:center;font-weight:900;color:var(--text-light-color);padding:.24rem 0 .32rem;font-size:.88rem;letter-spacing:.2px}
+.schedule-app
+.calendar-view.fixed-size.bigger {
+  width: 1400px;
+
+  height: 900px;
+}
+
+
+/* =========================
+   달력 컨트롤
+========================= */
+
+.schedule-app .calendar-close-text,
+.schedule-app .calendar-today-btn {
+  position: absolute;
+
+  top: 12px;
+
+  height: var(--cal-ctl-h);
+
+  min-width: var(--cal-ctl-minw);
+
+  padding: 0 16px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 10px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+
+  box-shadow: var(--shadow-sm);
+
+  z-index: 6;
+
+  background: #fff;
+}
+
+
+.schedule-app .calendar-close-text {
+  right: 12px;
+}
+
+
+.schedule-app .calendar-close-text:hover {
+  transform: translateY(-1px);
+
+  box-shadow: var(--shadow-md);
+}
+
+
+.schedule-app .calendar-today-btn {
+  right:
+    calc(
+      12px
+      + var(--cal-ctl-minw)
+      + var(--cal-ctl-gap)
+    );
+
+  color: #fff;
+
+  border: 1px solid transparent;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, .25),
+      rgba(255, 255, 255, 0)
+    ) padding-box,
+
+    linear-gradient(
+      135deg,
+      #e7eeff,
+      #6c8cf5
+    ) border-box,
+
+    linear-gradient(
+      180deg,
+      #e7eeff,
+      #6c8cf5
+    ) padding-box;
+
+  background-clip:
+    padding-box,
+    border-box,
+    padding-box;
+}
+
+
+.schedule-app .calendar-today-btn:hover {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 10px 18px
+    rgba(108, 140, 245, .28);
+}
+
+
+/* 검색 */
+.schedule-app .calendar-search-abs {
+  position: absolute;
+
+  top: 12px;
+
+  right:
+    calc(
+      12px
+      + var(--cal-ctl-minw)
+      + var(--cal-ctl-gap)
+      + var(--cal-ctl-minw)
+      + var(--cal-ctl-gap)
+    );
+
+  z-index: 6;
+
+  max-width:
+    calc(
+      100%
+      - 24px
+      - (var(--cal-ctl-minw) * 2)
+      - (var(--cal-ctl-gap) * 2)
+    );
+}
+
+
+.schedule-app
+.calendar-search-abs
+input {
+  width:
+    clamp(
+      180px,
+      26vw,
+      280px
+    );
+
+  height: var(--cal-ctl-h);
+
+  padding: 0 .76rem;
+
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 10px;
+
+  background: #fff;
+
+  font-size: .95rem;
+
+  outline: none;
+
+  display: flex;
+
+  align-items: center;
+
+  transition:
+    border-color .2s,
+    box-shadow .2s;
+}
+
+
+.schedule-app
+.calendar-search-abs
+input:focus {
+  border-color: var(--accent-color);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(108, 140, 245, .18);
+}
+
+
+/* =========================
+   달력 제목
+========================= */
+
+.schedule-app .calendar-header {
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  margin-bottom: .35rem;
+
+  flex: none;
+}
+
+
+.schedule-app .calendar-header.compact {
+  margin-bottom: .3rem;
+}
+
+
+.schedule-app .cal-title-group {
+  display: inline-grid;
+
+  grid-auto-flow: column;
+
+  gap: .6rem;
+
+  align-items: center;
+
+  padding: .22rem .5rem;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #f7faff
+    );
+
+  border:
+    1px solid
+    #ededed;
+
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 #f3f3f3,
+    0 6px 14px rgba(0, 0, 0, .04);
+}
+
+
+.schedule-app .cal-title {
+  display: flex;
+
+  align-items: center;
+
+  gap: .4rem;
+
+  margin: 0;
+
+  font-size: 1.22rem;
+
+  font-weight: 900;
+
+  letter-spacing: .3px;
+
+  padding: .16rem .36rem;
+
+  background:
+    linear-gradient(
+      90deg,
+      #2b2b2b,
+      #3c4a9b
+    );
+
+  -webkit-background-clip: text;
+
+  background-clip: text;
+
+  color: transparent;
+}
+
+
+/* =========================
+   달력 그리드
+========================= */
+
+.schedule-app .calendar-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(7, 1fr);
+
+  gap: 8px;
+
+  flex: 1;
+
+  min-height: 0;
+}
+
+
+.schedule-app .calendar-grid.fixed-rows {
+  grid-template-rows:
+    auto
+    repeat(6, 1fr);
+
+  height: 100%;
+}
+
+
+.schedule-app .day-name {
+  text-align: center;
+
+  font-weight: 900;
+
+  color: var(--text-light-color);
+
+  padding: .24rem 0 .32rem;
+
+  font-size: .88rem;
+
+  letter-spacing: .2px;
+}
+
 
 /* Day Cell */
-.schedule-app .calendar-day{
-  border:1px solid var(--border-color);
-  border-radius:12px;
-  padding:.42rem .38rem .38rem;
-  background:linear-gradient(180deg,#ffffff,#fbfbff);
-  transition:background-color .2s,border-color .2s,box-shadow .2s;
-  display:grid;grid-template-rows:auto auto 1fr; /* 숫자/배지, 공휴일문구, 아이템 */
-  height:100%;min-height:0;overflow:hidden;
+.schedule-app .calendar-day {
+  border:
+    1px solid
+    var(--border-color);
+
+  border-radius: 12px;
+
+  padding:
+    .42rem
+    .38rem
+    .38rem;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #fbfbff
+    );
+
+  transition:
+    background-color .2s,
+    border-color .2s,
+    box-shadow .2s;
+
+  display: grid;
+
+  grid-template-rows:
+    auto
+    auto
+    1fr;
+
+  height: 100%;
+
+  min-height: 0;
+
+  overflow: hidden;
 }
-.schedule-app .calendar-day:not(.empty):hover{background:#f7faff;border-color:#cfd7ff;box-shadow:0 8px 18px rgba(0,0,0,.05)}
-.schedule-app .calendar-day.empty{background:transparent;border-color:transparent}
 
-/* 오늘 표시(기본 파랑) — 아래 공휴일/일요일 규칙이 더 나중에 와서 필요시 덮어씀 */
-.schedule-app .calendar-day.today{border:2px solid #6C8CF5}
 
-/* ✅ 공휴일/일요일: 날짜 박스(셀) 빨간 테두리 */
+.schedule-app
+.calendar-day:not(.empty):hover {
+  background: #f7faff;
+
+  border-color: #cfd7ff;
+
+  box-shadow:
+    0 8px 18px
+    rgba(0, 0, 0, .05);
+}
+
+
+.schedule-app .calendar-day.empty {
+  background: transparent;
+
+  border-color: transparent;
+}
+
+
+.schedule-app .calendar-day.today {
+  border:
+    2px solid
+    #6C8CF5;
+}
+
+
+/* 공휴일 */
 .schedule-app .calendar-day.holiday,
-.schedule-app .calendar-day.sunday{
-  border:2px solid #e57373; /* 빨간 테두리 */
+.schedule-app .calendar-day.sunday {
+  border:
+    2px solid
+    #e57373;
 }
 
-/* 둘 다 겹칠 경우(오늘이면서 공휴일/일요일)도 빨강 유지 */
+
 .schedule-app .calendar-day.today.holiday,
-.schedule-app .calendar-day.today.sunday{
-  border-color:#e57373;
+.schedule-app .calendar-day.today.sunday {
+  border-color: #e57373;
 }
 
-.schedule-app .day-number{font-weight:900;font-size:.88rem;color:#222;display:flex;align-items:center;gap:.3rem;flex-wrap:nowrap}
-.schedule-app .day-number .num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:#f3f6ff;color:#2d3a8c;font-weight:900}
 
-/* (선택) 공휴일/일요일 날짜 배경 강조가 필요하면 아래 유지 */
-.schedule-app .calendar-day.holiday .day-number .num,
-.schedule-app .calendar-day.sunday  .day-number .num{
-  background:#fdecea;
-  color:#c62828;
-  border:1px solid #f4b4b4;
+.schedule-app .day-number {
+  font-weight: 900;
+
+  font-size: .88rem;
+
+  color: #222;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: .3rem;
+
+  flex-wrap: nowrap;
 }
 
-/* 공유/개인 카운트 뱃지 */
-.schedule-app .count-badge{display:inline-flex;align-items:center;justify-content:center;height:18px;padding:0 8px;border-radius:999px;background:#eee;font-weight:800;font-size:.72rem;color:#333;white-space:nowrap}
-.schedule-app .count-badge.count-shared{background:rgba(106,171,156,.18);color:#2e665b;border:1px solid rgba(106,171,156,.35)}
-.schedule-app .count-badge.count-personal{background:rgba(93,118,169,.18);color:#2c3d61;border:1px solid rgba(93,118,169,.35)}
 
-/* ✅ 공휴일 문구 (배지 아래, 한 줄) */
-.schedule-app .holiday-line{
-  margin:.24rem 0 .1rem;
-  font-weight:900;
-  font-size:.78rem;
-  color:#c62828;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+.schedule-app .day-number .num {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 28px;
+
+  height: 28px;
+
+  border-radius: 8px;
+
+  background: #f3f6ff;
+
+  color: #2d3a8c;
+
+  font-weight: 900;
 }
+
+
+.schedule-app
+.calendar-day.holiday
+.day-number
+.num,
+.schedule-app
+.calendar-day.sunday
+.day-number
+.num {
+  background: #fdecea;
+
+  color: #c62828;
+
+  border:
+    1px solid
+    #f4b4b4;
+}
+
+
+/* 공유/개인 카운트 */
+.schedule-app .count-badge {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  height: 18px;
+
+  padding: 0 8px;
+
+  border-radius: 999px;
+
+  background: #eee;
+
+  font-weight: 800;
+
+  font-size: .72rem;
+
+  color: #333;
+
+  white-space: nowrap;
+}
+
+
+.schedule-app
+.count-badge.count-shared {
+  background:
+    rgba(106, 171, 156, .18);
+
+  color: #2e665b;
+
+  border:
+    1px solid
+    rgba(106, 171, 156, .35);
+}
+
+
+.schedule-app
+.count-badge.count-personal {
+  background:
+    rgba(93, 118, 169, .18);
+
+  color: #2c3d61;
+
+  border:
+    1px solid
+    rgba(93, 118, 169, .35);
+}
+
+
+/* 공휴일 문구 */
+.schedule-app .holiday-line {
+  margin: .24rem 0 .1rem;
+
+  font-weight: 900;
+
+  font-size: .78rem;
+
+  color: #c62828;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
 
 /* 일정 목록 */
-.schedule-app .calendar-day .day-items{min-height:0;overflow-y:auto !important;overflow-x:hidden;display:flex;flex-direction:column;gap:4px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.schedule-app .calendar-day .day-items > *{flex:0 0 auto}
-.schedule-app .day-chip{
-  display:grid;grid-template-columns:max-content 1fr;align-items:center;gap:.34rem;
-  padding:.12rem .28rem;border-radius:7px;border:1px solid #efefef;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.03);
-  font-size:.72rem;line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.schedule-app .day-chip.ultra-tiny{padding:.1rem .24rem;font-size:.72rem;border-radius:6px}
-.schedule-app .day-chip.personal{border-left:3px solid #5670b4}
-.schedule-app .day-chip.shared{border-left:3px solid #5ea796}
-.schedule-app .chip-time{font-weight:900;font-size:.7rem;color:#333}
-.schedule-app .chip-title{overflow:hidden;text-overflow:ellipsis}
+.schedule-app
+.calendar-day
+.day-items {
+  min-height: 0;
 
-/* 완료 일정 칩 회색화 */
-.schedule-app .day-chip.completed{ background:#f2f3f5; color:#8c95a1; border-color:#e1e4e8; }
-.schedule-app .day-chip.completed .chip-time{ color:#9aa3ad; }
-.schedule-app .day-chip.completed .chip-title{ text-decoration:line-through; }
+  overflow-y: auto !important;
+
+  overflow-x: hidden;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 4px;
+
+  overscroll-behavior: contain;
+
+  -webkit-overflow-scrolling: touch;
+}
+
+
+.schedule-app
+.calendar-day
+.day-items
+> * {
+  flex: 0 0 auto;
+}
+
+
+.schedule-app .day-chip {
+  display: grid;
+
+  grid-template-columns:
+    max-content
+    1fr;
+
+  align-items: center;
+
+  gap: .34rem;
+
+  padding: .12rem .28rem;
+
+  border-radius: 7px;
+
+  border:
+    1px solid
+    #efefef;
+
+  background: #fff;
+
+  box-shadow:
+    0 1px 3px
+    rgba(0, 0, 0, .03);
+
+  font-size: .72rem;
+
+  line-height: 1.12;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+.schedule-app .day-chip.ultra-tiny {
+  padding: .1rem .24rem;
+
+  font-size: .72rem;
+
+  border-radius: 6px;
+}
+
+
+.schedule-app .day-chip.personal {
+  border-left:
+    3px solid
+    #5670b4;
+}
+
+
+.schedule-app .day-chip.shared {
+  border-left:
+    3px solid
+    #5ea796;
+}
+
+
+.schedule-app .chip-time {
+  font-weight: 900;
+
+  font-size: .7rem;
+
+  color: #333;
+}
+
+
+.schedule-app .chip-title {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+/* 완료 일정 */
+.schedule-app .day-chip.completed {
+  background: #f2f3f5;
+
+  color: #8c95a1;
+
+  border-color: #e1e4e8;
+}
+
+
+.schedule-app
+.day-chip.completed
+.chip-time {
+  color: #9aa3ad;
+}
+
+
+.schedule-app
+.day-chip.completed
+.chip-title {
+  text-decoration: line-through;
+}
+
 
 /* 검색 하이라이트 */
-.schedule-app mark.hl{
-  background:#ffec99;
-  color:inherit;
-  padding:0 .1em;
-  border-radius:3px;
+.schedule-app mark.hl {
+  background: #ffec99;
+
+  color: inherit;
+
+  padding: 0 .1em;
+
+  border-radius: 3px;
 }
 
-/* 반응형 보강 */
+
+/* =========================================================
+   기존 반응형
+========================================================= */
+
 @media (max-width: 1360px) {
-  .schedule-app .main-view{ grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
-}
-@media (max-width: 980px) {
-  .schedule-app{
-    left:0; /* ✅ 모바일 뷰에서는 사이드바 없음 */
-    padding:1rem;
+  .schedule-app .main-view {
+    grid-template-columns:
+      repeat(
+        auto-fit,
+        minmax(340px, 1fr)
+      );
   }
+}
+
+
+@media (max-width: 980px) {
+
+  .schedule-app {
+    left: 0;
+
+    padding: 1rem;
+  }
+
+
   .schedule-app .app-header,
-  .schedule-app .main-view{
+  .schedule-app .main-view {
     max-width: 100%;
+
     margin: 0;
   }
-  .schedule-app .main-view{ grid-template-columns: 1fr; }
 
-  /* 모바일에서 닫기/오늘/검색 겹침 방지 + 안벗어나게 */
-  .schedule-app .calendar-search-abs{
-    right:calc(
-      12px
-      + var(--cal-ctl-minw) + var(--cal-ctl-gap) /* 오늘 */
-      + var(--cal-ctl-minw) + var(--cal-ctl-gap) /* 닫기 */
-    );
-    max-width:calc(100% - 24px - (var(--cal-ctl-minw)*2) - (var(--cal-ctl-gap)*2));
+
+  .schedule-app .main-view {
+    grid-template-columns: 1fr;
   }
-  .schedule-app .calendar-search-abs input{ width:clamp(160px, 40vw, 220px); }
+
+
+  .schedule-app
+  .calendar-search-abs {
+    right:
+      calc(
+        12px
+        + var(--cal-ctl-minw)
+        + var(--cal-ctl-gap)
+        + var(--cal-ctl-minw)
+        + var(--cal-ctl-gap)
+      );
+
+    max-width:
+      calc(
+        100%
+        - 24px
+        - (var(--cal-ctl-minw) * 2)
+        - (var(--cal-ctl-gap) * 2)
+      );
+  }
+
+
+  .schedule-app
+  .calendar-search-abs
+  input {
+    width:
+      clamp(
+        160px,
+        40vw,
+        220px
+      );
+  }
 }
 
-/* 애니메이션 */
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes slideInUp{from{transform:translateY(26px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* =========================================================
+   ✅ 태블릿 전용 PC 레이아웃 강제 유지
+   ---------------------------------------------------------
+   중요:
+   - PC에는 적용되지 않음
+   - 스마트폰 768px 이하 적용되지 않음
+   - 갤럭시탭 등 터치 기반 태블릿에서만 적용
+
+   위쪽의 1360px / 980px 반응형 규칙이 태블릿에서
+   실행되더라도 여기서 다시 PC 레이아웃으로 복원합니다.
+========================================================= */
+
+@media screen
+  and (min-width: 769px)
+  and (max-width: 1366px)
+  and (any-pointer: coarse) {
+
+  /*
+    PC의 사이드바 기준 위치 복원
+  */
+  .schedule-app {
+    left:
+      calc(
+        var(--sidebar-width)
+        - var(--sidebar-gap)
+      ) !important;
+
+    right: 0 !important;
+
+    bottom: 0 !important;
+
+    padding:
+      1.8rem
+      2.2rem
+      2rem
+      1.2rem !important;
+  }
+
+
+  /*
+    schedule-app의 배경도
+    PC와 같은 위치에서 시작
+  */
+  .schedule-app::before {
+    left:
+      calc(
+        var(--sidebar-width)
+        - var(--sidebar-gap)
+      ) !important;
+  }
+
+
+  /*
+    PC 헤더 크기/위치 복원
+  */
+  .schedule-app .app-header {
+    max-width:
+      min(
+        1280px,
+        var(--content-max)
+      ) !important;
+
+    width: 100% !important;
+
+    margin-right: auto !important;
+  }
+
+
+  .schedule-app
+  .app-header.shift-right {
+    margin-left: 120px !important;
+  }
+
+
+  /*
+    ★ 가장 중요
+    태블릿에서도 Yesterday / Today / Tomorrow를
+    PC와 동일하게 반드시 3열로 유지
+  */
+  .schedule-app .main-view {
+    grid-template-columns:
+      repeat(
+        3,
+        minmax(0, 1fr)
+      ) !important;
+
+    gap: 1.3rem !important;
+
+    width: 100% !important;
+
+    max-width:
+      min(
+        1380px,
+        var(--content-max)
+      ) !important;
+
+    margin-right: auto !important;
+
+    overflow: hidden !important;
+  }
+
+
+  .schedule-app
+  .main-view.shift-right {
+    margin-left: 120px !important;
+  }
+
+
+  /*
+    각 컬럼이 내용 때문에 강제로 폭을 키우지 않도록 함
+  */
+  .schedule-app
+  .schedule-column {
+    min-width: 0 !important;
+  }
+
+
+  .schedule-app
+  .schedule-details {
+    min-width: 0 !important;
+  }
+
+
+  /*
+    전체 달력도 PC 고정 크기 유지
+  */
+  .schedule-app
+  .calendar-view.fixed-size.bigger {
+    width: 1400px !important;
+
+    height: 900px !important;
+  }
+
+
+  /*
+    980px 반응형에서 변경되는 검색창 크기도
+    PC 설정으로 되돌림
+  */
+  .schedule-app
+  .calendar-search-abs
+  input {
+    width:
+      clamp(
+        180px,
+        26vw,
+        280px
+      ) !important;
+  }
+}
+
+
+/* =========================
+   애니메이션
+========================= */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(26px);
+
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+
+    opacity: 1;
+  }
+}

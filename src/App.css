@@ -1,5 +1,7 @@
 /* ✅ 모바일 전체 화면 채우기 위해 필수 */
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   width: 100vw;
@@ -7,6 +9,7 @@ html, body, #root {
   overflow: hidden;
   background-color: white;
 }
+
 
 .App {
   text-align: center;
@@ -20,16 +23,19 @@ html, body, #root {
   font-weight: 500;
 }
 
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;
 }
+
 
 @media (prefers-reduced-motion: no-preference) {
   .App-logo {
     animation: App-logo-spin infinite 20s linear;
   }
 }
+
 
 .App-header {
   background-color: #282c34;
@@ -46,16 +52,18 @@ html, body, #root {
   font-weight: 500;
 }
 
+
 .App-link {
   color: #61dafb;
 }
+
 
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
 }
-

@@ -31,6 +31,9 @@ import AnnualSheetPage from "../pages/AnnualSheetPage";
 /* 대금결제 관리 */
 import PaymentSettlementPage from "../pages/PaymentSettlementPage.jsx";
 
+/* 손익계산 */
+import ProfitLossPage from "../pages/ProfitLossPage";
+
 /* 전기요금 추출 / 공용전기 계산 */
 import MessageExtractor from "../pages/MessageExtractor";
 import PublicElectricCalcPage from "../pages/PublicElectricCalcPage";
@@ -40,36 +43,50 @@ import CalendarPage from "../pages/CalendarPage";
 import PaperingPage from "../pages/PaperingPage";
 import MemoPage from "../pages/MemoPage";
 
-/* ✅ 일정관리(신규) */
+/* ✅ 일정관리 */
 import ScheduleManager from "../pages/ScheduleManager";
 
 /* ✅ 업데이트(모달) */
 import UpdatesModal from "../components/UpdatesModal";
 
-/* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
+/* ✅ 입주자카드 */
 import ResidentCardPage from "../pages/ResidentCardPage";
 
-/* ✅ 추가: 자재비관리대장 페이지 (부가서비스 메뉴용) */
+/* ✅ 자재비관리대장 */
 import MaterialCostPage from "../pages/MaterialCostPage";
 
-/* ✅ 추가: 관리종료 페이지 (빌라정보 메뉴용) */
+/* ✅ 관리종료 */
 import VillaEndPage from "../pages/VillaEndPage";
 
-/* ✅ 추가: 정산하자체크 페이지 (부가서비스 · 도배 아래) */
+/* ✅ 정산하자체크 */
 import SettlementDefectCheckPage from "../pages/SettlementDefectCheckPage";
 
 /* 스타일/자산 */
 import "remixicon/fonts/remixicon.css";
 import HNLogo from "../assets/HN LOGO.png";
 
+
 const ComingSoon = ({ title }) => (
   <div className="p-6">
-    <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
-    <p className="text-gray-500 mt-2">준비 중입니다.</p>
+    <h2 className="text-xl font-semibold text-gray-800">
+      {title}
+    </h2>
+
+    <p className="text-gray-500 mt-2">
+      준비 중입니다.
+    </p>
   </div>
 );
 
-const SidebarItem = ({ icon, label, onClick, active, hasChildren, isOpen }) => (
+
+const SidebarItem = ({
+  icon,
+  label,
+  onClick,
+  active,
+  hasChildren,
+  isOpen,
+}) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center justify-between text-[13px] px-3 py-1.5 rounded-xl transition-all duration-200
@@ -83,23 +100,38 @@ const SidebarItem = ({ icon, label, onClick, active, hasChildren, isOpen }) => (
       {icon && (
         <i
           className={`${icon} text-[18px] ${
-            active ? "text-[#5b45ff]" : "text-slate-500 group-hover:text-[#5b45ff]"
+            active
+              ? "text-[#5b45ff]"
+              : "text-slate-500 group-hover:text-[#5b45ff]"
           }`}
         />
       )}
-      <span className="tracking-tight">{label}</span>
+
+      <span className="tracking-tight">
+        {label}
+      </span>
     </div>
+
     {hasChildren && (
       <i
         className={`ri-arrow-down-s-line text-base transition-transform duration-200 ${
           isOpen ? "rotate-0" : "-rotate-90"
-        } ${active ? "text-[#5b45ff]" : "text-slate-400"}`}
+        } ${
+          active
+            ? "text-[#5b45ff]"
+            : "text-slate-400"
+        }`}
       />
     )}
   </button>
 );
 
-const SidebarSubmenu = ({ items = [], onClick, activeMenu }) => (
+
+const SidebarSubmenu = ({
+  items = [],
+  onClick,
+  activeMenu,
+}) => (
   <ul className="pl-4 mt-1.5 space-y-1 text-[12.5px]">
     {items.map((item) => (
       <li
@@ -110,72 +142,149 @@ const SidebarSubmenu = ({ items = [], onClick, activeMenu }) => (
               ? "bg-[#f3f4ff] text-[#5b45ff] ring-1 ring-[#e7e9ff]"
               : "text-slate-600 hover:text-[#5b45ff] hover:bg-white/60"
           }`}
-        onClick={() => onClick?.(item)}
+        onClick={() =>
+          onClick?.(item)
+        }
       >
         <i
           className={`ri-arrow-right-s-line text-[15px] ${
-            activeMenu === item ? "text-[#5b45ff]" : "text-slate-400"
+            activeMenu === item
+              ? "text-[#5b45ff]"
+              : "text-slate-400"
           }`}
         />
-        <span className="truncate">{item}</span>
+
+        <span className="truncate">
+          {item}
+        </span>
       </li>
     ))}
   </ul>
 );
 
-/* ✅ userPhotoUrl(선택) 추가: 전달 시 좌측 고스트 박스가 사진으로 표시됩니다. */
-const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) => {
+
+/* ✅ userPhotoUrl(선택) */
+const TrezoSidebar = ({
+  employeeId,
+  userId,
+  userName,
+  onLogout,
+  userPhotoUrl,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [activeContent, setActiveContent] = useState(null);
-  const [openMenu, setOpenMenu] = useState("");
-  const [activeMenu, setActiveMenu] = useState("");
+  const [activeContent, setActiveContent] =
+    useState(null);
 
-  /* ✅ 업데이트 모달 열림 상태 */
-  const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [openMenu, setOpenMenu] =
+    useState("");
 
-  const handleNavigate = (component, menuKey) => {
+  const [activeMenu, setActiveMenu] =
+    useState("");
+
+  /* ✅ 업데이트 모달 */
+  const [updatesOpen, setUpdatesOpen] =
+    useState(false);
+
+
+  const handleNavigate = (
+    component,
+    menuKey
+  ) => {
     setActiveContent(component);
     setActiveMenu(menuKey);
   };
+
 
   const goHome = () => {
     setActiveContent(null);
     setActiveMenu("");
     setOpenMenu("");
-    navigate("/main", { replace: true });
+
+    navigate(
+      "/main",
+      {
+        replace: true,
+      }
+    );
   };
+
 
   /* URL 쿼리 → 콘텐츠 스위칭 */
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const go = params.get("go");
-    const sub = params.get("sub");
+    const params =
+      new URLSearchParams(
+        location.search
+      );
 
-    if (go === "빌라정보" && sub) {
+    const go =
+      params.get("go");
+
+    const sub =
+      params.get("sub");
+
+
+    if (
+      go === "빌라정보" &&
+      sub
+    ) {
       setOpenMenu("villa");
+
       setActiveMenu(sub);
+
+
       const pages = {
-        코드별빌라: <VillaCodePage />,
-        통신사: <TelcoPage />,
-        승강기: <ElevatorPage />,
-        정화조: <SepticPage />,
-        소방안전: <FireSafetyPage />,
-        전기안전: <ElectricSafetyPage />,
-        상수도: <WaterPage />,
-        공용전기: <PublicElectricPage />,
-        건물청소: <CleaningPage />,
-        CCTV: <CctvPage />,
-        관리종료: <VillaEndPage />,
+        코드별빌라:
+          <VillaCodePage />,
+
+        통신사:
+          <TelcoPage />,
+
+        승강기:
+          <ElevatorPage />,
+
+        정화조:
+          <SepticPage />,
+
+        소방안전:
+          <FireSafetyPage />,
+
+        전기안전:
+          <ElectricSafetyPage />,
+
+        상수도:
+          <WaterPage />,
+
+        공용전기:
+          <PublicElectricPage />,
+
+        건물청소:
+          <CleaningPage />,
+
+        CCTV:
+          <CctvPage />,
+
+        관리종료:
+          <VillaEndPage />,
       };
-      setActiveContent(pages[sub] ?? <ComingSoon title={`빌라정보 · ${sub}`} />);
+
+
+      setActiveContent(
+        pages[sub] ??
+          <ComingSoon
+            title={`빌라정보 · ${sub}`}
+          />
+      );
+
       return;
     }
   }, [location.search]);
 
+
   return (
-    <div className="flex w-full h-screen">
+    <div className="hn-erp-desktop-shell flex w-full h-screen">
+
       <style>{`
         :root{
           --hn-grad-a:#f7f7ff;
@@ -186,133 +295,536 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
           --hn-softshadow:0 2px 10px rgba(22, 28, 45, .05);
           --hn-glow:0 0 0 2px rgba(91,69,255,.12);
         }
+
+
         .sidebar-scroll{
           scrollbar-width: thin;
           scrollbar-color: #9aa0ff #eef0ff;
         }
-        .sidebar-scroll::-webkit-scrollbar{ width: 10px; }
+
+
+        .sidebar-scroll::-webkit-scrollbar{
+          width: 10px;
+        }
+
+
         .sidebar-scroll::-webkit-scrollbar-track{
           background: #eef0ff;
           border-radius: 10px;
         }
+
+
         .sidebar-scroll::-webkit-scrollbar-thumb{
           background: #9aa0ff;
           border-radius: 10px;
           border: 2px solid #eef0ff;
         }
+
+
         .sidebar-scroll::-webkit-scrollbar-thumb:hover{
           background: #7e86ff;
         }
-        .hn-divider{ height:1px; background: linear-gradient(90deg, transparent, #eceef7, transparent); }
+
+
+        .hn-divider{
+          height:1px;
+
+          background:
+            linear-gradient(
+              90deg,
+              transparent,
+              #eceef7,
+              transparent
+            );
+        }
+
+
+        /* =====================================================
+           ✅ Galaxy Tab / 터치 태블릿 전용 PC 화면 축소
+           -----------------------------------------------------
+
+           기존 삼성 인터넷에서 실제로 정상 작동했던 방식입니다.
+
+           조건:
+           - 769px 이상
+           - 1366px 이하
+           - 터치 장치
+
+           따라서 일반 PC에서는 적용되지 않습니다.
+        ===================================================== */
+
+        @media screen
+          and (min-width: 769px)
+          and (max-width: 1366px)
+          and (any-pointer: coarse) {
+
+          .hn-erp-desktop-shell {
+            zoom: 0.67 !important;
+
+            /*
+             * 100 / 0.67
+             * = 약 149.2538
+             *
+             * 축소된 만큼 실제 레이아웃 공간을
+             * 다시 확보합니다.
+             */
+            width:
+              149.2538vw !important;
+
+            height:
+              149.2538dvh !important;
+
+            min-height:
+              149.2538dvh !important;
+
+            max-width:
+              none !important;
+
+            max-height:
+              none !important;
+          }
+        }
+
+
+        /* =====================================================
+           ✅ 홈 화면에 추가한 ERP
+           standalone 모드 전용
+
+           홈 화면 실행 시 삼성 인터넷의
+           pointer 판정이 달라지는 경우를 고려하여
+           any-pointer 조건은 사용하지 않습니다.
+
+           대신:
+           - standalone
+           - 769px 이상
+           - 1600px 이하
+
+           조건에서 67%를 강제합니다.
+        ===================================================== */
+
+        @media screen
+          and (display-mode: standalone)
+          and (min-width: 769px)
+          and (max-width: 1600px) {
+
+          .hn-erp-desktop-shell {
+            zoom: 0.67 !important;
+
+            width:
+              149.2538vw !important;
+
+            height:
+              149.2538dvh !important;
+
+            min-height:
+              149.2538dvh !important;
+
+            max-width:
+              none !important;
+
+            max-height:
+              none !important;
+          }
+        }
+
+
+        /* =====================================================
+           ✅ landscape standalone 추가 안전장치
+
+           홈 화면 실행 + 가로모드라면
+           같은 67% 규칙을 다시 한번 확실하게 적용
+        ===================================================== */
+
+        @media screen
+          and (display-mode: standalone)
+          and (orientation: landscape)
+          and (min-width: 769px) {
+
+          .hn-erp-desktop-shell {
+            zoom: 0.67 !important;
+
+            width:
+              149.2538vw !important;
+
+            height:
+              149.2538dvh !important;
+
+            min-height:
+              149.2538dvh !important;
+
+            max-width:
+              none !important;
+
+            max-height:
+              none !important;
+          }
+        }
       `}</style>
 
+
       <aside
-        className="w-60 h-full bg-[radial-gradient(1200px_600px_at_top_left,var(--hn-grad-a),transparent_60%),linear-gradient(180deg,var(--hn-grad-b),var(--hn-grad-c))]
-                   border-r border-[var(--hn-border)] flex flex-col shadow-[var(--hn-softshadow)]"
+        className="
+          w-60
+          h-full
+          bg-[radial-gradient(1200px_600px_at_top_left,var(--hn-grad-a),transparent_60%),linear-gradient(180deg,var(--hn-grad-b),var(--hn-grad-c))]
+          border-r
+          border-[var(--hn-border)]
+          flex
+          flex-col
+          shadow-[var(--hn-softshadow)]
+        "
       >
+
         <div
-          className="px-5 py-4 border-b border-[var(--hn-border)] flex items-center gap-3 cursor-pointer backdrop-blur-[2px]"
+          className="
+            px-5
+            py-4
+            border-b
+            border-[var(--hn-border)]
+            flex
+            items-center
+            gap-3
+            cursor-pointer
+            backdrop-blur-[2px]
+          "
           onClick={goHome}
           title="대시보드로 이동"
         >
-          <div className="w-12 h-12 rounded-xl bg-white shadow-[var(--hn-shadow)] grid place-items-center ring-1 ring-white/60">
-            <img src={HNLogo} alt="HN Logo" className="w-10 h-10 object-contain" />
+
+          <div
+            className="
+              w-12
+              h-12
+              rounded-xl
+              bg-white
+              shadow-[var(--hn-shadow)]
+              grid
+              place-items-center
+              ring-1
+              ring-white/60
+            "
+          >
+            <img
+              src={HNLogo}
+              alt="HN Logo"
+              className="
+                w-10
+                h-10
+                object-contain
+              "
+            />
           </div>
+
+
           <div className="flex flex-col leading-tight">
-            <span className="font-extrabold text-[17px] tracking-tight text-slate-800">
+
+            <span
+              className="
+                font-extrabold
+                text-[17px]
+                tracking-tight
+                text-slate-800
+              "
+            >
               한남주택관리
             </span>
-            <span className="text-[12.5px] text-slate-500 -mt-0.5">HANNAM ERP</span>
+
+            <span
+              className="
+                text-[12.5px]
+                text-slate-500
+                -mt-0.5
+              "
+            >
+              HANNAM ERP
+            </span>
+
           </div>
         </div>
 
-        <div className="px-5 py-4 border-b border-[var(--hn-border)]">
-          <div
-            className="relative rounded-2xl p-4
-                       bg-[conic-gradient(at_20%_20%,#ffffff_0%,#f6f7ff_35%,#f2f9ff_65%,#ffffff_100%)]
-                       ring-1 ring-[#e8eaff]
-                       shadow-[0_1px_0_rgba(255,255,255,.7),0_10px_24px_rgba(23,27,44,.06)]"
-          >
-            <span className="pointer-events-none absolute left-4 right-4 top-2 h-px bg-white/70" />
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex items-center gap-3">
+        <div
+          className="
+            px-5
+            py-4
+            border-b
+            border-[var(--hn-border)]
+          "
+        >
+
+          <div
+            className="
+              relative
+              rounded-2xl
+              p-4
+              bg-[conic-gradient(at_20%_20%,#ffffff_0%,#f6f7ff_35%,#f2f9ff_65%,#ffffff_100%)]
+              ring-1
+              ring-[#e8eaff]
+              shadow-[0_1px_0_rgba(255,255,255,.7),0_10px_24px_rgba(23,27,44,.06)]
+            "
+          >
+
+            <span
+              className="
+                pointer-events-none
+                absolute
+                left-4
+                right-4
+                top-2
+                h-px
+                bg-white/70
+              "
+            />
+
+
+            <div
+              className="
+                flex
+                items-center
+                justify-between
+                gap-3
+              "
+            >
+
+              <div
+                className="
+                  min-w-0
+                  flex
+                  items-center
+                  gap-3
+                "
+              >
+
                 <div
-                  className="w-10 h-10 rounded-xl bg-white/80 backdrop-blur ring-1 ring-[#eceefe]
-                             shadow-[inset_0_1px_0_rgba(255,255,255,.6),0_6px_16px_rgba(23,27,44,.06)]
-                             overflow-hidden grid place-items-center"
-                  title={userPhotoUrl ? "프로필 사진" : "사용자"}
+                  className="
+                    w-10
+                    h-10
+                    rounded-xl
+                    bg-white/80
+                    backdrop-blur
+                    ring-1
+                    ring-[#eceefe]
+                    shadow-[inset_0_1px_0_rgba(255,255,255,.6),0_6px_16px_rgba(23,27,44,.06)]
+                    overflow-hidden
+                    grid
+                    place-items-center
+                  "
+                  title={
+                    userPhotoUrl
+                      ? "프로필 사진"
+                      : "사용자"
+                  }
                 >
+
                   {userPhotoUrl ? (
                     <img
                       src={userPhotoUrl}
                       alt="User"
-                      className="w-full h-full object-cover"
+                      className="
+                        w-full
+                        h-full
+                        object-cover
+                      "
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <i className="ri-user-3-line text-[18px] text-slate-500" />
+                    <i
+                      className="
+                        ri-user-3-line
+                        text-[18px]
+                        text-slate-500
+                      "
+                    />
                   )}
+
                 </div>
 
+
                 <div className="min-w-0 text-center">
-                  <div className="font-semibold text-slate-800 text-[14px] leading-tight tracking-tight truncate whitespace-nowrap">
+
+                  <div
+                    className="
+                      font-semibold
+                      text-slate-800
+                      text-[14px]
+                      leading-tight
+                      tracking-tight
+                      truncate
+                      whitespace-nowrap
+                    "
+                  >
                     {userName}
                   </div>
 
+
                   <div className="mt-1 flex justify-center">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px]
-                                     bg-gradient-to-r from-[#ecfff7] via-[#f3fff9] to-[#f7fffd]
-                                     text-emerald-700 ring-1 ring-emerald-200/70
-                                     shadow-[inset_0_1px_0_rgba(255,255,255,.65)]
-                                     whitespace-nowrap select-none">
-                      <span className="relative w-1.5 h-1.5 rounded-full bg-emerald-500">
-                        <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/70"></span>
+
+                    <span
+                      className="
+                        inline-flex
+                        items-center
+                        gap-1.5
+                        px-2.5
+                        py-0.5
+                        rounded-full
+                        text-[11px]
+                        bg-gradient-to-r
+                        from-[#ecfff7]
+                        via-[#f3fff9]
+                        to-[#f7fffd]
+                        text-emerald-700
+                        ring-1
+                        ring-emerald-200/70
+                        shadow-[inset_0_1px_0_rgba(255,255,255,.65)]
+                        whitespace-nowrap
+                        select-none
+                      "
+                    >
+
+                      <span
+                        className="
+                          relative
+                          w-1.5
+                          h-1.5
+                          rounded-full
+                          bg-emerald-500
+                        "
+                      >
+                        <span
+                          className="
+                            absolute
+                            inset-0
+                            rounded-full
+                            animate-ping
+                            bg-emerald-400/70
+                          "
+                        />
                       </span>
+
                       로그인 중
+
                     </span>
+
                   </div>
                 </div>
               </div>
 
+
               <button
                 type="button"
                 onClick={onLogout}
-                className="relative w-11 h-11 grid place-items-center rounded-2xl
-                           bg-white/90 text-slate-700
-                           ring-1 ring-[#e7e9ff] hover:ring-2 hover:ring-[#dfe3ff]
-                           shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_8px_22px_rgba(23,27,44,.08)]
-                           hover:shadow-[0_12px_28px_rgba(23,27,44,.12)]
-                           transition duration-150 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-[#dfe2ff]"
+                className="
+                  relative
+                  w-11
+                  h-11
+                  grid
+                  place-items-center
+                  rounded-2xl
+                  bg-white/90
+                  text-slate-700
+                  ring-1
+                  ring-[#e7e9ff]
+                  hover:ring-2
+                  hover:ring-[#dfe3ff]
+                  shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_8px_22px_rgba(23,27,44,.08)]
+                  hover:shadow-[0_12px_28px_rgba(23,27,44,.12)]
+                  transition
+                  duration-150
+                  hover:-translate-y-0.5
+                  active:translate-y-0
+                  focus:outline-none
+                  focus:ring-2
+                  focus:ring-[#dfe2ff]
+                "
                 title="로그아웃"
                 aria-label="로그아웃"
               >
-                <i className="ri-logout-box-r-line text-[18px]" />
-                <span className="pointer-events-none absolute inset-0 rounded-2xl
-                                 bg-[radial-gradient(65%_45%_at_50%_12%,rgba(255,255,255,.95),transparent)]" />
+
+                <i
+                  className="
+                    ri-logout-box-r-line
+                    text-[18px]
+                  "
+                />
+
+                <span
+                  className="
+                    pointer-events-none
+                    absolute
+                    inset-0
+                    rounded-2xl
+                    bg-[radial-gradient(65%_45%_at_50%_12%,rgba(255,255,255,.95),transparent)]
+                  "
+                />
+
               </button>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 sidebar-scroll">
+
+        <div
+          className="
+            flex-1
+            overflow-y-auto
+            px-3
+            py-3
+            sidebar-scroll
+          "
+        >
+
           <nav className="space-y-0.5">
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 빌라정보 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-building-4-line"
                 label="빌라정보"
+
                 onClick={() => {
-                  const newState = openMenu === "villa" ? "" : "villa";
-                  setOpenMenu(newState);
-                  setActiveMenu("빌라정보");
+                  const newState =
+                    openMenu === "villa"
+                      ? ""
+                      : "villa";
+
+                  setOpenMenu(
+                    newState
+                  );
+
+                  setActiveMenu(
+                    "빌라정보"
+                  );
                 }}
-                active={activeMenu === "빌라정보"}
+
+                active={
+                  activeMenu ===
+                  "빌라정보"
+                }
+
                 hasChildren
-                isOpen={openMenu === "villa"}
+
+                isOpen={
+                  openMenu ===
+                  "villa"
+                }
               />
+
+
               {openMenu === "villa" && (
                 <>
                   <div className="hn-divider my-1.5" />
+
                   <SidebarSubmenu
                     items={[
                       "코드별빌라",
@@ -327,84 +839,234 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                       "CCTV",
                       "관리종료",
                     ]}
-                    activeMenu={activeMenu}
+
+                    activeMenu={
+                      activeMenu
+                    }
+
                     onClick={(item) => {
-                      setActiveMenu(item);
+                      setActiveMenu(
+                        item
+                      );
+
+
                       const pages = {
-                        코드별빌라: <VillaCodePage />,
-                        통신사: <TelcoPage />,
-                        승강기: <ElevatorPage />,
-                        정화조: <SepticPage />,
-                        소방안전: <FireSafetyPage />,
-                        전기안전: <ElectricSafetyPage />,
-                        상수도: <WaterPage />,
-                        공용전기: <PublicElectricPage />,
-                        건물청소: <CleaningPage />,
-                        CCTV: <CctvPage />,
-                        관리종료: <VillaEndPage />,
+                        코드별빌라:
+                          <VillaCodePage />,
+
+                        통신사:
+                          <TelcoPage />,
+
+                        승강기:
+                          <ElevatorPage />,
+
+                        정화조:
+                          <SepticPage />,
+
+                        소방안전:
+                          <FireSafetyPage />,
+
+                        전기안전:
+                          <ElectricSafetyPage />,
+
+                        상수도:
+                          <WaterPage />,
+
+                        공용전기:
+                          <PublicElectricPage />,
+
+                        건물청소:
+                          <CleaningPage />,
+
+                        CCTV:
+                          <CctvPage />,
+
+                        관리종료:
+                          <VillaEndPage />,
                       };
-                      handleNavigate(pages[item] ?? <ComingSoon title={item} />, item);
+
+
+                      handleNavigate(
+                        pages[item] ??
+                          <ComingSoon
+                            title={item}
+                          />,
+                        item
+                      );
                     }}
                   />
                 </>
               )}
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 이사정산 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-truck-line"
                 label="이사정산"
+
                 onClick={() => {
                   setOpenMenu("");
+
                   handleNavigate(
-                    <MoveoutList employeeId={employeeId} userId={userId} isMobile={false} />,
+                    <MoveoutList
+                      employeeId={
+                        employeeId
+                      }
+
+                      userId={
+                        userId
+                      }
+
+                      isMobile={
+                        false
+                      }
+                    />,
                     "이사정산"
                   );
                 }}
-                active={activeMenu === "이사정산"}
+
+                active={
+                  activeMenu ===
+                  "이사정산"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 캘린더 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-calendar-line"
                 label="캘린더"
+
                 onClick={() => {
                   setOpenMenu("");
-                  handleNavigate(<CalendarPage />, "캘린더");
+
+                  handleNavigate(
+                    <CalendarPage />,
+                    "캘린더"
+                  );
                 }}
-                active={activeMenu === "캘린더"}
+
+                active={
+                  activeMenu ===
+                  "캘린더"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 일정관리 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-calendar-check-line"
                 label="일정관리"
+
                 onClick={() => {
                   setOpenMenu("");
-                  handleNavigate(<ScheduleManager />, "일정관리");
+
+                  handleNavigate(
+                    <ScheduleManager />,
+                    "일정관리"
+                  );
                 }}
-                active={activeMenu === "일정관리"}
+
+                active={
+                  activeMenu ===
+                  "일정관리"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 부가서비스 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-tools-line"
                 label="부가서비스"
+
                 onClick={() => {
-                  const newState = openMenu === "addon" ? "" : "addon";
-                  setOpenMenu(newState);
-                  setActiveMenu("부가서비스");
+                  const newState =
+                    openMenu === "addon"
+                      ? ""
+                      : "addon";
+
+                  setOpenMenu(
+                    newState
+                  );
+
+                  setActiveMenu(
+                    "부가서비스"
+                  );
                 }}
-                active={activeMenu === "부가서비스"}
+
+                active={
+                  activeMenu ===
+                  "부가서비스"
+                }
+
                 hasChildren
-                isOpen={openMenu === "addon"}
+
+                isOpen={
+                  openMenu ===
+                  "addon"
+                }
               />
+
+
               {openMenu === "addon" && (
                 <>
                   <div className="hn-divider my-1.5" />
+
                   <SidebarSubmenu
                     items={[
                       "입주청소",
@@ -415,20 +1077,46 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
                       "입주자카드",
                       "자재비관리대장",
                     ]}
-                    activeMenu={activeMenu}
+
+                    activeMenu={
+                      activeMenu
+                    }
+
                     onClick={(item) => {
-                      setActiveMenu(item);
+                      setActiveMenu(
+                        item
+                      );
+
+
                       const pages = {
-                        입주청소: <MoveInCleaningPage />,
-                        도배: <PaperingPage />,
-                        "정산 하자 체크": <SettlementDefectCheckPage />,
-                        "전기요금 추출": <MessageExtractor />,
-                        "공용전기 계산": <PublicElectricCalcPage />,
-                        입주자카드: <ResidentCardPage />,
-                        자재비관리대장: <MaterialCostPage />,
+                        입주청소:
+                          <MoveInCleaningPage />,
+
+                        도배:
+                          <PaperingPage />,
+
+                        "정산 하자 체크":
+                          <SettlementDefectCheckPage />,
+
+                        "전기요금 추출":
+                          <MessageExtractor />,
+
+                        "공용전기 계산":
+                          <PublicElectricCalcPage />,
+
+                        입주자카드:
+                          <ResidentCardPage />,
+
+                        자재비관리대장:
+                          <MaterialCostPage />,
                       };
+
+
                       handleNavigate(
-                        pages[item] ?? <ComingSoon title={`부가서비스 · ${item}`} />,
+                        pages[item] ??
+                          <ComingSoon
+                            title={`부가서비스 · ${item}`}
+                          />,
                         item
                       );
                     }}
@@ -437,131 +1125,415 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               )}
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 관리비회계 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-coins-line"
                 label="관리비회계"
+
                 onClick={() => {
-                  const newState = openMenu === "accounting" ? "" : "accounting";
-                  setOpenMenu(newState);
-                  setActiveMenu("관리비회계");
+                  const newState =
+                    openMenu ===
+                    "accounting"
+                      ? ""
+                      : "accounting";
+
+                  setOpenMenu(
+                    newState
+                  );
+
+                  setActiveMenu(
+                    "관리비회계"
+                  );
                 }}
-                active={activeMenu === "관리비회계"}
+
+                active={
+                  activeMenu ===
+                  "관리비회계"
+                }
+
                 hasChildren
-                isOpen={openMenu === "accounting"}
+
+                isOpen={
+                  openMenu ===
+                  "accounting"
+                }
               />
-              {openMenu === "accounting" && (
+
+
+              {openMenu ===
+                "accounting" && (
                 <>
                   <div className="hn-divider my-1.5" />
+
                   <SidebarSubmenu
-                    items={["수입정리", "지출정리", "일마감", "월마감", "연간시트", "대금결제 관리"]}
-                    activeMenu={activeMenu}
+                    items={[
+                      "수입정리",
+                      "지출정리",
+                      "일마감",
+                      "월마감",
+                      "연간시트",
+                      "대금결제 관리",
+                      "손익계산",
+                    ]}
+
+                    activeMenu={
+                      activeMenu
+                    }
+
                     onClick={(item) => {
-                      setActiveMenu(item);
-                      if (item === "수입정리") {
-                        handleNavigate(<IncomeImportPage />, item);
+                      setActiveMenu(
+                        item
+                      );
+
+
+                      if (
+                        item ===
+                        "수입정리"
+                      ) {
+                        handleNavigate(
+                          <IncomeImportPage />,
+                          item
+                        );
+
                         return;
                       }
-                      if (item === "지출정리") {
-                        handleNavigate(<ExpensePage />, item);
+
+
+                      if (
+                        item ===
+                        "지출정리"
+                      ) {
+                        handleNavigate(
+                          <ExpensePage />,
+                          item
+                        );
+
                         return;
                       }
-                      if (item === "일마감") {
-                        handleNavigate(<DailyClosePage />, item);
+
+
+                      if (
+                        item ===
+                        "일마감"
+                      ) {
+                        handleNavigate(
+                          <DailyClosePage />,
+                          item
+                        );
+
                         return;
                       }
-                      if (item === "월마감") {
-                        handleNavigate(<MonthlyClosePage />, item);
+
+
+                      if (
+                        item ===
+                        "월마감"
+                      ) {
+                        handleNavigate(
+                          <MonthlyClosePage />,
+                          item
+                        );
+
                         return;
                       }
-                      if (item === "연간시트") {
-                        handleNavigate(<AnnualSheetPage />, item);
+
+
+                      if (
+                        item ===
+                        "연간시트"
+                      ) {
+                        handleNavigate(
+                          <AnnualSheetPage />,
+                          item
+                        );
+
                         return;
                       }
-                      if (item === "대금결제 관리") {
-                        handleNavigate(<PaymentSettlementPage />, item);
+
+
+                      if (
+                        item ===
+                        "대금결제 관리"
+                      ) {
+                        handleNavigate(
+                          <PaymentSettlementPage />,
+                          item
+                        );
+
                         return;
                       }
-                      handleNavigate(<ComingSoon title={`관리비회계 · ${item}`} />, item);
+
+
+                      if (
+                        item ===
+                        "손익계산"
+                      ) {
+                        handleNavigate(
+                          <ProfitLossPage />,
+                          item
+                        );
+
+                        return;
+                      }
+
+
+                      handleNavigate(
+                        <ComingSoon
+                          title={`관리비회계 · ${item}`}
+                        />,
+                        item
+                      );
                     }}
                   />
                 </>
               )}
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 영수증발행 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-receipt-line"
                 label="영수증발행"
+
                 onClick={() => {
                   setOpenMenu("");
-                  handleNavigate(<ReceiptIssuePage />, "영수증발행");
+
+                  handleNavigate(
+                    <ReceiptIssuePage />,
+                    "영수증발행"
+                  );
                 }}
-                active={activeMenu === "영수증발행"}
+
+                active={
+                  activeMenu ===
+                  "영수증발행"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 거래처관리 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-booklet-line"
                 label="거래처관리"
+
                 onClick={() => {
                   setOpenMenu("");
-                  handleNavigate(<VendorsMainPage />, "거래처관리");
+
+                  handleNavigate(
+                    <VendorsMainPage />,
+                    "거래처관리"
+                  );
                 }}
-                active={activeMenu === "거래처관리"}
+
+                active={
+                  activeMenu ===
+                  "거래처관리"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 메모 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-sticky-note-line"
                 label="메모"
+
                 onClick={() => {
                   setOpenMenu("");
-                  handleNavigate(<MemoPage userId={userId} />, "메모");
+
+                  handleNavigate(
+                    <MemoPage
+                      userId={
+                        userId
+                      }
+                    />,
+                    "메모"
+                  );
                 }}
-                active={activeMenu === "메모"}
+
+                active={
+                  activeMenu ===
+                  "메모"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 사원관리 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-user-line"
                 label="사원관리"
+
                 onClick={() => {
                   setOpenMenu("");
-                  handleNavigate(<EmployeePage />, "사원관리");
+
+                  handleNavigate(
+                    <EmployeePage />,
+                    "사원관리"
+                  );
                 }}
-                active={activeMenu === "사원관리"}
+
+                active={
+                  activeMenu ===
+                  "사원관리"
+                }
               />
+
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 기초등록 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/70
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-settings-3-line"
                 label="기초등록"
+
                 onClick={() => {
-                  const newState = openMenu === "settings" ? "" : "settings";
-                  setOpenMenu(newState);
-                  setActiveMenu("기초등록");
+                  const newState =
+                    openMenu ===
+                    "settings"
+                      ? ""
+                      : "settings";
+
+                  setOpenMenu(
+                    newState
+                  );
+
+                  setActiveMenu(
+                    "기초등록"
+                  );
                 }}
-                active={activeMenu === "기초등록"}
+
+                active={
+                  activeMenu ===
+                  "기초등록"
+                }
+
                 hasChildren
-                isOpen={openMenu === "settings"}
+
+                isOpen={
+                  openMenu ===
+                  "settings"
+                }
               />
-              {openMenu === "settings" && (
+
+
+              {openMenu ===
+                "settings" && (
                 <>
                   <div className="hn-divider my-1.5" />
+
                   <SidebarSubmenu
-                    items={["사원코드생성", "설정"]}
-                    activeMenu={activeMenu}
+                    items={[
+                      "사원코드생성",
+                      "설정",
+                    ]}
+
+                    activeMenu={
+                      activeMenu
+                    }
+
                     onClick={(item) => {
-                      setActiveMenu(item);
-                      if (item === "사원코드생성") {
-                        handleNavigate(<UserRegisterPage />, item);
-                      } else if (item === "설정") {
-                        handleNavigate(<VendorRegisterPage />, item);
+                      setActiveMenu(
+                        item
+                      );
+
+
+                      if (
+                        item ===
+                        "사원코드생성"
+                      ) {
+                        handleNavigate(
+                          <UserRegisterPage />,
+                          item
+                        );
+                      }
+
+
+                      else if (
+                        item ===
+                        "설정"
+                      ) {
+                        handleNavigate(
+                          <VendorRegisterPage />,
+                          item
+                        );
                       }
                     }}
                   />
@@ -569,35 +1541,98 @@ const TrezoSidebar = ({ employeeId, userId, userName, onLogout, userPhotoUrl }) 
               )}
             </div>
 
-            <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-[var(--hn-border)] p-1.5 shadow-[var(--hn-softshadow)]">
+
+            {/* 업데이트 */}
+            <div
+              className="
+                rounded-2xl
+                bg-white/80
+                backdrop-blur
+                ring-1
+                ring-[var(--hn-border)]
+                p-1.5
+                shadow-[var(--hn-softshadow)]
+              "
+            >
+
               <SidebarItem
                 icon="ri-rocket-line"
                 label="업데이트"
+
                 onClick={() => {
                   setOpenMenu("");
-                  setActiveMenu("업데이트");
-                  setUpdatesOpen(true);
+
+                  setActiveMenu(
+                    "업데이트"
+                  );
+
+                  setUpdatesOpen(
+                    true
+                  );
                 }}
-                active={activeMenu === "업데이트"}
+
+                active={
+                  activeMenu ===
+                  "업데이트"
+                }
               />
+
             </div>
+
           </nav>
         </div>
       </aside>
 
-      <main className="flex-1 p-6 bg-[linear-gradient(180deg,#fafbff,white)] overflow-auto">
-        {activeContent || <Dashboard userId={userId} userName={userName} />}
+
+      <main
+        className="
+          flex-1
+          p-6
+          bg-[linear-gradient(180deg,#fafbff,white)]
+          overflow-auto
+        "
+      >
+
+        {activeContent || (
+          <Dashboard
+            userId={
+              userId
+            }
+
+            userName={
+              userName
+            }
+          />
+        )}
+
       </main>
 
+
       <UpdatesModal
-        isOpen={updatesOpen}
-        onClose={() => setUpdatesOpen(false)}
-        userId={userId}
-        employeeId={employeeId}
-        displayName={userName}
+        isOpen={
+          updatesOpen
+        }
+
+        onClose={() =>
+          setUpdatesOpen(false)
+        }
+
+        userId={
+          userId
+        }
+
+        employeeId={
+          employeeId
+        }
+
+        displayName={
+          userName
+        }
       />
+
     </div>
   );
 };
+
 
 export default TrezoSidebar;

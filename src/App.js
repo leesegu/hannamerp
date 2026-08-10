@@ -36,17 +36,24 @@ import ReceiptIssuePage from "./pages/ReceiptIssuePage";
 import IncomeImportPage from "./pages/IncomeImportPage";
 import ExpensePage from "./pages/ExpensePage";
 import DailyClosePage from "./pages/DailyClosePage";
+
 /* ✅ 월마감 추가 */
 import MonthlyClosePage from "./pages/MonthlyClosePage";
+
 /* ✅ 연간시트 추가 (직접 URL 진입용 라우트) */
 import AnnualSheetPage from "./pages/AnnualSheetPage";
 
 /* ✅ 대금결제 관리 */
 import PaymentSettlementPage from "./pages/PaymentSettlementPage.jsx";
 
+/* ✅ 손익계산 */
+import ProfitLossPage from "./pages/ProfitLossPage";
+
 import MessageExtractor from "./pages/MessageExtractor";
+
 /* ✅ 공용전기 계산 라우트 추가 */
 import PublicElectricCalcPage from "./pages/PublicElectricCalcPage";
+
 import CalendarPage from "./pages/CalendarPage";
 import PaperingPage from "./pages/PaperingPage";
 import MemoPage from "./pages/MemoPage";
@@ -90,6 +97,7 @@ import PayrollBook from "./pages/PayrollBook";
 */
 function CardExpensePageWrapper() {
   const [open, setOpen] = useState(false);
+
   return (
     <div style={{ padding: 16 }}>
       <button
@@ -110,12 +118,22 @@ function CardExpensePageWrapper() {
       >
         카드지출 열기
       </button>
+
       <CardExpenseModal open={open} onClose={() => setOpen(false)} />
     </div>
   );
 }
 
-function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, isAuthReady, authUser }) {
+function AppRoutes({
+  employeeId,
+  userId,
+  userName,
+  isMobile,
+  onLogin,
+  onLogout,
+  isAuthReady,
+  authUser,
+}) {
   const navigate = useNavigate();
 
   // ✅ 앱 로컬 로그인(사번/아이디) OR Firebase Auth 중 하나라도 있으면 로그인 상태로 간주
@@ -132,9 +150,11 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/"
         element={
-          isLoggedInEffective
-            ? <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
-            : <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
+          ) : (
+            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+          )
         }
       />
 
@@ -142,9 +162,13 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/login"
         element={
-          isLoggedInEffective
-            ? <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
-            : (isMobile ? <Navigate to="/mobile/login" replace /> : <LoginPage onLogin={onLogin} />)
+          isLoggedInEffective ? (
+            <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
+          ) : isMobile ? (
+            <Navigate to="/mobile/login" replace />
+          ) : (
+            <LoginPage onLogin={onLogin} />
+          )
         }
       />
 
@@ -152,9 +176,11 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       <Route
         path="/mobile/login"
         element={
-          isLoggedInEffective
-            ? <Navigate to="/mobile/list" replace />
-            : <MobileLogin /* onLogin={onLogin} 전달해도 무방 */ />
+          isLoggedInEffective ? (
+            <Navigate to="/mobile/list" replace />
+          ) : (
+            <MobileLogin />
+          )
         }
       />
 
@@ -163,7 +189,10 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
         path="/main"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : isMobile ? (
             <Navigate to="/mobile/list" replace />
           ) : (
@@ -182,7 +211,10 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
         path="/form"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
             <MoveoutForm
               employeeId={employeeId}
@@ -201,7 +233,10 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
           !isLoggedInEffective ? (
             <Navigate to="/mobile/login" replace />
           ) : (
-            <MoveoutFormMobile employeeId={employeeId} userId={userId} />
+            <MoveoutFormMobile
+              employeeId={employeeId}
+              userId={userId}
+            />
           )
         }
       />
@@ -213,7 +248,10 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
           !isLoggedInEffective ? (
             <Navigate to="/mobile/login" replace />
           ) : (
-            <MoveoutListMobile employeeId={employeeId} userId={userId} />
+            <MoveoutListMobile
+              employeeId={employeeId}
+              userId={userId}
+            />
           )
         }
       />
@@ -247,9 +285,15 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
         path="/list"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
-            <MoveoutList employeeId={employeeId} userId={userId} />
+            <MoveoutList
+              employeeId={employeeId}
+              userId={userId}
+            />
           )
         }
       />
@@ -257,69 +301,177 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       {/* 영수증 발행 리스트 */}
       <Route
         path="/receipts"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ReceiptIssuePage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <ReceiptIssuePage />
+          )
+        }
       />
 
       {/* 관리비회계 · 수입정리 */}
       <Route
         path="/accounting/income"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <IncomeImportPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <IncomeImportPage />
+          )
+        }
       />
 
       {/* 관리비회계 · 지출정리 */}
       <Route
         path="/accounting/expense"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ExpensePage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <ExpensePage />
+          )
+        }
       />
 
       {/* ✅ 관리비회계 · 대금결제 관리 */}
       <Route
         path="/accounting/payment-settlement"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PaymentSettlementPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <PaymentSettlementPage />
+          )
+        }
+      />
+
+      {/* ✅ 관리비회계 · 손익계산 */}
+      <Route
+        path="/accounting/profit-loss"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <ProfitLossPage />
+          )
+        }
       />
 
       {/* 관리비회계 · 일마감 */}
       <Route
         path="/accounting/daily-close"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <DailyClosePage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <DailyClosePage />
+          )
+        }
       />
 
       {/* 관리비회계 · 월마감 */}
       <Route
         path="/accounting/monthly-close"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MonthlyClosePage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <MonthlyClosePage />
+          )
+        }
       />
 
       {/* ✅ 관리비회계 · 연간시트 (직접 URL 접근용) */}
       <Route
         path="/accounting/annual-sheet"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <AnnualSheetPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <AnnualSheetPage />
+          )
+        }
       />
 
       {/* 전기요금 추출 */}
       <Route
         path="/extract"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MessageExtractor />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <MessageExtractor />
+          )
+        }
       />
 
-      {/* ✅ 공용전기 계산 (직접 URL 접근용 라우트 추가) */}
+      {/* ✅ 공용전기 계산 */}
       <Route
         path="/public-electric-calc"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PublicElectricCalcPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <PublicElectricCalcPage />
+          )
+        }
       />
 
       {/* 캘린더 */}
       <Route
         path="/calendar"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CalendarPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <CalendarPage />
+          )
+        }
       />
 
-      {/* ✅ 일정관리(어제/오늘/내일 + 대형 달력 + 개인/공유 + 알람) */}
+      {/* ✅ 일정관리 */}
       <Route
         path="/schedule"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
             <ScheduleManager />
           )
@@ -329,86 +481,287 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
       {/* 부가서비스 */}
       <Route
         path="/papering"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PaperingPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <PaperingPage />
+          )
+        }
       />
 
       {/* 메모 */}
       <Route
         path="/memo"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MemoPage userId={userId} />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <MemoPage userId={userId} />
+          )
+        }
       />
 
       {/* 기타 메뉴 */}
-      <Route path="/villa" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <VillaCodePage />} />
-      <Route path="/telco" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <TelcoPage />} />
-      <Route path="/elevator" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ElevatorPage />} />
-      <Route path="/septic" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <SepticPage />} />
-      <Route path="/fire-safety" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <FireSafetyPage />} />
-      <Route path="/electric-safety" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ElectricSafetyPage />} />
-      <Route path="/water" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <WaterPage />} />
-      <Route path="/public-electric" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <PublicElectricPage />} />
-      <Route path="/cleaning" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CleaningPage />} />
-      <Route path="/cctv" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <CctvPage />} />
+      <Route
+        path="/villa"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <VillaCodePage />
+          )
+        }
+      />
+
+      <Route
+        path="/telco"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <TelcoPage />
+          )
+        }
+      />
+
+      <Route
+        path="/elevator"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <ElevatorPage />
+          )
+        }
+      />
+
+      <Route
+        path="/septic"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <SepticPage />
+          )
+        }
+      />
+
+      <Route
+        path="/fire-safety"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <FireSafetyPage />
+          )
+        }
+      />
+
+      <Route
+        path="/electric-safety"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <ElectricSafetyPage />
+          )
+        }
+      />
+
+      <Route
+        path="/water"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <WaterPage />
+          )
+        }
+      />
+
+      <Route
+        path="/public-electric"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <PublicElectricPage />
+          )
+        }
+      />
+
+      <Route
+        path="/cleaning"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <CleaningPage />
+          )
+        }
+      />
+
+      <Route
+        path="/cctv"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <CctvPage />
+          )
+        }
+      />
 
       {/* 기초등록/사원 */}
-      <Route path="/basic/vendor-register" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <VendorRegisterPage />} />
-      <Route path="/employee" element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <EmployeePage />} />
+      <Route
+        path="/basic/vendor-register"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <VendorRegisterPage />
+          )
+        }
+      />
 
-      {/* ✅ (추가) 부가서비스 · 입주자카드 (직접 URL 접근용 라우트) */}
+      <Route
+        path="/employee"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <EmployeePage />
+          )
+        }
+      />
+
+      {/* ✅ 부가서비스 · 입주자카드 */}
       <Route
         path="/addon/resident-card"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <ResidentCardPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <ResidentCardPage />
+          )
+        }
       />
 
-      {/* ✅ (추가) 부가서비스 · 자재비관리대장 (직접 URL 접근용 라우트) */}
+      {/* ✅ 부가서비스 · 자재비관리대장 */}
       <Route
         path="/addon/material-cost"
-        element={!isLoggedInEffective ? <Navigate to={isMobile ? "/mobile/login" : "/login"} replace /> : <MaterialCostPage />}
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
+          ) : (
+            <MaterialCostPage />
+          )
+        }
       />
 
-      {/* ✅ (추가) 부가서비스 · 정산하자체크 (직접 URL 접근용 라우트) */}
+      {/* ✅ 부가서비스 · 정산하자체크 */}
       <Route
         path="/addon/settlement-defect-check"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
             <SettlementDefectCheckPage />
           )
         }
       />
 
-      {/* ✅ (추가) 관리비회계 · 카드지출 (직접 URL 접근용 라우트)
-          - 기존 코드에 영향 없이, 로그인 상태에서 접근 시 버튼 → 팝업 */}
+      {/* ✅ 관리비회계 · 카드지출 */}
       <Route
         path="/accounting/card-expense"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
             <CardExpensePageWrapper />
           )
         }
       />
 
-      {/* ✅ (추가) 증명서 발급 페이지 라우트 */}
+      {/* ✅ 증명서 발급 */}
       <Route
         path="/certificates"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
             <CertificateIssuePage />
           )
         }
       />
 
-      {/* ✅ (추가) 급여대장 라우트 */}
+      {/* ✅ 급여대장 */}
       <Route
         path="/payroll-book"
         element={
           !isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           ) : (
             <PayrollBook />
           )
@@ -420,9 +773,15 @@ function AppRoutes({ employeeId, userId, userName, isMobile, onLogin, onLogout, 
         path="*"
         element={
           isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/list" : "/main"}
+              replace
+            />
           ) : (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={isMobile ? "/mobile/login" : "/login"}
+              replace
+            />
           )
         }
       />
@@ -447,26 +806,41 @@ function App() {
     setUserId(id);
     setEmployeeId(employeeNo);
     setUserName(name);
-    try { localStorage.setItem("autoLogin", JSON.stringify({ id, employeeNo, name })); } catch {}
+
+    try {
+      localStorage.setItem(
+        "autoLogin",
+        JSON.stringify({ id, employeeNo, name })
+      );
+    } catch {}
   };
 
   const handleLogout = async () => {
-    try { localStorage.removeItem("autoLogin"); } catch {}
+    try {
+      localStorage.removeItem("autoLogin");
+    } catch {}
+
     setUserId("");
     setEmployeeId("");
     setUserName("");
+
     // ✅ 모바일(Firebase Auth) 로그아웃도 함께 시도 (실패해도 무시)
-    try { await signOut(auth); } catch {}
+    try {
+      await signOut(auth);
+    } catch {}
   };
 
   useEffect(() => {
     const stored = localStorage.getItem("autoLogin");
+
     if (stored) {
       const { id, employeeNo, name } = JSON.parse(stored);
+
       setUserId(id);
       setEmployeeId(employeeNo);
       setUserName(name);
     }
+
     setLoading(false);
   }, []);
 
@@ -476,14 +850,115 @@ function App() {
       setAuthUser(u || null);
       setIsAuthReady(true);
     });
+
     return () => unsub();
   }, []);
 
+  /*
+   * =========================================================
+   * ✅ 모바일 / PC 화면 판정
+   * ---------------------------------------------------------
+   * 수정 목적:
+   *
+   * - 스마트폰:
+   *   기존처럼 768px 이하에서 모바일 ERP 사용
+   *
+   * - Android 태블릿:
+   *   삼성 인터넷 창을 반으로 줄이거나
+   *   분할화면 / 팝업화면으로 작게 만들어도
+   *   절대 모바일 ERP로 자동 전환하지 않음
+   *
+   * 중요:
+   * window.innerWidth만으로 태블릿을 판단하지 않고
+   * 기기 자체의 screen.width / screen.height를 먼저 확인
+   * =========================================================
+   */
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    const checkMobile = () => {
+      const userAgent =
+        window.navigator.userAgent || "";
+
+      /* Android 기기 여부 */
+      const isAndroid =
+        /Android/i.test(userAgent);
+
+      /*
+       * 현재 브라우저 창 너비가 아니라
+       * 기기 자체 화면 크기를 확인
+       *
+       * 따라서 분할화면으로 삼성 인터넷 창이
+       * 768px 이하가 되어도 태블릿 판정은 유지됨
+       */
+      const screenWidth =
+        window.screen?.width || 0;
+
+      const screenHeight =
+        window.screen?.height || 0;
+
+      const deviceShortSide =
+        Math.min(
+          screenWidth,
+          screenHeight
+        );
+
+      /*
+       * Android 태블릿 판정
+       *
+       * 짧은 변이 600px 이상이면
+       * 태블릿으로 판단
+       */
+      const isAndroidTablet =
+        isAndroid &&
+        deviceShortSide >= 600;
+
+      /*
+       * ✅ 태블릿은 창 크기와 관계없이
+       * 항상 PC ERP 유지
+       *
+       * 전체화면
+       * 분할화면
+       * 팝업창
+       * 작은 인터넷 창
+       *
+       * 모두 PC 버전 유지
+       */
+      if (isAndroidTablet) {
+        setIsMobile(false);
+        return;
+      }
+
+      /*
+       * 태블릿이 아닌 장치만
+       * 기존 모바일 판정 그대로 사용
+       */
+      setIsMobile(
+        window.innerWidth <= 768
+      );
+    };
+
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+
+    window.addEventListener(
+      "resize",
+      checkMobile
+    );
+
+    window.addEventListener(
+      "orientationchange",
+      checkMobile
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        checkMobile
+      );
+
+      window.removeEventListener(
+        "orientationchange",
+        checkMobile
+      );
+    };
   }, []);
 
   if (loading || !isAuthReady) return null;

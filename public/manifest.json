@@ -1,6 +1,6 @@
 {
   "short_name": "한남ERP",
-  "name": "한남 이사정산",
+  "name": "한남주택관리 ERP",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,7 +20,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "landscape",
   "theme_color": "#ff6e00",
   "background_color": "#ffffff"
 }
