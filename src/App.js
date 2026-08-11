@@ -64,6 +64,8 @@ import MobileCalendarPage from "./pages/MobileCalendarPage";
 /* ✅ 추가: 모바일 전용 개인 장부 페이지 import */
 import MobilePersonalLedgerPage from "./pages/MobilePersonalLedgerPage";
 
+import WaterMeterReadingMobilePage from "./pages/WaterMeterReadingMobilePage";
+
 /* ✅ 추가: 일정관리(어제·오늘·내일 + 대형 달력) */
 import ScheduleManager from "./pages/ScheduleManager";
 
@@ -75,6 +77,9 @@ import MaterialCostPage from "./pages/MaterialCostPage";
 
 /* ✅ [추가] 정산하자체크 페이지 import */
 import SettlementDefectCheckPage from "./pages/SettlementDefectCheckPage";
+
+/* ✅ 수도검침조회 */
+import WaterMeterReadingPage from "./pages/WaterMeterReadingPage";
 
 import "./App.css";
 
@@ -278,6 +283,13 @@ function AppRoutes({
             <MobilePersonalLedgerPage />
           )
         }
+      />
+
+      {/* ✅ 수도검침원 모바일 전용 접속 */}
+      {/* 기존 ERP 로그인과 별도로 검침원 이름 + 연락처로 접속 */}
+      <Route
+        path="/mobile/water-reading"
+        element={<WaterMeterReadingMobilePage />}
       />
 
       {/* PC 조회 */}
@@ -722,6 +734,21 @@ function AppRoutes({
           )
         }
       />
+
+      {/* ✅ 부가서비스 · 수도검침조회 */}
+<Route
+  path="/addon/water-meter-reading"
+  element={
+    !isLoggedInEffective ? (
+      <Navigate
+        to={isMobile ? "/mobile/login" : "/login"}
+        replace
+      />
+    ) : (
+      <WaterMeterReadingPage />
+    )
+  }
+/>
 
       {/* ✅ 관리비회계 · 카드지출 */}
       <Route

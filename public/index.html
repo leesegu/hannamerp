@@ -50,11 +50,41 @@
       href="%PUBLIC_URL%/logo192.png"
     />
 
-    <!-- ✅ PWA manifest -->
-    <link
-      rel="manifest"
-      href="%PUBLIC_URL%/manifest.json"
-    />
+    <!--
+      =====================================================
+      ✅ PWA manifest 자동 분리
+
+      일반 ERP
+      → manifest.json
+
+      수도검침 모바일
+      → manifest-water-reading.json
+
+      중요:
+      기존 ERP manifest는 그대로 유지하기 때문에
+      기존 PC / 태블릿 ERP 홈화면 실행에는 영향 없음
+      =====================================================
+    -->
+    <script>
+      (function () {
+        var pathname = window.location.pathname || "";
+
+        var isWaterReading =
+          pathname === "/mobile/water-reading" ||
+          pathname.startsWith("/mobile/water-reading/");
+
+        var manifestLink =
+          document.createElement("link");
+
+        manifestLink.rel = "manifest";
+
+        manifestLink.href = isWaterReading
+          ? "%PUBLIC_URL%/manifest-water-reading.json"
+          : "%PUBLIC_URL%/manifest.json";
+
+        document.head.appendChild(manifestLink);
+      })();
+    </script>
 
     <!-- RemixIcon CDN -->
     <link

@@ -71,10 +71,15 @@ const dateToNum = (v) => {
   return parseInt(`${y}${m}${dd}`, 10);
 };
 
-/* ===== '도배' 판별 & 합계 ===== */
+/* ===== '도배/벽지' 판별 & 합계 =====
+   ✅ 수정된 부분: 적는 사람마다 "도배", "도배비", "도배비용", "벽지", "벽지비용" 등
+   다르게 적더라도 모두 도배 관련 항목으로 인식하도록 키워드 목록 방식으로 변경.
+   나중에 다른 표현이 추가로 발견되면 PAPERING_KEYWORDS 배열에만 단어를 추가하면 됩니다. */
+const PAPERING_KEYWORDS = ["도배", "벽지"];
+
 const isPaperingDesc = (desc) => {
   const t = s(desc).replace(/\s+/g, "");
-  return t.includes("도배");
+  return PAPERING_KEYWORDS.some((kw) => t.includes(kw));
 };
 const sumPaperingAmount = (extras) => {
   if (!Array.isArray(extras)) return 0;

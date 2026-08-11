@@ -1,1160 +1,1704 @@
 // src/pages/PaymentSettlementPage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./PaymentSettlementPage.css";
-
 import { db } from "../firebase";
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp,
-  arrayUnion, arrayRemove
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
-/* ───────────────── 유틸 ───────────────── */
-const toCurrency = (n) => (Number(n || 0)).toLocaleString("ko-KR");
-const ymKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-const monthIndex = (d) => d.getMonth() + 1;
+import PageTitle from "../components/PageTitle";
+import "./PaymentSettlementPage.css";
+
+/* ✅ 부과시작월 선택용 - 스타일 적용된 달력 */
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { ko } from "date-fns/locale";
+
+/* ===== 유틸 ===== */
 const s = (v) => String(v ?? "").trim();
+const parseNumber = (v) =>
+  parseInt(String(v ?? "").replace(/[^0-9\-]/g, ""), 10) || 0;
+const fmtComma = (n) => {
+  const num = parseNumber(n);
+  return num === 0 ? "" : num.toLocaleString();
+};
+const fmtWon = (n) => `${parseNumber(n).toLocaleString()}원`;
 
-/* ───────── 외부 클릭 닫기 ───────── */
-function useOnClickOutside(ref, handler) {
-  useEffect(() => {
-    const fn = (e) => {
-      if (!ref.current || ref.current.contains(e.target)) return;
-      handler?.();
-    };
-    document.addEventListener("mousedown", fn);
-    return () => document.removeEventListener("mousedown", fn);
-  }, [ref, handler]);
-}
+const pad2 = (n) => String(n).padStart(2, "0");
+const nowYm = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+};
+const shiftYm = (ym, delta) => {
+  const [y, m] = s(ym).split("-").map((x) => parseInt(x, 10));
+  const d = new Date(y || new Date().getFullYear(), (m || 1) - 1 + delta, 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+};
+const ymLabel = (ym) => {
+  const [y, m] = s(ym).split("-").map((x) => parseInt(x, 10));
+  if (!y || !m) return ym;
+  return `${y}년 ${m}월`;
+};
 
-/* ───────── 커스텀 MonthPicker (연/월) ───────── */
-function MonthPicker({ valueDate, onChange }) {
-  const [open, setOpen] = useState(false);
-  const [year, setYear] = useState(valueDate.getFullYear());
-  const ref = useRef(null);
-  useOnClickOutside(ref, () => setOpen(false));
-  useEffect(() => setYear(valueDate.getFullYear()), [valueDate]);
+/* ✅ 구분별 ERP 자동수집 매핑
+   여기 등록된 "구분"으로 건물별 계약 관리를 켜면, villas 컬렉션에서
+   matchField 값이 업체명과 일치하는 건물을 자동으로 가져옵니다.
+   전기안전/소방안전 페이지가 준비되면 이 목록에 필드명만 추가하면 됩니다. */
+const AUTO_SOURCE_CONFIG = {
+  승강기: { matchField: "elevator", amountField: "elevatorAmount" },
+};
 
-  const selectMonth = (m) => {
-    const d = new Date(year, m - 1, 1);
-    onChange?.(d);
-    setOpen(false);
-  };
-  const years = [];
-  const base = new Date().getFullYear();
-  for (let y = base - 2; y <= base + 2; y++) years.push(y);
+/* 연-월 문자열(YYYY-MM) ↔ Date 변환 (부과시작월 달력용) */
+const ymToDate = (ym) => {
+  const v = s(ym);
+  if (!/^\d{4}-\d{2}$/.test(v)) return null;
+  const [y, m] = v.split("-").map((x) => parseInt(x, 10));
+  const d = new Date(y, m - 1, 1);
+  return isNaN(d.getTime()) ? null : d;
+};
+const dateToYm = (d) => {
+  if (!d) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+};
 
-  return (
-    <div className="mp-wrap" ref={ref}>
-      <button
-        className="select like-input month-trigger slim with-iconless center-text"
-        onClick={() => setOpen(v=>!v)}
-        aria-label="대상월 선택"
-        type="button"
-      >
-        <i className="ri-calendar-event-line"></i>
-        <span className="ym-label">{ymKey(valueDate)}</span>
-      </button>
-      {open && (
-        <div className="mp-panel">
-          <div className="mp-head">
-            <i className="ri-sparkling-2-line"></i>
-            <select className="select bare" value={year} onChange={(e)=>setYear(Number(e.target.value))}>
-              {years.map((y) => <option key={y} value={y}>{y}년</option>)}
-            </select>
-          </div>
-          <div className="mp-grid">
-            {Array.from({ length: 12 }).map((_, i) => {
-              const m = i + 1;
-              const isNow = valueDate.getFullYear() === year && valueDate.getMonth() + 1 === m;
-              return (
-                <button key={m} className={`mp-cell ${isNow ? "now" : ""}`} onClick={()=>selectMonth(m)} type="button">{m}월</button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+const DEFAULT_CATEGORIES = {
+  "10일": ["건물청소", "기타"],
+  말일: [
+    "승강기",
+    "전기안전",
+    "소방안전",
+    "사무실월세",
+    "사무실수도",
+    "전산",
+    "청소비",
+    "대표자활동비",
+    "건물주",
+    "기타",
+  ],
+};
 
-/* ───────── 공통 모달 ───────── */
-function Modal({
-  open, onClose, title, width = 980, children, footer,
-  hideCloseIcon = false, headerExtra = null,
-  showIcon = true, headCompact = false
-}) {
+/* ===== 부과시작월 선택용 - 스타일 있는 달력 트리거 버튼 ===== */
+const MonthPickerInput = React.forwardRef(({ value, onClick }, ref) => (
+  <button
+    type="button"
+    ref={ref}
+    onClick={onClick}
+    className={`pmt-month-picker-btn ${value ? "has-value" : ""}`}
+  >
+    <span className="pmt-month-picker-icon">📅</span>
+    <span>{value || "부과시작월"}</span>
+  </button>
+));
+
+/* ===== 간단 모달 ===== */
+function SimpleModal({ open, title, children, onClose, size = "lg" }) {
   if (!open) return null;
+  const panelClass =
+    size === "sm"
+      ? "pmt-modal-panel pmt-modal-panel--sm"
+      : size === "xl"
+      ? "pmt-modal-panel pmt-modal-panel--xl"
+      : "pmt-modal-panel";
   return (
-    <div className="psp-modal-backdrop" onClick={onClose}>
-      <div
-        className={`psp-modal glam ${headCompact ? "head-compact" : ""}`}
-        style={{ maxWidth: width, width }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="psp-modal-head">
-          <div className="headline">
-            {showIcon ? <i className="ri-flashlight-line"></i> : null}
-            <h3>{title}</h3>
-          </div>
-          <div className="head-extra">{headerExtra}</div>
-          {!hideCloseIcon && (
-            <button className="icon-btn" onClick={onClose} aria-label="닫기" type="button">
-              <i className="ri-close-line" />
-            </button>
-          )}
+    <div className="pmt-modal-overlay">
+      <div className="pmt-modal-backdrop" onClick={onClose} />
+      <div className={panelClass}>
+        <div className="pmt-modal-header">
+          <h3 className="pmt-modal-title">{title}</h3>
+          <button type="button" className="pmt-modal-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
-        <div className="psp-modal-body">{children}</div>
-        {footer && <div className="psp-modal-foot sticky-foot">{footer}</div>}
+        <div className="pmt-modal-body">{children}</div>
       </div>
     </div>
   );
 }
 
-/* ───────── (간단 구현) 결제 등록 모달 ───────── */
-/* 기존에 별도 파일이 있다면 이 블록 제거 후 import 하세요. */
-function RegisterModal({
-  open, onClose, onSubmit, categories, vendorNamesByCat,
-  mode = "create",
-  initial = {
-    category: "", vendorName: "", bank: "", accountHolder: "", accountNo: "",
-    amount: "", note: "", cycle: "말일", addToSites: false,
-  },
-}) {
-  const [form, setForm] = useState(initial);
-  useEffect(() => setForm(initial), [open, initial]);
+/* ===== 카테고리(구분) 관리 모달 ===== */
+function CategoryManagerModal({ open, onClose, payType }) {
+  const [items, setItems] = useState([]);
+  const [newItem, setNewItem] = useState("");
 
-  const onChange = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const vendorOptions = vendorNamesByCat?.[form.category] || [];
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const ref = doc(db, "serviceSettings", `결제구분_${payType}`);
+      const snap = await getDoc(ref);
+      const arr = Array.isArray(snap.data()?.items)
+        ? snap.data().items.filter((x) => s(x) !== "")
+        : [];
+      setItems(arr);
+    })();
+  }, [open, payType]);
 
-  const handleSubmit = async () => {
+  const save = async (nextItems) => {
+    setItems(nextItems);
+    await setDoc(
+      doc(db, "serviceSettings", `결제구분_${payType}`),
+      { items: nextItems },
+      { merge: true }
+    );
+  };
+
+  const handleAdd = () => {
+    const v = s(newItem);
+    if (!v || items.includes(v)) return;
+    save([...items, v]);
+    setNewItem("");
+  };
+
+  const handleRemove = (v) => {
+    if (!window.confirm(`"${v}" 구분을 삭제할까요?`)) return;
+    save(items.filter((x) => x !== v));
+  };
+
+  return (
+    <SimpleModal open={open} title={`구분 관리 (${payType})`} onClose={onClose} size="sm">
+      <div className="pmt-cat-list">
+        {items.length === 0 && (
+          <div className="pmt-cat-empty">등록된 구분이 없습니다.</div>
+        )}
+        {items.map((it) => (
+          <div key={it} className="pmt-cat-row">
+            <span>{it}</span>
+            <button
+              type="button"
+              className="pmt-cat-del"
+              onClick={() => handleRemove(it)}
+            >
+              삭제
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="pmt-cat-add">
+        <input
+          type="text"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder="새 구분 입력"
+          className="pmt-input"
+        />
+        <button type="button" className="pmt-btn pmt-btn-primary" onClick={handleAdd}>
+          추가
+        </button>
+      </div>
+    </SimpleModal>
+  );
+}
+
+/* ===== 지급 대상(거래처/담당자) 등록·수정 폼 ===== */
+function PayeeFormModal({ open, onClose, onSaved, payType, categories, initial }) {
+  const isEdit = !!initial?.id;
+
+  const [form, setForm] = useState(() => ({
+    tableGroup: initial?.tableGroup || (payType === "10일" ? "청소비" : ""),
+    category: initial?.category || "",
+    name: initial?.name || "",
+    bank: initial?.bank || "",
+    account: initial?.account || "",
+    note: initial?.note || "",
+    active: initial?.active !== false,
+    defaultCleaningFee: fmtComma(initial?.defaultCleaningFee) || "",
+    defaultEnvelopeFee: fmtComma(initial?.defaultEnvelopeFee) || "",
+    defaultSalary: fmtComma(initial?.defaultSalary) || "",
+    defaultAllowance: fmtComma(initial?.defaultAllowance) || "",
+    defaultAmount: fmtComma(initial?.defaultAmount) || "",
+    hasBuildings: !!initial?.hasBuildings,
+  }));
+
+  const [buildings, setBuildings] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    // 새로 등록하는 경우: 건물 목록은 빈 배열에서 시작
+    if (!initial?.id) {
+      setBuildings([]);
+      return;
+    }
+
+    // 수정하는 경우, 말일 + 건물계약 대상이면 기존 건물 목록을 불러옴
+    if (payType !== "말일") {
+      setBuildings([]);
+      return;
+    }
+
+    (async () => {
+      const snap = await getDocs(
+        collection(db, "paymentPayees", initial.id, "buildings")
+      );
+      setBuildings(
+        snap.docs.map((d) => ({
+          id: d.id,
+          buildingName: d.data().buildingName || "",
+          monthlyAmount: fmtComma(d.data().monthlyAmount) || "",
+          startYearMonth: d.data().startYearMonth || "",
+          villaId: d.data().villaId || null,
+        }))
+      );
+    })();
+  }, [open, initial?.id, payType]);
+
+  /* ✅ ERP(villas)에서 이 업체 이름과 일치하는 건물을 자동으로 가져와 병합합니다.
+     이미 목록에 있는 건물(villaId로 매칭)은 금액만 최신화하고,
+     직접 추가한 건물(villaId 없음)은 그대로 유지합니다. */
+  const fetchBuildingsFromErp = async ({ silent = false } = {}) => {
+    const cfg = AUTO_SOURCE_CONFIG[form.category];
+    if (!cfg) {
+      if (!silent) {
+        alert(
+          `"${form.category || "선택 안 됨"}" 구분은 아직 ERP 자동수집이 연결되어 있지 않습니다.\n건물을 직접 추가해 주세요.`
+        );
+      }
+      return;
+    }
+    if (!s(form.name)) {
+      if (!silent) alert("먼저 업체명을 입력해 주세요. (ERP에 저장된 업체명과 정확히 일치해야 자동으로 수집됩니다)");
+      return;
+    }
+    try {
+      const qy = query(
+        collection(db, "villas"),
+        where(cfg.matchField, "==", s(form.name))
+      );
+      const snap = await getDocs(qy);
+      if (snap.empty) {
+        if (!silent)
+          alert(`"${form.name}" 업체로 등록된 건물을 ERP에서 찾지 못했습니다.`);
+        return;
+      }
+      setBuildings((prev) => {
+        const byVillaId = new Map(prev.filter((b) => b.villaId).map((b) => [b.villaId, b]));
+        const manualRows = prev.filter((b) => !b.villaId);
+        const merged = snap.docs.map((d) => {
+          const v = d.data();
+          const old = byVillaId.get(d.id);
+          return {
+            id: old?.id || `villa_${d.id}`,
+            villaId: d.id,
+            buildingName: s(v.name) || s(v.code) || "이름없음",
+            monthlyAmount: fmtComma(v[cfg.amountField]) || "",
+            startYearMonth: old?.startYearMonth || "",
+          };
+        });
+        return [...merged, ...manualRows];
+      });
+    } catch (e) {
+      console.error(e);
+      if (!silent) alert("ERP 건물 정보를 불러오는 중 오류가 발생했습니다.");
+    }
+  };
+
+  /* ✅ 건물별 계약 관리를 켜거나, 구분/업체명이 바뀌면 자동으로 ERP와 동기화 */
+  useEffect(() => {
+    if (!open) return;
+    if (payType !== "말일") return;
+    if (!form.hasBuildings) return;
+    if (!AUTO_SOURCE_CONFIG[form.category]) return;
+    if (!s(form.name)) return;
+    fetchBuildingsFromErp({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, payType, form.hasBuildings, form.category, form.name]);
+
+  const handleChange = (key, val) => setForm((p) => ({ ...p, [key]: val }));
+  const handleAmount = (key, val) => handleChange(key, fmtComma(parseNumber(val)));
+
+  const addBuildingRow = () => {
+    setBuildings((prev) => [
+      ...prev,
+      {
+        id: `new_${Date.now()}_${prev.length}`,
+        buildingName: "",
+        monthlyAmount: "",
+        startYearMonth: "",
+        villaId: null,
+      },
+    ]);
+  };
+  const updateBuildingRow = (id, key, val) => {
+    setBuildings((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? { ...b, [key]: key === "monthlyAmount" ? fmtComma(parseNumber(val)) : val }
+          : b
+      )
+    );
+  };
+  const removeBuildingRow = (id) => {
+    setBuildings((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!s(form.name)) {
+      alert("이름/업체명을 입력해 주세요.");
+      return;
+    }
+
     const payload = {
+      payType,
       category: s(form.category),
-      vendorName: s(form.vendorName),
+      name: s(form.name),
       bank: s(form.bank),
-      accountHolder: s(form.accountHolder),
-      accountNo: s(form.accountNo),
-      amount: Number(String(form.amount).replace(/[^\d]/g, "")) || 0,
+      account: s(form.account),
       note: s(form.note),
-      cycle: form.cycle || "말일",
+      active: !!form.active,
       updatedAt: serverTimestamp(),
     };
-    await onSubmit?.(payload, form.addToSites);
-    onClose?.();
+
+    if (payType === "10일") {
+      payload.tableGroup = form.tableGroup;
+      if (form.tableGroup === "청소비") {
+        payload.defaultCleaningFee = parseNumber(form.defaultCleaningFee);
+        payload.defaultEnvelopeFee = parseNumber(form.defaultEnvelopeFee);
+      } else {
+        payload.defaultSalary = parseNumber(form.defaultSalary);
+        payload.defaultAllowance = parseNumber(form.defaultAllowance);
+      }
+    } else {
+      payload.hasBuildings = !!form.hasBuildings;
+      if (!form.hasBuildings) {
+        payload.defaultAmount = parseNumber(form.defaultAmount);
+      }
+    }
+
+    try {
+      let payeeId = initial?.id;
+      if (isEdit) {
+        await updateDoc(doc(db, "paymentPayees", payeeId), payload);
+      } else {
+        const added = await addDoc(collection(db, "paymentPayees"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+        payeeId = added.id;
+      }
+
+      if (payType === "말일" && form.hasBuildings) {
+        const existingSnap = await getDocs(
+          collection(db, "paymentPayees", payeeId, "buildings")
+        );
+        await Promise.all(
+          existingSnap.docs.map((d) =>
+            deleteDoc(doc(db, "paymentPayees", payeeId, "buildings", d.id))
+          )
+        );
+        await Promise.all(
+          buildings
+            .filter((b) => s(b.buildingName))
+            .map((b) =>
+              addDoc(collection(db, "paymentPayees", payeeId, "buildings"), {
+                buildingName: s(b.buildingName),
+                monthlyAmount: parseNumber(b.monthlyAmount),
+                startYearMonth: s(b.startYearMonth),
+                villaId: b.villaId || null,
+                active: true,
+              })
+            )
+        );
+      }
+
+      onSaved?.();
+    } catch (err) {
+      console.error(err);
+      alert("저장 중 오류가 발생했습니다.");
+    }
   };
 
   return (
-    <Modal
+    <SimpleModal
       open={open}
+      title={isEdit ? "지급 대상 수정" : "지급 대상 등록"}
       onClose={onClose}
-      title="결제등록"
-      width={820}
-      hideCloseIcon
-      showIcon={false}
-      headCompact
-      footer={
-        <div className="foot-actions">
-          <button className="btn-eq primary" onClick={handleSubmit} type="button">
-            <i className="ri-check-line" /> {mode === "edit" ? "수정" : "저장"}
-          </button>
-          <button className="btn-eq ghost" onClick={onClose} type="button">
-            <i className="ri-close-circle-line" /> 닫기
-          </button>
-        </div>
-      }
+      size="lg"
     >
-      <div className="reg-grid">
-        <div className="row two">
-          <div className="field">
-            <label>구분</label>
-            <select className="select" value={form.category} onChange={(e)=>onChange("category", e.target.value)}>
-              <option value="">선택</option>
-              {categories.map((c)=> <option key={c} value={c}>{c}</option>)}
-            </select>
+      <form onSubmit={handleSubmit} className="pmt-form">
+        {payType === "10일" && (
+          <div className="pmt-form-row">
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">그룹</label>
+              <select
+                value={form.tableGroup}
+                onChange={(e) => handleChange("tableGroup", e.target.value)}
+                className="pmt-input pmt-input-select"
+              >
+                <option value="청소비">청소비 (표A)</option>
+                <option value="월급">월급 (표B)</option>
+              </select>
+            </div>
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">구분</label>
+              <select
+                value={form.category}
+                onChange={(e) => handleChange("category", e.target.value)}
+                className="pmt-input pmt-input-select"
+              >
+                <option value="">선택</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="field">
-            <label>거래처명</label>
-            <input className="input" value={form.vendorName} onChange={(e)=>onChange("vendorName", e.target.value)} list="vendorOptions" />
-            <datalist id="vendorOptions">
-              {vendorOptions.map(v => <option key={v} value={v} />)}
-            </datalist>
-          </div>
-        </div>
+        )}
 
-        <div className="row three">
-          <div className="field">
-            <label>은행</label>
-            <input className="input" value={form.bank} onChange={(e)=>onChange("bank", e.target.value)} />
+        {payType === "말일" && (
+          <div className="pmt-form-row">
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">구분</label>
+              <select
+                value={form.category}
+                onChange={(e) => handleChange("category", e.target.value)}
+                className="pmt-input pmt-input-select"
+              >
+                <option value="">선택</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="pmt-form-field pmt-form-field-checkbox">
+              <label className="pmt-form-label">건물별 계약 관리</label>
+              <label className="pmt-switch-wrap">
+                <span className="pmt-switch">
+                  <input
+                    type="checkbox"
+                    checked={form.hasBuildings}
+                    onChange={(e) => handleChange("hasBuildings", e.target.checked)}
+                  />
+                  <span className="pmt-switch-track">
+                    <span className="pmt-switch-thumb" />
+                  </span>
+                </span>
+                <span className="pmt-switch-text">
+                  승강기/전기/소방처럼 건물마다 금액이 다르면 켜주세요
+                </span>
+              </label>
+            </div>
           </div>
-          <div className="field">
-            <label>예금주</label>
-            <input className="input" value={form.accountHolder} onChange={(e)=>onChange("accountHolder", e.target.value)} />
-          </div>
-          <div className="field">
-            <label>계좌번호</label>
-            <input className="input mono" value={form.accountNo} onChange={(e)=>onChange("accountNo", e.target.value)} />
-          </div>
-        </div>
+        )}
 
-        <div className="row two">
-          <div className="field">
-            <label>금액</label>
+        <div className="pmt-form-row">
+          <div className="pmt-form-field">
+            <label className="pmt-form-label">
+              {payType === "10일" ? "이름" : "업체명"}
+            </label>
             <input
-              className="input ar"
-              inputMode="numeric"
-              value={form.amount}
-              onChange={(e)=>onChange("amount", e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="0"
+              type="text"
+              value={form.name}
+              onChange={(e) => handleChange("name", e.target.value)}
+              className="pmt-input"
             />
           </div>
-          <div className="field">
-            <label>결제주기</label>
-            <select className="select" value={form.cycle} onChange={(e)=>onChange("cycle", e.target.value)}>
-              <option value="말일">말일</option>
-              <option value="10일">10일</option>
-            </select>
+        </div>
+
+        <div className="pmt-form-row">
+          <div className="pmt-form-field">
+            <label className="pmt-form-label">은행</label>
+            <input
+              type="text"
+              value={form.bank}
+              onChange={(e) => handleChange("bank", e.target.value)}
+              className="pmt-input"
+            />
+          </div>
+          <div className="pmt-form-field">
+            <label className="pmt-form-label">계좌</label>
+            <input
+              type="text"
+              value={form.account}
+              onChange={(e) => handleChange("account", e.target.value)}
+              className="pmt-input"
+            />
           </div>
         </div>
 
-        <div className="row one">
-          <div className="field">
-            <label>비고</label>
-            <input className="input" value={form.note} onChange={(e)=>onChange("note", e.target.value)} />
+        {payType === "10일" && form.tableGroup === "청소비" && (
+          <div className="pmt-form-row">
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">기본 청소비</label>
+              <input
+                type="text"
+                value={form.defaultCleaningFee}
+                onChange={(e) => handleAmount("defaultCleaningFee", e.target.value)}
+                className="pmt-input pmt-input-number"
+                placeholder="0"
+              />
+            </div>
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">기본 봉투/스티커</label>
+              <input
+                type="text"
+                value={form.defaultEnvelopeFee}
+                onChange={(e) => handleAmount("defaultEnvelopeFee", e.target.value)}
+                className="pmt-input pmt-input-number"
+                placeholder="0"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="row one">
-          <label className="check">
-            <input type="checkbox" checked={!!form.addToSites} onChange={(e)=>onChange("addToSites", e.target.checked)} />
-            <span>달표(거래처별 사이트)에 함께 추가</span>
-          </label>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/* ───────── 옵션 관리 모달 ───────── */
-function ManageOptionsModal({ open, onClose, categories, setCategories, vendorNamesByCat, setVendorNamesByCat }) {
-  const [catInput, setCatInput] = useState("");
-  const [selectedCat, setSelectedCat] = useState(categories[0] || "");
-  const [vendorInput, setVendorInput] = useState("");
-
-  useEffect(() => {
-    if (!selectedCat && categories.length) setSelectedCat(categories[0]);
-  }, [categories, selectedCat]);
-
-  const addCat = () => {
-    const n = s(catInput);
-    if (!n || categories.includes(n)) return;
-    setCategories([...categories, n]);
-    setVendorNamesByCat({ ...vendorNamesByCat, [n]: vendorNamesByCat[n] || [] });
-    setCatInput("");
-    if (!selectedCat) setSelectedCat(n);
-  };
-  const removeCat = (name) => {
-    if (!window.confirm(`구분 "${name}"을(를) 삭제할까요? 연결된 거래처명 목록도 함께 제거됩니다.`)) return;
-    const { [name]: _, ...rest } = vendorNamesByCat;
-    setVendorNamesByCat(rest);
-    setCategories(categories.filter((c) => c !== name));
-    if (selectedCat === name) setSelectedCat("");
-  };
-
-  const addVendor = () => {
-    if (!selectedCat) return alert("먼저 구분을 선택하세요.");
-    const n = s(vendorInput);
-    if (!n) return;
-    const list = vendorNamesByCat[selectedCat] || [];
-    if (list.includes(n)) return;
-    setVendorNamesByCat({ ...vendorNamesByCat, [selectedCat]: [...list, n] });
-    setVendorInput("");
-  };
-  const removeVendor = (name) => {
-    const list = vendorNamesByCat[selectedCat] || [];
-    setVendorNamesByCat({ ...vendorNamesByCat, [selectedCat]: list.filter((x) => x !== name) });
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="구분 · 거래처명 관리"
-      width={760}
-      hideCloseIcon
-      footer={
-        <div className="foot-actions">
-          <button className="btn-eq primary" onClick={onClose} type="button"><i className="ri-check-line" /> 저장</button>
-          <button className="btn-eq ghost" onClick={onClose} type="button"><i className="ri-close-circle-line" /> 닫기</button>
-        </div>
-      }
-    >
-      <div className="mgr-grid">
-        <section className="mgr-card">
-          <header><i className="ri-shapes-line"></i> 구분</header>
-          <div className="row add">
-            <input className="mgr-input" placeholder="구분 추가" value={catInput}
-              onChange={(e)=>setCatInput(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&addCat()} />
-            <button className="btn-primary mini" onClick={addCat} type="button"><i className="ri-add-line" /> 추가</button>
+        {payType === "10일" && form.tableGroup === "월급" && (
+          <div className="pmt-form-row">
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">기본 월급</label>
+              <input
+                type="text"
+                value={form.defaultSalary}
+                onChange={(e) => handleAmount("defaultSalary", e.target.value)}
+                className="pmt-input pmt-input-number"
+                placeholder="0"
+              />
+            </div>
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">기본 수당</label>
+              <input
+                type="text"
+                value={form.defaultAllowance}
+                onChange={(e) => handleAmount("defaultAllowance", e.target.value)}
+                className="pmt-input pmt-input-number"
+                placeholder="0"
+              />
+            </div>
           </div>
-          <ul className="pill-list">
-            {categories.map((c) => (
-              <li key={c} className={`pill ${selectedCat === c ? "active" : ""}`} onClick={()=>setSelectedCat(c)}>
-                  <span>{c}</span>
-                  <button className="x" onClick={(e)=>{e.stopPropagation(); removeCat(c);}} aria-label="삭제" type="button"><i className="ri-close-line" /></button>
-              </li>
-            ))}
-            {!categories.length && <div className="empty">등록된 구분이 없습니다.</div>}
-          </ul>
-        </section>
+        )}
 
-        <section className="mgr-card">
-          <header><i className="ri-building-line"></i> 거래처명 {selectedCat ? <em>({selectedCat})</em> : null}</header>
-          <div className="row add">
-            <input className="mgr-input" placeholder="거래처명 추가" value={vendorInput}
-              onChange={(e)=>setVendorInput(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&addVendor()} disabled={!selectedCat} />
-            <button className="btn-primary mini" onClick={addVendor} disabled={!selectedCat} type="button"><i className="ri-add-line" /> 추가</button>
+        {payType === "말일" && !form.hasBuildings && (
+          <div className="pmt-form-row">
+            <div className="pmt-form-field">
+              <label className="pmt-form-label">기본 금액</label>
+              <input
+                type="text"
+                value={form.defaultAmount}
+                onChange={(e) => handleAmount("defaultAmount", e.target.value)}
+                className="pmt-input pmt-input-number"
+                placeholder="0"
+              />
+            </div>
           </div>
-          <ul className="pill-list">
-            {(vendorNamesByCat[selectedCat] || []).map((v) => (
-              <li key={v} className="pill">
-                <span>{v}</span>
-                <button className="x" onClick={()=>removeVendor(v)} aria-label="삭제" type="button"><i className="ri-close-line" /></button>
-              </li>
-            ))}
-            {selectedCat && !(vendorNamesByCat[selectedCat] || []).length && <div className="empty">등록된 거래처명이 없습니다.</div>}
-            {!selectedCat && <div className="empty">좌측에서 구분을 선택하세요.</div>}
-          </ul>
-        </section>
-      </div>
-    </Modal>
-  );
-}
+        )}
 
-/* ───────── 달표 보기 ───────── */
-function SitesViewer({
-  sites, vendors, targetDate,
-  cat, vendor, year, editMode
-}) {
-  // monthsByYear: { "2025": {1:..., 12:...} } 를 우선 사용, 없으면 기존 months fallback
-  const normalizeRow = (s) => {
-    const monthsByYear = s.monthsByYear || {};
-    const current = monthsByYear[year] || s.months || {};
-    return {
-      ...s,
-      monthsByYear,
-      months: current,
-      baseAmount: s.baseAmount || current[1] || 0,
-      startMonth: s.startMonth || 1,
-    };
-  };
-
-  const [rows, setRows] = useState(() => sites.map(normalizeRow));
-  useEffect(() => { setRows(sites.map(normalizeRow)); }, [sites, year]);
-
-  const now = new Date();
-  const currentMonthForYear = (year === now.getFullYear()) ? (now.getMonth() + 1) : 12;
-  const m = currentMonthForYear;
-
-  const list = (!cat || !vendor) ? [] : rows.filter((s) => s.category === cat && s.vendorName === vendor);
-
-  const monthTotals = Array.from({ length: 12 }).map((_, i) => {
-    const mm = i + 1;
-    if (mm > m) return 0;
-    return list.reduce((sum, r) => sum + Number((r.monthsByYear?.[year]?.[mm]) || 0), 0);
-  });
-
-  const saveRow = async (row) => {
-    try {
-      const monthsByYear = { ...(row.monthsByYear || {}) };
-      monthsByYear[year] = row.months || {};
-      // 호환성 유지를 위해 현재 year 데이터는 months에도 반영
-      await updateDoc(doc(db, "paymentSites", row.id), {
-        baseAmount: row.baseAmount || 0,
-        startMonth: row.startMonth || 1,
-        monthsByYear,
-        months: monthsByYear[year],
-        updatedAt: serverTimestamp(),
-      });
-    } catch (e) {
-      console.error("paymentSites update failed:", e);
-    }
-  };
-
-  const setRowAmount = (id, val) => {
-    const num = Number(String(val).replace(/[^\d]/g, "")) || 0;
-    setRows((arr) =>
-      arr.map((r) => {
-        if (r.id !== id) return r;
-        const sm = Number(r.startMonth || 1);
-        const newMonths = {};
-        for (let i = 1; i <= 12; i++) newMonths[i] = (i >= sm && i <= m ? num : 0);
-        const updated = { ...r, baseAmount: num, months: newMonths, monthsByYear: { ...(r.monthsByYear||{}), [year]: newMonths } };
-        saveRow(updated);
-        return updated;
-      })
-    );
-  };
-
-  const setRowStartMonth = (id, smVal) => {
-    const sm = Number(smVal);
-    setRows((arr) =>
-      arr.map((r) => {
-        if (r.id !== id) return r;
-        const num = Number(r.baseAmount || 0);
-        const newMonths = {};
-        for (let i = 1; i <= 12; i++) newMonths[i] = (i >= sm && i <= m ? num : 0);
-        const updated = { ...r, startMonth: sm, months: newMonths, monthsByYear: { ...(r.monthsByYear||{}), [year]: newMonths } };
-        saveRow(updated);
-        return updated;
-      })
-    );
-  };
-
-  // ✅ 납부 완료된 월(헤더/셀) 표시
-  const paidMonthsByVendor = useMemo(() => {
-    const map = {};
-    if (!vendors || !list.length) return map;
-    const vendorId = list[0].vendorId;
-    const vendorDoc = vendors.find(v => v.id === vendorId);
-    if (vendorDoc?.payments) {
-      vendorDoc.payments.forEach(p => { map[p.ym] = true; });
-    }
-    return map;
-  }, [vendors, list]);
-
-  // ✅ 이월 & 이월취소
-  const rolloverToNextYear = async () => {
-    const next = year + 1;
-    const targets = list.map(r => {
-      const decVal = (r.monthsByYear?.[year]?.[12]) || 0;
-      const nextJan = { ...(r.monthsByYear?.[next] || {}) };
-      nextJan[1] = decVal;
-      const monthsByYear = { ...(r.monthsByYear||{}), [next]: nextJan };
-      return { ...r, monthsByYear };
-    });
-    setRows(prev => prev.map(r => {
-      const t = targets.find(x => x.id === r.id);
-      return t ? t : r;
-    }));
-    await Promise.all(targets.map(async (t) => {
-      await updateDoc(doc(db, "paymentSites", t.id), {
-        monthsByYear: t.monthsByYear,
-        // 호환성: 현재 모달 year가 next면 months도 반영
-        ...(next === year ? { months: t.monthsByYear[next] } : {}),
-        updatedAt: serverTimestamp(),
-      });
-    }));
-    alert(`${year}년 12월 → ${next}년 1월 이월 완료`);
-  };
-
-  const cancelRollover = async () => {
-    const next = year + 1;
-    const targets = list.map(r => {
-      const nextJan = { ...(r.monthsByYear?.[next] || {}) };
-      // 단순 되돌리기: 1월 금액을 0으로
-      nextJan[1] = 0;
-      const monthsByYear = { ...(r.monthsByYear||{}), [next]: nextJan };
-      return { ...r, monthsByYear };
-    });
-    setRows(prev => prev.map(r => {
-      const t = targets.find(x => x.id === r.id);
-      return t ? t : r;
-    }));
-    await Promise.all(targets.map(async (t) => {
-      await updateDoc(doc(db, "paymentSites", t.id), {
-        monthsByYear: t.monthsByYear,
-        ...(next === year ? { months: t.monthsByYear[next] } : {}),
-        updatedAt: serverTimestamp(),
-      });
-    }));
-    alert(`${year + 1}년 1월 이월 취소 완료`);
-  };
-
-  return (
-    <div className="sites-viewer">
-      <div className="table-scroll sites-scroll-fixed">
-        <table className="table light sticky-first nowrap header-sum sites-centercols sites-tiny more-tight">
-          <thead>
-            <tr>
-              <th className="villa-col">빌라명</th>
-              <th className="tc">구분</th>
-              <th className="tc">거래처명</th>
-              <th className="tc">결제시작</th>
-              <th className="ar">금액</th>
-              {Array.from({ length: 12 }).map((_, i) => {
-                const mm = i + 1;
-                const show = mm <= m;
-                const sum = monthTotals[i] || 0;
-                const ym = `${year}-${String(mm).padStart(2, '0')}`;
-                const isPaid = paidMonthsByVendor[ym];
-                return (
-                  <th key={mm} className={`ar head-month ${isPaid ? "paid" : ""}`}>
-                    <div className="head-month-wrap">
-                      <span className="mon">{mm}월</span>
-                      <span className="mon-sum">{show ? (sum ? `₩${toCurrency(sum)}` : "-") : "-"}</span>
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((s) => (
-              <tr key={s.id} className="fixed-row-height">
-                <td className="em villa-col">{s.villa}</td>
-                <td className="tc">{s.category}</td>
-                <td className="tc">{s.vendorName}</td>
-                <td className="tc">
-                  <select
-                    className="select mini"
-                    value={s.startMonth || 1}
-                    onChange={(e)=>setRowStartMonth(s.id, e.target.value)}
-                    title="결제시작(월)"
-                    disabled={!editMode}
+        {payType === "말일" && form.hasBuildings && (
+          <div className="pmt-buildings-editor">
+            <div className="pmt-buildings-header">
+              <label className="pmt-form-label">건물별 월 계약금액</label>
+              <div className="pmt-buildings-header-actions">
+                {AUTO_SOURCE_CONFIG[form.category] && (
+                  <button
+                    type="button"
+                    className="pmt-btn pmt-btn-secondary pmt-btn-sm"
+                    onClick={() => fetchBuildingsFromErp({ silent: false })}
                   >
-                    {Array.from({length:12}).map((_,i)=> <option key={i+1} value={i+1}>{i+1}월</option>)}
-                  </select>
-                </td>
-                <td className="ar">
-                  {editMode ? (
-                    <input
-                      className="input input-mini narrow ar sites-amount-input"
-                      inputMode="numeric"
-                      value={s.baseAmount || ""}
-                      onChange={(e) => setRowAmount(s.id, e.target.value)}
-                      placeholder="0"
-                    />
-                  ) : (
-                    s.baseAmount ? `₩${toCurrency(s.baseAmount)}` : "-"
-                  )}
-                </td>
+                    ⟳ ERP에서 가져오기
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pmt-btn pmt-btn-ghost pmt-btn-sm"
+                  onClick={addBuildingRow}
+                >
+                  + 건물 추가
+                </button>
+              </div>
+            </div>
 
-                {Array.from({ length: 12 }).map((_, i) => {
-                  const mm = i + 1;
-                  const val = s.monthsByYear?.[year]?.[mm] || 0;
-                  const show = mm <= m;
-                  const ym = `${year}-${String(mm).padStart(2, '0')}`;
-                  const isPaid = paidMonthsByVendor[ym];
-                  return (
-                    <td key={mm} className={`ar ${mm === m ? "highlight-lite" : ""} ${isPaid ? "paid" : ""}`}>
-                      {show ? (val ? `₩${toCurrency(val)}` : "-") : "-"}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-            {!list.length && (
-              <tr className="fixed-row-height">
-                <td colSpan={17} className="empty">표시할 데이터가 없습니다.</td>
-              </tr>
+            {AUTO_SOURCE_CONFIG[form.category] && (
+              <div className="pmt-buildings-hint">
+                "{form.category}" 구분은 ERP에 등록된 건물 정보를 자동으로
+                불러옵니다. 건물명·금액은 ERP 값을 그대로 따라가고,
+                <strong> 부과시작월만 직접 선택</strong>하면 됩니다.
+              </div>
             )}
-          </tbody>
-        </table>
-      </div>
 
-      {/* 달표 상단 컨트롤(이월/이월취소) - 상단 extra에 배치되지만 editMode 토글은 부모에서 */}
-      <div style={{display:"none"}}>
-        <button onClick={rolloverToNextYear} />
-        <button onClick={cancelRollover} />
-      </div>
-    </div>
+            {buildings.length === 0 && (
+              <div className="pmt-cat-empty">등록된 건물이 없습니다.</div>
+            )}
+            {buildings.map((b) => (
+              <div key={b.id} className="pmt-building-row">
+                <div className="pmt-building-name-cell">
+                  <input
+                    type="text"
+                    placeholder="건물명"
+                    value={b.buildingName}
+                    disabled={!!b.villaId}
+                    onChange={(e) =>
+                      updateBuildingRow(b.id, "buildingName", e.target.value)
+                    }
+                    className={`pmt-input ${b.villaId ? "pmt-input-readonly" : ""}`}
+                  />
+                  {b.villaId && <span className="pmt-erp-chip">ERP연동</span>}
+                </div>
+                <input
+                  type="text"
+                  placeholder="월 금액"
+                  value={b.monthlyAmount}
+                  disabled={!!b.villaId}
+                  onChange={(e) =>
+                    updateBuildingRow(b.id, "monthlyAmount", e.target.value)
+                  }
+                  className={`pmt-input pmt-input-number ${
+                    b.villaId ? "pmt-input-readonly" : ""
+                  }`}
+                />
+                <DatePicker
+                  locale={ko}
+                  dateFormat="yyyy-MM"
+                  showMonthYearPicker
+                  withPortal
+                  selected={ymToDate(b.startYearMonth)}
+                  onChange={(d) =>
+                    updateBuildingRow(b.id, "startYearMonth", dateToYm(d))
+                  }
+                  customInput={<MonthPickerInput />}
+                />
+                <button
+                  type="button"
+                  className="pmt-building-del"
+                  onClick={() => removeBuildingRow(b.id)}
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="pmt-form-row">
+          <div className="pmt-form-field">
+            <label className="pmt-form-label">비고</label>
+            <input
+              type="text"
+              value={form.note}
+              onChange={(e) => handleChange("note", e.target.value)}
+              className="pmt-input"
+            />
+          </div>
+          <div className="pmt-form-field pmt-form-field-checkbox">
+            <label className="pmt-form-label">사용 여부</label>
+            <label className="pmt-switch-wrap">
+              <span className="pmt-switch">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => handleChange("active", e.target.checked)}
+                />
+                <span className="pmt-switch-track">
+                  <span className="pmt-switch-thumb" />
+                </span>
+              </span>
+              <span className="pmt-switch-text">
+                {form.active ? "사용" : "중지"}
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="pmt-form-actions">
+          <button type="submit" className="pmt-btn pmt-btn-primary">
+            저장
+          </button>
+          <button type="button" className="pmt-btn pmt-btn-ghost" onClick={onClose}>
+            닫기
+          </button>
+        </div>
+      </form>
+    </SimpleModal>
   );
 }
 
-/* ───────── 메인 페이지 ───────── */
-export default function PaymentSettlementPage() {
-  const [targetDate, setTargetDate] = useState(() => new Date());
-  const [cycleFilter, setCycleFilter] = useState("말일");
-  const [search, setSearch] = useState("");
+/* ===== 지급 대상 관리(목록) 모달 ===== */
+function PayeeManagerModal({ open, onClose, payType, categories, payees }) {
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingPayee, setEditingPayee] = useState(null);
 
-  const [vendors, setVendors] = useState([]);
-  const [sites, setSites] = useState([]);
-
-  const [categories, setCategories] = useState([]);
-  const [vendorNamesByCat, setVendorNamesByCat] = useState({});
-  const [villasDocs, setVillasDocs] = useState([]);
-
-  const [openRegister, setOpenRegister] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-
-  const [openManage, setOpenManage] = useState(false);
-  const [openSites, setOpenSites] = useState(false);
-
-  // ✅ SitesViewer 제어 상태
-  const [sitesCat, setSitesCat] = useState("");
-  const [sitesVendor, setSitesVendor] = useState("");
-  const [sitesEditMode, setSitesEditMode] = useState(false);
-  const [sitesYear, setSitesYear] = useState(targetDate.getFullYear());
-
-  // ✅ 메인 테이블: (년-별) 결제달 선택/금액 계산/입금확인 표시
-  const [paymentMonths, setPaymentMonths] = useState({});
-  const [calculatedAmounts, setCalculatedAmounts] = useState({});
-  const [paidStatuses, setPaidStatuses] = useState({});
-  // ✅ 메인 리스트 수정모드 스위치
-  const [inlineEditMode, setInlineEditMode] = useState(false);
-
-  useEffect(() => {
-    const statuses = {};
-    vendors.forEach(v => {
-      (v.payments || []).forEach(p => {
-        statuses[`${v.id}-${p.ym}`] = true;
-      });
-    });
-    setPaidStatuses(statuses);
-  }, [vendors]);
-
-  useEffect(() => {
-    const DEFAULT_CATS = ["승강기", "소방안전", "전기안전", "건물청소"];
-    setCategories(DEFAULT_CATS);
-
-    const unsubVillas = onSnapshot(collection(db, "villas"), (snap) => {
-      const acc = { 승강기: [], 소방안전: [], 전기안전: [], 건물청소: [] };
-      const docs = [];
-      const pushIf = (cat, val) => { const t = s(val); if (t) acc[cat].push(t); };
-
-      snap.docs.forEach((d) => {
-        const v = d.data() || {};
-        docs.push({ id: d.id, ...v });
-        pushIf("승강기", v.elevator ?? v.elevatorVendor ?? v.elevatorCompany);
-        pushIf("소방안전", v.fireSafety ?? v.fireSafetyVendor ?? v.fireSafetyCompany);
-        pushIf("전기안전", v.electricSafety ?? v.electricSafetyVendor ?? v.electricSafetyCompany);
-        pushIf("건물청소", v.cleaning ?? v.buildingCleaning ?? v.cleaningVendor ?? v.cleaningCompany);
-      });
-
-      setVillasDocs(docs);
-      const uniqSorted = Object.fromEntries(Object.entries(acc).map(([k, arr]) => [k, Array.from(new Set(arr)).sort()]));
-      setVendorNamesByCat(uniqSorted);
-    });
-
-    const unsubVendors = onSnapshot(collection(db, "paymentVendors"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setVendors(list.sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
-    });
-
-    const unsubSites = onSnapshot(collection(db, "paymentSites"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setSites(list);
-    });
-
-    return () => { unsubVillas(); unsubVendors(); unsubSites(); };
-  }, []);
-
-  const targetYM = ymKey(targetDate);
-  const targetM = monthIndex(targetDate);
-  const targetY = targetDate.getFullYear();
-
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return vendors
-      .filter((v) => v.cycle === cycleFilter)
-      .filter((v) => {
-        if (!q) return true;
-        const hay = `${v.category} ${v.vendorName} ${v.bank} ${v.accountHolder} ${v.accountNo} ${v.note}`.toLowerCase();
-        return hay.includes(q);
-      });
-  }, [vendors, cycleFilter, search]);
-
-  const totals = useMemo(() => ({
-    planned: filteredRows.reduce((a, r) => a + Number(r.amount || 0), 0),
-    unpaidAcc: filteredRows.reduce((a, r) => {
-      const calc = calculatedAmounts[r.id];
-      if (calc) return a + calc.unpaid;
-      const vendorData = vendors.find(v => v.id === r.id);
-      const months = Math.max(0, (targetY - (vendorData?.startYear || targetY)) * 12 + (targetM - (vendorData?.startMonth || 1)) + 1);
-      const base = Number(vendorData?.amount || 0);
-      const paidSum = (vendorData?.payments || []).filter(p => p.ym <= targetYM).reduce((sum, p) => sum + p.amount, 0);
-      return a + Math.max(0, months * base - paidSum);
-    }, 0),
-  }), [filteredRows, vendors, targetY, targetM, targetYM, calculatedAmounts]);
-
-  const handleCreate = async (item, addToSites) => {
+  const handleAdd = () => {
+    setEditingPayee(null);
+    setFormOpen(true);
+  };
+  const handleEdit = (p) => {
+    setEditingPayee(p);
+    setFormOpen(true);
+  };
+  const handleDelete = async (p) => {
+    if (
+      !window.confirm(
+        `"${p.name}" 지급 대상을 완전히 삭제할까요?\n(이미 생성된 이전 달 지급 기록은 남아있습니다)`
+      )
+    )
+      return;
     try {
-      const ref = await addDoc(collection(db, "paymentVendors"), {
-        ...item,
-        startYear: new Date().getFullYear(),
-        startMonth: new Date().getMonth() + 1,
-        payments: [],
-        selectedMonths: {},
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      if (addToSites) {
-        await addDoc(collection(db, "paymentSites"), {
-          vendorId: ref.id,
-          vendorName: item.vendorName,
-          category: item.category,
-          villa: "-", // 필요시 수정
-          baseAmount: item.amount || 0,
-          startMonth: 1,
-          monthsByYear: { [new Date().getFullYear()]: {} },
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+      if (payType === "말일" && p.hasBuildings) {
+        const snap = await getDocs(collection(db, "paymentPayees", p.id, "buildings"));
+        await Promise.all(
+          snap.docs.map((d) =>
+            deleteDoc(doc(db, "paymentPayees", p.id, "buildings", d.id))
+          )
+        );
       }
-    } catch (e) {
-      console.error(e);
-      alert("결제 등록 중 오류가 발생했습니다.");
-    }
-  };
-
-  const handleUpdate = async (id, patch) => {
-    try {
-      await updateDoc(doc(db, "paymentVendors", id), {
-        ...patch,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (e) {
-      console.error(e);
-      alert("수정 중 오류가 발생했습니다.");
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("이 결제 항목을 삭제할까요?")) return;
-    try {
-      await deleteDoc(doc(db, "paymentVendors", id));
-    } catch (e) {
-      console.error(e);
+      await deleteDoc(doc(db, "paymentPayees", p.id));
+    } catch (err) {
+      console.error(err);
       alert("삭제 중 오류가 발생했습니다.");
     }
   };
 
-  // ✅ 키를 "vendorId:year" 형태로 관리 (년도별 저장)
-  const pmKey = (vendorId, year) => `${vendorId}:${year}`;
+  const grouped = useMemo(() => {
+    if (payType !== "10일") return { 전체: payees };
+    return {
+      청소비: payees.filter((p) => p.tableGroup !== "월급"),
+      월급: payees.filter((p) => p.tableGroup === "월급"),
+    };
+  }, [payees, payType]);
 
-  // ✅ 결제달 선택 시: 중복 검사(동년도의 해당 월에 결제 기록이 이미 있으면 확인창), 그리고 즉시 저장
-  const handlePaymentMonthChange = async (vendorId, selectedMonth) => {
-    const year = targetY;
-    const key = pmKey(vendorId, year);
-    setPaymentMonths(prev => ({ ...prev, [key]: selectedMonth }));
+  return (
+    <>
+      <SimpleModal
+        open={open}
+        title={`지급 대상 관리 (${payType})`}
+        onClose={onClose}
+        size="xl"
+      >
+        <div className="pmt-payee-toolbar">
+          <button type="button" className="pmt-btn pmt-btn-primary" onClick={handleAdd}>
+            + 새 지급 대상 등록
+          </button>
+        </div>
 
-    if (!selectedMonth) {
-      setCalculatedAmounts(prev => {
-        const { [vendorId]: _, ...rest } = prev;
-        return rest;
-      });
-      // 빈 값 저장(해당 연도 선택 해제)
-      try {
-        await updateDoc(doc(db, "paymentVendors", vendorId), {
-          [`selectedMonths.${year}`]: null,
-          updatedAt: serverTimestamp(),
-        });
-      } catch (e) {
-        console.error(e);
-      }
-      return;
-    }
+        {Object.entries(grouped).map(([groupName, list]) => (
+          <div key={groupName} className="pmt-payee-group">
+            {payType === "10일" && (
+              <div className="pmt-payee-group-title">{groupName}</div>
+            )}
+            <table className="pmt-payee-table">
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>이름/업체</th>
+                  <th>은행</th>
+                  <th>계좌</th>
+                  <th>기본금액</th>
+                  <th>사용</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="pmt-payee-empty">
+                      등록된 대상이 없습니다.
+                    </td>
+                  </tr>
+                )}
+                {list.map((p) => {
+                  let amountLabel = "-";
+                  if (payType === "10일") {
+                    amountLabel =
+                      p.tableGroup === "월급"
+                        ? `${fmtComma(p.defaultSalary)}${
+                            p.defaultAllowance ? " + " + fmtComma(p.defaultAllowance) : ""
+                          }`
+                        : `${fmtComma(p.defaultCleaningFee)}${
+                            p.defaultEnvelopeFee ? " + " + fmtComma(p.defaultEnvelopeFee) : ""
+                          }`;
+                  } else {
+                    amountLabel = p.hasBuildings
+                      ? "건물별 계약"
+                      : fmtComma(p.defaultAmount);
+                  }
+                  return (
+                    <tr key={p.id}>
+                      <td>{p.category || "-"}</td>
+                      <td className="pmt-payee-name">{p.name}</td>
+                      <td>{p.bank || "-"}</td>
+                      <td>{p.account || "-"}</td>
+                      <td>{amountLabel}</td>
+                      <td>
+                        <span
+                          className={`pmt-active-badge ${
+                            p.active !== false ? "is-on" : "is-off"
+                          }`}
+                        >
+                          {p.active !== false ? "사용" : "중지"}
+                        </span>
+                      </td>
+                      <td className="pmt-payee-actions">
+                        <button
+                          type="button"
+                          className="pmt-btn pmt-btn-ghost pmt-btn-sm"
+                          onClick={() => handleEdit(p)}
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          className="pmt-btn pmt-btn-danger pmt-btn-sm"
+                          onClick={() => handleDelete(p)}
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </SimpleModal>
 
-    const monthNum = parseInt(selectedMonth, 10);
-    const vendorSites = sites.filter(s => s.vendorId === vendorId);
+      {/* key로 강제 재마운트: 다른 대상을 수정하거나 새로 등록할 때마다
+          폼 내부 상태(useState 초기값)가 새로 초기화되도록 합니다. */}
+      <PayeeFormModal
+        key={formOpen ? `${payType}-${editingPayee?.id || "new"}` : "closed"}
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSaved={() => setFormOpen(false)}
+        payType={payType}
+        categories={categories}
+        initial={editingPayee}
+      />
+    </>
+  );
+}
 
-    let amountForMonth = 0;
-    vendorSites.forEach(site => {
-      const byYear = site.monthsByYear || {};
-      const months = byYear[year] || site.months || {};
-      amountForMonth += months[monthNum] || 0;
-    });
+/* ===== 건물별 지급현황 모달 (말일, 건물 계약 있는 업체) ===== */
+function BuildingStatusModal({ open, onClose, record }) {
+  const [rows, setRows] = useState([]);
 
-    let unpaidAmount = 0;
-    for (let m = monthNum + 1; m <= targetM; m++) {
-      vendorSites.forEach(site => {
-        const byYear = site.monthsByYear || {};
-        const months = byYear[year] || site.months || {};
-        unpaidAmount += months[m] || 0;
-      });
-    }
+  useEffect(() => {
+    if (!open || !record) return;
+    setRows(
+      (record.buildingStatus || []).map((b) => ({
+        ...b,
+        monthlyAmountText: fmtComma(b.monthlyAmount),
+      }))
+    );
+  }, [open, record]);
 
-    setCalculatedAmounts(prev => ({
-      ...prev,
-      [vendorId]: { amount: amountForMonth, unpaid: unpaidAmount }
+  const togglePaid = (idx) => {
+    setRows((prev) =>
+      prev.map((r, i) => (i === idx ? { ...r, paid: !r.paid } : r))
+    );
+  };
+  const changeAmount = (idx, val) => {
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === idx
+          ? {
+              ...r,
+              monthlyAmountText: fmtComma(val),
+              monthlyAmount: parseNumber(val),
+            }
+          : r
+      )
+    );
+  };
+
+  const handleSave = async () => {
+    if (!record) return;
+    const newBuildingStatus = rows.map((r) => ({
+      buildingName: r.buildingName,
+      monthlyAmount: parseNumber(r.monthlyAmountText ?? r.monthlyAmount),
+      paid: !!r.paid,
+      unpaidStreak: r.paid ? 0 : r.unpaidStreak || 1,
+      startYearMonth: r.startYearMonth || "",
     }));
+    const newAmount = newBuildingStatus.reduce(
+      (sum, b) => sum + (b.monthlyAmount || 0),
+      0
+    );
+    const allPaid = newBuildingStatus.every((b) => b.paid);
 
-    // ✅ 중복확인
-    const vDoc = vendors.find(v => v.id === vendorId);
-    const ym = `${year}-${String(monthNum).padStart(2, '0')}`;
-    const alreadyPaid = (vDoc?.payments || []).some(p => p.ym === ym);
-    if (alreadyPaid) {
-      const ok = window.confirm(`${ym}에 이미 입금확인 기록이 있습니다. 결제달로 선택하시겠어요?`);
-      if (!ok) return;
-    }
-
-    // ✅ 즉시 저장(자동 저장)
     try {
-      await updateDoc(doc(db, "paymentVendors", vendorId), {
-        [`selectedMonths.${year}`]: monthNum,
+      await updateDoc(doc(db, "paymentRecords", record.id), {
+        buildingStatus: newBuildingStatus,
+        amount: newAmount,
+        paid: allPaid,
         updatedAt: serverTimestamp(),
       });
-    } catch (e) {
-      console.error("selectedMonth save failed:", e);
-      alert("결제달 저장 중 오류가 발생했습니다.");
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("저장 중 오류가 발생했습니다.");
     }
   };
 
-  // ✅ 입금확인 핸들러 (수정모드에서만 활성화). 즉시 저장/삭제
-  const handlePaymentConfirm = async (vendorId, isChecked) => {
-    const year = targetY;
-    const key = pmKey(vendorId, year);
-    const selectedMonth = paymentMonths[key]
-      ?? vendors.find(v=>v.id===vendorId)?.selectedMonths?.[year]
-      ?? null;
-
-    if (!selectedMonth) return;
-
-    const amount = calculatedAmounts[vendorId]?.amount || 0;
-    const ym = `${year}-${String(selectedMonth).padStart(2, '0')}`;
-    const paymentRecord = { ym, amount };
-
-    const docRef = doc(db, "paymentVendors", vendorId);
-    try {
-      if (isChecked) {
-        await updateDoc(docRef, { payments: arrayUnion(paymentRecord), updatedAt: serverTimestamp() });
-      } else {
-        await updateDoc(docRef, { payments: arrayRemove(paymentRecord), updatedAt: serverTimestamp() });
-      }
-    } catch (e) {
-      console.error("Payment confirmation update failed:", e);
-      alert("입금 확인 상태 변경 중 오류가 발생했습니다.");
-    }
-  };
-
-  // ✅ 달표보기 헤더 컨트롤
-  const sitesHeaderControls = (
-    <div className="sites-header-controls">
-      <div className="sites-header-controls-left">
-        <select className="select mini" value={sitesCat} onChange={(e) => setSitesCat(e.target.value)}>
-          <option value="">구분 전체</option>
-          {Array.from(new Set(sites.map(s => s.category))).map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select className="select mini" value={sitesVendor} onChange={(e) => setSitesVendor(e.target.value)}>
-          <option value="">거래처 전체</option>
-          {Array.from(new Set(sites.filter(s => !sitesCat || s.category === sitesCat).map(s => s.vendorName))).map((v) => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <select className="select mini" value={sitesYear} onChange={(e)=>setSitesYear(Number(e.target.value))}>
-          {Array.from({length:5}).map((_,i)=>{
-            const y = new Date().getFullYear()-2+i;
-            return <option key={y} value={y}>{y}년</option>;
-          })}
-        </select>
-
-        {/* 달표보기 금액 수정 모드 스위치 */}
-        <label className="switch luxe" style={{marginLeft:8}}>
-          <input
-            type="checkbox"
-            checked={!!sitesEditMode}
-            onChange={(e)=>setSitesEditMode(e.target.checked)}
-          />
-          <span className="slider" />
-          <span className="label">금액수정</span>
-        </label>
-
-        {/* 이월 / 이월취소 버튼 */}
-        <button
-          className="btn tiny"
-          onClick={async ()=>{
-            window.dispatchEvent(new CustomEvent("PSP_ROLLOVER", { detail: { year: sitesYear, cat: sitesCat, vendor: sitesVendor } }));
-          }}
-          type="button"
-        >
-          <i className="ri-arrow-right-circle-line"></i> 이월
+  return (
+    <SimpleModal
+      open={open}
+      title={`건물별 지급현황 - ${record?.name || ""}`}
+      onClose={onClose}
+      size="sm"
+    >
+      <div className="pmt-building-status-list">
+        {rows.length === 0 && (
+          <div className="pmt-cat-empty">등록된 건물이 없습니다.</div>
+        )}
+        {rows.map((r, idx) => (
+          <div key={`${r.buildingName}-${idx}`} className="pmt-building-status-row">
+            <label className="pmt-checkbox-wrap pmt-building-status-check">
+              <input
+                type="checkbox"
+                checked={!!r.paid}
+                onChange={() => togglePaid(idx)}
+              />
+              <span className="pmt-building-status-name">{r.buildingName}</span>
+            </label>
+            <input
+              type="text"
+              className="pmt-input pmt-input-number pmt-building-status-amount"
+              value={r.monthlyAmountText ?? fmtComma(r.monthlyAmount)}
+              onChange={(e) => changeAmount(idx, e.target.value)}
+            />
+            {r.startYearMonth && (
+              <span className="pmt-start-chip">{ymLabel(r.startYearMonth)}부터</span>
+            )}
+            {!r.paid && r.unpaidStreak > 0 && (
+              <span className="pmt-unpaid-chip">{r.unpaidStreak}개월째 미납</span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="pmt-form-actions">
+        <button type="button" className="pmt-btn pmt-btn-primary" onClick={handleSave}>
+          저장
         </button>
-        <button
-          className="btn tiny"
-          onClick={async ()=>{
-            window.dispatchEvent(new CustomEvent("PSP_ROLLOVER_CANCEL", { detail: { year: sitesYear, cat: sitesCat, vendor: sitesVendor } }));
-          }}
-          type="button"
-        >
-          <i className="ri-arrow-go-back-line"></i> 이월취소
+        <button type="button" className="pmt-btn pmt-btn-ghost" onClick={onClose}>
+          닫기
         </button>
       </div>
-      <button className="btn-eq ghost" onClick={()=>setOpenSites(false)} type="button">
-        <i className="ri-close-circle-line" /> 닫기
+    </SimpleModal>
+  );
+}
+
+/* ===== 메인 페이지 ===== */
+export default function PaymentSettlementPage() {
+  const [payType, setPayType] = useState("10일"); // '10일' | '말일'
+  const [yearMonth, setYearMonth] = useState(nowYm());
+
+  const [categories, setCategories] = useState([]);
+  const [payees, setPayees] = useState([]);
+  const [records, setRecords] = useState([]);
+
+  const [catModalOpen, setCatModalOpen] = useState(false);
+  const [payeeModalOpen, setPayeeModalOpen] = useState(false);
+  const [buildingModalRecord, setBuildingModalRecord] = useState(null);
+
+  const generatingRef = useRef(false);
+
+  /* 🔁 구분(카테고리) 구독 + 없으면 기본값 자동 생성 */
+  useEffect(() => {
+    const ref = doc(db, "serviceSettings", `결제구분_${payType}`);
+    const unsub = onSnapshot(ref, async (snap) => {
+      if (!snap.exists()) {
+        try {
+          await setDoc(ref, { items: DEFAULT_CATEGORIES[payType] || [] });
+        } catch (e) {
+          console.error("기본 구분 생성 오류:", e);
+        }
+        return;
+      }
+      const arr = Array.isArray(snap.data()?.items)
+        ? snap.data().items.filter((x) => s(x) !== "")
+        : [];
+      setCategories(arr);
+    });
+    return () => unsub();
+  }, [payType]);
+
+  /* 🔁 지급 대상(템플릿) 구독 */
+  useEffect(() => {
+    const qy = query(collection(db, "paymentPayees"), where("payType", "==", payType));
+    const unsub = onSnapshot(
+      qy,
+      (snap) => setPayees(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("[paymentPayees listen error]", err)
+    );
+    return () => unsub();
+  }, [payType]);
+
+  /* 🔁 이번 달 지급 기록 구독 */
+  useEffect(() => {
+    const qy = query(
+      collection(db, "paymentRecords"),
+      where("payType", "==", payType),
+      where("yearMonth", "==", yearMonth)
+    );
+    const unsub = onSnapshot(
+      qy,
+      (snap) => setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("[paymentRecords listen error]", err)
+    );
+    return () => unsub();
+  }, [payType, yearMonth]);
+
+  /* 🔁 템플릿에는 있는데 이번 달 기록이 없는 대상 → 자동 생성 */
+  useEffect(() => {
+    if (!payees.length) return;
+    if (generatingRef.current) return;
+
+    const activePayees = payees.filter((p) => p.active !== false);
+    const existingIds = new Set(records.map((r) => r.payeeId));
+    const missing = activePayees.filter((p) => !existingIds.has(p.id));
+    if (!missing.length) return;
+
+    generatingRef.current = true;
+    (async () => {
+      const prevYearMonth = shiftYm(yearMonth, -1);
+      for (const payee of missing) {
+        try {
+          const recordId = `${payType}_${yearMonth}_${payee.id}`;
+
+          const payload = {
+            payType,
+            yearMonth,
+            payeeId: payee.id,
+            category: s(payee.category),
+            name: s(payee.name),
+            bank: s(payee.bank),
+            account: s(payee.account),
+            note: "",
+            paid: false,
+            excluded: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+
+          if (payType === "10일") {
+            payload.tableGroup = payee.tableGroup || "청소비";
+            if (payload.tableGroup === "월급") {
+              const salary = parseNumber(payee.defaultSalary);
+              const allowance = parseNumber(payee.defaultAllowance);
+              payload.salary = salary;
+              payload.allowance = allowance;
+              payload.amount = salary + allowance;
+
+              const prevId = `10일_${prevYearMonth}_${payee.id}`;
+              const prevSnap = await getDoc(doc(db, "paymentRecords", prevId));
+              payload.prevAmount = prevSnap.exists()
+                ? parseNumber(prevSnap.data().amount)
+                : 0;
+            } else {
+              const cleaningFee = parseNumber(payee.defaultCleaningFee);
+              const envelopeFee = parseNumber(payee.defaultEnvelopeFee);
+              payload.cleaningFee = cleaningFee;
+              payload.envelopeFee = envelopeFee;
+              payload.amount = cleaningFee + envelopeFee;
+            }
+          } else {
+            if (payee.hasBuildings) {
+              const buildingsSnap = await getDocs(
+                collection(db, "paymentPayees", payee.id, "buildings")
+              );
+              const prevId = `말일_${prevYearMonth}_${payee.id}`;
+              const prevSnap = await getDoc(doc(db, "paymentRecords", prevId));
+              const prevMap = new Map();
+              if (prevSnap.exists()) {
+                (prevSnap.data().buildingStatus || []).forEach((b) =>
+                  prevMap.set(b.buildingName, b)
+                );
+              }
+              const buildingStatus = buildingsSnap.docs
+                .filter((d) => d.data().active !== false)
+                .filter((d) => {
+                  // ✅ 부과시작월이 이번 달보다 나중이면 아직 부과 대상이 아니므로 제외
+                  const startYm = s(d.data().startYearMonth);
+                  return !startYm || startYm <= yearMonth;
+                })
+                .map((d) => {
+                  const bd = d.data();
+                  const prev = prevMap.get(bd.buildingName);
+                  const prevStreak =
+                    prev && !prev.paid ? parseNumber(prev.unpaidStreak) : 0;
+                  return {
+                    buildingName: s(bd.buildingName),
+                    monthlyAmount: parseNumber(bd.monthlyAmount),
+                    startYearMonth: s(bd.startYearMonth),
+                    paid: false,
+                    unpaidStreak: prevStreak + 1,
+                  };
+                });
+              payload.buildingStatus = buildingStatus;
+              payload.hasBuildings = true;
+              payload.amount = buildingStatus.reduce(
+                (sum, b) => sum + (b.monthlyAmount || 0),
+                0
+              );
+            } else {
+              payload.hasBuildings = false;
+              payload.amount = parseNumber(payee.defaultAmount);
+            }
+          }
+
+          await setDoc(doc(db, "paymentRecords", recordId), payload, {
+            merge: true,
+          });
+        } catch (e) {
+          console.error("지급 기록 자동 생성 오류:", e);
+        }
+      }
+      generatingRef.current = false;
+    })();
+  }, [payees, records, payType, yearMonth]);
+
+  /* ===== 표시용 목록 (이번달 제외 처리된 것 제외) ===== */
+  const visibleRecords = useMemo(
+    () => records.filter((r) => !r.excluded),
+    [records]
+  );
+
+  const cleaningRows = useMemo(
+    () =>
+      payType === "10일"
+        ? visibleRecords.filter((r) => r.tableGroup !== "월급")
+        : [],
+    [visibleRecords, payType]
+  );
+  const salaryRows = useMemo(
+    () =>
+      payType === "10일"
+        ? visibleRecords.filter((r) => r.tableGroup === "월급")
+        : [],
+    [visibleRecords, payType]
+  );
+
+  /* ===== 인라인 저장 ===== */
+  const saveRecord = async (recordId, patch) => {
+    try {
+      await updateDoc(doc(db, "paymentRecords", recordId), {
+        ...patch,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("지급 기록 저장 오류:", err);
+      alert("저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleCleaningFeeChange = (row, key, val) => {
+    const num = parseNumber(val);
+    const cleaningFee = key === "cleaningFee" ? num : parseNumber(row.cleaningFee);
+    const envelopeFee = key === "envelopeFee" ? num : parseNumber(row.envelopeFee);
+    saveRecord(row.id, {
+      [key]: num,
+      amount: cleaningFee + envelopeFee,
+    });
+  };
+
+  const handleSalaryChange = (row, key, val) => {
+    const num = parseNumber(val);
+    const salary = key === "salary" ? num : parseNumber(row.salary);
+    const allowance = key === "allowance" ? num : parseNumber(row.allowance);
+    saveRecord(row.id, {
+      [key]: num,
+      amount: salary + allowance,
+    });
+  };
+
+  const handleExclude = async (row) => {
+    if (
+      !window.confirm(
+        "이번 달 지급 목록에서 제외할까요?\n(다음 달에는 다시 자동으로 나타납니다)"
+      )
+    )
+      return;
+    await saveRecord(row.id, { excluded: true });
+  };
+
+  /* ===== 합계 ===== */
+  const summary10 = useMemo(() => {
+    const cleaningFeeSum = cleaningRows.reduce(
+      (s2, r) => s2 + parseNumber(r.cleaningFee),
+      0
+    );
+    const envelopeFeeSum = cleaningRows.reduce(
+      (s2, r) => s2 + parseNumber(r.envelopeFee),
+      0
+    );
+    const cleaningAmountSum = cleaningRows.reduce(
+      (s2, r) => s2 + parseNumber(r.amount),
+      0
+    );
+    const salaryAmountSum = salaryRows.reduce(
+      (s2, r) => s2 + parseNumber(r.amount),
+      0
+    );
+    return {
+      cleaningFeeSum,
+      envelopeFeeSum,
+      cleaningAmountSum,
+      salaryAmountSum,
+      total: cleaningAmountSum + salaryAmountSum,
+    };
+  }, [cleaningRows, salaryRows]);
+
+  const summary30 = useMemo(() => {
+    const total = visibleRecords.reduce((s2, r) => s2 + parseNumber(r.amount), 0);
+    const paidTotal = visibleRecords
+      .filter((r) => r.paid)
+      .reduce((s2, r) => s2 + parseNumber(r.amount), 0);
+    const unpaidCount = visibleRecords.filter((r) => !r.paid).length;
+    return { total, paidTotal, unpaidTotal: total - paidTotal, unpaidCount };
+  }, [visibleRecords]);
+
+  /* ===== 렌더 ===== */
+  const renderMonthNav = () => (
+    <div className="pmt-month-nav">
+      <button
+        type="button"
+        className="pmt-month-btn"
+        onClick={() => setYearMonth((ym) => shiftYm(ym, -1))}
+      >
+        ◀
       </button>
+      <span className="pmt-month-label">{ymLabel(yearMonth)}</span>
+      <button
+        type="button"
+        className="pmt-month-btn"
+        onClick={() => setYearMonth((ym) => shiftYm(ym, 1))}
+      >
+        ▶
+      </button>
+      {yearMonth !== nowYm() && (
+        <button
+          type="button"
+          className="pmt-month-today"
+          onClick={() => setYearMonth(nowYm())}
+        >
+          이번달
+        </button>
+      )}
     </div>
   );
 
-  // ✅ SitesViewer 이월/취소 부모 위임
-  useEffect(() => {
-    const onRoll = async (e) => {
-      const y = e.detail?.year;
-      const c = e.detail?.cat;
-      const v = e.detail?.vendor;
-      const filtered = sites.filter(s => (!c || s.category===c) && (!v || s.vendorName===v));
-      const next = (y || targetY) + 1;
-      await Promise.all(filtered.map(async (r) => {
-        const monthsByYear = { ...(r.monthsByYear || {}) };
-        const dec = monthsByYear[y]?.[12] ?? (r.months?.[12] || 0);
-        const nextJan = { ...(monthsByYear[next] || {}) };
-        nextJan[1] = dec;
-        monthsByYear[next] = nextJan;
-        await updateDoc(doc(db, "paymentSites", r.id), {
-          monthsByYear,
-          updatedAt: serverTimestamp(),
-        });
-      }));
-      alert(`${y}년 12월 → ${next}년 1월 이월 완료`);
-    };
-    const onRollCancel = async (e) => {
-      const y = e.detail?.year;
-      const c = e.detail?.cat;
-      const v = e.detail?.vendor;
-      const filtered = sites.filter(s => (!c || s.category===c) && (!v || s.vendorName===v));
-      const next = (y || targetY) + 1;
-      await Promise.all(filtered.map(async (r) => {
-        const monthsByYear = { ...(r.monthsByYear || {}) };
-        const nextJan = { ...(monthsByYear[next] || {}) };
-        nextJan[1] = 0;
-        monthsByYear[next] = nextJan;
-        await updateDoc(doc(db, "paymentSites", r.id), {
-          monthsByYear,
-          updatedAt: serverTimestamp(),
-        });
-      }));
-      alert(`${next}년 1월 이월 취소 완료`);
-    };
-    window.addEventListener("PSP_ROLLOVER", onRoll);
-    window.addEventListener("PSP_ROLLOVER_CANCEL", onRollCancel);
-    return () => {
-      window.removeEventListener("PSP_ROLLOVER", onRoll);
-      window.removeEventListener("PSP_ROLLOVER_CANCEL", onRollCancel);
-    };
-  }, [sites, targetY]);
-
   return (
-    <div className="psp-container psp wrap light">
-      {/* 상단 (sticky) */}
-      <header className="psp-hero single-line sticky">
-        <div className="title">
-          <i className="ri-bank-card-2-line"></i>
-          <h1>대금결제 관리</h1>
-        </div>
+    <div className="page-wrapper pmt-page">
+      <PageTitle>대금결제관리</PageTitle>
 
-        <div className="hero-controls">
-          <MonthPicker valueDate={targetDate} onChange={(d)=>{ setTargetDate(d); setSitesYear(d.getFullYear()); }} />
+      <div className="pmt-card">
+        {/* 상단 툴바 */}
+        <div className="pmt-toolbar">
+          <div className="pmt-toolbar-left">
+            <div className="pmt-toggle-group">
+              <button
+                type="button"
+                className={`pmt-toggle-btn ${payType === "말일" ? "is-active" : ""}`}
+                onClick={() => setPayType("말일")}
+              >
+                말일
+              </button>
+              <button
+                type="button"
+                className={`pmt-toggle-btn ${payType === "10일" ? "is-active" : ""}`}
+                onClick={() => setPayType("10일")}
+              >
+                10일
+              </button>
+            </div>
+            {renderMonthNav()}
+          </div>
 
-          <div className="cycle-toggle">
+          <div className="pmt-toolbar-right">
             <button
-              className={cycleFilter === '말일' ? 'active' : ''}
-              onClick={() => setCycleFilter('말일')}
               type="button"
+              className="pmt-btn pmt-btn-secondary"
+              onClick={() => setCatModalOpen(true)}
             >
-              말일
+              구분 관리
             </button>
             <button
-              className={cycleFilter === '10일' ? 'active' : ''}
-              onClick={() => setCycleFilter('10일')}
               type="button"
+              className="pmt-btn pmt-btn-primary"
+              onClick={() => setPayeeModalOpen(true)}
             >
-              10일
+              지급 대상 관리
             </button>
           </div>
-
-          <div className="search-wrap">
-            <i className="ri-search-line" aria-hidden="true"></i>
-            <input
-              className="search"
-              placeholder=""
-              value={search}
-              onChange={(e)=>setSearch(e.target.value)}
-            />
-          </div>
-
-          <button className="btn glam" onClick={()=>{ setEditTarget(null); setOpenRegister(true); }} type="button">
-            <i className="ri-add-circle-line"></i> 결제등록
-          </button>
-          <button className="btn pale" onClick={()=>setOpenSites(true)} type="button">
-            <i className="ri-table-2"></i> 달표보기
-          </button>
-          <button className="btn ghost" onClick={()=>setOpenManage(true)} type="button">
-            <i className="ri-settings-5-line"></i> 관리
-          </button>
-
-          {/* ✅ 메인 리스트 수정모드 스위치(결제달/입금확인 편집 허용) */}
-          <label className="switch luxe" title="수정모드" style={{marginLeft:8}}>
-            <input
-              type="checkbox"
-              checked={!!inlineEditMode}
-              onChange={(e)=>setInlineEditMode(e.target.checked)}
-            />
-            <span className="slider" />
-            <span className="label">수정모드</span>
-          </label>
-
-          <div className="metrics inline">
-            <div className="chip">
-              <i className="ri-bill-line"></i> 예정 ₩{toCurrency(totals.planned)}
-            </div>
-            <div className="chip warn">
-              <i className="ri-alarm-warning-line"></i> 미납누계 ₩{toCurrency(totals.unpaidAcc)}
-            </div>
-          </div>
         </div>
-      </header>
 
-      {/* 리스트 */}
-      <section className="card light psp-list">
-        <div className="table-scroll">
-          <table className="table light centered body-mini">
-            <thead>
-              <tr>
-                <th>구분</th>
-                <th>거래처명</th>
-                {/* ✅ 결제달 */}
-                <th>결제달</th>
-                <th>은행</th>
-                <th>예금주</th>
-                <th>계좌번호</th>
-                <th className="ar">금액</th>
-                {/* ✅ 입금확인 */}
-                <th>입금확인</th>
-                <th className="tc">비고</th>
-                <th className="ar">미납누계</th>
-                <th className="tc">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((r) => {
-                const key = pmKey(r.id, targetY);
-                const selectedMonth =
-                  paymentMonths[key] ??
-                  r.selectedMonths?.[targetY] ??
-                  "";
-                const calc = calculatedAmounts[r.id];
-                const displayAmount = calc ? calc.amount : r.amount;
-                const ym = selectedMonth ? `${targetY}-${String(selectedMonth).padStart(2,'0')}` : '';
-                const isPaid = paidStatuses[`${r.id}-${ym}`];
-
-                const vendorData = vendors.find(v => v.id === r.id);
-                const months = Math.max(0, (targetY - (vendorData?.startYear || targetY)) * 12 + (targetM - (vendorData?.startMonth || 1)) + 1);
-                const base = Number(vendorData?.amount || 0);
-                const paidSum = (vendorData?.payments || []).filter(p => p.ym <= ymKey(targetDate)).reduce((sum, p) => sum + p.amount, 0);
-                const originalUnpaid = Math.max(0, months * base - paidSum);
-
-                const displayUnpaid = calc ? calc.unpaid : originalUnpaid;
-
-                return (
-                  <tr key={r.id}>
-                    <td>{r.category}</td>
-                    <td className="em">{r.vendorName}</td>
-
-                    {/* ✅ 결제달 선택 (수정모드에서만 활성화) */}
-                    <td>
-                      <select
-                        className="select mini"
-                        value={selectedMonth}
-                        onChange={(e) => handlePaymentMonthChange(r.id, e.target.value)}
-                        disabled={!inlineEditMode}
-                      >
-                        <option value="">-</option>
-                        {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>{i+1}월</option>)}
-                      </select>
-                    </td>
-
-                    <td>{r.bank}</td>
-                    <td>{r.accountHolder}</td>
-                    <td className="mono">{r.accountNo}</td>
-                    <td className="ar strong">₩{toCurrency(displayAmount)}</td>
-
-                    {/* ✅ 입금확인 스위치 */}
-                    <td>
-                      <label className="switch mini-switch">
+        {/* ===== 10일 화면 ===== */}
+        {payType === "10일" && (
+          <>
+            <div className="pmt-section-title">청소비 지급 (표A)</div>
+            <div className="pmt-table-wrap">
+              <table className="pmt-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 90 }}>구분</th>
+                    <th style={{ width: 130 }}>이름</th>
+                    <th style={{ width: 90 }}>은행</th>
+                    <th style={{ width: 170 }}>계좌</th>
+                    <th style={{ width: 110 }}>청소비</th>
+                    <th style={{ width: 110 }}>봉투/스티커</th>
+                    <th style={{ width: 110 }}>금액</th>
+                    <th style={{ width: 130 }}>비고</th>
+                    <th style={{ width: 80 }}>지급완료</th>
+                    <th style={{ width: 70 }}>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cleaningRows.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="pmt-empty">
+                        등록된 청소비 지급 대상이 없습니다. "지급 대상 관리"에서
+                        추가해 주세요.
+                      </td>
+                    </tr>
+                  )}
+                  {cleaningRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.category || "-"}</td>
+                      <td className="pmt-td-left">{row.name}</td>
+                      <td>{row.bank || "-"}</td>
+                      <td>{row.account || "-"}</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="pmt-table-input"
+                          value={fmtComma(row.cleaningFee)}
+                          onChange={(e) =>
+                            handleCleaningFeeChange(row, "cleaningFee", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="pmt-table-input"
+                          value={fmtComma(row.envelopeFee)}
+                          onChange={(e) =>
+                            handleCleaningFeeChange(row, "envelopeFee", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td className="pmt-td-amount">{fmtComma(row.amount)}</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="pmt-table-input pmt-table-input-left"
+                          value={row.note || ""}
+                          onChange={(e) => saveRecord(row.id, { note: e.target.value })}
+                        />
+                      </td>
+                      <td className="pmt-td-center">
                         <input
                           type="checkbox"
-                          disabled={!inlineEditMode || !selectedMonth}
-                          checked={!!isPaid}
-                          onChange={(e) => handlePaymentConfirm(r.id, e.target.checked)}
+                          checked={!!row.paid}
+                          onChange={(e) => saveRecord(row.id, { paid: e.target.checked })}
                         />
-                        <span className="slider"></span>
-                      </label>
-                    </td>
+                      </td>
+                      <td className="pmt-td-center">
+                        <button
+                          type="button"
+                          className="pmt-row-del"
+                          onClick={() => handleExclude(row)}
+                        >
+                          제외
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                    <td className="muted">{r.note}</td>
-                    <td className="ar danger">₩{toCurrency(displayUnpaid)}</td>
-                    <td className="tc">
-                      <span className="row-actions">
-                        <button className="icon-btn ghost" title="수정"
-                          onClick={()=>{ setEditTarget(r); setOpenRegister(true); }} type="button">
-                          <i className="ri-pencil-line"></i>
-                        </button>
-                        <button className="icon-btn ghost" title="삭제" onClick={()=>handleDelete(r.id)} type="button">
-                          <i className="ri-delete-bin-6-line"></i>
-                        </button>
-                      </span>
-                    </td>
+            <div className="pmt-summary-cards">
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">청소비 합계</div>
+                <div className="pmt-summary-value">
+                  {fmtWon(summary10.cleaningFeeSum)}
+                </div>
+              </div>
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">봉투/스티커 합계</div>
+                <div className="pmt-summary-value">
+                  {fmtWon(summary10.envelopeFeeSum)}
+                </div>
+              </div>
+              <div className="pmt-summary-card pmt-summary-card--accent">
+                <div className="pmt-summary-label">표A 금액합계</div>
+                <div className="pmt-summary-value">
+                  {fmtWon(summary10.cleaningAmountSum)}
+                </div>
+              </div>
+            </div>
+
+            <div className="pmt-section-title pmt-section-title-spaced">
+              직원 월급 (표B)
+            </div>
+            <div className="pmt-table-wrap">
+              <table className="pmt-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 90 }}>구분</th>
+                    <th style={{ width: 130 }}>직원명</th>
+                    <th style={{ width: 90 }}>은행</th>
+                    <th style={{ width: 170 }}>계좌</th>
+                    <th style={{ width: 110 }}>월급</th>
+                    <th style={{ width: 110 }}>수당</th>
+                    <th style={{ width: 110 }}>금액</th>
+                    <th style={{ width: 110 }}>전월입금액</th>
+                    <th style={{ width: 80 }}>지급완료</th>
+                    <th style={{ width: 70 }}>관리</th>
                   </tr>
-                );
-              })}
-              {filteredRows.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="empty">데이터가 없습니다.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                </thead>
+                <tbody>
+                  {salaryRows.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="pmt-empty">
+                        등록된 직원이 없습니다. "지급 대상 관리"에서 추가해 주세요.
+                      </td>
+                    </tr>
+                  )}
+                  {salaryRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>월급</td>
+                      <td className="pmt-td-left">{row.name}</td>
+                      <td>{row.bank || "-"}</td>
+                      <td>{row.account || "-"}</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="pmt-table-input"
+                          value={fmtComma(row.salary)}
+                          onChange={(e) =>
+                            handleSalaryChange(row, "salary", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="pmt-table-input"
+                          value={fmtComma(row.allowance)}
+                          onChange={(e) =>
+                            handleSalaryChange(row, "allowance", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td className="pmt-td-amount">{fmtComma(row.amount)}</td>
+                      <td className="pmt-td-muted">{fmtComma(row.prevAmount)}</td>
+                      <td className="pmt-td-center">
+                        <input
+                          type="checkbox"
+                          checked={!!row.paid}
+                          onChange={(e) => saveRecord(row.id, { paid: e.target.checked })}
+                        />
+                      </td>
+                      <td className="pmt-td-center">
+                        <button
+                          type="button"
+                          className="pmt-row-del"
+                          onClick={() => handleExclude(row)}
+                        >
+                          제외
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-      {/* 모달들 */}
-      {!editTarget && (
-        <RegisterModal
-          open={openRegister}
-          onClose={()=>setOpenRegister(false)}
-          onSubmit={handleCreate}
-          categories={categories}
-          vendorNamesByCat={vendorNamesByCat}
-          mode="create"
-        />
-      )}
-      {editTarget && (
-        <RegisterModal
-          open={openRegister}
-          onClose={()=>{ setOpenRegister(false); setEditTarget(null); }}
-          onSubmit={(patch)=>handleUpdate(editTarget.id, patch)}
-          categories={categories}
-          vendorNamesByCat={vendorNamesByCat}
-          mode="edit"
-          initial={{
-            category: editTarget.category,
-            vendorName: editTarget.vendorName,
-            bank: editTarget.bank,
-            accountHolder: editTarget.accountHolder,
-            accountNo: editTarget.accountNo,
-            amount: editTarget.amount ?? "",
-            note: editTarget.note,
-            cycle: editTarget.cycle,
-            addToSites: false,
-          }}
-        />
-      )}
+            <div className="pmt-summary-cards">
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">월급 합계</div>
+                <div className="pmt-summary-value">
+                  {fmtWon(summary10.salaryAmountSum)}
+                </div>
+              </div>
+              <div className="pmt-summary-card pmt-summary-card--accent">
+                <div className="pmt-summary-label">총 지출액 (표A+표B)</div>
+                <div className="pmt-summary-value">{fmtWon(summary10.total)}</div>
+              </div>
+            </div>
+          </>
+        )}
 
-      <ManageOptionsModal
-        open={openManage}
-        onClose={()=>setOpenManage(false)}
-        categories={categories}
-        setCategories={setCategories}
-        vendorNamesByCat={vendorNamesByCat}
-        setVendorNamesByCat={setVendorNamesByCat}
+        {/* ===== 말일 화면 ===== */}
+        {payType === "말일" && (
+          <>
+            <div className="pmt-table-wrap">
+              <table className="pmt-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 100 }}>구분</th>
+                    <th style={{ width: 150 }}>업체</th>
+                    <th style={{ width: 180 }}>미납내용</th>
+                    <th style={{ width: 90 }}>은행</th>
+                    <th style={{ width: 170 }}>계좌</th>
+                    <th style={{ width: 120 }}>금액</th>
+                    <th style={{ width: 140 }}>비고</th>
+                    <th style={{ width: 80 }}>지급완료</th>
+                    <th style={{ width: 70 }}>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRecords.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="pmt-empty">
+                        등록된 지급 대상이 없습니다. "지급 대상 관리"에서 추가해
+                        주세요.
+                      </td>
+                    </tr>
+                  )}
+                  {visibleRecords.map((row) => {
+                    const unpaidBuildings = (row.buildingStatus || []).filter(
+                      (b) => !b.paid
+                    );
+                    return (
+                      <tr key={row.id}>
+                        <td
+                          className={row.hasBuildings ? "pmt-td-clickable" : ""}
+                          onClick={() => row.hasBuildings && setBuildingModalRecord(row)}
+                          title={row.hasBuildings ? "건물별 계약 현황 보기" : undefined}
+                        >
+                          {row.category || "-"}
+                        </td>
+                        <td
+                          className={`pmt-td-left ${
+                            row.hasBuildings ? "pmt-td-clickable" : ""
+                          }`}
+                          onClick={() => row.hasBuildings && setBuildingModalRecord(row)}
+                          title={row.hasBuildings ? "건물별 계약 현황 보기" : undefined}
+                        >
+                          {row.name}
+                        </td>
+                        <td className="pmt-td-left">
+                          {row.hasBuildings ? (
+                            <button
+                              type="button"
+                              className={`pmt-unpaid-btn ${
+                                unpaidBuildings.length ? "has-unpaid" : ""
+                              }`}
+                              onClick={() => setBuildingModalRecord(row)}
+                            >
+                              {unpaidBuildings.length
+                                ? `${unpaidBuildings.length}개 건물 미납`
+                                : "전체 완납"}
+                            </button>
+                          ) : (
+                            <span className="pmt-td-muted">-</span>
+                          )}
+                        </td>
+                        <td>{row.bank || "-"}</td>
+                        <td>{row.account || "-"}</td>
+                        <td>
+                          {row.hasBuildings ? (
+                            <span className="pmt-td-amount">{fmtComma(row.amount)}</span>
+                          ) : (
+                            <input
+                              type="text"
+                              className="pmt-table-input"
+                              value={fmtComma(row.amount)}
+                              onChange={(e) =>
+                                saveRecord(row.id, { amount: parseNumber(e.target.value) })
+                              }
+                            />
+                          )}
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="pmt-table-input pmt-table-input-left"
+                            value={row.note || ""}
+                            onChange={(e) =>
+                              saveRecord(row.id, { note: e.target.value })
+                            }
+                          />
+                        </td>
+                        <td className="pmt-td-center">
+                          {row.hasBuildings ? (
+                            <span
+                              className={`pmt-active-badge ${
+                                row.paid ? "is-on" : "is-off"
+                              }`}
+                            >
+                              {row.paid ? "완납" : "미납"}
+                            </span>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={!!row.paid}
+                              onChange={(e) =>
+                                saveRecord(row.id, { paid: e.target.checked })
+                              }
+                            />
+                          )}
+                        </td>
+                        <td className="pmt-td-center">
+                          <button
+                            type="button"
+                            className="pmt-row-del"
+                            onClick={() => handleExclude(row)}
+                          >
+                            제외
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="pmt-summary-cards">
+              <div className="pmt-summary-card pmt-summary-card--accent">
+                <div className="pmt-summary-label">이번 달 총액</div>
+                <div className="pmt-summary-value">{fmtWon(summary30.total)}</div>
+              </div>
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">지급완료 금액</div>
+                <div className="pmt-summary-value">{fmtWon(summary30.paidTotal)}</div>
+              </div>
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">미지급 건수</div>
+                <div className="pmt-summary-value">{summary30.unpaidCount}건</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <CategoryManagerModal
+        open={catModalOpen}
+        onClose={() => setCatModalOpen(false)}
+        payType={payType}
       />
-
-      <Modal
-        open={openSites}
-        onClose={()=>setOpenSites(false)}
-        title="거래처별 달표"
-        width={1800}
-        hideCloseIcon
-        showIcon={false}
-        headCompact={true}
-        headerExtra={sitesHeaderControls}
-      >
-        <SitesViewer
-          sites={sites}
-          vendors={vendors}
-          targetDate={targetDate}
-          cat={sitesCat}
-          vendor={sitesVendor}
-          year={sitesYear}
-          editMode={sitesEditMode}
-        />
-      </Modal>
+      <PayeeManagerModal
+        open={payeeModalOpen}
+        onClose={() => setPayeeModalOpen(false)}
+        payType={payType}
+        categories={categories}
+        payees={payees}
+      />
+      <BuildingStatusModal
+        open={!!buildingModalRecord}
+        onClose={() => setBuildingModalRecord(null)}
+        record={buildingModalRecord}
+      />
     </div>
   );
 }

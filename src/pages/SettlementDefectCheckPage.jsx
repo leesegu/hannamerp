@@ -1,5 +1,6 @@
 // src/pages/SettlementDefectCheckPage.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import "./SettlementDefectCheckPage.css";
 import { db } from "../firebase";
 import {
@@ -14,17 +15,31 @@ import * as htmlToImage from "html-to-image";
 import { jsPDF } from "jspdf";
 
 /* ===== 유틸 ===== */
-const toNum = (v) =>
-  v === "" || v == null ? 0 : Number(String(v).replace(/[,\s]/g, "")) || 0;
+
+const toNum = (v) => {
+  if (v === "" || v == null) return 0;
+  const cleaned = String(v).replace(/[^0-9.-]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const fmtAmount = (val) => {
   const n = toNum(val);
   return n ? n.toLocaleString() : n === 0 ? "0" : "";
 };
 
-// 제외 키워드: 이 단어들이 들어간 추가내역은 '하자' 리스트에서 제외
+/* ✅ 도배/벽지 키워드: 이 단어가 포함된 내용은 다른 제외 키워드와
+   같이 적혀 있어도(예: "1차 도배비", "도배 요금") 무조건 하자
+   리스트 후보로 포함됩니다. */
+const PAPERING_KEYWORDS = ["도배", "벽지"];
+
+const containsPaperingKeyword = (text) => {
+  const s = String(text || "").trim();
+  if (!s) return false;
+  return PAPERING_KEYWORDS.some((kw) => s.includes(kw));
+};
+
 const EXCLUDE_KEYWORDS = [
-  "도배",
   "청소",
   "소취",
   "요금",
@@ -37,25 +52,23 @@ const EXCLUDE_KEYWORDS = [
 const containsExcludedKeyword = (text) => {
   const s = String(text || "").trim();
   if (!s) return false;
+  if (containsPaperingKeyword(s)) return false;
   return EXCLUDE_KEYWORDS.some((kw) => s.includes(kw));
 };
 
-// 날짜 비교용: 문자열/타임스탬프/Date 등 최대한 정규화해서 내림차순 정렬
+// 날짜 비교용
 const toDateValue = (val) => {
   if (!val) return null;
 
-  // Firestore Timestamp
   if (typeof val === "object" && typeof val.toDate === "function") {
     const d = val.toDate();
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
-  // Date 객체
   if (val instanceof Date && !isNaN(val)) {
     return new Date(val.getFullYear(), val.getMonth(), val.getDate());
   }
 
-  // 문자열: yyyy-mm-dd, yyyy.mm.dd 등
   const s = String(val).trim();
   const m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
   if (!m) return null;
@@ -67,9 +80,134 @@ const toDateValue = (val) => {
   return isNaN(dd) ? null : dd;
 };
 
+/* ===== 처리결과 커스텀 드롭다운 ===== */
+const STATUS_OPTIONS = [
+  { value: "미결", label: "미결", tone: "pending" },
+  { value: "완료", label: "완료", tone: "done" },
+  { value: "보류", label: "보류", tone: "hold" },
+];
+
+const FILTER_STATUS_OPTIONS = [
+  { value: "전체", label: "전체", tone: "all" },
+  ...STATUS_OPTIONS,
+];
+
+function StatusDropdown({
+  value,
+  onChange,
+  size = "row",
+  options = STATUS_OPTIONS,
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0, w: 0 });
+  const btnRef = useRef(null);
+  // ✅ 옵션 목록(Portal로 렌더링됨)의 DOM을 참조하기 위한 ref.
+  //    이게 없으면 "바깥 클릭 감지"가 옵션 목록 자체를 바깥으로
+  //    오인해서, 옵션을 클릭하는 순간(mousedown)에 목록이 먼저
+  //    사라져버려 선택(click)이 무시되는 버그가 발생합니다.
+  const listRef = useRef(null);
+
+  const current = options.find((o) => o.value === value) || options[0];
+
+  const openList = () => {
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      const vh = window.innerHeight || 0;
+      const vw = window.innerWidth || 0;
+      const EST_H = options.length * 38 + 12;
+      const PAD = 8;
+
+      let y = rect.bottom + 6;
+      if (y + EST_H > vh - PAD) {
+        y = Math.max(PAD, rect.top - EST_H - 6);
+      }
+
+      let x = rect.left;
+      const listW = Math.max(rect.width, 130);
+      if (x + listW > vw - PAD) {
+        x = Math.max(PAD, vw - PAD - listW);
+      }
+
+      setPos({ x, y, w: rect.width });
+    }
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e) => {
+      // ✅ 트리거 버튼 또는 옵션 목록 내부 클릭은 "바깥 클릭"이 아님
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (listRef.current && listRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    const handleEsc = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [open]);
+
+  const handlePick = (opt) => {
+    setOpen(false);
+    if (opt.value !== value) onChange(opt.value);
+  };
+
+  return (
+    <div className={`sd-dropdown sd-dropdown--${size}`}>
+      <button
+        type="button"
+        ref={btnRef}
+        className={`sd-dropdown-trigger sd-dropdown-trigger--${size} sd-dropdown-trigger--${current.tone}`}
+        onClick={() => (open ? setOpen(false) : openList())}
+      >
+        <span className="sd-dropdown-dot" />
+        <span className="sd-dropdown-label">{current.label}</span>
+        <span className={`sd-dropdown-arrow ${open ? "is-open" : ""}`}>▾</span>
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={listRef}
+            className="sd-dropdown-list"
+            style={{
+              position: "fixed",
+              left: pos.x,
+              top: pos.y,
+              minWidth: Math.max(pos.w, 130),
+            }}
+          >
+            {options.map((opt) => (
+              <button
+                type="button"
+                key={opt.value}
+                className={`sd-dropdown-option sd-dropdown-option--${opt.tone} ${
+                  opt.value === value ? "is-selected" : ""
+                }`}
+                onClick={() => handlePick(opt)}
+              >
+                <span className="sd-dropdown-dot" />
+                <span>{opt.label}</span>
+                {opt.value === value && (
+                  <span className="sd-dropdown-check">✓</span>
+                )}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
 export default function SettlementDefectCheckPage() {
   const [moveouts, setMoveouts] = useState([]);
-  const [filterStatus, setFilterStatus] = useState("미결");
+  const [filterStatus, setFilterStatus] = useState("전체");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortKey, setSortKey] = useState("moveDate");
   const [sortDir, setSortDir] = useState("desc");
@@ -80,9 +218,8 @@ export default function SettlementDefectCheckPage() {
   const [memoModalOpen, setMemoModalOpen] = useState(false);
   const [memoTargetRow, setMemoTargetRow] = useState(null);
   const [memoDraft, setMemoDraft] = useState("");
-
-  /* ✅ 메모 팝오버 위치(마우스 기준) */
   const [memoPos, setMemoPos] = useState({ x: 0, y: 0 });
+  const [memoSide, setMemoSide] = useState("left"); // 'left' | 'right'
 
   /* ===== Firestore 구독: moveouts 컬렉션 ===== */
   useEffect(() => {
@@ -168,9 +305,11 @@ export default function SettlementDefectCheckPage() {
 
   /* ===== 필터 + 검색 + 정렬 적용된 목록 ===== */
   const defectRows = useMemo(() => {
-    let rows = allDefectRows.filter(
-      (r) => !r.defectHidden && r.defectStatus === filterStatus
-    );
+    let rows = allDefectRows.filter((r) => {
+      if (r.defectHidden) return false;
+      if (filterStatus === "전체") return true;
+      return r.defectStatus === filterStatus;
+    });
 
     const term = searchTerm.trim().toLowerCase();
     if (term) {
@@ -282,34 +421,50 @@ export default function SettlementDefectCheckPage() {
     }
   };
 
-  /* ✅ 메모 아이콘 클릭 → 마우스 포인트 '왼쪽'에 팝오버 오픈 */
+  /* ✅ 메모 아이콘 클릭 → 클릭한 '버튼' 위치를 기준으로 팝오버 오픈 */
   const openMemoModal = (row, e) => {
     setMemoTargetRow(row);
     setMemoDraft(String(row?.defectMemo || ""));
     setMemoModalOpen(true);
 
-    const POP_W = 420; // 예상 팝오버 폭(대략)
-    const GAP = 12; // 마우스와 간격
-    const PAD = 8; // 화면 가장자리 패딩
-
     const vw = window.innerWidth || 0;
     const vh = window.innerHeight || 0;
 
-    // 기본: 마우스 왼쪽
-    let x = (e?.clientX ?? 0) - POP_W - GAP;
-    let y = (e?.clientY ?? 0);
+    const POP_W = vw <= 960 ? 280 : 320;
+    const EST_H = 230;
+    const GAP = 10;
+    const PAD = 10;
 
-    // 왼쪽이 화면 밖이면 → 오른쪽으로 fallback
-    if (x < PAD) x = (e?.clientX ?? 0) + GAP;
+    const btn = e?.currentTarget;
+    const rect =
+      btn && typeof btn.getBoundingClientRect === "function"
+        ? btn.getBoundingClientRect()
+        : {
+            left: e?.clientX ?? 0,
+            right: e?.clientX ?? 0,
+            top: e?.clientY ?? 0,
+            bottom: e?.clientY ?? 0,
+            height: 0,
+          };
 
-    // 세로는 화면 안으로 clamp (대략적인 높이 여유)
-    const EST_H = 260;
+    let side = "left";
+    let x = rect.left - POP_W - GAP;
+    let y = rect.top + rect.height / 2 - EST_H / 2;
+
+    if (x < PAD) {
+      side = "right";
+      x = rect.right + GAP;
+    }
+
+    if (x + POP_W > vw - PAD) {
+      x = Math.max(PAD, vw - PAD - POP_W);
+    }
+    if (x < PAD) x = PAD;
+
     if (y < PAD) y = PAD;
     if (y + EST_H > vh - PAD) y = Math.max(PAD, vh - PAD - EST_H);
 
-    // 가로도 화면 안으로 clamp
-    if (x + POP_W > vw - PAD) x = Math.max(PAD, vw - PAD - POP_W);
-
+    setMemoSide(side);
     setMemoPos({ x, y });
   };
 
@@ -334,14 +489,27 @@ export default function SettlementDefectCheckPage() {
   /* ===== PDF 저장 ===== */
   const handleSavePdf = async () => {
     if (!tableRef.current) return;
+
+    const proceed = window.confirm(
+      "현재 하자 리스트를 PDF 파일로 저장하시겠습니까?"
+    );
+    if (!proceed) return;
+
+    const node = tableRef.current;
     try {
       setPdfStatus("PDF 파일 생성 중입니다...");
-      const node = tableRef.current;
+
+      node.classList.add("pdf-export-mode");
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
 
       const dataUrl = await htmlToImage.toPng(node, {
         backgroundColor: "#ffffff",
-        pixelRatio: 1,
+        pixelRatio: 2,
       });
+
+      node.classList.remove("pdf-export-mode");
 
       const img = new Image();
       img.src = dataUrl;
@@ -350,7 +518,7 @@ export default function SettlementDefectCheckPage() {
         const pdf = new jsPDF({
           unit: "mm",
           format: "a4",
-          orientation: "portrait",
+          orientation: "landscape",
         });
 
         const pageWidth = pdf.internal.pageSize.getWidth();
@@ -394,6 +562,7 @@ export default function SettlementDefectCheckPage() {
         setPdfStatus("PDF 생성 중 오류가 발생했습니다.");
       };
     } catch (err) {
+      node.classList.remove("pdf-export-mode");
       console.error("PDF 저장 실패:", err);
       setPdfStatus("PDF 생성 중 오류가 발생했습니다.");
     }
@@ -418,6 +587,53 @@ export default function SettlementDefectCheckPage() {
     if (sortKey !== key) return <span className="sort-icon sort-icon-idle">↕</span>;
     return <span className="sort-icon">{sortDir === "asc" ? "▲" : "▼"}</span>;
   };
+
+  /* ✅ 메모 팝오버: document.body로 Portal 렌더링 */
+  const memoPopover =
+    memoModalOpen &&
+    createPortal(
+      <div className="sd-popover-overlay" onMouseDown={closeMemoModal}>
+        <div
+          className={`sd-popover sd-popover--${memoSide}`}
+          style={{
+            position: "fixed",
+            left: memoPos.x,
+            top: memoPos.y,
+          }}
+          role="dialog"
+          aria-modal="false"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="sd-popover-header">
+            <div className="sd-popover-title">메모</div>
+            <div className="sd-popover-sub">
+              {memoTargetRow?.villaName || "-"} {memoTargetRow?.unitNumber || ""}
+              {" · "}
+              {String(memoTargetRow?.moveDate || "").slice(0, 10) || "-"}
+            </div>
+          </div>
+
+          <div className="sd-popover-body">
+            <textarea
+              className="sd-popover-textarea"
+              value={memoDraft}
+              onChange={(e) => setMemoDraft(e.target.value)}
+              placeholder="메모를 입력하세요."
+            />
+          </div>
+
+          <div className="sd-popover-actions">
+            <button type="button" className="sd-btn sd-btn-primary" onClick={handleSaveMemo}>
+              저장
+            </button>
+            <button type="button" className="sd-btn sd-btn-ghost" onClick={closeMemoModal}>
+              취소
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
 
   return (
     <div className="settle-defect-page">
@@ -449,15 +665,12 @@ export default function SettlementDefectCheckPage() {
             <div className="summary-controls-luxe">
               <div className="control-group">
                 <label className="control-label">처리결과</label>
-                <select
-                  className="control-select luxe-select"
+                <StatusDropdown
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                >
-                  <option value="미결">미결</option>
-                  <option value="완료">완료</option>
-                  <option value="보류">보류</option>
-                </select>
+                  onChange={setFilterStatus}
+                  size="filter"
+                  options={FILTER_STATUS_OPTIONS}
+                />
               </div>
 
               <div className="control-group control-search">
@@ -557,15 +770,11 @@ export default function SettlementDefectCheckPage() {
                       <span className="defect-text">{renderDefectText(row.defects)}</span>
                     </td>
                     <td className="cell-result">
-                      <select
-                        className={`result-select luxe-table-select result-${result}`}
+                      <StatusDropdown
                         value={result}
-                        onChange={(e) => handleResultChange(row, e.target.value)}
-                      >
-                        <option value="미결">미결</option>
-                        <option value="완료">완료</option>
-                        <option value="보류">보류</option>
-                      </select>
+                        onChange={(v) => handleResultChange(row, v)}
+                        size="row"
+                      />
                     </td>
 
                     <td className="cell-memo">
@@ -594,52 +803,10 @@ export default function SettlementDefectCheckPage() {
             </tbody>
           </table>
         </div>
-
-        {/* 메모 입력창: 마우스포인트 '왼쪽'에 뜨도록 위치 고정 */}
-        {memoModalOpen && (
-          <div className="sd-popover-overlay" onMouseDown={closeMemoModal}>
-            <div
-              className="sd-popover"
-              style={{
-                position: "fixed",
-                left: memoPos.x,
-                top: memoPos.y,
-                transform: "translate(0, 0)",
-              }}
-              role="dialog"
-              aria-modal="false"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div className="sd-popover-header">
-                <div className="sd-popover-title">메모</div>
-                <div className="sd-popover-sub">
-                  {memoTargetRow?.villaName || "-"} {memoTargetRow?.unitNumber || ""}
-                  {" · "}
-                  {String(memoTargetRow?.moveDate || "").slice(0, 10) || "-"}
-                </div>
-              </div>
-
-              <div className="sd-popover-body">
-                <textarea
-                  className="sd-popover-textarea"
-                  value={memoDraft}
-                  onChange={(e) => setMemoDraft(e.target.value)}
-                  placeholder="메모를 입력하세요."
-                />
-              </div>
-
-              <div className="sd-popover-actions">
-                <button type="button" className="sd-btn sd-btn-primary" onClick={handleSaveMemo}>
-                  저장
-                </button>
-                <button type="button" className="sd-btn sd-btn-ghost" onClick={closeMemoModal}>
-                  취소
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* ✅ 메모 팝오버: document.body에 Portal로 렌더링 (화면 밖 잘림 방지) */}
+      {memoPopover}
     </div>
   );
 }

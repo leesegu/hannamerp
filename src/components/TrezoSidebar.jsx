@@ -55,6 +55,9 @@ import ResidentCardPage from "../pages/ResidentCardPage";
 /* ✅ 자재비관리대장 */
 import MaterialCostPage from "../pages/MaterialCostPage";
 
+/* ✅ 수도검침조회 */
+import WaterMeterReadingPage from "../pages/WaterMeterReadingPage";
+
 /* ✅ 관리종료 */
 import VillaEndPage from "../pages/VillaEndPage";
 
@@ -1076,6 +1079,7 @@ const TrezoSidebar = ({
                       "공용전기 계산",
                       "입주자카드",
                       "자재비관리대장",
+                      "수도검침조회",
                     ]}
 
                     activeMenu={
@@ -1109,6 +1113,8 @@ const TrezoSidebar = ({
 
                         자재비관리대장:
                           <MaterialCostPage />,
+                        수도검침조회:
+    <WaterMeterReadingPage />,  
                       };
 
 

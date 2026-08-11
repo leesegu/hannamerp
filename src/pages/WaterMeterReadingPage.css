@@ -1,0 +1,3253 @@
+/* src/pages/WaterMeterReadingPage.css */
+
+
+/* =========================================================
+   PAGE
+
+   수도검침조회 페이지 자체의
+   외부 가로/세로 스크롤은 사용하지 않음
+========================================================= */
+
+.wmr-page {
+  width: 100%;
+  max-width: 100%;
+
+  height: calc(100vh - 90px);
+  min-height: 0;
+
+  padding: 22px;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+
+  background: #f5f7fb;
+
+  color: #1f2937;
+
+  font-family: "Pretendard", sans-serif;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.wmr-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  margin-bottom: 16px;
+
+  flex: 0 0 auto;
+}
+
+.wmr-page-header h2 {
+  margin: 0;
+
+  color: #1e293b;
+
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.wmr-page-header p {
+  margin: 5px 0 0;
+
+  color: #8a95a8;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.wmr-header-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  flex: 0 0 auto;
+}
+
+.wmr-btn {
+  height: 38px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding: 0 14px;
+
+  border-radius: 9px;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.wmr-btn svg {
+  font-size: 15px;
+}
+
+.wmr-btn:hover {
+  transform: translateY(-1px);
+}
+
+.wmr-btn-add {
+  min-width: 82px;
+
+  border: 1px solid #273449;
+
+  background:
+    linear-gradient(
+      180deg,
+      #35445d 0%,
+      #253247 100%
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 5px 14px
+    rgba(37, 50, 71, 0.18);
+}
+
+.wmr-btn-add svg {
+  width: 18px;
+  height: 18px;
+
+  padding: 3px;
+
+  box-sizing: border-box;
+
+  border-radius: 5px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.14
+    );
+}
+
+.wmr-btn-add:hover {
+  border-color: #1f2b3e;
+
+  background:
+    linear-gradient(
+      180deg,
+      #41516d 0%,
+      #2b3950 100%
+    );
+
+  box-shadow:
+    0 7px 17px
+    rgba(37, 50, 71, 0.22);
+}
+
+.wmr-btn-inspector {
+  border: 1px solid #d9dff0;
+
+  background: #ffffff;
+
+  color: #5363c8;
+}
+
+.wmr-btn-inspector:hover {
+  border-color: #cbd3ef;
+
+  background: #f6f7ff;
+}
+
+.wmr-btn-upload {
+  border: 1px solid #596cf4;
+
+  background:
+    linear-gradient(
+      180deg,
+      #7484ff 0%,
+      #596cf4 100%
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 5px 13px
+    rgba(89, 108, 244, 0.2);
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+.wmr-search-panel {
+  min-height: 62px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 11px 14px;
+
+  margin-bottom: 14px;
+
+  box-sizing: border-box;
+
+  flex: 0 0 auto;
+
+  background: #ffffff;
+
+  border: 1px solid #e4e9f1;
+  border-radius: 13px;
+
+  box-shadow:
+    0 2px 9px
+    rgba(15, 23, 42, 0.035);
+}
+
+.wmr-search-wrap {
+  position: relative;
+
+  width: 360px;
+  max-width: 100%;
+}
+
+.wmr-search-wrap input {
+  width: 100%;
+  height: 38px;
+
+  padding:
+    0 38px
+    0 37px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2eb;
+  border-radius: 9px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #344054;
+
+  font-family: inherit;
+  font-size: 13px;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.wmr-search-wrap input::placeholder {
+  color: #a6afbd;
+}
+
+.wmr-search-wrap input:focus {
+  border-color: #7281f4;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(100, 116, 240, 0.08);
+}
+
+.wmr-search-icon {
+  position: absolute;
+
+  top: 50%;
+  left: 12px;
+
+  transform:
+    translateY(-50%);
+
+  color: #8e99aa;
+
+  font-size: 15px;
+
+  pointer-events: none;
+}
+
+.wmr-search-clear {
+  position: absolute;
+
+  top: 50%;
+  right: 9px;
+
+  width: 25px;
+  height: 25px;
+
+  transform:
+    translateY(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 6px;
+
+  background: transparent;
+
+  color: #9aa4b3;
+
+  cursor: pointer;
+}
+
+.wmr-search-clear:hover {
+  background: #f1f3f7;
+
+  color: #5d6878;
+}
+
+.wmr-search-count {
+  min-width: 60px;
+
+  flex: 0 0 auto;
+
+  color: #697586;
+
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.wmr-upload-message {
+  min-width: 0;
+
+  margin-left: auto;
+
+  overflow: hidden;
+
+  color: #667085;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   MAIN LAYOUT
+
+   페이지 외부 스크롤을 발생시키지 않고
+   이 영역 안에서만 레이아웃 유지
+========================================================= */
+
+.wmr-content {
+  width: 100%;
+  max-width: 100%;
+
+  height: calc(100% - 145px);
+
+  min-width: 0;
+  min-height: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    245px
+    minmax(0, 1fr);
+
+  gap: 14px;
+
+  align-items: stretch;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   VILLA LIST PANEL
+========================================================= */
+
+.wmr-villa-list-panel {
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border: 1px solid #e3e8f0;
+  border-radius: 13px;
+
+  box-shadow:
+    0 2px 9px
+    rgba(15, 23, 42, 0.035);
+}
+
+.wmr-villa-list-header {
+  height: 47px;
+
+  flex: 0 0 47px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 14px;
+
+  box-sizing: border-box;
+
+  border-bottom:
+    1px solid #edf0f4;
+
+  background: #fafbfc;
+}
+
+.wmr-villa-list-header strong {
+  color: #344054;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wmr-villa-list-header span {
+  min-width: 25px;
+  height: 23px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 7px;
+
+  box-sizing: border-box;
+
+  border-radius: 20px;
+
+  background: #edf0ff;
+
+  color: #5e6ee4;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   빌라 목록에서만 세로 스크롤 사용
+========================================================= */
+
+.wmr-villa-list {
+  flex: 1;
+
+  min-height: 0;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  padding: 6px;
+
+  box-sizing: border-box;
+
+  overscroll-behavior: contain;
+}
+
+.wmr-villa-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.wmr-villa-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.wmr-villa-list::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+
+  background: #d9dee7;
+}
+
+.wmr-villa-list::-webkit-scrollbar-thumb:hover {
+  background: #c8ced9;
+}
+
+.wmr-villa-item {
+  width: 100%;
+
+  min-height: 55px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 8px;
+
+  box-sizing: border-box;
+
+  border: none;
+  border-radius: 9px;
+
+  background: transparent;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s ease;
+}
+
+.wmr-villa-item:hover {
+  background: #f6f8fb;
+}
+
+.wmr-villa-item.active {
+  background:
+    linear-gradient(
+      90deg,
+      #eff2ff 0%,
+      #f7f8ff 100%
+    );
+}
+
+.wmr-villa-item-icon {
+  width: 31px;
+  height: 31px;
+
+  flex: 0 0 31px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+
+  background: #f0f2f6;
+
+  color: #768296;
+
+  font-size: 14px;
+}
+
+.wmr-villa-item.active
+  .wmr-villa-item-icon {
+  background: #6678f3;
+
+  color: #ffffff;
+}
+
+.wmr-villa-item-text {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.wmr-villa-item-text strong {
+  display: block;
+
+  overflow: hidden;
+
+  margin-bottom: 3px;
+
+  color: #344054;
+
+  font-size: 12.5px;
+  font-weight: 750;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-villa-item.active
+  .wmr-villa-item-text strong {
+  color: #4657c7;
+}
+
+.wmr-villa-item-text span {
+  display: block;
+
+  overflow: hidden;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 500;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-villa-arrow {
+  flex: 0 0 auto;
+
+  color: #c0c6d0;
+
+  font-size: 13px;
+}
+
+.wmr-list-empty {
+  padding: 40px 10px;
+
+  color: #98a2b3;
+
+  font-size: 12px;
+
+  text-align: center;
+}
+
+
+/* =========================================================
+   DETAIL PANEL
+========================================================= */
+
+.wmr-detail-panel {
+  width: 100%;
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   VILLA INFO
+========================================================= */
+
+.wmr-villa-info-card {
+  flex: 0 0 auto;
+
+  margin-bottom: 14px;
+
+  padding: 16px;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+
+  border: 1px solid #e3e8f0;
+  border-radius: 13px;
+
+  box-shadow:
+    0 2px 9px
+    rgba(15, 23, 42, 0.035);
+}
+
+.wmr-villa-info-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 14px;
+
+  margin-bottom: 14px;
+}
+
+.wmr-villa-title-row {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+}
+
+.wmr-villa-title-icon {
+  width: 34px;
+  height: 34px;
+
+  flex: 0 0 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #6678f3,
+      #8190ff
+    );
+
+  color: #ffffff;
+
+  font-size: 16px;
+
+  box-shadow:
+    0 4px 10px
+    rgba(102, 120, 243, 0.2);
+}
+
+.wmr-villa-title-row h3 {
+  min-width: 0;
+
+  margin: 0;
+
+  overflow: hidden;
+
+  color: #253044;
+
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-room-count {
+  flex: 0 0 auto;
+
+  padding: 4px 8px;
+
+  border-radius: 20px;
+
+  background: #f0f2ff;
+
+  color: #6373df;
+
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.wmr-villa-manage-buttons {
+  display: flex;
+
+  gap: 6px;
+
+  flex: 0 0 auto;
+}
+
+.wmr-icon-btn {
+  width: 32px;
+  height: 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #687588;
+
+  cursor: pointer;
+}
+
+.wmr-icon-btn:hover {
+  background: #f5f7fa;
+
+  color: #344054;
+}
+
+.wmr-icon-btn.danger:hover {
+  border-color: #f3c5c5;
+
+  background: #fff6f6;
+
+  color: #dc4c4c;
+}
+
+.wmr-info-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      4,
+      minmax(0, 1fr)
+    );
+
+  gap: 8px;
+}
+
+.wmr-info-item {
+  min-width: 0;
+  min-height: 58px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 9px 11px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #edf0f4;
+  border-radius: 9px;
+
+  background: #fafbfc;
+}
+
+.wmr-info-icon {
+  width: 29px;
+  height: 29px;
+
+  flex: 0 0 29px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 7px;
+
+  background: #eef1f6;
+
+  color: #758196;
+
+  font-size: 13px;
+}
+
+.wmr-info-item > div:last-child {
+  min-width: 0;
+}
+
+.wmr-info-item span {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #9aa4b2;
+
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.wmr-info-item strong {
+  display: block;
+
+  overflow: hidden;
+
+  color: #3d4859;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-villa-memo {
+  margin-top: 9px;
+
+  padding: 8px 11px;
+
+  border-radius: 8px;
+
+  background: #fff9ec;
+
+  color: #8c6725;
+
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   TABLE CARD
+
+   남은 화면 높이를 전부 사용
+========================================================= */
+
+.wmr-table-card {
+  flex: 1;
+
+  width: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border: 1px solid #e3e8f0;
+  border-radius: 13px;
+
+  box-shadow:
+    0 2px 9px
+    rgba(15, 23, 42, 0.035);
+}
+
+.wmr-table-title {
+  min-height: 50px;
+
+  flex: 0 0 50px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 15px;
+
+  box-sizing: border-box;
+
+  border-bottom:
+    1px solid #e8ecf2;
+}
+
+.wmr-table-title strong {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #344054;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wmr-table-title span {
+  display: block;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   TABLE SCROLL
+
+   페이지 외부가 아니라
+   데이터 테이블 내부에서만 가로/세로 스크롤 사용
+========================================================= */
+
+.wmr-table-scroll {
+  flex: 1;
+
+  width: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  overflow: auto;
+
+  overscroll-behavior: contain;
+}
+
+.wmr-table-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.wmr-table-scroll::-webkit-scrollbar-track {
+  background: #f7f8fa;
+}
+
+.wmr-table-scroll::-webkit-scrollbar-thumb {
+  background: #d8dee7;
+
+  border-radius: 10px;
+}
+
+.wmr-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #c7ced9;
+}
+
+.wmr-table {
+  width: 100%;
+
+  min-width: 1050px;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  table-layout: fixed;
+}
+
+.wmr-table thead th {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 10;
+
+  height: 39px;
+
+  padding: 0 5px;
+
+  border-right:
+    1px solid #e9edf3;
+
+  border-bottom:
+    1px solid #dfe5ed;
+
+  background: #f7f8fa;
+
+  color: #536074;
+
+  font-size: 11.5px;
+  font-weight: 750;
+
+  text-align: center;
+
+  white-space: nowrap;
+}
+
+.wmr-table thead th:last-child {
+  border-right: none;
+}
+
+.wmr-table tbody th,
+.wmr-table tbody td {
+  height: 38px;
+
+  padding: 0;
+
+  border-right:
+    1px solid #edf0f4;
+
+  border-bottom:
+    1px solid #edf0f4;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+}
+
+.wmr-table tbody tr:hover th,
+.wmr-table tbody tr:hover td {
+  background: #fbfcfe;
+}
+
+.wmr-table tbody tr:last-child th,
+.wmr-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.wmr-table td:last-child {
+  border-right: none;
+}
+
+
+/* =========================================================
+   고정 호실 열
+========================================================= */
+
+.wmr-room-column,
+.wmr-room-cell {
+  position: sticky;
+
+  left: 0;
+
+  z-index: 8;
+
+  width: 105px;
+  min-width: 105px;
+
+  background: #f7f8fa !important;
+}
+
+.wmr-room-column {
+  z-index: 15 !important;
+}
+
+.wmr-room-cell {
+  color: #344054;
+
+  font-size: 11.5px;
+  font-weight: 750;
+
+  text-align: center;
+
+  white-space: normal;
+
+  word-break: keep-all;
+}
+
+
+/* =========================================================
+   검침값 INPUT
+========================================================= */
+
+.wmr-table td input {
+  width: 100%;
+  height: 37px;
+
+  padding: 0 5px;
+
+  box-sizing: border-box;
+
+  border: none;
+
+  outline: none;
+
+  background: transparent;
+
+  color: #39465a;
+
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+
+  text-align: center;
+}
+
+.wmr-table td input:focus {
+  position: relative;
+
+  z-index: 2;
+
+  background: #f2f4ff;
+
+  box-shadow:
+    inset 0 0 0 1.5px
+    #697bf3;
+}
+
+
+/* =========================================================
+   TABLE EMPTY
+========================================================= */
+
+.wmr-table-empty-cell {
+  height: 140px !important;
+
+  padding: 20px !important;
+
+  color: #98a2b3 !important;
+
+  font-size: 12px !important;
+
+  text-align: center !important;
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.wmr-no-selection {
+  width: 100%;
+  height: 100%;
+
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+
+  border: 1px solid #e3e8f0;
+  border-radius: 13px;
+
+  color: #98a2b3;
+
+  text-align: center;
+}
+
+.wmr-no-selection > svg {
+  margin-bottom: 12px;
+
+  color: #8996f2;
+
+  font-size: 35px;
+}
+
+.wmr-no-selection strong {
+  margin-bottom: 5px;
+
+  color: #536074;
+
+  font-size: 14px;
+}
+
+.wmr-no-selection span {
+  color: #a1aab7;
+
+  font-size: 11.5px;
+}
+
+
+/* =========================================================
+   MODAL
+========================================================= */
+
+.wmr-modal-backdrop {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  box-sizing: border-box;
+
+  background:
+    rgba(
+      24,
+      31,
+      44,
+      0.42
+    );
+
+  backdrop-filter:
+    blur(2px);
+}
+
+.wmr-modal {
+  width: min(
+    760px,
+    96vw
+  );
+
+  max-height: 88vh;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border-radius: 15px;
+
+  box-shadow:
+    0 24px 70px
+    rgba(15, 23, 42, 0.24);
+}
+
+.wmr-modal-header {
+  min-height: 67px;
+
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 20px;
+
+  border-bottom:
+    1px solid #e8ecf2;
+}
+
+.wmr-modal-header h3 {
+  margin: 0 0 3px;
+
+  color: #263247;
+
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.wmr-modal-header p {
+  margin: 0;
+
+  color: #98a2b3;
+
+  font-size: 11px;
+}
+
+.wmr-modal-close {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #7c8797;
+
+  font-size: 18px;
+
+  cursor: pointer;
+}
+
+.wmr-modal-close:hover {
+  background: #f1f3f6;
+}
+
+.wmr-modal-body {
+  flex: 1;
+
+  min-height: 0;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding: 18px 20px;
+
+  box-sizing: border-box;
+}
+
+.wmr-form-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 12px;
+}
+
+.wmr-form-group {
+  min-width: 0;
+}
+
+.wmr-form-group label {
+  display: block;
+
+  margin-bottom: 6px;
+
+  color: #4a5568;
+
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.wmr-form-group label em {
+  margin-left: 3px;
+
+  color: #ef5e5e;
+
+  font-style: normal;
+}
+
+.wmr-form-group input {
+  width: 100%;
+  height: 38px;
+
+  padding: 0 11px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #344054;
+
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.wmr-form-group input:focus {
+  border-color: #7180f2;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(102, 120, 243, 0.08);
+}
+
+.wmr-form-full {
+  margin-top: 12px;
+}
+
+
+/* =========================================================
+   ROOM REGISTER
+========================================================= */
+
+.wmr-room-section {
+  margin-top: 20px;
+
+  padding-top: 16px;
+
+  border-top:
+    1px solid #edf0f4;
+}
+
+.wmr-room-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin-bottom: 10px;
+}
+
+.wmr-room-section-header strong {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #3f4a5a;
+
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.wmr-room-section-header span {
+  display: block;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+.wmr-small-add-btn {
+  height: 32px;
+
+  flex: 0 0 auto;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding: 0 10px;
+
+  border: 1px solid #d9dfea;
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #566274;
+
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.wmr-small-add-btn:hover {
+  background: #f7f8fa;
+}
+
+.wmr-room-input-list {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 7px;
+}
+
+.wmr-room-input-row {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+}
+
+.wmr-room-number {
+  width: 27px;
+  height: 33px;
+
+  flex: 0 0 27px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 7px;
+
+  background: #f1f3f6;
+
+  color: #7b8798;
+
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.wmr-room-input-row input {
+  min-width: 0;
+
+  flex: 1;
+
+  height: 33px;
+
+  padding: 0 9px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dde3eb;
+  border-radius: 7px;
+
+  outline: none;
+
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.wmr-room-input-row input:focus {
+  border-color: #7180f2;
+}
+
+.wmr-room-delete-btn {
+  width: 31px;
+  height: 31px;
+
+  flex: 0 0 31px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #eceff3;
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #a0a8b4;
+
+  cursor: pointer;
+}
+
+.wmr-room-delete-btn:hover {
+  border-color: #f1c8c8;
+
+  background: #fff5f5;
+
+  color: #e15c5c;
+}
+
+
+/* =========================================================
+   MODAL FOOTER
+========================================================= */
+
+.wmr-modal-footer {
+  min-height: 60px;
+
+  flex: 0 0 60px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 7px;
+
+  padding: 0 20px;
+
+  box-sizing: border-box;
+
+  border-top:
+    1px solid #e8ecf2;
+
+  background: #fafbfc;
+}
+
+.wmr-modal-cancel,
+.wmr-modal-save {
+  height: 35px;
+
+  padding: 0 14px;
+
+  border-radius: 8px;
+
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.wmr-modal-cancel {
+  border: 1px solid #dce2ea;
+
+  background: #ffffff;
+
+  color: #657184;
+}
+
+.wmr-modal-save {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 5px;
+
+  border: 1px solid #5d70ee;
+
+  background:
+    linear-gradient(
+      180deg,
+      #7484fa,
+      #5d70ee
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 4px 10px
+    rgba(93, 112, 238, 0.18);
+}
+
+
+/* =========================================================
+   ETC
+========================================================= */
+
+.wmr-hidden-input {
+  display: none;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+
+   태블릿에서 창 너비가 줄어들어도
+   페이지 전체를 800px 이상으로 강제로 키우지 않음.
+
+   따라서 외부 가로 스크롤 없이
+   테이블 내부 스크롤만 사용.
+========================================================= */
+
+@media (
+  max-width: 1100px
+) {
+  .wmr-page {
+    width: 100%;
+    max-width: 100%;
+
+    overflow: hidden;
+  }
+
+
+  .wmr-content {
+    width: 100%;
+    max-width: 100%;
+
+    min-width: 0;
+
+    grid-template-columns:
+      210px
+      minmax(0, 1fr);
+
+    overflow: hidden;
+  }
+
+
+  .wmr-villa-list-panel {
+    min-width: 0;
+  }
+
+
+  .wmr-detail-panel {
+    min-width: 0;
+
+    overflow: hidden;
+  }
+
+
+  .wmr-info-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+
+/* =========================================================
+   더 좁은 태블릿 화면
+
+   모바일 페이지로 전환하는 것이 아니라
+   동일 PC 레이아웃을 압축해서 유지.
+========================================================= */
+
+@media (
+  max-width: 800px
+) {
+  .wmr-page {
+    padding: 14px;
+  }
+
+
+  .wmr-page-header {
+    margin-bottom: 10px;
+  }
+
+
+  .wmr-page-header h2 {
+    font-size: 20px;
+  }
+
+
+  .wmr-page-header p {
+    font-size: 11px;
+  }
+
+
+  .wmr-search-panel {
+    min-height: 54px;
+
+    padding: 8px 10px;
+
+    margin-bottom: 10px;
+  }
+
+
+  .wmr-search-wrap {
+    width: 260px;
+  }
+
+
+  .wmr-content {
+    height:
+      calc(100% - 122px);
+
+    grid-template-columns:
+      180px
+      minmax(0, 1fr);
+
+    gap: 10px;
+  }
+
+
+  .wmr-villa-list-header {
+    padding: 0 10px;
+  }
+
+
+  .wmr-villa-item {
+    gap: 6px;
+
+    padding:
+      7px 5px;
+  }
+
+
+  .wmr-villa-item-icon {
+    width: 28px;
+    height: 28px;
+
+    flex-basis: 28px;
+  }
+
+
+  .wmr-villa-info-card {
+    padding: 12px;
+
+    margin-bottom: 10px;
+  }
+
+
+  .wmr-villa-title-row h3 {
+    font-size: 15px;
+  }
+
+
+  .wmr-info-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+
+    gap: 6px;
+  }
+
+
+  .wmr-info-item {
+    min-height: 50px;
+
+    padding: 7px;
+  }
+
+
+  .wmr-info-icon {
+    width: 26px;
+    height: 26px;
+
+    flex-basis: 26px;
+  }
+
+
+  .wmr-table-title {
+    min-height: 44px;
+
+    flex-basis: 44px;
+  }
+}
+
+/* =========================================================
+   INSPECTOR MANAGER
+========================================================= */
+
+.wmr-inspector-modal {
+  width: min(
+    720px,
+    96vw
+  );
+}
+
+.wmr-inspector-form-card {
+  padding: 14px;
+
+  border: 1px solid #e7eaf2;
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fbfcff 0%,
+      #f7f8fc 100%
+    );
+}
+
+.wmr-inspector-form-title {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  margin-bottom: 13px;
+}
+
+.wmr-inspector-form-title > svg {
+  width: 34px;
+  height: 34px;
+
+  flex: 0 0 34px;
+
+  padding: 8px;
+
+  box-sizing: border-box;
+
+  border-radius: 9px;
+
+  background: #6678f3;
+
+  color: #ffffff;
+}
+
+.wmr-inspector-form-title strong {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #344054;
+
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.wmr-inspector-form-title span {
+  display: block;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+.wmr-inspector-form-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 10px;
+}
+
+.wmr-inspector-form-actions {
+  display: flex;
+  justify-content: flex-end;
+
+  gap: 7px;
+
+  margin-top: 10px;
+}
+
+.wmr-inspector-reset-btn,
+.wmr-inspector-save-btn {
+  height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding: 0 12px;
+
+  border-radius: 8px;
+
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.wmr-inspector-reset-btn {
+  border: 1px solid #dde2ea;
+
+  background: #ffffff;
+
+  color: #667085;
+}
+
+.wmr-inspector-save-btn {
+  border: 1px solid #5d70ee;
+
+  background:
+    linear-gradient(
+      180deg,
+      #7484fa,
+      #5d70ee
+    );
+
+  color: #ffffff;
+}
+
+.wmr-inspector-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin: 18px 0 8px;
+}
+
+.wmr-inspector-list-head strong {
+  color: #3f4a5a;
+
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.wmr-inspector-list-head span {
+  min-width: 28px;
+  height: 22px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 7px;
+
+  box-sizing: border-box;
+
+  border-radius: 20px;
+
+  background: #eef1ff;
+
+  color: #6071df;
+
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.wmr-inspector-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.wmr-inspector-empty {
+  padding: 28px 10px;
+
+  border: 1px dashed #dde2ea;
+  border-radius: 10px;
+
+  color: #98a2b3;
+
+  font-size: 11.5px;
+
+  text-align: center;
+}
+
+.wmr-inspector-item {
+  min-height: 58px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 9px 10px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #e9ecf2;
+  border-radius: 10px;
+
+  background: #ffffff;
+}
+
+.wmr-inspector-avatar {
+  width: 35px;
+  height: 35px;
+
+  flex: 0 0 35px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #eff2ff;
+
+  color: #6172df;
+}
+
+.wmr-inspector-item-info {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.wmr-inspector-item-info strong {
+  display: block;
+
+  margin-bottom: 3px;
+
+  color: #344054;
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.wmr-inspector-item-info span {
+  display: flex;
+  align-items: center;
+
+  gap: 4px;
+
+  color: #8a95a6;
+
+  font-size: 10.5px;
+}
+
+.wmr-inspector-item-info span svg {
+  font-size: 11px;
+}
+
+.wmr-inspector-item-actions {
+  display: flex;
+
+  gap: 5px;
+}
+
+.wmr-inspector-item-actions button {
+  width: 30px;
+  height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e0e5ec;
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #718096;
+
+  cursor: pointer;
+}
+
+.wmr-inspector-item-actions button:hover {
+  background: #f5f7fa;
+
+  color: #364152;
+}
+
+.wmr-inspector-item-actions button.danger:hover {
+  border-color: #f0c9c9;
+
+  background: #fff6f6;
+
+  color: #dc4c4c;
+}
+
+.wmr-inspector-mobile-note {
+  margin-right: auto;
+
+  color: #8a95a6;
+
+  font-size: 10.5px;
+}
+
+.wmr-inspector-mobile-note strong {
+  margin-left: 5px;
+
+  color: #5f70dc;
+}
+
+
+/* =========================================================
+   INSPECTOR RESPONSIVE
+========================================================= */
+
+@media (
+  max-width: 800px
+) {
+  .wmr-header-actions {
+    gap: 5px;
+  }
+
+  .wmr-btn {
+    padding: 0 9px;
+  }
+
+  .wmr-inspector-form-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .wmr-inspector-mobile-note {
+    display: none;
+  }
+}
+
+
+/* =========================================================
+   YEAR / READING VALIDATION / REVERSE METER
+   - 년도 선택
+   - 전년도 12월 표시
+   - 빈칸/0/검침 이상 상태
+   - 호실별 역순 계량기 설정
+========================================================= */
+
+.wmr-table-title {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wmr-year-selector {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+}
+
+.wmr-year-selector > span {
+  color: #7b8798;
+
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.wmr-year-selector select {
+  height: 32px;
+
+  min-width: 96px;
+
+  padding: 0 28px 0 10px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #344054;
+
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.wmr-year-selector select:focus {
+  border-color: #7180f2;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(102, 120, 243, 0.08);
+}
+
+
+/* =========================================================
+   월 헤더
+========================================================= */
+
+.wmr-month-head {
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 1px;
+
+  line-height: 1.05;
+}
+
+.wmr-month-head span {
+  color: #536074;
+
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.wmr-month-head small {
+  color: #9aa4b2;
+
+  font-size: 8.5px;
+  font-weight: 650;
+}
+
+
+/* =========================================================
+   검침표 폭
+
+   검침 경고 메모가 입력칸 아래에서 읽히도록
+   데이터테이블 내부 가로스크롤을 사용.
+========================================================= */
+
+.wmr-table {
+  min-width: 1500px;
+}
+
+.wmr-room-column,
+.wmr-room-cell {
+  width: 120px;
+  min-width: 120px;
+}
+
+
+/* =========================================================
+   호실 / 역순 계량기
+========================================================= */
+
+.wmr-room-cell {
+  padding: 0 6px !important;
+}
+
+.wmr-room-cell-inner {
+  width: 100%;
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  box-sizing: border-box;
+}
+
+.wmr-room-name {
+  min-width: 0;
+
+  overflow: hidden;
+
+  color: #344054;
+
+  font-size: 11.5px;
+  font-weight: 750;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-reverse-btn {
+  min-width: 30px;
+  height: 19px;
+
+  flex: 0 0 auto;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 5px;
+
+  border: 1px solid #dfe4eb;
+  border-radius: 20px;
+
+  background: #ffffff;
+
+  color: #a0a8b4;
+
+  font-family: inherit;
+  font-size: 8.5px;
+  font-weight: 750;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.wmr-reverse-btn:hover {
+  border-color: #cfd6e0;
+
+  background: #f8fafc;
+
+  color: #667085;
+}
+
+.wmr-reverse-btn.active {
+  border-color: #e8b04a;
+
+  background: #fff7df;
+
+  color: #9a6500;
+
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(232, 176, 74, 0.08);
+}
+
+
+/* =========================================================
+   검침 입력 셀
+========================================================= */
+
+.wmr-table tbody td.wmr-reading-cell {
+  height: 38px;
+
+  vertical-align: top;
+}
+
+.wmr-table tbody td.wmr-reading-cell.has-note {
+  height: 64px;
+}
+
+.wmr-reading-cell-inner {
+  width: 100%;
+  min-height: 37px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: stretch;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+}
+
+.wmr-table tbody tr:hover
+  .wmr-reading-cell-inner {
+  background: #fbfcfe;
+}
+
+
+/* 기존 input 규칙보다 우선 */
+.wmr-table td input.wmr-reading-input {
+  width: 100%;
+  height: 37px;
+
+  flex: 0 0 37px;
+
+  padding: 0 5px;
+
+  box-sizing: border-box;
+
+  border: none;
+
+  outline: none;
+
+  background: transparent;
+
+  color: #39465a;
+
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+
+  text-align: center;
+}
+
+.wmr-table td.has-note
+  input.wmr-reading-input {
+  height: 34px;
+  flex-basis: 34px;
+}
+
+
+/* 빈칸: 오류가 아니라 구분용 회청색 */
+.wmr-table td input.wmr-reading-input.is-blank {
+  background: #f7f9fc;
+
+  color: #8b96a7;
+}
+
+
+/* 0: 오류가 아니라 확인 가능한 주황 계열 */
+.wmr-table td input.wmr-reading-input.is-zero {
+  background: #fff8e8;
+
+  color: #b57608;
+
+  font-weight: 800;
+}
+
+
+/* 전월 역전 / 평균사용량 10톤 이상 차이 */
+.wmr-table td input.wmr-reading-input.is-warning {
+  background: #fff1f1;
+
+  color: #d93636;
+
+  font-weight: 800;
+
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(217, 54, 54, 0.28);
+}
+
+
+/* 포커스는 상태 색상을 유지하면서 테두리만 강조 */
+.wmr-table td input.wmr-reading-input:focus {
+  position: relative;
+
+  z-index: 2;
+
+  box-shadow:
+    inset 0 0 0 1.5px
+    #697bf3;
+}
+
+.wmr-table td input.wmr-reading-input.is-warning:focus {
+  box-shadow:
+    inset 0 0 0 1.5px
+    #dc4545;
+}
+
+
+/* =========================================================
+   검침 확인 메모
+
+   팝업을 띄우지 않고 해당 입력칸 아래에만 표시.
+========================================================= */
+
+.wmr-reading-note {
+  width: 100%;
+  min-height: 27px;
+
+  display: -webkit-box;
+
+  overflow: hidden;
+
+  padding: 3px 4px 4px;
+
+  box-sizing: border-box;
+
+  border-top:
+    1px solid
+    rgba(217, 54, 54, 0.12);
+
+  background: #fff8f8;
+
+  color: #c43d3d;
+
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 1.25;
+
+  text-align: center;
+
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+
+  word-break: keep-all;
+}
+
+
+/* =========================================================
+   태블릿 폭 보정
+========================================================= */
+
+@media (
+  max-width: 1100px
+) {
+  .wmr-table {
+    min-width: 1450px;
+  }
+
+  .wmr-year-selector > span {
+    display: none;
+  }
+}
+
+@media (
+  max-width: 800px
+) {
+  .wmr-table-title {
+    gap: 8px;
+  }
+
+  .wmr-year-selector select {
+    min-width: 84px;
+
+    height: 30px;
+
+    padding:
+      0 22px
+      0 8px;
+
+    font-size: 10.5px;
+  }
+
+  .wmr-room-column,
+  .wmr-room-cell {
+    width: 108px;
+    min-width: 108px;
+  }
+
+  .wmr-reverse-btn {
+    min-width: 27px;
+
+    padding: 0 4px;
+
+    font-size: 8px;
+  }
+}
+
+/* =========================================================
+   2026-08 추가 수정
+   - 13개월 한 화면 표시 / 가로스크롤 제거
+   - 역순 버튼 폭 축소
+   - 경고 말풍선 레이어
+   - Excel 신규 빌라 선택 추가 모달
+========================================================= */
+
+/* 데이터테이블은 페이지 상세영역 폭 안에서만 사용 */
+.wmr-table-scroll {
+  overflow-x: hidden !important;
+  overflow-y: auto;
+}
+
+.wmr-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+}
+
+/* 호실열을 최소화하고 남은 폭을 13개 월이 균등 사용 */
+.wmr-room-column,
+.wmr-room-cell {
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+}
+
+.wmr-table thead th {
+  height: 37px;
+  padding: 0 2px !important;
+  font-size: 10.5px;
+  letter-spacing: -0.2px;
+}
+
+.wmr-month-head {
+  gap: 0 !important;
+  line-height: 1.05;
+}
+
+.wmr-month-head span {
+  font-size: 10.5px;
+}
+
+.wmr-month-head small {
+  margin-top: 1px;
+  font-size: 7.5px;
+}
+
+.wmr-room-cell {
+  padding: 0 3px !important;
+}
+
+.wmr-room-cell-inner {
+  min-height: 36px;
+  gap: 2px !important;
+}
+
+.wmr-room-name {
+  font-size: 10.5px;
+  letter-spacing: -0.3px;
+}
+
+.wmr-reverse-btn {
+  min-width: 24px !important;
+  height: 17px !important;
+  padding: 0 3px !important;
+  font-size: 7px !important;
+  letter-spacing: -0.5px;
+}
+
+/* 월별 검침값의 좌우 여백을 최소화 */
+.wmr-table td input.wmr-reading-input {
+  height: 36px !important;
+  padding: 0 2px !important;
+  font-size: 10.5px !important;
+  letter-spacing: -0.25px;
+}
+
+.wmr-table tbody th,
+.wmr-table tbody td,
+.wmr-table tbody td.wmr-reading-cell,
+.wmr-table tbody td.wmr-reading-cell.has-note,
+.wmr-table tbody td.wmr-reading-cell.has-warning {
+  height: 37px !important;
+  min-height: 37px !important;
+}
+
+.wmr-reading-cell-inner {
+  position: relative;
+  min-height: 36px !important;
+  height: 36px;
+  display: block !important;
+  overflow: visible;
+}
+
+/* 기존 아래쪽 메모 레이아웃은 사용하지 않음 */
+.wmr-reading-note {
+  display: none !important;
+}
+
+/* 경고가 있는 칸임을 작게 표시 */
+.wmr-warning-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 3;
+
+  width: 11px;
+  height: 11px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+  background: #dc3d3d;
+  color: #ffffff;
+
+  font-size: 7px;
+  font-weight: 900;
+  line-height: 1;
+
+  pointer-events: none;
+
+  box-shadow: 0 1px 3px rgba(185, 28, 28, 0.22);
+}
+
+/*
+ * fixed 말풍선이므로 table/td의 overflow나 z-index에 가리지 않는다.
+ * 입력칸에 포커스하거나 마우스를 올렸을 때만 표시한다.
+ */
+.wmr-warning-popover {
+  position: fixed;
+  z-index: 20000;
+
+  width: max-content;
+  max-width: min(290px, calc(100vw - 32px));
+
+  transform: translate(-50%, calc(-100% - 9px));
+
+  padding: 7px 10px;
+  box-sizing: border-box;
+
+  border: 1px solid #f1b9b9;
+  border-radius: 8px;
+
+  background: #fff7f7;
+  color: #b72f2f;
+
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+  letter-spacing: -0.15px;
+  text-align: left;
+  white-space: normal;
+  word-break: keep-all;
+
+  pointer-events: none;
+
+  box-shadow:
+    0 8px 24px rgba(69, 19, 19, 0.14),
+    0 2px 6px rgba(69, 19, 19, 0.08);
+}
+
+.wmr-warning-popover::after {
+  content: "";
+
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+
+  width: 10px;
+  height: 10px;
+
+  transform: translateX(-50%) rotate(45deg);
+
+  border-right: 1px solid #f1b9b9;
+  border-bottom: 1px solid #f1b9b9;
+
+  background: #fff7f7;
+}
+
+/* =========================================================
+   Excel 신규 빌라 선택 팝업
+========================================================= */
+
+.wmr-import-modal {
+  width: min(620px, 94vw);
+}
+
+.wmr-import-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  margin-bottom: 10px;
+  padding: 10px 12px;
+
+  border: 1px solid #e5e9f2;
+  border-radius: 10px;
+
+  background: #f8f9fc;
+}
+
+.wmr-import-summary strong {
+  color: #4454c6;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wmr-import-summary span {
+  color: #8a94a5;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.wmr-import-select-all {
+  min-height: 34px;
+
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 0 10px;
+  margin-bottom: 7px;
+
+  border: 1px solid #e7eaf0;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #596579;
+  font-size: 11px;
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.wmr-import-villa-list {
+  max-height: 330px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-right: 3px;
+}
+
+.wmr-import-villa-item {
+  min-height: 48px;
+
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  padding: 7px 10px;
+  box-sizing: border-box;
+
+  border: 1px solid #e8ebf1;
+  border-radius: 9px;
+
+  background: #ffffff;
+
+  cursor: pointer;
+}
+
+.wmr-import-villa-item:hover {
+  border-color: #d7ddf1;
+  background: #fafbff;
+}
+
+.wmr-import-villa-item input,
+.wmr-import-select-all input {
+  width: 15px;
+  height: 15px;
+
+  flex: 0 0 15px;
+
+  accent-color: #6374ed;
+  cursor: pointer;
+}
+
+.wmr-import-villa-item > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.wmr-import-villa-item strong {
+  display: block;
+  margin-bottom: 2px;
+
+  overflow: hidden;
+
+  color: #364152;
+  font-size: 11.5px;
+  font-weight: 800;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-import-villa-item small {
+  display: block;
+
+  overflow: hidden;
+
+  color: #98a2b3;
+  font-size: 9.5px;
+  font-weight: 550;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-auto-save-note {
+  margin-right: auto;
+
+  color: #7c8798;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+/* 기존 태블릿 min-width 규칙보다 우선해 항상 한 화면에 맞춤 */
+@media (max-width: 1100px) {
+  .wmr-table {
+    min-width: 0 !important;
+  }
+
+  .wmr-room-column,
+  .wmr-room-cell {
+    width: 82px !important;
+    min-width: 82px !important;
+    max-width: 82px !important;
+  }
+
+  .wmr-table thead th,
+  .wmr-table td input.wmr-reading-input {
+    font-size: 9.5px !important;
+  }
+
+  .wmr-reverse-btn {
+    min-width: 22px !important;
+    font-size: 6.5px !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .wmr-room-column,
+  .wmr-room-cell {
+    width: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+  }
+
+  .wmr-room-cell-inner {
+    gap: 1px !important;
+  }
+
+  .wmr-room-name {
+    font-size: 9px;
+  }
+
+  .wmr-reverse-btn {
+    min-width: 20px !important;
+    height: 16px !important;
+    padding: 0 2px !important;
+    font-size: 6px !important;
+  }
+
+  .wmr-table thead th,
+  .wmr-table td input.wmr-reading-input {
+    font-size: 8.5px !important;
+  }
+
+  .wmr-warning-popover {
+    max-width: 240px;
+    font-size: 9.5px;
+  }
+
+  .wmr-import-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .wmr-auto-save-note {
+    display: none;
+  }
+}
+
+
+/* =========================================================
+   2026-08-11 추가 수정
+   - 검색창을 검침원관리 버튼 왼쪽으로 이동
+   - 상단 검색 패널 제거 후 본문 영역 상향
+   - 검침원 모바일 로그인 토글 / 마지막 로그인 표시
+   - 월 헤더 아래 모바일 검침일 표시
+========================================================= */
+
+/* 페이지를 세로 flex 구조로 바꿔 검색 패널이 빠진 공간까지 본문이 사용 */
+.wmr-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.wmr-page-header {
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+}
+
+.wmr-content {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0;
+}
+
+/* 기존 별도 검색 패널은 더 이상 렌더링하지 않음 */
+.wmr-search-panel {
+  display: none !important;
+}
+
+/* 헤더 안 검색영역 */
+.wmr-header-search-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.wmr-header-search {
+  width: 300px;
+  max-width: 30vw;
+}
+
+.wmr-header-search input {
+  height: 38px;
+}
+
+.wmr-header-search-count {
+  flex: 0 0 auto;
+  color: #7b8798;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* 업로드 완료 문구는 레이아웃 높이를 차지하지 않게 표시 */
+.wmr-upload-message-floating {
+  position: absolute;
+  z-index: 30;
+  top: 61px;
+  right: 22px;
+  max-width: 430px;
+  padding: 5px 9px;
+  border: 1px solid #e3e8f0;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  pointer-events: none;
+}
+
+/* =========================================================
+   월 아래 검침일 행
+========================================================= */
+
+.wmr-reading-date-row th {
+  position: sticky;
+  top: 37px !important;
+  z-index: 11;
+  height: 22px !important;
+  min-height: 22px !important;
+  padding: 0 2px !important;
+  border-right: 1px solid #e9edf3;
+  border-bottom: 1px solid #dfe5ed;
+  background: #fbfcfe !important;
+  color: #a0a8b5;
+  font-size: 8.5px !important;
+  font-weight: 700 !important;
+  line-height: 1;
+  text-align: center;
+}
+
+.wmr-reading-date-row th.has-date {
+  color: #5969d8;
+  font-weight: 850 !important;
+}
+
+.wmr-reading-date-row .wmr-reading-date-label {
+  z-index: 16 !important;
+  color: #8994a5;
+  font-size: 8px !important;
+  letter-spacing: -0.2px;
+}
+
+/* =========================================================
+   검침원 로그인 제어
+========================================================= */
+
+.wmr-inspector-modal {
+  width: min(930px, 96vw);
+}
+
+.wmr-inspector-item {
+  gap: 12px;
+}
+
+.wmr-inspector-access-area {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.wmr-inspector-last-login {
+  width: 112px;
+  flex: 0 0 112px;
+  text-align: right;
+}
+
+.wmr-inspector-last-login span {
+  display: block;
+  margin-bottom: 2px;
+  color: #a0a8b5;
+  font-size: 8.5px;
+  font-weight: 650;
+}
+
+.wmr-inspector-last-login strong {
+  display: block;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.wmr-access-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wmr-access-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wmr-access-toggle-track {
+  position: relative;
+  width: 38px;
+  height: 21px;
+  flex: 0 0 38px;
+  display: block;
+  border: 1px solid #d8dee8;
+  border-radius: 999px;
+  background: #e8ecf2;
+  box-sizing: border-box;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.wmr-access-toggle-track i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+  transition: transform 0.16s ease;
+}
+
+.wmr-access-toggle em {
+  min-width: 55px;
+  color: #8a95a6;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.wmr-access-toggle.active .wmr-access-toggle-track {
+  border-color: #5f73ef;
+  background: #687af2;
+  box-shadow: 0 0 0 3px rgba(104, 122, 242, 0.08);
+}
+
+.wmr-access-toggle.active .wmr-access-toggle-track i {
+  transform: translateX(17px);
+}
+
+.wmr-access-toggle.active em {
+  color: #5365d5;
+}
+
+/* 자동 허용기간에는 토글을 켠 상태로 고정하고 클릭은 받지 않음 */
+.wmr-access-toggle.automatic {
+  cursor: default;
+}
+
+.wmr-access-toggle.automatic .wmr-access-toggle-track {
+  border-color: #5f73ef;
+  background: #687af2;
+}
+
+.wmr-access-toggle.automatic em {
+  color: #5365d5;
+}
+
+@media (max-width: 1100px) {
+  .wmr-header-search {
+    width: 230px;
+    max-width: 24vw;
+  }
+
+  .wmr-header-search-count {
+    display: none;
+  }
+
+  .wmr-inspector-modal {
+    width: min(860px, 97vw);
+  }
+
+  .wmr-inspector-last-login {
+    width: 102px;
+    flex-basis: 102px;
+  }
+}
+
+@media (max-width: 800px) {
+  .wmr-page-header {
+    margin-bottom: 8px;
+  }
+
+  .wmr-header-actions {
+    min-width: 0;
+  }
+
+  .wmr-header-search {
+    width: 180px;
+    max-width: 28vw;
+  }
+
+  .wmr-header-search input {
+    padding-left: 31px;
+    padding-right: 30px;
+    font-size: 10.5px;
+  }
+
+  .wmr-upload-message-floating {
+    top: 53px;
+    right: 14px;
+    max-width: 320px;
+    font-size: 9.5px;
+  }
+
+  .wmr-reading-date-row th {
+    top: 37px !important;
+    font-size: 7.5px !important;
+  }
+
+  .wmr-inspector-item {
+    flex-wrap: wrap;
+  }
+
+  .wmr-inspector-item-info {
+    min-width: 180px;
+  }
+
+  .wmr-inspector-access-area {
+    width: 100%;
+    justify-content: flex-end;
+    padding-left: 45px;
+    box-sizing: border-box;
+  }
+}
