@@ -9,22 +9,35 @@
     />
 
     <!--
-      ✅ 기본 viewport
+      =====================================================
+      기본 viewport
+      =====================================================
 
-      중요:
       - PC 화면 배율에는 영향 없음
       - 태블릿 일반 브라우저와 홈 화면 실행 시
         동일한 CSS viewport 기준 사용
-      - 실제 67% 축소는 TrezoSidebar에서만 처리
+      - 실제 태블릿 축소 처리는 기존 React/CSS에서 담당
     -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
 
-    <!-- ✅ 모바일 / 웹앱 실행 설정 -->
+    <!--
+      =====================================================
+      모바일 / PWA 실행 설정
+      =====================================================
+    -->
+
+    <!-- iPhone / iPad -->
     <meta
       name="apple-mobile-web-app-capable"
+      content="yes"
+    />
+
+    <!-- Android / 일반 PWA -->
+    <meta
+      name="mobile-web-app-capable"
       content="yes"
     />
 
@@ -33,7 +46,7 @@
       content="default"
     />
 
-    <!-- ✅ Android / 브라우저 테마 -->
+    <!-- Android / 브라우저 테마 -->
     <meta
       name="theme-color"
       content="#ff6e00"
@@ -44,7 +57,7 @@
       content="한남주택관리 ERP 시스템"
     />
 
-    <!-- ✅ 홈 화면 아이콘 -->
+    <!-- 홈 화면 아이콘 -->
     <link
       rel="apple-touch-icon"
       href="%PUBLIC_URL%/logo192.png"
@@ -52,7 +65,8 @@
 
     <!--
       =====================================================
-      ✅ PWA manifest 자동 분리
+      PWA manifest 자동 분리
+      =====================================================
 
       일반 ERP
       → manifest.json
@@ -60,29 +74,117 @@
       수도검침 모바일
       → manifest-water-reading.json
 
+      이사정산 모바일
+      → manifest-moveout.json
+
       중요:
-      기존 ERP manifest는 그대로 유지하기 때문에
-      기존 PC / 태블릿 ERP 홈화면 실행에는 영향 없음
-      =====================================================
+      - 기존 PC ERP manifest 유지
+      - 수도검침 manifest 유지
+      - 이사정산만 별도의 PWA로 설치
     -->
     <script>
       (function () {
-        var pathname = window.location.pathname || "";
+        var pathname =
+          window.location.pathname || "";
 
+        /*
+         * =================================================
+         * 수도검침 모바일
+         * =================================================
+         */
         var isWaterReading =
           pathname === "/mobile/water-reading" ||
-          pathname.startsWith("/mobile/water-reading/");
+          pathname.startsWith(
+            "/mobile/water-reading/"
+          );
 
+        /*
+         * =================================================
+         * 이사정산 모바일
+         * =================================================
+         *
+         * 이사정산 관련 모바일 페이지는
+         * 모두 동일한 이사정산 manifest 사용
+         */
+        var isMoveoutMobile =
+          pathname === "/mobile/moveout" ||
+          pathname === "/mobile/login" ||
+          pathname === "/mobile/list" ||
+          pathname === "/mobile/form" ||
+          pathname.startsWith(
+            "/mobile/form/"
+          ) ||
+          pathname === "/calendar-mobile" ||
+          pathname ===
+            "/mobile/personal-ledger";
+
+        /*
+         * =================================================
+         * manifest 결정
+         * =================================================
+         */
+        var manifestHref =
+          "%PUBLIC_URL%/manifest.json";
+
+        /*
+         * 수도검침 우선
+         *
+         * 수도검침은 현재 정상 작동 중이므로
+         * 기존 manifest 구조 그대로 유지
+         */
+        if (isWaterReading) {
+          manifestHref =
+            "%PUBLIC_URL%/manifest-water-reading.json";
+         
+            var appleIcon =
+    document.querySelector(
+      'link[rel="apple-touch-icon"]'
+    );
+
+  if (appleIcon) {
+    appleIcon.href =
+      "%PUBLIC_URL%/water-reading-512.png";
+  }
+}
+
+        /*
+         * 이사정산 모바일
+         *
+         * 버전값을 추가하여
+         * 기존 manifest 캐시 사용을 최대한 방지
+         */
+        else if (isMoveoutMobile) {
+          manifestHref =
+            "%PUBLIC_URL%/manifest-moveout.json?v=20260812-1";
+        }
+
+        /*
+         * =================================================
+         * manifest link 생성
+         * =================================================
+         */
         var manifestLink =
           document.createElement("link");
 
         manifestLink.rel = "manifest";
+        manifestLink.href = manifestHref;
 
-        manifestLink.href = isWaterReading
-          ? "%PUBLIC_URL%/manifest-water-reading.json"
-          : "%PUBLIC_URL%/manifest.json";
+        document.head.appendChild(
+          manifestLink
+        );
 
-        document.head.appendChild(manifestLink);
+        /*
+         * =================================================
+         * 페이지 제목도 모바일 앱에 맞춰 표시
+         * =================================================
+         */
+        if (isWaterReading) {
+          document.title =
+            "한남주택관리 수도검침";
+        } else if (isMoveoutMobile) {
+          document.title =
+            "한남주택관리 이사정산";
+        }
       })();
     </script>
 
@@ -98,10 +200,10 @@
       rel="stylesheet"
     />
 
-    <!-- ✅ 제목 -->
+    <!-- 기본 제목 -->
     <title>한남주택관리 ERP</title>
 
-    <!-- ✅ Google Identity Services SDK -->
+    <!-- Google Identity Services SDK -->
     <script
       src="https://accounts.google.com/gsi/client"
       async

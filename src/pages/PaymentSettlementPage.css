@@ -1,18 +1,21 @@
 /* src/pages/PaymentSettlementPage.css */
 
 :root {
-  --pmt-ink: #10182b;
+  --pmt-ink: #0b1220;
   --pmt-muted: #64748b;
   --pmt-line: #e5e9f0;
   --pmt-bg: #ffffff;
   --pmt-brand: #2563eb;
   --pmt-brand-dark: #1d4ed8;
+  --pmt-brand-light: #60a5fa;
+  --pmt-violet: #7c3aed;
   --pmt-teal: #0d9488;
   --pmt-amber: #d97706;
   --pmt-danger: #dc2626;
   --pmt-success: #059669;
-  --pmt-shadow-soft: 0 20px 44px rgba(15, 23, 42, 0.08);
-  --pmt-radius-lg: 22px;
+  --pmt-shadow-soft: 0 24px 56px rgba(30, 41, 89, 0.10);
+  --pmt-shadow-lift: 0 16px 32px rgba(37, 99, 235, 0.16);
+  --pmt-radius-lg: 24px;
   --pmt-transition: 0.16s ease-out;
 }
 
@@ -20,17 +23,20 @@
   width: 100%;
   min-height: 100%;
   padding: 18px 20px 32px;
-  background: var(--pmt-bg);
+  background:
+    radial-gradient(1200px 320px at 8% -10%, rgba(37, 99, 235, 0.07), transparent 60%),
+    radial-gradient(1000px 280px at 95% 0%, rgba(124, 58, 237, 0.06), transparent 55%),
+    var(--pmt-bg);
   box-sizing: border-box;
 }
 
 .pmt-card {
   width: 100%;
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff, #fbfcff 60%, #ffffff);
   border-radius: var(--pmt-radius-lg);
   box-shadow: var(--pmt-shadow-soft);
   border: 1px solid rgba(226, 232, 240, 0.9);
-  padding: 20px 22px 24px;
+  padding: 22px 24px 26px;
   box-sizing: border-box;
   position: relative;
 }
@@ -41,9 +47,10 @@
   top: 0;
   left: 22px;
   right: 22px;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
-  background: linear-gradient(90deg, var(--pmt-brand), var(--pmt-teal), var(--pmt-amber));
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, var(--pmt-brand), var(--pmt-violet), var(--pmt-teal), var(--pmt-amber));
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
 }
 
 /* ===== 툴바 ===== */
@@ -74,16 +81,17 @@
 .pmt-toggle-group {
   display: inline-flex;
   padding: 4px;
-  background: #f1f5f9;
-  border-radius: 12px;
+  background: linear-gradient(180deg, #eef2f9, #f1f5f9);
+  border-radius: 13px;
   gap: 4px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .pmt-toggle-btn {
   border: none;
   background: transparent;
   padding: 8px 18px;
-  border-radius: 9px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
   color: var(--pmt-muted);
@@ -92,9 +100,9 @@
 }
 
 .pmt-toggle-btn.is-active {
-  background: linear-gradient(135deg, var(--pmt-brand), var(--pmt-brand-dark));
+  background: linear-gradient(135deg, var(--pmt-brand), var(--pmt-violet));
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
 
 .pmt-month-nav {
@@ -154,6 +162,10 @@
   font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   transition: transform var(--pmt-transition), box-shadow var(--pmt-transition), filter var(--pmt-transition);
   white-space: nowrap;
 }
@@ -162,16 +174,37 @@
   transform: translateY(-1px);
 }
 
+.pmt-btn:active {
+  transform: translateY(0);
+}
+
+.pmt-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
 .pmt-btn-primary {
-  background: linear-gradient(135deg, var(--pmt-brand), var(--pmt-brand-dark));
+  background: linear-gradient(135deg, var(--pmt-brand), var(--pmt-violet));
   color: #ffffff;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+.pmt-btn-primary:hover {
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.16) inset;
+  filter: brightness(1.03);
 }
 
 .pmt-btn-secondary {
   background: #ffffff;
   border-color: var(--pmt-line);
   color: var(--pmt-ink);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.pmt-btn-secondary:hover {
+  border-color: var(--pmt-brand);
+  color: var(--pmt-brand-dark);
 }
 
 .pmt-btn-ghost {
@@ -182,16 +215,18 @@
 
 .pmt-btn-ghost:hover {
   background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .pmt-btn-danger {
-  background: #fef2f2;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
   border-color: rgba(220, 38, 38, 0.35);
   color: var(--pmt-danger);
 }
 
 .pmt-btn-danger:hover {
-  background: #fee2e2;
+  background: #fecaca;
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.2);
 }
 
 .pmt-btn-sm {
@@ -218,7 +253,7 @@
   border: 1px solid var(--pmt-line);
   overflow: hidden;
   background: #ffffff;
-  box-shadow: 0 6px 16px rgba(100, 116, 139, 0.08);
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.07), 0 2px 6px rgba(15, 23, 42, 0.05);
 }
 
 .pmt-table {
@@ -230,15 +265,16 @@
 }
 
 .pmt-table thead {
-  background: linear-gradient(135deg, #0f172a, var(--pmt-brand-dark));
+  background: linear-gradient(120deg, #0f172a, var(--pmt-brand-dark) 55%, var(--pmt-violet));
   color: #f8fafc;
 }
 
 .pmt-table thead th {
-  padding: 11px 8px;
+  padding: 12px 8px;
   text-align: center;
   font-weight: 700;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .pmt-table tbody tr:nth-child(even) {
@@ -249,8 +285,12 @@
   background: #ffffff;
 }
 
+.pmt-table tbody tr {
+  transition: background var(--pmt-transition);
+}
+
 .pmt-table tbody tr:hover {
-  background: #eef4ff;
+  background: #eaf1ff;
 }
 
 .pmt-table td {
@@ -326,6 +366,79 @@
   background: #fee2e2;
 }
 
+/* ✅ 제외된 항목을 다시 포함시키는 버튼 */
+.pmt-row-restore {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(5, 150, 105, 0.35);
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--pmt-transition);
+}
+
+.pmt-row-restore:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+}
+
+/* ✅ 관리 열: 제외/포함 버튼 + 순서변경 핸들 */
+.pmt-td-manage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* ✅ 누른 채로 위/아래로 끌어 순서를 바꾸는 핸들 버튼 */
+.pmt-row-drag {
+  width: 28px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--pmt-line);
+  background: #ffffff;
+  color: var(--pmt-muted);
+  font-size: 13px;
+  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--pmt-transition);
+  touch-action: none;
+}
+
+.pmt-row-drag:hover {
+  border-color: var(--pmt-brand);
+  color: var(--pmt-brand-dark);
+  background: #eef2ff;
+}
+
+.pmt-row-drag:active {
+  cursor: grabbing;
+}
+
+/* ✅ 제외 처리된 행: 회색으로 흐리게, 내용은 그대로 확인 가능 */
+.pmt-row-excluded {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+}
+
+.pmt-row-excluded:hover {
+  opacity: 0.68;
+}
+
+/* ✅ 지금 드래그로 순서를 옮기고 있는 행 강조 */
+.pmt-row-dragging {
+  position: relative;
+  z-index: 2;
+  background: #eef2ff !important;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: -2px;
+}
+
 .pmt-empty {
   text-align: center;
   padding: 24px 10px;
@@ -338,22 +451,39 @@
   border: 1px solid #cbd5e1;
   background: #f1f5f9;
   color: #334155;
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 12px;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 11.5px;
   font-weight: 700;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  word-break: keep-all;
   cursor: pointer;
   transition: all var(--pmt-transition);
 }
 
 .pmt-unpaid-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
 }
 
 .pmt-unpaid-btn.has-unpaid {
-  background: #fef2f2;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
   border-color: rgba(220, 38, 38, 0.35);
-  color: var(--pmt-danger);
+  color: #991b1b;
+}
+
+.pmt-unpaid-btn.is-scheduled {
+  background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--pmt-brand-dark);
+}
+
+.pmt-unpaid-btn.is-done {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  border-color: rgba(5, 150, 105, 0.4);
+  color: #065f46;
 }
 
 .pmt-active-badge {
@@ -365,13 +495,18 @@
 }
 
 .pmt-active-badge.is-on {
-  background: #d1fae5;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   color: #065f46;
 }
 
 .pmt-active-badge.is-off {
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
   color: #991b1b;
+}
+
+.pmt-active-badge.is-scheduled {
+  background: #eff6ff;
+  color: var(--pmt-brand-dark);
 }
 
 /* ===== 합계 카드 ===== */
@@ -385,15 +520,40 @@
 .pmt-summary-card {
   flex: 1;
   min-width: 160px;
-  padding: 12px 16px;
+  padding: 13px 16px 13px 18px;
   border-radius: 14px;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #f8fafc, #f4f7fb);
   border: 1px solid var(--pmt-line);
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--pmt-transition), box-shadow var(--pmt-transition);
+}
+
+.pmt-summary-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--pmt-brand), var(--pmt-teal));
+  opacity: 0.75;
+}
+
+.pmt-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
 }
 
 .pmt-summary-card--accent {
   background: linear-gradient(135deg, #eef2ff, #e0f2fe);
   border-color: rgba(37, 99, 235, 0.25);
+}
+
+.pmt-summary-card--accent::before {
+  background: linear-gradient(180deg, var(--pmt-brand), var(--pmt-violet));
+  width: 5px;
+  opacity: 1;
 }
 
 .pmt-summary-label {
@@ -406,10 +566,11 @@
 
 .pmt-summary-value {
   margin-top: 5px;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 800;
   color: var(--pmt-ink);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 /* ===== 모달 공통 ===== */
@@ -425,7 +586,8 @@
 .pmt-modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(10, 15, 35, 0.5);
+  backdrop-filter: blur(3px);
 }
 
 .pmt-modal-panel {
@@ -435,8 +597,25 @@
   max-height: calc(100vh - 60px);
   overflow-y: auto;
   background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.32);
+  border-radius: 22px;
+  box-shadow: 0 36px 80px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d2fe #f8fafc;
+}
+
+.pmt-modal-panel::-webkit-scrollbar {
+  width: 9px;
+}
+.pmt-modal-panel::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+.pmt-modal-panel::-webkit-scrollbar-thumb {
+  background: #c7d2fe;
+  border-radius: 999px;
+  border: 2px solid #f8fafc;
+}
+.pmt-modal-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--pmt-brand);
 }
 
 .pmt-modal-panel--sm {
@@ -447,23 +626,43 @@
   width: 880px;
 }
 
+.pmt-modal-panel--wide {
+  width: 760px;
+}
+
 .pmt-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
+  gap: 12px;
+  padding: 17px 22px;
   border-bottom: 1px solid var(--pmt-line);
   position: sticky;
   top: 0;
-  background: #ffffff;
-  border-radius: 20px 20px 0 0;
+  /* ✅ 스크롤 시 내용이 헤더 앞으로 겹쳐 올라오지 않고,
+     깔끔하게 헤더 뒤쪽으로 사라지도록 쌓임 순서를 명시적으로 고정 */
+  z-index: 5;
+  background: linear-gradient(180deg, #ffffff, #fbfcff);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 .pmt-modal-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 16.5px;
   font-weight: 800;
   color: var(--pmt-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.pmt-modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .pmt-modal-close {
@@ -475,10 +674,19 @@
   cursor: pointer;
   font-size: 13px;
   color: var(--pmt-muted);
+  flex-shrink: 0;
+  transition: all var(--pmt-transition);
+}
+
+.pmt-modal-close:hover {
+  background: #e2e8f0;
+  color: var(--pmt-ink);
 }
 
 .pmt-modal-body {
   padding: 18px 20px 22px;
+  position: relative;
+  z-index: 1;
 }
 
 /* ===== 구분 관리 ===== */
@@ -543,6 +751,43 @@
 
 .pmt-input-select {
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7' fill='none'><path d='M1 1L5 5.5L9 1' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  font-weight: 600;
+}
+
+.pmt-input-select:hover {
+  border-color: var(--pmt-brand);
+}
+
+.pmt-input-select:focus {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7' fill='none'><path d='M1 1L5 5.5L9 1' stroke='%232563eb' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+/* ===== 말일 표 "납부상태" 드롭다운 ===== */
+.pmt-status-select {
+  height: 34px;
+  padding: 0 26px 0 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  border-width: 1px;
+}
+
+.pmt-status-select.is-scheduled {
+  background-color: #eff6ff;
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--pmt-brand-dark);
+}
+
+.pmt-status-select.is-done {
+  background-color: #d1fae5;
+  border-color: rgba(5, 150, 105, 0.35);
+  color: #065f46;
 }
 
 .pmt-input-number {
@@ -619,15 +864,27 @@
 .pmt-building-name-cell {
   position: relative;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
 }
 
 .pmt-building-name-cell .pmt-input {
   width: 100%;
 }
 
+.pmt-building-address {
+  font-size: 10.5px;
+  color: var(--pmt-muted);
+  padding-left: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .pmt-erp-chip {
   position: absolute;
+  top: 4px;
   right: 8px;
   font-size: 9.5px;
   font-weight: 800;
@@ -788,7 +1045,8 @@
 }
 
 .pmt-switch input:checked + .pmt-switch-track {
-  background: linear-gradient(135deg, var(--pmt-brand), var(--pmt-brand-dark));
+  background: linear-gradient(135deg, var(--pmt-brand), var(--pmt-violet));
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
 .pmt-switch input:checked + .pmt-switch-track .pmt-switch-thumb {
@@ -801,17 +1059,22 @@
   line-height: 1.4;
 }
 
-/* ===== 말일 표에서 구분/업체 클릭 가능 표시 ===== */
+/* ===== 말일 표에서 구분/업체 클릭 가능 표시 =====
+   ✅ 마우스를 올렸을 때 배경/밑줄 없이 글자 색상만 바뀌도록 하고,
+      마우스를 떼면 잔상 없이 바로 원래 색으로 돌아오게 함 */
 .pmt-td-clickable {
   cursor: pointer;
-  transition: color var(--pmt-transition), background var(--pmt-transition);
+  transition: color 0.12s ease-out;
 }
 
 .pmt-td-clickable:hover {
   color: var(--pmt-brand-dark);
-  background: #eef2ff;
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
+}
+
+/* ✅ 말일 표 "업체" 열 가운데 정렬 */
+.pmt-td-company {
+  text-align: center !important;
+  font-weight: 600;
 }
 
 .pmt-start-chip {
@@ -887,37 +1150,245 @@
   justify-content: center;
 }
 
-/* ===== 건물별 지급현황 모달 ===== */
-.pmt-building-status-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
+/* ===== 결제 요약 모달 (금액 3종) ===== */
+.pmt-bstatus-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
-.pmt-building-status-row {
+.pmt-bstatus-summary--stack {
+  grid-template-columns: 1fr;
+  margin-bottom: 0;
+}
+
+.pmt-bstatus-summary-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
   background: #f8fafc;
   border: 1px solid var(--pmt-line);
 }
 
-.pmt-building-status-check {
+.pmt-bstatus-summary-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pmt-muted);
+}
+
+.pmt-bstatus-summary-value {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pmt-bstatus-summary-value.is-scheduled {
+  color: var(--pmt-brand-dark);
+}
+
+.pmt-bstatus-summary-value.is-overdue {
+  color: var(--pmt-danger);
+}
+
+.pmt-bstatus-summary-value.is-paid {
+  color: var(--pmt-success);
+}
+
+/* ===== 건물 수 요약 (건물별 지급현황 - 목록 모달) ===== */
+.pmt-bcount-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pmt-bcount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fafc, #f4f7fb);
+  border: 1px solid var(--pmt-line);
+  transition: transform var(--pmt-transition), box-shadow var(--pmt-transition);
+}
+
+.pmt-bcount-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.pmt-bcount-item.is-paid {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border-color: rgba(5, 150, 105, 0.25);
+}
+
+.pmt-bcount-item.is-unpaid {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.pmt-bcount-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pmt-muted);
+}
+
+.pmt-bcount-value {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--pmt-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 건물별 1~12월 체크그리드 리스트 ===== */
+.pmt-monthgrid-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pmt-monthgrid-card {
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--pmt-line);
+  padding: 12px 14px;
+  transition: all var(--pmt-transition);
+}
+
+.pmt-monthgrid-card.is-unpaid {
+  background: linear-gradient(180deg, #fff6f6, #fff9f9);
+  border-color: rgba(220, 38, 38, 0.22);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.06);
+}
+
+.pmt-monthgrid-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.pmt-monthgrid-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--pmt-ink);
+}
+
+.pmt-monthgrid-amount {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--pmt-brand-dark);
+  font-variant-numeric: tabular-nums;
+  background: #eef2ff;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.pmt-monthgrid-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 6px;
+}
+
+/* ✅ 건물 카드 상단의 비고 입력창 (모든 달에 동일하게 표시되는 값) */
+.pmt-monthgrid-note {
   flex: 1;
-  height: auto;
-}
-
-.pmt-building-status-name {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.pmt-building-status-amount {
-  width: 110px;
+  min-width: 140px;
   height: 32px;
+  font-size: 12px;
+}
+
+/* ✅ 건물별 지급현황 모달 헤더의 정렬 드롭다운 (저장/닫기 버튼 좌측) */
+.pmt-sort-select {
+  height: 30px;
+  width: auto;
+  min-width: 90px;
+  font-size: 12px;
+  padding: 0 26px 0 10px;
+}
+
+/* ✅ 스타일이 있는 커스텀 "체크 버튼" (12개월 그리드용) */
+.pmt-month-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 46px;
+  border-radius: 11px;
+  border: 1px solid var(--pmt-line);
+  background: #ffffff;
+  color: var(--pmt-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--pmt-transition);
+}
+
+.pmt-month-chip:hover:not(:disabled) {
+  border-color: var(--pmt-brand);
+  color: var(--pmt-brand-dark);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.16);
+}
+
+.pmt-month-chip:disabled {
+  cursor: not-allowed;
+}
+
+.pmt-month-chip.is-checked {
+  background: linear-gradient(150deg, #6ee7b7, #10b981);
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.35);
+}
+
+.pmt-month-chip.is-overdue {
+  background: linear-gradient(150deg, #fecaca, #fca5a5);
+  border-color: rgba(220, 38, 38, 0.5);
+  color: #7f1d1d;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.14);
+}
+
+.pmt-month-chip.is-na {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #cbd5e1;
+}
+
+.pmt-month-chip.is-current:not(.is-checked) {
+  box-shadow: 0 0 0 2.5px rgba(37, 99, 235, 0.45), 0 4px 10px rgba(37, 99, 235, 0.16);
+}
+
+/* ✅ "다음 결제 대상월" — 지금 '납부완료'를 누르면 실제로 체크될 달을
+   호박색 링으로 강조합니다. 밀린 달이 있는 건물은 이 표시가 가장 오래된
+   미납월 위에 뜨고, 밀린 게 없는 건물은 이번 달 위에 뜹니다. */
+.pmt-month-chip.is-next:not(.is-checked) {
+  box-shadow: 0 0 0 2.5px rgba(217, 119, 6, 0.55), 0 4px 10px rgba(217, 119, 6, 0.2);
+}
+
+.pmt-month-chip.is-current.is-next:not(.is-checked) {
+  box-shadow: 0 0 0 2.5px rgba(217, 119, 6, 0.6), 0 0 0 5px rgba(37, 99, 235, 0.3),
+    0 4px 10px rgba(217, 119, 6, 0.2);
+}
+
+.pmt-month-chip-num {
+  font-size: 11px;
+}
+
+.pmt-month-chip-mark {
+  font-size: 13px;
+  font-weight: 900;
+  min-height: 14px;
 }
 
 .pmt-unpaid-chip {
@@ -928,6 +1399,45 @@
   border-radius: 999px;
   padding: 3px 9px;
   white-space: nowrap;
+}
+
+.pmt-paid-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pmt-success);
+  background: #d1fae5;
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/* ✅ 건물 카드에서 "다음 결제 대상월"을 알려주는 배지 */
+.pmt-next-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: #92400e;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/* ===== 작은 토글 스위치 (표/카드 안에서 사용) ===== */
+.pmt-switch-sm {
+  width: 34px;
+  height: 20px;
+}
+
+.pmt-switch-sm .pmt-switch-thumb {
+  width: 14px;
+  height: 14px;
+  top: 3px;
+  left: 3px;
+}
+
+.pmt-switch-sm input:checked + .pmt-switch-track .pmt-switch-thumb {
+  transform: translateX(14px);
 }
 
 /* 반응형 */
@@ -949,7 +1459,20 @@
     grid-template-columns: 1fr;
   }
 
-  .pmt-modal-panel--xl {
+  .pmt-modal-panel--xl,
+  .pmt-modal-panel--wide {
     width: calc(100vw - 24px);
+  }
+
+  .pmt-bstatus-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .pmt-bcount-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .pmt-monthgrid-row {
+    grid-template-columns: repeat(6, 1fr);
   }
 }

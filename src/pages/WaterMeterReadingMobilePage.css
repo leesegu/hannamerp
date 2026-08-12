@@ -886,6 +886,190 @@
 }
 
 /* =========================================================
+   계량기 위치 터치 말풍선
+========================================================= */
+
+.wmrm-info-grid > .wmrm-meter-location-wrap {
+  position: relative;
+  padding: 0;
+  overflow: visible;
+}
+
+.wmrm-meter-location {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+
+  display: block;
+
+  padding: 8px;
+  box-sizing: border-box;
+
+  border: none;
+  border-radius: 9px;
+
+  background: transparent;
+
+  font-family: inherit;
+  text-align: left;
+
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wmrm-meter-location.is-open {
+  background: #f4f6ff;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(95, 114, 238, 0.18);
+}
+
+.wmrm-meter-location-bubble {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 120;
+
+  width: min(280px, calc(100vw - 56px));
+  max-width: 280px;
+
+  padding: 11px 12px;
+  box-sizing: border-box;
+
+  border: 1px solid #dce2f5;
+  border-radius: 11px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 12px 30px rgba(37, 48, 75, 0.16),
+    0 3px 8px rgba(37, 48, 75, 0.08);
+
+  text-align: left;
+}
+
+.wmrm-info-grid .wmrm-meter-location-bubble > span {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #7e8aa0;
+
+  font-size: 9.5px;
+  font-weight: 750;
+}
+
+.wmrm-info-grid .wmrm-meter-location-bubble > strong {
+  display: block;
+
+  overflow: visible;
+
+  color: #344054;
+
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+
+  text-overflow: clip;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.wmrm-meter-location-bubble > i {
+  position: absolute;
+  right: 20px;
+  top: -6px;
+
+  width: 10px;
+  height: 10px;
+
+  border-top: 1px solid #dce2f5;
+  border-left: 1px solid #dce2f5;
+
+  background: #ffffff;
+
+  transform: rotate(45deg);
+}
+
+/* =========================================================
+   검침값 입력 중 표시되는 미니 진행 바
+
+   sticky 검침대상 카드의 바로 아래에 떠 있도록 배치합니다.
+========================================================= */
+
+.wmrm-input-floating-bar {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: calc(100% + 6px);
+  z-index: 110;
+
+  min-height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding: 7px 10px;
+  box-sizing: border-box;
+
+  border: 1px solid rgba(204, 212, 251, 0.96);
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.97);
+
+  box-shadow:
+    0 8px 20px rgba(41, 53, 86, 0.13),
+    0 2px 6px rgba(41, 53, 86, 0.06);
+
+  backdrop-filter: blur(10px);
+
+  pointer-events: none;
+}
+
+.wmrm-input-floating-bar > strong {
+  min-width: 0;
+  flex: 1;
+
+  display: block;
+  overflow: hidden;
+
+  color: #344054;
+
+  font-size: 11.5px;
+  font-weight: 850;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmrm-input-floating-bar > span {
+  flex: 0 0 auto;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 5px;
+
+  color: #7d89a0;
+
+  font-size: 9.5px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+.wmrm-input-floating-bar > span > b {
+  color: #5668dc;
+
+  font-size: 11px;
+  font-weight: 900;
+}
+
+/* =========================================================
    입력 가능 월 안내
 
    이 영역은 고정하지 않고 검침 목록과 함께 자연스럽게 스크롤됩니다.

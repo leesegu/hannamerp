@@ -9,7 +9,7 @@ import {
 } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
-import MobileLogin from "./pages/MobileLogin"; // ✅ 모바일 전용 로그인 추가
+import MobileLogin from "./pages/MobileLogin";
 
 import TrezoSidebar from "./components/TrezoSidebar";
 import MoveoutForm from "./MoveoutForm";
@@ -37,69 +37,193 @@ import IncomeImportPage from "./pages/IncomeImportPage";
 import ExpensePage from "./pages/ExpensePage";
 import DailyClosePage from "./pages/DailyClosePage";
 
-/* ✅ 월마감 추가 */
+/* 월마감 */
 import MonthlyClosePage from "./pages/MonthlyClosePage";
 
-/* ✅ 연간시트 추가 (직접 URL 진입용 라우트) */
+/* 연간시트 */
 import AnnualSheetPage from "./pages/AnnualSheetPage";
 
-/* ✅ 대금결제 관리 */
+/* 대금결제 관리 */
 import PaymentSettlementPage from "./pages/PaymentSettlementPage.jsx";
 
-/* ✅ 손익계산 */
+/* 손익계산 */
 import ProfitLossPage from "./pages/ProfitLossPage";
 
 import MessageExtractor from "./pages/MessageExtractor";
 
-/* ✅ 공용전기 계산 라우트 추가 */
+/* 공용전기 계산 */
 import PublicElectricCalcPage from "./pages/PublicElectricCalcPage";
 
 import CalendarPage from "./pages/CalendarPage";
 import PaperingPage from "./pages/PaperingPage";
 import MemoPage from "./pages/MemoPage";
 
-/* ✅ 추가: 모바일 전용 캘린더 라우트에 사용할 컴포넌트 import */
+/* 모바일 전용 캘린더 */
 import MobileCalendarPage from "./pages/MobileCalendarPage";
 
-/* ✅ 추가: 모바일 전용 개인 장부 페이지 import */
+/* 모바일 개인 장부 */
 import MobilePersonalLedgerPage from "./pages/MobilePersonalLedgerPage";
 
+/* 수도검침 모바일 */
 import WaterMeterReadingMobilePage from "./pages/WaterMeterReadingMobilePage";
 
-/* ✅ 추가: 일정관리(어제·오늘·내일 + 대형 달력) */
+/* 일정관리 */
 import ScheduleManager from "./pages/ScheduleManager";
 
-/* ✅ 추가: 입주자카드 페이지 (부가서비스 메뉴용) */
+/* 입주자카드 */
 import ResidentCardPage from "./pages/ResidentCardPage";
 
-/* ✅ 추가: 자재비관리대장 페이지 */
+/* 자재비관리대장 */
 import MaterialCostPage from "./pages/MaterialCostPage";
 
-/* ✅ [추가] 정산하자체크 페이지 import */
+/* 정산하자체크 */
 import SettlementDefectCheckPage from "./pages/SettlementDefectCheckPage";
 
-/* ✅ 수도검침조회 */
+/* 수도검침조회 */
 import WaterMeterReadingPage from "./pages/WaterMeterReadingPage";
 
 import "./App.css";
 
-/* ✅ Firebase Auth 상태도 함께 인지해서 모바일 로그인과 동작 일치 */
+/* Firebase */
 import { auth } from "./firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+} from "firebase/auth";
 
-/* ✅ [추가] 카드지출 팝업 컴포넌트 import (src/pages/CardExpenseModal.jsx) */
+/* 카드지출 */
 import CardExpenseModal from "./pages/CardExpenseModal";
 
-/* ✅ [추가] 증명서 발급 페이지 라우트용 import (새 파일) */
+/* 증명서 발급 */
 import CertificateIssuePage from "./pages/CertificateIssuePage";
 
-/* ✅ [추가] 급여대장 페이지 라우트용 import */
+/* 급여대장 */
 import PayrollBook from "./pages/PayrollBook";
 
-/* ✅ [추가] 라우트에서 사용할 카드지출 래퍼 컴포넌트
-   - 페이지로 직접 접근했을 때도 팝업을 띄울 수 있도록 최소 구현
-   - 기존 페이지에는 영향 없음
-*/
+/* =========================================================
+ * 모바일 / PC 최초 판정
+ * =========================================================
+ *
+ * 중요:
+ *
+ * 기존에는 App 시작 시
+ *
+ * isMobile = false
+ *
+ * 상태로 먼저 시작한 뒤 useEffect에서 모바일 여부를
+ * 판단했습니다.
+ *
+ * 이제는 React 최초 실행 순간부터 현재 URL과
+ * 실제 기기를 검사하여 모바일 여부를 결정합니다.
+ *
+ * 특히:
+ *
+ * /mobile/...
+ *
+ * 주소는 화면 크기, 태블릿, 브라우저 종류와 관계없이
+ * 항상 모바일 화면으로 처리합니다.
+ * ========================================================= */
+function detectMobileMode() {
+  const pathname =
+    window.location.pathname || "";
+
+  /*
+   * =====================================================
+   * 모바일 전용 URL
+   * =====================================================
+   *
+   * 이 URL은 PC에서 직접 접속해도
+   * 모바일 전용 화면을 표시합니다.
+   */
+  const isForcedMobileRoute =
+    pathname === "/calendar-mobile" ||
+    pathname === "/mobile" ||
+    pathname.startsWith("/mobile/");
+
+  if (isForcedMobileRoute) {
+    return true;
+  }
+
+  /*
+   * =====================================================
+   * User Agent
+   * =====================================================
+   */
+  const userAgent =
+    window.navigator.userAgent || "";
+
+  const isAndroid =
+    /Android/i.test(userAgent);
+
+  const isIPhone =
+    /iPhone|iPod/i.test(userAgent);
+
+  /*
+   * =====================================================
+   * 실제 기기 화면 크기
+   * =====================================================
+   *
+   * 브라우저 창의 크기가 아닌
+   * 실제 화면의 짧은 변 기준
+   */
+  const screenWidth =
+    window.screen?.width || 0;
+
+  const screenHeight =
+    window.screen?.height || 0;
+
+  const deviceShortSide =
+    Math.min(
+      screenWidth,
+      screenHeight
+    );
+
+  /*
+   * =====================================================
+   * Android 태블릿
+   * =====================================================
+   *
+   * 일반 ERP 주소에서는 PC ERP 유지
+   *
+   * 단,
+   *
+   * /mobile/...
+   *
+   * 경로는 위에서 이미 모바일로 확정됨
+   */
+  const isAndroidTablet =
+    isAndroid &&
+    deviceShortSide >= 600;
+
+  if (isAndroidTablet) {
+    return false;
+  }
+
+  /*
+   * =====================================================
+   * 실제 스마트폰
+   * =====================================================
+   */
+  const isPhysicalPhone =
+    (isAndroid || isIPhone) &&
+    deviceShortSide > 0 &&
+    deviceShortSide < 600;
+
+  if (isPhysicalPhone) {
+    return true;
+  }
+
+  /*
+   * =====================================================
+   * 최종 fallback
+   * =====================================================
+   */
+  return window.innerWidth <= 768;
+}
+
+/* =========================================================
+ * 카드지출 페이지 래퍼
+ * ========================================================= */
 function CardExpensePageWrapper() {
   const [open, setOpen] = useState(false);
 
@@ -118,17 +242,24 @@ function CardExpensePageWrapper() {
           background:
             "linear-gradient(180deg,#6C8CF5 0%, #4F73EA 100%)",
           color: "#fff",
-          boxShadow: "0 6px 16px rgba(94,126,242,.28)",
+          boxShadow:
+            "0 6px 16px rgba(94,126,242,.28)",
         }}
       >
         카드지출 열기
       </button>
 
-      <CardExpenseModal open={open} onClose={() => setOpen(false)} />
+      <CardExpenseModal
+        open={open}
+        onClose={() => setOpen(false)}
+      />
     </div>
   );
 }
 
+/* =========================================================
+ * ROUTES
+ * ========================================================= */
 function AppRoutes({
   employeeId,
   userId,
@@ -141,65 +272,134 @@ function AppRoutes({
 }) {
   const navigate = useNavigate();
 
-  // ✅ 앱 로컬 로그인(사번/아이디) OR Firebase Auth 중 하나라도 있으면 로그인 상태로 간주
-  const isLoggedInEffective = Boolean((employeeId && userId) || authUser);
+  /*
+   * 앱 로컬 로그인 또는 Firebase Auth 중
+   * 하나라도 있으면 로그인 상태로 간주
+   */
+  const isLoggedInEffective = Boolean(
+    (employeeId && userId) ||
+      authUser
+  );
 
   if (!isAuthReady) {
-    // Firebase Auth 초기화 대기
     return null;
   }
 
   return (
     <Routes>
-      {/* 루트: 환경/로그인 상태별 분기 */}
+      {/* =====================================================
+          루트
+          ===================================================== */}
       <Route
         path="/"
         element={
           isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/list"
+                  : "/main"
+              }
+              replace
+            />
           ) : (
-            <Navigate to={isMobile ? "/mobile/login" : "/login"} replace />
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
+              replace
+            />
           )
         }
       />
 
-      {/* PC 로그인 */}
+      {/* =====================================================
+          PC 로그인
+          ===================================================== */}
       <Route
         path="/login"
         element={
           isLoggedInEffective ? (
-            <Navigate to={isMobile ? "/mobile/list" : "/main"} replace />
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/list"
+                  : "/main"
+              }
+              replace
+            />
           ) : isMobile ? (
-            <Navigate to="/mobile/login" replace />
+            <Navigate
+              to="/mobile/login"
+              replace
+            />
           ) : (
-            <LoginPage onLogin={onLogin} />
+            <LoginPage
+              onLogin={onLogin}
+            />
           )
         }
       />
 
-      {/* ✅ 모바일 전용 로그인 */}
+      {/* =====================================================
+          이사정산 모바일 홈화면 전용 시작 주소
+          ===================================================== */}
+      <Route
+        path="/mobile/moveout"
+        element={
+          isLoggedInEffective ? (
+            <Navigate
+              to="/mobile/list"
+              replace
+            />
+          ) : (
+            <Navigate
+              to="/mobile/login"
+              replace
+            />
+          )
+        }
+      />
+
+      {/* =====================================================
+          모바일 전용 로그인
+          ===================================================== */}
       <Route
         path="/mobile/login"
         element={
           isLoggedInEffective ? (
-            <Navigate to="/mobile/list" replace />
+            <Navigate
+              to="/mobile/list"
+              replace
+            />
           ) : (
             <MobileLogin />
           )
         }
       />
 
-      {/* 메인 */}
+      {/* =====================================================
+          메인
+          ===================================================== */}
       <Route
         path="/main"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : isMobile ? (
-            <Navigate to="/mobile/list" replace />
+            <Navigate
+              to="/mobile/list"
+              replace
+            />
           ) : (
             <TrezoSidebar
               employeeId={employeeId}
@@ -211,13 +411,19 @@ function AppRoutes({
         }
       />
 
-      {/* PC 등록/수정 */}
+      {/* =====================================================
+          PC 이사정산 등록/수정
+          ===================================================== */}
       <Route
         path="/form"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -225,18 +431,25 @@ function AppRoutes({
               employeeId={employeeId}
               userId={userId}
               isMobile={false}
-              onDone={() => navigate(-1)}
+              onDone={() =>
+                navigate(-1)
+              }
             />
           )
         }
       />
 
-      {/* 모바일 등록/수정 */}
+      {/* =====================================================
+          모바일 이사정산 등록/수정
+          ===================================================== */}
       <Route
         path="/mobile/form"
         element={
           !isLoggedInEffective ? (
-            <Navigate to="/mobile/login" replace />
+            <Navigate
+              to="/mobile/login"
+              replace
+            />
           ) : (
             <MoveoutFormMobile
               employeeId={employeeId}
@@ -246,12 +459,17 @@ function AppRoutes({
         }
       />
 
-      {/* 모바일 조회 */}
+      {/* =====================================================
+          모바일 이사정산 조회
+          ===================================================== */}
       <Route
         path="/mobile/list"
         element={
           !isLoggedInEffective ? (
-            <Navigate to="/mobile/login" replace />
+            <Navigate
+              to="/mobile/login"
+              replace
+            />
           ) : (
             <MoveoutListMobile
               employeeId={employeeId}
@@ -261,44 +479,65 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 모바일 전용 캘린더 */}
+      {/* =====================================================
+          모바일 전용 캘린더
+          ===================================================== */}
       <Route
         path="/calendar-mobile"
         element={
           !isLoggedInEffective ? (
-            <Navigate to="/mobile/login" replace />
+            <Navigate
+              to="/mobile/login"
+              replace
+            />
           ) : (
             <MobileCalendarPage />
           )
         }
       />
 
-      {/* ✅ 모바일 전용 개인 장부 */}
+      {/* =====================================================
+          모바일 전용 개인 장부
+          ===================================================== */}
       <Route
         path="/mobile/personal-ledger"
         element={
           !isLoggedInEffective ? (
-            <Navigate to="/mobile/login" replace />
+            <Navigate
+              to="/mobile/login"
+              replace
+            />
           ) : (
             <MobilePersonalLedgerPage />
           )
         }
       />
 
-      {/* ✅ 수도검침원 모바일 전용 접속 */}
-      {/* 기존 ERP 로그인과 별도로 검침원 이름 + 연락처로 접속 */}
+      {/* =====================================================
+          수도검침 모바일
+
+          기존 ERP 로그인과 별도
+          ===================================================== */}
       <Route
         path="/mobile/water-reading"
-        element={<WaterMeterReadingMobilePage />}
+        element={
+          <WaterMeterReadingMobilePage />
+        }
       />
 
-      {/* PC 조회 */}
+      {/* =====================================================
+          PC 이사정산 조회
+          ===================================================== */}
       <Route
         path="/list"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -310,13 +549,19 @@ function AppRoutes({
         }
       />
 
-      {/* 영수증 발행 리스트 */}
+      {/* =====================================================
+          영수증
+          ===================================================== */}
       <Route
         path="/receipts"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -325,13 +570,19 @@ function AppRoutes({
         }
       />
 
-      {/* 관리비회계 · 수입정리 */}
+      {/* =====================================================
+          수입정리
+          ===================================================== */}
       <Route
         path="/accounting/income"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -340,13 +591,19 @@ function AppRoutes({
         }
       />
 
-      {/* 관리비회계 · 지출정리 */}
+      {/* =====================================================
+          지출정리
+          ===================================================== */}
       <Route
         path="/accounting/expense"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -355,13 +612,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 관리비회계 · 대금결제 관리 */}
+      {/* =====================================================
+          대금결제 관리
+          ===================================================== */}
       <Route
         path="/accounting/payment-settlement"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -370,13 +633,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 관리비회계 · 손익계산 */}
+      {/* =====================================================
+          손익계산
+          ===================================================== */}
       <Route
         path="/accounting/profit-loss"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -385,13 +654,19 @@ function AppRoutes({
         }
       />
 
-      {/* 관리비회계 · 일마감 */}
+      {/* =====================================================
+          일마감
+          ===================================================== */}
       <Route
         path="/accounting/daily-close"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -400,13 +675,19 @@ function AppRoutes({
         }
       />
 
-      {/* 관리비회계 · 월마감 */}
+      {/* =====================================================
+          월마감
+          ===================================================== */}
       <Route
         path="/accounting/monthly-close"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -415,13 +696,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 관리비회계 · 연간시트 (직접 URL 접근용) */}
+      {/* =====================================================
+          연간시트
+          ===================================================== */}
       <Route
         path="/accounting/annual-sheet"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -430,13 +717,19 @@ function AppRoutes({
         }
       />
 
-      {/* 전기요금 추출 */}
+      {/* =====================================================
+          전기요금 추출
+          ===================================================== */}
       <Route
         path="/extract"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -445,13 +738,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 공용전기 계산 */}
+      {/* =====================================================
+          공용전기 계산
+          ===================================================== */}
       <Route
         path="/public-electric-calc"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -460,13 +759,19 @@ function AppRoutes({
         }
       />
 
-      {/* 캘린더 */}
+      {/* =====================================================
+          캘린더
+          ===================================================== */}
       <Route
         path="/calendar"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -475,13 +780,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 일정관리 */}
+      {/* =====================================================
+          일정관리
+          ===================================================== */}
       <Route
         path="/schedule"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -490,13 +801,19 @@ function AppRoutes({
         }
       />
 
-      {/* 부가서비스 */}
+      {/* =====================================================
+          도배
+          ===================================================== */}
       <Route
         path="/papering"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -505,28 +822,42 @@ function AppRoutes({
         }
       />
 
-      {/* 메모 */}
+      {/* =====================================================
+          메모
+          ===================================================== */}
       <Route
         path="/memo"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
-            <MemoPage userId={userId} />
+            <MemoPage
+              userId={userId}
+            />
           )
         }
       />
 
-      {/* 기타 메뉴 */}
+      {/* =====================================================
+          빌라정보
+          ===================================================== */}
       <Route
         path="/villa"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -540,7 +871,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -554,7 +889,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -568,7 +907,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -582,7 +925,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -596,7 +943,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -610,7 +961,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -624,7 +979,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -638,7 +997,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -652,7 +1015,11 @@ function AppRoutes({
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -661,13 +1028,19 @@ function AppRoutes({
         }
       />
 
-      {/* 기초등록/사원 */}
+      {/* =====================================================
+          기초등록
+          ===================================================== */}
       <Route
         path="/basic/vendor-register"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -676,12 +1049,19 @@ function AppRoutes({
         }
       />
 
+      {/* =====================================================
+          직원
+          ===================================================== */}
       <Route
         path="/employee"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -690,13 +1070,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 부가서비스 · 입주자카드 */}
+      {/* =====================================================
+          입주자카드
+          ===================================================== */}
       <Route
         path="/addon/resident-card"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -705,13 +1091,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 부가서비스 · 자재비관리대장 */}
+      {/* =====================================================
+          자재비관리대장
+          ===================================================== */}
       <Route
         path="/addon/material-cost"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -720,13 +1112,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 부가서비스 · 정산하자체크 */}
+      {/* =====================================================
+          정산하자체크
+          ===================================================== */}
       <Route
         path="/addon/settlement-defect-check"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -735,28 +1133,40 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 부가서비스 · 수도검침조회 */}
-<Route
-  path="/addon/water-meter-reading"
-  element={
-    !isLoggedInEffective ? (
-      <Navigate
-        to={isMobile ? "/mobile/login" : "/login"}
-        replace
+      {/* =====================================================
+          수도검침조회
+          ===================================================== */}
+      <Route
+        path="/addon/water-meter-reading"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
+              replace
+            />
+          ) : (
+            <WaterMeterReadingPage />
+          )
+        }
       />
-    ) : (
-      <WaterMeterReadingPage />
-    )
-  }
-/>
 
-      {/* ✅ 관리비회계 · 카드지출 */}
+      {/* =====================================================
+          카드지출
+          ===================================================== */}
       <Route
         path="/accounting/card-expense"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -765,13 +1175,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 증명서 발급 */}
+      {/* =====================================================
+          증명서 발급
+          ===================================================== */}
       <Route
         path="/certificates"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -780,13 +1196,19 @@ function AppRoutes({
         }
       />
 
-      {/* ✅ 급여대장 */}
+      {/* =====================================================
+          급여대장
+          ===================================================== */}
       <Route
         path="/payroll-book"
         element={
           !isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           ) : (
@@ -795,18 +1217,28 @@ function AppRoutes({
         }
       />
 
-      {/* 와일드카드 */}
+      {/* =====================================================
+          와일드카드
+          ===================================================== */}
       <Route
         path="*"
         element={
           isLoggedInEffective ? (
             <Navigate
-              to={isMobile ? "/mobile/list" : "/main"}
+              to={
+                isMobile
+                  ? "/mobile/list"
+                  : "/main"
+              }
               replace
             />
           ) : (
             <Navigate
-              to={isMobile ? "/mobile/login" : "/login"}
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
               replace
             />
           )
@@ -816,20 +1248,62 @@ function AppRoutes({
   );
 }
 
+/* =========================================================
+ * APP
+ * ========================================================= */
 function App() {
-  const [isMobile, setIsMobile] = useState(false);
+  /*
+   * =====================================================
+   * 모바일 상태
+   * =====================================================
+   *
+   * 기존:
+   *
+   * useState(false)
+   *
+   * 변경:
+   *
+   * 앱 실행 즉시 현재 경로와 기기를 판단합니다.
+   */
+  const [isMobile, setIsMobile] =
+    useState(() =>
+      detectMobileMode()
+    );
 
-  // 기존(사번/아이디 기반) 로컬 로그인 상태
-  const [employeeId, setEmployeeId] = useState("");
-  const [userId, setUserId] = useState("");
-  const [userName, setUserName] = useState("");
-  const [loading, setLoading] = useState(true);
+  /*
+   * 기존 사번/아이디 기반 로그인 상태
+   */
+  const [employeeId, setEmployeeId] =
+    useState("");
 
-  // ✅ Firebase Auth 상태
-  const [authUser, setAuthUser] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [userId, setUserId] =
+    useState("");
 
-  const handleLogin = ({ id, employeeNo, name }) => {
+  const [userName, setUserName] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  /*
+   * Firebase Auth 상태
+   */
+  const [authUser, setAuthUser] =
+    useState(null);
+
+  const [
+    isAuthReady,
+    setIsAuthReady,
+  ] = useState(false);
+
+  /* =========================================================
+     PC 로그인 성공 처리
+     ========================================================= */
+  const handleLogin = ({
+    id,
+    employeeNo,
+    name,
+  }) => {
     setUserId(id);
     setEmployeeId(employeeNo);
     setUserName(name);
@@ -837,129 +1311,123 @@ function App() {
     try {
       localStorage.setItem(
         "autoLogin",
-        JSON.stringify({ id, employeeNo, name })
+        JSON.stringify({
+          id,
+          employeeNo,
+          name,
+        })
       );
     } catch {}
   };
 
+  /* =========================================================
+     로그아웃
+     ========================================================= */
   const handleLogout = async () => {
     try {
-      localStorage.removeItem("autoLogin");
+      localStorage.removeItem(
+        "autoLogin"
+      );
     } catch {}
 
     setUserId("");
     setEmployeeId("");
     setUserName("");
 
-    // ✅ 모바일(Firebase Auth) 로그아웃도 함께 시도 (실패해도 무시)
     try {
       await signOut(auth);
     } catch {}
   };
 
+  /* =========================================================
+     기존 자동 로그인 정보
+     ========================================================= */
   useEffect(() => {
-    const stored = localStorage.getItem("autoLogin");
+    try {
+      const stored =
+        localStorage.getItem(
+          "autoLogin"
+        );
 
-    if (stored) {
-      const { id, employeeNo, name } = JSON.parse(stored);
+      if (stored) {
+        const parsed =
+          JSON.parse(stored);
 
-      setUserId(id);
-      setEmployeeId(employeeNo);
-      setUserName(name);
+        const {
+          id,
+          employeeNo,
+          name,
+        } = parsed || {};
+
+        if (
+          id &&
+          employeeNo
+        ) {
+          setUserId(id);
+          setEmployeeId(
+            employeeNo
+          );
+          setUserName(
+            name || ""
+          );
+        }
+      }
+    } catch (e) {
+      console.warn(
+        "[App] autoLogin parse error:",
+        e
+      );
+
+      try {
+        localStorage.removeItem(
+          "autoLogin"
+        );
+      } catch {}
     }
 
     setLoading(false);
   }, []);
 
-  // ✅ 모바일 로그인(Firebase Auth) 상태 감지
+  /* =========================================================
+     Firebase Auth 상태 감지
+     ========================================================= */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setAuthUser(u || null);
-      setIsAuthReady(true);
-    });
+    const unsub =
+      onAuthStateChanged(
+        auth,
+        (u) => {
+          setAuthUser(
+            u || null
+          );
 
-    return () => unsub();
+          setIsAuthReady(
+            true
+          );
+        }
+      );
+
+    return () =>
+      unsub();
   }, []);
 
-  /*
+  /* =========================================================
+   * 모바일 / PC 화면 재판정
    * =========================================================
-   * ✅ 모바일 / PC 화면 판정
-   * ---------------------------------------------------------
-   * 수정 목적:
    *
-   * - 스마트폰:
-   *   기존처럼 768px 이하에서 모바일 ERP 사용
+   * 최초 판정:
+   * useState(() => detectMobileMode())
    *
-   * - Android 태블릿:
-   *   삼성 인터넷 창을 반으로 줄이거나
-   *   분할화면 / 팝업화면으로 작게 만들어도
-   *   절대 모바일 ERP로 자동 전환하지 않음
+   * 이후:
+   * - 화면 회전
+   * - 창 크기 변경
+   * - PWA 복귀
    *
-   * 중요:
-   * window.innerWidth만으로 태블릿을 판단하지 않고
-   * 기기 자체의 screen.width / screen.height를 먼저 확인
-   * =========================================================
-   */
+   * 시 다시 검사합니다.
+   * ========================================================= */
   useEffect(() => {
     const checkMobile = () => {
-      const userAgent =
-        window.navigator.userAgent || "";
-
-      /* Android 기기 여부 */
-      const isAndroid =
-        /Android/i.test(userAgent);
-
-      /*
-       * 현재 브라우저 창 너비가 아니라
-       * 기기 자체 화면 크기를 확인
-       *
-       * 따라서 분할화면으로 삼성 인터넷 창이
-       * 768px 이하가 되어도 태블릿 판정은 유지됨
-       */
-      const screenWidth =
-        window.screen?.width || 0;
-
-      const screenHeight =
-        window.screen?.height || 0;
-
-      const deviceShortSide =
-        Math.min(
-          screenWidth,
-          screenHeight
-        );
-
-      /*
-       * Android 태블릿 판정
-       *
-       * 짧은 변이 600px 이상이면
-       * 태블릿으로 판단
-       */
-      const isAndroidTablet =
-        isAndroid &&
-        deviceShortSide >= 600;
-
-      /*
-       * ✅ 태블릿은 창 크기와 관계없이
-       * 항상 PC ERP 유지
-       *
-       * 전체화면
-       * 분할화면
-       * 팝업창
-       * 작은 인터넷 창
-       *
-       * 모두 PC 버전 유지
-       */
-      if (isAndroidTablet) {
-        setIsMobile(false);
-        return;
-      }
-
-      /*
-       * 태블릿이 아닌 장치만
-       * 기존 모바일 판정 그대로 사용
-       */
       setIsMobile(
-        window.innerWidth <= 768
+        detectMobileMode()
       );
     };
 
@@ -975,6 +1443,15 @@ function App() {
       checkMobile
     );
 
+    /*
+     * PWA 아이콘으로 다시 열거나
+     * 백그라운드에서 복귀한 경우
+     */
+    window.addEventListener(
+      "pageshow",
+      checkMobile
+    );
+
     return () => {
       window.removeEventListener(
         "resize",
@@ -985,10 +1462,20 @@ function App() {
         "orientationchange",
         checkMobile
       );
+
+      window.removeEventListener(
+        "pageshow",
+        checkMobile
+      );
     };
   }, []);
 
-  if (loading || !isAuthReady) return null;
+  if (
+    loading ||
+    !isAuthReady
+  ) {
+    return null;
+  }
 
   return (
     <Router>

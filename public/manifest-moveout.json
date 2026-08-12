@@ -1,26 +1,28 @@
 {
-  "short_name": "한남ERP",
-  "name": "한남주택관리 ERP",
+  "id": "/mobile/moveout-app",
+  "short_name": "이사정산",
+  "name": "한남주택관리 이사정산",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "/logo192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo512.png",
+      "src": "/logo512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
   ],
-  "start_url": "/",
+  "start_url": "/mobile/moveout?source=moveout-pwa",
+  "scope": "/mobile/",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "portrait",
   "theme_color": "#ff6e00",
   "background_color": "#ffffff"
 }

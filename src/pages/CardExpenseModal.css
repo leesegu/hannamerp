@@ -79,7 +79,7 @@
 .cemodal .pill svg{opacity:.8}
 
 /* 신규 입력 폼 */
-.cemodal .cemodal__newform{display:grid;grid-template-columns:160px 160px 160px 160px 160px 2fr 2fr 120px;gap:8px;align-items:center;padding:12px 20px;border-bottom:1px solid #eef2fa;background:linear-gradient(180deg,#ffffff 0%, #f9fbff 100%)}
+.cemodal .cemodal__newform{display:grid;grid-template-columns:150px 140px 140px 150px 150px 2fr 150px 2fr 110px;gap:8px;align-items:center;padding:12px 20px;border-bottom:1px solid #eef2fa;background:linear-gradient(180deg,#ffffff 0%, #f9fbff 100%)}
 .cemodal .input-center{text-align:center}
 
 /* 테이블 */
@@ -308,11 +308,27 @@
 
 /* 반응형 */
 @media (max-width:1400px){
-  .cemodal .cemodal__newform{grid-template-columns:1fr 1fr 1fr 1fr 1fr 2fr 2fr 120px}
+  .cemodal .cemodal__newform{grid-template-columns:1fr 1fr 1fr 1fr 1fr 2fr 1fr 2fr 110px}
 }
 @media (max-width:900px){
   .cemodal .cemodal__panel{width:96vw;height:92vh;border-radius:20px}
   .cemodal .cemodal__stats{grid-template-columns:1fr 1fr}
   .cemodal .cemodal__newform{grid-template-columns:1fr 1fr}
   .cemodal .stats-layout{grid-template-columns:1fr}
+}
+
+/* 청구 항목 */
+.cemodal .cemodal__table tbody td.col-billing{
+  text-align:center;
+  font-weight:700;
+  color:#35406f;
+  white-space:nowrap;
+}
+.cemodal .billing-select-wrap .csel-trigger{
+  justify-content:flex-start;
+}
+.cemodal .stats-basis-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
 }

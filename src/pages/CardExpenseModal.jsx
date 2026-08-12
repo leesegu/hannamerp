@@ -82,6 +82,12 @@ const toNum = (v) => {
 const fmtWon = (n) => (toNum(n) || 0).toLocaleString("ko-KR");
 const monthKeyOf = (d) => String(d || "").slice(0, 7);
 const yearOf = (mk) => String(mk || "").slice(0, 4);
+const BILLING_OPTIONS = [
+  "건물주청구",
+  "세입자청구",
+  "서비스",
+  "운영비",
+];
 
 function sumo(rows, key) {
   const m = new Map();
@@ -165,6 +171,7 @@ const CustomMonthPicker = ({ value, onChange }) => {
   }, [value]);
 
   const MONTH_LABELS = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+const BILLING_OPTIONS = ["건물주청구", "세입자청구", "서비스", "운영비"];
   return (
     <div className="mp-wrap" ref={wrapperRef}>
       <button className="mp-trigger" onClick={() => setIsOpen(!isOpen)}>
@@ -241,6 +248,7 @@ const StatsModal = ({ rows, onClose }) => {
   const [months, setMonths] = useState(() => new Set(MONTH_LABELS));
   const payers = distinct((rows || []).map(r => r.payer));
   const [payFilter, setPayFilter] = useState(() => new Set(payers));
+  const [statBasis, setStatBasis] = useState("category");
 
   useEffect(() => {
     setPayFilter(new Set(payers));
@@ -268,19 +276,28 @@ const StatsModal = ({ rows, onClose }) => {
     });
   }, [rows, year, months, payFilter]);
 
-  const cats = distinct(filtered.map(r => r.category)).filter(Boolean);
+  const statKey = statBasis === "billing" ? "billing" : "category";
+  const statItems = distinct(
+    filtered.map(r => statKey === "billing" ? (r.billing || "미지정") : (r.category || "미지정"))
+  ).filter(Boolean);
 
   const monthRows = Array.from({length:12}, (_,i)=>i).map(i => {
     const mk = `${year}-${ z2(i+1) }`;
     const inside = filtered.filter(r => (r.date||"").startsWith(mk));
-    const totalsByCat = {};
-    cats.forEach(c => { totalsByCat[c] = inside.filter(r => r.category===c).reduce((s,r)=>s+toNum(r.amount),0); });
+    const totalsByItem = {};
+    statItems.forEach(item => {
+      totalsByItem[item] = inside
+        .filter(r => (statKey === "billing" ? (r.billing || "미지정") : (r.category || "미지정")) === item)
+        .reduce((s,r)=>s+toNum(r.amount),0);
+    });
     const sum = inside.reduce((s,r)=>s+toNum(r.amount),0);
-    return { label: MONTH_LABELS[i], totalsByCat, sum };
+    return { label: MONTH_LABELS[i], totalsByItem, sum };
   });
 
-  const grandByCat = {};
-  cats.forEach(c => { grandByCat[c] = monthRows.reduce((s,row)=>s+row.totalsByCat[c],0); });
+  const grandByItem = {};
+  statItems.forEach(item => {
+    grandByItem[item] = monthRows.reduce((s,row)=>s+row.totalsByItem[item],0);
+  });
   const grandSum = monthRows.reduce((s,row)=>s+row.sum,0);
 
   return (
@@ -318,6 +335,24 @@ const StatsModal = ({ rows, onClose }) => {
             </div>
 
             <div className="filter-block">
+              <div className="filter-title">통계 기준</div>
+              <div className="stats-basis-row">
+                <button
+                  className={`met ${statBasis === "category" ? "is-on":""}`}
+                  onClick={()=>setStatBasis("category")}
+                >
+                  사용내역별
+                </button>
+                <button
+                  className={`met ${statBasis === "billing" ? "is-on":""}`}
+                  onClick={()=>setStatBasis("billing")}
+                >
+                  청구항목별
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-block">
               <div className="filter-title">결제자</div>
               <div className="payer-list">
                 {payers.map(p => (
@@ -338,7 +373,7 @@ const StatsModal = ({ rows, onClose }) => {
               <thead>
                 <tr>
                   <th>월</th>
-                  {cats.map(c => <th key={c}>{c}</th>)}
+                  {statItems.map(item => <th key={item}>{item}</th>)}
                   <th>총합계</th>
                 </tr>
               </thead>
@@ -346,7 +381,7 @@ const StatsModal = ({ rows, onClose }) => {
                 {monthRows.map(row => (
                   <tr key={row.label}>
                     <td className="mcell">{row.label}</td>
-                    {cats.map(c => <td key={c}>{row.totalsByCat[c].toLocaleString('ko-KR')}</td>)}
+                    {statItems.map(item => <td key={item}>{row.totalsByItem[item].toLocaleString('ko-KR')}</td>)}
                     <td className="strong">{row.sum.toLocaleString('ko-KR')}</td>
                   </tr>
                 ))}
@@ -354,7 +389,7 @@ const StatsModal = ({ rows, onClose }) => {
               <tfoot>
                 <tr>
                   <td className="mcell strong">총합계</td>
-                  {cats.map(c => <td key={c} className="strong">{grandByCat[c].toLocaleString('ko-KR')}</td>)}
+                  {statItems.map(item => <td key={item} className="strong">{grandByItem[item].toLocaleString('ko-KR')}</td>)}
                   <td className="strong">{grandSum.toLocaleString('ko-KR')}</td>
                 </tr>
               </tfoot>
@@ -497,6 +532,7 @@ export default function CardExpenseModal({ open, onClose }) {
     category: "식대",
     amount: "",
     desc: "",
+    billing: "건물주청구",
     memo: "",
   });
 
@@ -628,6 +664,9 @@ export default function CardExpenseModal({ open, onClose }) {
       const amountStr = String(r.amount ?? "");
       return (
         amountStr.includes(needle) ||
+        (r.payer || "").toLowerCase().includes(needle) ||
+        (r.category || "").toLowerCase().includes(needle) ||
+        (r.billing || "").toLowerCase().includes(needle) ||
         (r.desc  || "").toLowerCase().includes(needle) ||
         (r.memo  || "").toLowerCase().includes(needle)
       );
@@ -657,6 +696,7 @@ export default function CardExpenseModal({ open, onClose }) {
       category: (newRow.category || "").trim(),
       amount: numeric,
       desc: (newRow.desc || "").trim(),
+      billing: (newRow.billing || "건물주청구").trim(),
       memo: (newRow.memo || "").trim(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -683,7 +723,7 @@ export default function CardExpenseModal({ open, onClose }) {
   };
 
   /* ✏️ 편집(즉시 저장 + 낙관적 반영) */
-  const beginEdit = (row) => { setEditId(row.id); setEditDraft({ ...row, amount: String(row.amount ?? "") }); };
+  const beginEdit = (row) => { setEditId(row.id); setEditDraft({ ...row, billing: row.billing || "미지정", amount: String(row.amount ?? "") }); };
   const cancelEdit = () => { setEditId(null); setEditDraft({}); };
 
   const commitEdit = async () => {
@@ -702,6 +742,7 @@ export default function CardExpenseModal({ open, onClose }) {
       category: (editDraft.category || "").trim(),
       amount: numeric,
       desc: (editDraft.desc || "").trim(),
+      billing: (editDraft.billing || "미지정").trim(),
       memo: (editDraft.memo || "").trim(),
       updatedAt: serverTimestamp(),
     };
@@ -778,6 +819,9 @@ export default function CardExpenseModal({ open, onClose }) {
     return (yearRows || []).filter((r) => {
       const s = String(r.amount || "");
       return s.includes(needle) ||
+             (r.payer || "").toLowerCase().includes(needle) ||
+             (r.category || "").toLowerCase().includes(needle) ||
+             (r.billing || "").toLowerCase().includes(needle) ||
              (r.desc || "").toLowerCase().includes(needle) ||
              (r.memo || "").toLowerCase().includes(needle);
     }).map((r) => r.id);
@@ -800,7 +844,7 @@ export default function CardExpenseModal({ open, onClose }) {
           const arr = (base || []).filter((r) => {
             if (!q.trim()) return true;
             const s2 = String(r.amount || "");
-            return s2.includes(nn) || (r.desc || "").toLowerCase().includes(nn) || (r.memo || "").toLowerCase().includes(nn);
+            return s2.includes(nn) || (r.payer || "").toLowerCase().includes(nn) || (r.category || "").toLowerCase().includes(nn) || (r.billing || "").toLowerCase().includes(nn) || (r.desc || "").toLowerCase().includes(nn) || (r.memo || "").toLowerCase().includes(nn);
           }).sort(byDateDesc);
           return arr;
         })();
@@ -990,6 +1034,16 @@ export default function CardExpenseModal({ open, onClose }) {
               />
             </div>
 
+            {/* 청구 */}
+            <div className="inputwrap no-select-padding billing-select-wrap">
+              <CustomSelect
+                value={newRow.billing}
+                onChange={(v) => setNewRow((x) => ({ ...x, billing: v }))}
+                options={BILLING_OPTIONS}
+                renderIcon={IconTag}
+              />
+            </div>
+
             {/* 비고 */}
             <div className="inputwrap input--stretch">
               <IconPencil className="inputicon" />
@@ -1026,6 +1080,7 @@ export default function CardExpenseModal({ open, onClose }) {
                     <span className="thicon"><IconWon /></span>금액
                   </th>
                   <th><span className="thicon"><IconNote /></span>내용</th>
+                  <th style={{ width: 150 }}><span className="thicon"><IconTag /></span>청구</th>
                   <th style={{ width: 200 }}><span className="thicon"><IconPencil /></span>비고</th>
                   <th style={{ width: 120 }}></th>
                 </tr>
@@ -1097,6 +1152,16 @@ export default function CardExpenseModal({ open, onClose }) {
                             <input value={editDraft.desc || ""} onChange={(e) => setEditDraft((v) => ({ ...v, desc: e.target.value }))} />
                           </div>
                         </td>
+                        <td className="col-billing" style={{ width: 150 }}>
+                          <div className="inputwrap no-select-padding">
+                            <CustomSelect
+                              value={editDraft.billing || "미지정"}
+                              onChange={(v) => setEditDraft((x) => ({ ...x, billing: v }))}
+                              options={["미지정", ...BILLING_OPTIONS]}
+                              renderIcon={IconTag}
+                            />
+                          </div>
+                        </td>
                         <td className="col-memo" style={{ width: 200 }}>
                           <div className="inputwrap">
                             <IconPencil className="inputicon" />
@@ -1116,6 +1181,7 @@ export default function CardExpenseModal({ open, onClose }) {
                         <td>{r.category}</td>
                         <td className="num">{fmtWon(r.amount)}</td>
                         <td className="col-desc muted">{r.desc}</td>
+                        <td className="col-billing">{r.billing || "미지정"}</td>
                         <td className="col-memo muted" style={{ width: 200 }}>{r.memo}</td>
                         <td className="actions">
                           <button className="btn edit" onClick={() => beginEdit(r)}>수정</button>
@@ -1126,7 +1192,7 @@ export default function CardExpenseModal({ open, onClose }) {
                   </tr>
                 ))}
                 {!current.length && (
-                  <tr><td colSpan={8} className="empty">데이터가 없습니다</td></tr>
+                  <tr><td colSpan={9} className="empty">데이터가 없습니다</td></tr>
                 )}
               </tbody>
             </table>

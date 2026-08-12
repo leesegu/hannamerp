@@ -316,6 +316,8 @@ const WaterMeterReadingMobilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [isMeterLocationOpen, setIsMeterLocationOpen] = useState(false);
+  const [focusedRoomId, setFocusedRoomId] = useState(null);
 
   const inputRefs = useRef(new Map());
   const saveTimers = useRef(new Map());
@@ -609,6 +611,11 @@ const WaterMeterReadingMobilePage = () => {
   );
 
   useEffect(() => {
+    setIsMeterLocationOpen(false);
+    setFocusedRoomId(null);
+  }, [selectedVillaId]);
+
+  useEffect(() => {
     if (filteredVillas.length === 0) {
       return;
     }
@@ -893,6 +900,8 @@ const WaterMeterReadingMobilePage = () => {
     setVillas([]);
     setSelectedVillaId(null);
     setSearchText("");
+    setIsMeterLocationOpen(false);
+    setFocusedRoomId(null);
   };
 
   /* =====================================================
@@ -1100,12 +1109,45 @@ const WaterMeterReadingMobilePage = () => {
                     <strong>{selectedVilla.lobby || "-"}</strong>
                   </div>
 
-                  <div>
-                    <FiDroplet />
-                    <span>계량기 위치</span>
-                    <strong>{selectedVilla.meterLocation || "-"}</strong>
+                  <div className="wmrm-meter-location-wrap">
+                    <button
+                      type="button"
+                      className={`wmrm-meter-location ${
+                        isMeterLocationOpen ? "is-open" : ""
+                      }`}
+                      aria-expanded={isMeterLocationOpen}
+                      aria-label="계량기 위치 전체 내용 보기"
+                      onClick={() =>
+                        setIsMeterLocationOpen((previous) => !previous)
+                      }
+                    >
+                      <FiDroplet />
+                      <span>계량기 위치</span>
+                      <strong>{selectedVilla.meterLocation || "-"}</strong>
+                    </button>
+
+                    {isMeterLocationOpen && (
+                      <div
+                        className="wmrm-meter-location-bubble"
+                        role="tooltip"
+                      >
+                        <span>계량기 위치</span>
+                        <strong>{selectedVilla.meterLocation || "-"}</strong>
+                        <i aria-hidden="true" />
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {focusedRoomId && (
+                  <div className="wmrm-input-floating-bar" aria-live="polite">
+                    <strong>{selectedVilla.villaName}</strong>
+                    <span>
+                      {editableMonthLabel} 진행률
+                      <b>{completionRate}%</b>
+                    </span>
+                  </div>
+                )}
               </section>
 
               <section className="wmrm-month-lock">
@@ -1176,7 +1218,12 @@ const WaterMeterReadingMobilePage = () => {
                           value={currentValue}
                           placeholder="검침값 입력"
                           aria-label={`${room.room} ${editableMonthLabel} 검침값`}
-                          onFocus={(event) => event.currentTarget.select()}
+                          onFocus={(event) => {
+                            setIsMeterLocationOpen(false);
+                            setFocusedRoomId(room.id);
+                            event.currentTarget.select();
+                          }}
+                          onBlur={() => setFocusedRoomId(null)}
                           onChange={(event) =>
                             updateReading(room.id, event.target.value)
                           }
