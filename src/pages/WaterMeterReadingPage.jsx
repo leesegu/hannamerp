@@ -912,16 +912,49 @@ const getReadingAnalysis = (
     );
 
   /*
-   * 과거 정상 사용량이 하나 이상 있을 때
-   * 현재 사용량과 평균 사용량의 절대 차이가 10톤 이상이면 경고.
+   * 평균 사용량 경고는 "사용량이 크게 증가한 첫 달"에만 표시한다.
+   *
+   * 예) 10 → 10 → 10 → 20 → 20
+   *     4월의 20톤만 경고하고, 5월의 20톤은 새 기준 사용량으로 보고
+   *     반복 경고하지 않는다.
+   *
+   * 감소한 사용량은 평균 경고 대상이 아니다.
+   * 과거 평균보다 10톤 이상 증가했고, 직전 달 사용량보다도
+   * 10톤 이상 증가한 경우에만 경고한다.
    */
-  if (
+  const previousUsagePoint =
+    getPreviousReadingPoint(
+      previousPoint.year,
+      previousPoint.monthNumber
+    );
+
+  const beforePreviousValue =
+    getRoomYearReading(
+      room,
+      previousUsagePoint.year,
+      previousUsagePoint.monthKey
+    );
+
+  const previousUsage =
+    calculateUsage(
+      beforePreviousValue,
+      previousValue,
+      reverseMeter
+    );
+
+  const increasedFromAverage =
     count > 0 &&
     average !== null &&
-    Math.abs(
-      currentUsage -
-        average
-    ) >= 10
+    currentUsage - average >= 10;
+
+  const firstLargeIncrease =
+    previousUsage === null
+      ? increasedFromAverage
+      : currentUsage - previousUsage >= 10;
+
+  if (
+    increasedFromAverage &&
+    firstLargeIncrease
   ) {
     return {
       status: "warning",
@@ -930,7 +963,7 @@ const getReadingAnalysis = (
           1
         )}톤 대비 현재 ${currentUsage.toFixed(
           1
-        )}톤입니다. 검침값을 확인해주세요.`,
+        )}톤으로 사용량이 크게 증가했습니다. 검침값을 확인해주세요.`,
       usage:
         currentUsage,
       average,
@@ -4783,10 +4816,17 @@ const WaterMeterReadingPage = () => {
                             >
                               <th className="wmr-room-cell">
                                 <div className="wmr-room-cell-inner">
-                                  <span className="wmr-room-name">
-                                    {
+                                  <span
+                                    className="wmr-room-name-wrap"
+                                    data-room-name={
                                       room.room
                                     }
+                                  >
+                                    <span className="wmr-room-name">
+                                      {
+                                        room.room
+                                      }
+                                    </span>
                                   </span>
 
                                   <button

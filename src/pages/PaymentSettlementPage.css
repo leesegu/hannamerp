@@ -256,6 +256,22 @@
   box-shadow: 0 10px 26px rgba(37, 99, 235, 0.07), 0 2px 6px rgba(15, 23, 42, 0.05);
 }
 
+/* ✅ [추가] 말일 표 전용 - 표 자체가 내부 스크롤이 되도록 하여, 위에 있는
+   "이번 달 총액/지급완료 금액/미지급 건수" 요약 박스는 이 스크롤 영역
+   밖에 있으므로 표를 아무리 아래로 스크롤해도 움직이지 않습니다.
+   컬럼 제목(구분/업체/내용/...)도 스크롤 중 계속 보이도록 고정했습니다. */
+.pmt-table-wrap--scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.pmt-table-wrap--scroll .pmt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--pmt-brand-dark);
+}
+
 .pmt-table {
   width: 100%;
   border-collapse: separate;
@@ -446,43 +462,63 @@
   font-size: 13px;
 }
 
-/* ===== 미납 버튼/뱃지 ===== */
+/* ===== 내용 열 버튼 / 미납·납부예정 배지 =====
+   ✅ [수정] 미납/납부예정 배지 2개를 세로로 두 줄 쌓지 않고, 가로로 나란히
+   배치해서 한 줄에 표시되도록 했습니다(색상 구분은 그대로 유지). 열 폭도
+   360px로 넓혀서 웬만한 금액에서는 줄바꿈 없이 한 줄에 들어갑니다. */
 .pmt-unpaid-btn {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
   border: 1px solid #cbd5e1;
-  background: #f1f5f9;
-  color: #334155;
+  background: #f8fafc;
   border-radius: 10px;
-  padding: 6px 12px;
-  font-size: 11.5px;
-  font-weight: 700;
-  line-height: 1.5;
-  text-align: left;
-  white-space: normal;
-  word-break: keep-all;
+  padding: 6px 10px;
   cursor: pointer;
   transition: all var(--pmt-transition);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .pmt-unpaid-btn:hover {
   transform: translateY(-1px);
+  border-color: var(--pmt-brand);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
 }
 
-.pmt-unpaid-btn.has-unpaid {
+.pmt-content-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.pmt-content-line--unpaid {
   background: linear-gradient(135deg, #fee2e2, #fecaca);
-  border-color: rgba(220, 38, 38, 0.35);
   color: #991b1b;
 }
 
-.pmt-unpaid-btn.is-scheduled {
+.pmt-content-line--cycle.is-scheduled {
   background: linear-gradient(135deg, #dbeafe, #e0f2fe);
-  border-color: rgba(37, 99, 235, 0.35);
   color: var(--pmt-brand-dark);
 }
 
-.pmt-unpaid-btn.is-done {
+.pmt-content-line--cycle.is-done {
   background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-  border-color: rgba(5, 150, 105, 0.4);
+  color: #065f46;
+}
+
+.pmt-content-line--allpaid {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   color: #065f46;
 }
 
@@ -515,6 +551,20 @@
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 14px;
+}
+
+/* ✅ [추가] 말일 표 위쪽으로 옮긴 요약 박스: pmt-table-wrap--scroll이
+   자체 스크롤을 갖게 되어 이 박스는 원래도 그 스크롤 영역 밖에 있지만,
+   혹시 페이지 전체가 길어져 화면이 스크롤되는 경우까지 대비해 상단에
+   sticky로 한 번 더 고정해 둡니다. */
+.pmt-summary-cards--sticky {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  margin-top: 0;
+  margin-bottom: 14px;
+  padding-top: 2px;
+  background: linear-gradient(180deg, #ffffff, #fbfcff 70%, #ffffff);
 }
 
 .pmt-summary-card {
@@ -1150,55 +1200,6 @@
   justify-content: center;
 }
 
-/* ===== 결제 요약 모달 (금액 3종) ===== */
-.pmt-bstatus-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.pmt-bstatus-summary--stack {
-  grid-template-columns: 1fr;
-  margin-bottom: 0;
-}
-
-.pmt-bstatus-summary-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid var(--pmt-line);
-}
-
-.pmt-bstatus-summary-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--pmt-muted);
-}
-
-.pmt-bstatus-summary-value {
-  font-size: 17px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.pmt-bstatus-summary-value.is-scheduled {
-  color: var(--pmt-brand-dark);
-}
-
-.pmt-bstatus-summary-value.is-overdue {
-  color: var(--pmt-danger);
-}
-
-.pmt-bstatus-summary-value.is-paid {
-  color: var(--pmt-success);
-}
-
 /* ===== 건물 수 요약 (건물별 지급현황 - 목록 모달) ===== */
 .pmt-bcount-summary {
   display: grid;
@@ -1462,10 +1463,6 @@
   .pmt-modal-panel--xl,
   .pmt-modal-panel--wide {
     width: calc(100vw - 24px);
-  }
-
-  .pmt-bstatus-summary {
-    grid-template-columns: 1fr;
   }
 
   .pmt-bcount-summary {

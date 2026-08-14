@@ -24,7 +24,9 @@ import {
   FiX,
 } from "react-icons/fi";
 
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
+
+import { signInAnonymously } from "firebase/auth";
 
 import {
   collection,
@@ -43,6 +45,13 @@ import "./WaterMeterReadingMobilePage.css";
 const WATER_VILLA_COLLECTION = "waterMeterReadingVillas";
 const WATER_INSPECTOR_COLLECTION = "waterMeterInspectors";
 const SESSION_KEY = "hannam_water_inspector_session";
+
+/*
+ * 홈화면(PWA) 실행 시 최신 배포본 자동 확인용
+ * - 앱이 다시 전면으로 올라올 때 Service Worker 업데이트 확인
+ * - 새 Service Worker가 활성화되면 한 번만 새로고침
+ */
+const PWA_RELOAD_GUARD_KEY = "hannam_water_pwa_reload_guard";
 
 /* =========================================================
    공통 유틸
@@ -210,6 +219,17 @@ const getEditablePeriod = (date = new Date()) => {
    각 월의 "사용량 = 이번 검침 - 이전 검침" 평균을 계산합니다.
 ========================================================= */
 
+const calculateMobileUsage = (previousValue, currentValue, reverseMeter) => {
+  const previous = toReadingNumber(previousValue);
+  const current = toReadingNumber(currentValue);
+
+  if (previous === null || current === null || previous === 0 || current === 0) {
+    return null;
+  }
+
+  return reverseMeter ? previous - current : current - previous;
+};
+
 const getReadingWarning = (room, editableMonthKey) => {
   const readings = room?.readings || {};
   const currentValue = toReadingNumber(readings[editableMonthKey]);
@@ -217,19 +237,28 @@ const getReadingWarning = (room, editableMonthKey) => {
   const previousValue = previousMonthKey
     ? toReadingNumber(readings[previousMonthKey])
     : null;
+  const reverseMeter = Boolean(room?.reverseMeter);
 
   if (currentValue === null) {
     return null;
   }
 
-  if (previousValue !== null && currentValue < previousValue) {
-    return {
-      type: "lower",
-      text: `전월 검침값 ${previousValue}보다 작습니다. 다시 확인해주세요.`,
-    };
+  if (previousValue !== null) {
+    const directionError = reverseMeter
+      ? currentValue > previousValue
+      : currentValue < previousValue;
+
+    if (directionError) {
+      return {
+        type: "lower",
+        text: reverseMeter
+          ? `역순 계량기입니다. 전월 검침값 ${previousValue}보다 큰 값인지 다시 확인해주세요.`
+          : `전월 검침값 ${previousValue}보다 작습니다. 다시 확인해주세요.`,
+      };
+    }
   }
 
-  if (previousValue === null) {
+  if (previousValue === null || previousValue === 0 || currentValue === 0) {
     return null;
   }
 
@@ -247,16 +276,13 @@ const getReadingWarning = (room, editableMonthKey) => {
     const beforeKey = MONTH_SEQUENCE[index - 1].key;
     const afterKey = MONTH_SEQUENCE[index].key;
 
-    const beforeValue = toReadingNumber(readings[beforeKey]);
-    const afterValue = toReadingNumber(readings[afterKey]);
+    const usage = calculateMobileUsage(
+      readings[beforeKey],
+      readings[afterKey],
+      reverseMeter
+    );
 
-    if (beforeValue === null || afterValue === null) {
-      continue;
-    }
-
-    const usage = afterValue - beforeValue;
-
-    if (usage < 0) {
+    if (usage === null || usage < 0) {
       continue;
     }
 
@@ -271,10 +297,37 @@ const getReadingWarning = (room, editableMonthKey) => {
     historicalUsages.reduce((sum, value) => sum + value, 0) /
     historicalUsages.length;
 
-  const currentUsage = currentValue - previousValue;
-  const difference = Math.abs(currentUsage - averageUsage);
+  const currentUsage = calculateMobileUsage(
+    previousValue,
+    currentValue,
+    reverseMeter
+  );
 
-  if (difference < 10) {
+  if (currentUsage === null || currentUsage < 0) {
+    return null;
+  }
+
+  /*
+   * 평균 경고는 사용량이 크게 증가한 첫 달에만 표시합니다.
+   * 10 → 10 → 10 → 20 → 20이면 첫 20톤 월만 경고합니다.
+   * 사용량이 감소한 경우에는 평균 경고를 띄우지 않습니다.
+   */
+  const beforePreviousMonthKey = getPreviousMonthKey(previousMonthKey);
+  const previousUsage = beforePreviousMonthKey
+    ? calculateMobileUsage(
+        readings[beforePreviousMonthKey],
+        readings[previousMonthKey],
+        reverseMeter
+      )
+    : null;
+
+  const increasedFromAverage = currentUsage - averageUsage >= 10;
+  const firstLargeIncrease =
+    previousUsage === null
+      ? increasedFromAverage
+      : currentUsage - previousUsage >= 10;
+
+  if (!increasedFromAverage || !firstLargeIncrease) {
     return null;
   }
 
@@ -288,10 +341,9 @@ const getReadingWarning = (room, editableMonthKey) => {
 
   return {
     type: "average",
-    text: `평균 사용량 ${averageText}톤 대비 이번 사용량 ${currentUsageText}톤입니다. 10톤 이상 차이가 있어 다시 확인해주세요.`,
+    text: `평균 사용량 ${averageText}톤 대비 이번 사용량 ${currentUsageText}톤으로 크게 증가했습니다. 검침값을 다시 확인해주세요.`,
   };
 };
-
 const WaterMeterReadingMobilePage = () => {
   const [session, setSession] = useState(() => {
     try {
@@ -316,11 +368,186 @@ const WaterMeterReadingMobilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isMeterLocationOpen, setIsMeterLocationOpen] = useState(false);
   const [focusedRoomId, setFocusedRoomId] = useState(null);
+  const [openRoomNameId, setOpenRoomNameId] = useState(null);
+  const [keyboardModeByRoom, setKeyboardModeByRoom] = useState({});
 
   const inputRefs = useRef(new Map());
   const saveTimers = useRef(new Map());
+
+  /*
+   * 입력 중인 최신 값을 Firestore 실시간 스냅샷보다 우선해서 유지합니다.
+   * 서버에서 예전 값이 잠깐 다시 도착해도 사용자가 방금 입력한 값이
+   * 화면에서 사라졌다 나타나는 현상을 막기 위한 로컬 보호 버퍼입니다.
+   */
+  const pendingReadingsRef = useRef(new Map());
+  const savingReadingKeysRef = useRef(new Set());
+
+  /* =====================================================
+     홈화면(PWA) 최신 배포본 자동 확인
+
+     목적
+     - Firebase Hosting 배포 후 홈화면 앱이 이전 JS/CSS를 계속
+       표시하는 현상을 최대한 줄입니다.
+     - 앱 최초 실행 / 다시 전면으로 돌아올 때 Service Worker에
+       업데이트 확인을 요청합니다.
+     - 새 Service Worker가 실제 제어권을 가져오면 화면을 한 번만
+       자동 새로고침하여 최신 파일을 사용합니다.
+
+     주의
+     - Service Worker를 삭제하거나 캐시 전체를 강제로 비우지 않습니다.
+     - 다른 ERP 페이지의 PWA 동작에는 영향을 주지 않습니다.
+  ===================================================== */
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator)
+    ) {
+      return undefined;
+    }
+
+    let disposed = false;
+    let updateTimer = null;
+
+    const reloadOnce = () => {
+      if (disposed) {
+        return;
+      }
+
+      try {
+        const alreadyReloaded =
+          sessionStorage.getItem(PWA_RELOAD_GUARD_KEY) === "1";
+
+        if (alreadyReloaded) {
+          sessionStorage.removeItem(PWA_RELOAD_GUARD_KEY);
+          return;
+        }
+
+        sessionStorage.setItem(PWA_RELOAD_GUARD_KEY, "1");
+      } catch {
+        // sessionStorage 사용이 제한된 환경에서도 새로고침은 진행
+      }
+
+      window.location.reload();
+    };
+
+    const requestServiceWorkerUpdate = async () => {
+      try {
+        const registrations =
+          await navigator.serviceWorker.getRegistrations();
+
+        if (disposed) {
+          return;
+        }
+
+        await Promise.all(
+          registrations.map(async (registration) => {
+            try {
+              await registration.update();
+
+              /*
+               * 새 worker가 waiting 상태라면 CRA/Workbox에서 흔히
+               * 사용하는 SKIP_WAITING 메시지를 전달합니다.
+               * 해당 메시지를 지원하지 않는 worker에서는 무시됩니다.
+               */
+              if (registration.waiting) {
+                registration.waiting.postMessage({
+                  type: "SKIP_WAITING",
+                });
+              }
+            } catch (error) {
+              console.warn(
+                "수도검침 PWA 업데이트 확인 실패:",
+                error
+              );
+            }
+          })
+        );
+      } catch (error) {
+        console.warn(
+          "수도검침 Service Worker 확인 실패:",
+          error
+        );
+      }
+    };
+
+    /*
+     * 새 Service Worker가 활성화되어 현재 페이지의 controller가
+     * 바뀌는 순간 최신 리소스를 사용하도록 한 번만 새로고침합니다.
+     */
+    const handleControllerChange = () => {
+      reloadOnce();
+    };
+
+    /*
+     * 홈화면 앱이 백그라운드에 있다가 다시 열리는 경우에도
+     * 즉시 최신 배포본을 확인합니다.
+     */
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      requestServiceWorkerUpdate();
+    };
+
+    /*
+     * bfcache 또는 홈화면 앱 재개 상황에서도 업데이트 확인
+     */
+    const handlePageShow = () => {
+      requestServiceWorkerUpdate();
+    };
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      handleControllerChange
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    window.addEventListener(
+      "pageshow",
+      handlePageShow
+    );
+
+    // 페이지가 처음 열린 직후 즉시 확인
+    requestServiceWorkerUpdate();
+
+    // 앱을 오래 켜둔 경우에도 5분마다 새 배포본 확인
+    updateTimer = window.setInterval(
+      requestServiceWorkerUpdate,
+      5 * 60 * 1000
+    );
+
+    return () => {
+      disposed = true;
+
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        handleControllerChange
+      );
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+
+      window.removeEventListener(
+        "pageshow",
+        handlePageShow
+      );
+
+      if (updateTimer) {
+        window.clearInterval(updateTimer);
+      }
+    };
+  }, []);
 
   /* =====================================================
      날짜가 바뀌면 입력 가능 월도 자동으로 전환
@@ -408,6 +635,34 @@ const WaterMeterReadingMobilePage = () => {
     setLoginError("");
 
     try {
+      /* =====================================================
+         0. Firebase Authentication 확인
+
+         - 기존 ERP 로그인 사용자가 이미 인증되어 있으면 그대로 사용
+         - 검침원 폰처럼 인증 사용자가 없을 때만 익명 로그인
+         - Firestore Rules의 인증 조건을 충족시킨 뒤 검침원 확인
+      ===================================================== */
+
+      if (typeof auth.authStateReady === "function") {
+        await auth.authStateReady();
+      }
+
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+      }
+
+      if (!auth.currentUser) {
+        const noUserError = new Error(
+          "Firebase 인증 세션을 만들지 못했습니다."
+        );
+        noUserError.code = "auth/no-current-user";
+        throw noUserError;
+      }
+
+      /* =====================================================
+         1. 검침원 조회
+      ===================================================== */
+
       const inspectorQuery = query(
         collection(db, WATER_INSPECTOR_COLLECTION),
         where("normalizedPhone", "==", phone)
@@ -427,20 +682,26 @@ const WaterMeterReadingMobilePage = () => {
         );
 
       if (!matched) {
-        setLoginError("등록된 검침원 정보와 일치하지 않습니다.");
-        return;
-      }
-
-      /*
-       * 모바일 자체 날짜 규칙으로 접속 여부를 판단하지 않습니다.
-       * PC 검침원관리 화면과 같은 규칙만 사용합니다.
-       */
-      if (!isInspectorLoginAllowed(matched, loginDate)) {
         setLoginError(
-          "현재는 검침하는 날짜가 아닙니다. PC 검침원관리에서 모바일 로그인을 허용한 후 다시 시도해주세요."
+          "등록된 검침원 정보와 일치하지 않습니다. 이름과 연락처를 다시 확인해주세요."
         );
         return;
       }
+
+      /* =====================================================
+         2. 모바일 로그인 허용 여부
+      ===================================================== */
+
+      if (!isInspectorLoginAllowed(matched, loginDate)) {
+        setLoginError(
+          "현재 모바일 로그인이 허용되어 있지 않습니다. PC 검침원관리에서 모바일 로그인을 허용한 후 다시 시도해주세요."
+        );
+        return;
+      }
+
+      /* =====================================================
+         3. 모바일 검침 세션 생성
+      ===================================================== */
 
       const nextSession = {
         id: matched.id,
@@ -449,22 +710,69 @@ const WaterMeterReadingMobilePage = () => {
         loggedInAt: Date.now(),
       };
 
-      /* PC 검침원관리의 '마지막 로그인' 표시용 */
-      await setDoc(
-        doc(db, WATER_INSPECTOR_COLLECTION, matched.id),
-        {
-          lastLoginAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
       localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+
       setSessionInspector(matched);
       setSession(nextSession);
+
+      /* =====================================================
+         4. PC 검침원관리 '마지막 로그인' 기록
+
+         기록 실패가 검침 화면 접속 자체를 막지는 않도록 처리
+      ===================================================== */
+
+      try {
+        await setDoc(
+          doc(db, WATER_INSPECTOR_COLLECTION, matched.id),
+          {
+            lastLoginAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (writeError) {
+        console.warn(
+          "검침원 마지막 로그인 시간 저장 실패:",
+          writeError?.code,
+          writeError?.message,
+          writeError
+        );
+      }
     } catch (error) {
-      console.error("검침원 로그인 오류:", error);
-      setLoginError("검침원 확인 중 오류가 발생했습니다.");
+      console.error(
+        "검침원 로그인 오류:",
+        error?.code,
+        error?.message,
+        error
+      );
+
+      if (error?.code === "auth/operation-not-allowed") {
+        setLoginError(
+          "Firebase 익명 로그인이 허용되어 있지 않습니다. 관리자에게 문의해주세요. (auth/operation-not-allowed)"
+        );
+      } else if (error?.code === "auth/network-request-failed") {
+        setLoginError(
+          "인증 서버에 연결할 수 없습니다. 인터넷 연결을 확인한 후 다시 시도해주세요. (auth/network-request-failed)"
+        );
+      } else if (error?.code === "permission-denied") {
+        setLoginError(
+          "검침원 정보를 확인할 권한이 없습니다. 관리자에게 문의해주세요. (permission-denied)"
+        );
+      } else if (error?.code === "unavailable") {
+        setLoginError(
+          "서버에 연결할 수 없습니다. 인터넷 연결을 확인한 후 다시 시도해주세요. (unavailable)"
+        );
+      } else if (error?.code === "failed-precondition") {
+        setLoginError(
+          "검침원 확인 설정에 문제가 있습니다. 관리자에게 문의해주세요. (failed-precondition)"
+        );
+      } else {
+        setLoginError(
+          `검침원 확인 중 오류가 발생했습니다.${
+            error?.code ? ` (${error.code})` : ""
+          }`
+        );
+      }
     } finally {
       setLoginLoading(false);
     }
@@ -552,10 +860,58 @@ const WaterMeterReadingMobilePage = () => {
       collection(db, WATER_VILLA_COLLECTION),
       (snapshot) => {
         const next = snapshot.docs
-          .map((item) => ({
-            id: item.id,
-            ...item.data(),
-          }))
+          .map((item) => {
+            const serverVilla = {
+              id: item.id,
+              ...item.data(),
+            };
+
+            const rooms = Array.isArray(serverVilla.rooms)
+              ? serverVilla.rooms.map((room) => {
+                  const timerKey = `${serverVilla.id}:${room.id}:${editableMonthKey}`;
+                  const pendingValue = pendingReadingsRef.current.get(timerKey);
+
+                  if (pendingValue === undefined) {
+                    return room;
+                  }
+
+                  const serverValue = normalizeReadingInput(
+                    room.readings?.[editableMonthKey] ?? ""
+                  );
+
+                  /*
+                   * 서버 스냅샷이 현재 사용자의 최신 입력값과 정확히 같아진 순간에만
+                   * 보호 버퍼를 해제합니다. 그 전까지는 예전 서버값이 화면을 덮지 못합니다.
+                   */
+                  if (serverValue === pendingValue) {
+                    pendingReadingsRef.current.delete(timerKey);
+                    return room;
+                  }
+
+                  return {
+                    ...room,
+                    readings: {
+                      ...(room.readings || {}),
+                      [editableMonthKey]: pendingValue,
+                    },
+                    readingYears: {
+                      ...(room.readingYears || {}),
+                      [String(editableReadingPoint.year)]: {
+                        ...(room.readingYears?.[
+                          String(editableReadingPoint.year)
+                        ] || {}),
+                        [editableReadingPoint.monthKey]: pendingValue,
+                      },
+                    },
+                  };
+                })
+              : [];
+
+            return {
+              ...serverVilla,
+              rooms,
+            };
+          })
           .sort(
             (a, b) =>
               Number(a.sourceSheetIndex ?? 999999) -
@@ -589,7 +945,12 @@ const WaterMeterReadingMobilePage = () => {
       saveTimers.current.forEach((timer) => clearTimeout(timer));
       saveTimers.current.clear();
     };
-  }, [session]);
+  }, [
+    session,
+    editableMonthKey,
+    editableReadingPoint.year,
+    editableReadingPoint.monthKey,
+  ]);
 
   const filteredVillas = useMemo(() => {
     const keyword = cleanText(searchText).toLowerCase();
@@ -613,6 +974,7 @@ const WaterMeterReadingMobilePage = () => {
   useEffect(() => {
     setIsMeterLocationOpen(false);
     setFocusedRoomId(null);
+    setOpenRoomNameId(null);
   }, [selectedVillaId]);
 
   useEffect(() => {
@@ -685,33 +1047,53 @@ const WaterMeterReadingMobilePage = () => {
       };
     });
 
-    const statusOrder = {
-      missing: 0,
-      progress: 1,
-      complete: 2,
-    };
-
-    const sortedItems = [...items].sort((a, b) => {
-      const statusDifference = statusOrder[a.status] - statusOrder[b.status];
-
-      if (statusDifference !== 0) {
-        return statusDifference;
-      }
-
-      return (
+    /*
+     * 기본 순서는 PC/엑셀에서 등록된 원래 순서(sourceSheetIndex)를 유지합니다.
+     * "총 검침빌라" 선택 시 항상 이 순서로 돌아옵니다.
+     */
+    const originalItems = [...items].sort(
+      (a, b) =>
         Number(a.sourceSheetIndex ?? 999999) -
         Number(b.sourceSheetIndex ?? 999999)
-      );
-    });
+    );
 
     return {
-      items: sortedItems,
+      items: originalItems,
       total: items.length,
       complete: items.filter((item) => item.status === "complete").length,
       progress: items.filter((item) => item.status === "progress").length,
       missing: items.filter((item) => item.status === "missing").length,
     };
   }, [villas, editableMonthKey]);
+
+  /*
+   * 검침현황 요약 박스 선택에 따른 목록 정렬
+   *
+   * all      : 원래 등록 순서
+   * complete : 검침완료 빌라를 최상단
+   * progress : 검침진행중 빌라를 최상단
+   * missing  : 검침누락 빌라를 최상단
+   *
+   * 선택 상태가 아닌 나머지 빌라도 사라지지 않고,
+   * 기존 등록 순서를 유지한 채 아래쪽에 표시됩니다.
+   */
+  const displayedInspectionItems = useMemo(() => {
+    const originalItems = inspectionStatus.items || [];
+
+    if (statusFilter === "all") {
+      return originalItems;
+    }
+
+    const selectedItems = originalItems.filter(
+      (item) => item.status === statusFilter
+    );
+
+    const otherItems = originalItems.filter(
+      (item) => item.status !== statusFilter
+    );
+
+    return [...selectedItems, ...otherItems];
+  }, [inspectionStatus.items, statusFilter]);
 
   const openVillaFromStatus = (villaId) => {
     setSelectedVillaId(villaId);
@@ -796,9 +1178,81 @@ const WaterMeterReadingMobilePage = () => {
 
         transaction.update(villaRef, updateData);
       });
+
+      return true;
     } catch (error) {
       console.error("모바일 검침값 저장 오류:", error);
+      return false;
     }
+  };
+
+  const flushPendingReading = async (villaId, roomId, monthKey) => {
+    const timerKey = `${villaId}:${roomId}:${monthKey}`;
+
+    if (savingReadingKeysRef.current.has(timerKey)) {
+      return;
+    }
+
+    const pendingValue = pendingReadingsRef.current.get(timerKey);
+
+    if (pendingValue === undefined) {
+      return;
+    }
+
+    savingReadingKeysRef.current.add(timerKey);
+
+    try {
+      const valueToSave = pendingValue;
+
+      const saved = await persistReading(
+        villaId,
+        roomId,
+        monthKey,
+        valueToSave
+      );
+
+      /*
+       * 저장 성공 후에도 사용자가 값을 다시 바꿨다면 최신 값을 다시 저장합니다.
+       * 값이 바뀌지 않았다면 보호 버퍼를 해제합니다.
+       */
+      const latestValue = pendingReadingsRef.current.get(timerKey);
+
+      if (saved && latestValue !== undefined && latestValue !== valueToSave) {
+        window.setTimeout(() => {
+          flushPendingReading(villaId, roomId, monthKey);
+        }, 0);
+      }
+    } finally {
+      savingReadingKeysRef.current.delete(timerKey);
+
+      const latestValue = pendingReadingsRef.current.get(timerKey);
+
+      if (latestValue !== undefined && latestValue !== pendingValue) {
+        window.setTimeout(() => {
+          flushPendingReading(villaId, roomId, monthKey);
+        }, 0);
+      }
+    }
+  };
+
+  const scheduleReadingSave = (villaId, roomId, monthKey) => {
+    const timerKey = `${villaId}:${roomId}:${monthKey}`;
+    const previousTimer = saveTimers.current.get(timerKey);
+
+    if (previousTimer) {
+      clearTimeout(previousTimer);
+    }
+
+    /*
+     * 빠르게 숫자를 연속 입력하는 동안에는 서버 저장을 잠깐 미룹니다.
+     * 예: 576을 입력할 때 5, 57을 각각 저장하지 않고 완성값 576을 저장.
+     */
+    const timer = window.setTimeout(() => {
+      saveTimers.current.delete(timerKey);
+      flushPendingReading(villaId, roomId, monthKey);
+    }, 550);
+
+    saveTimers.current.set(timerKey, timer);
   };
 
   const updateReading = (roomId, rawValue) => {
@@ -809,6 +1263,10 @@ const WaterMeterReadingMobilePage = () => {
     const villaId = selectedVilla.id;
     const value = normalizeReadingInput(rawValue);
     const monthKey = editableMonthKey;
+    const timerKey = `${villaId}:${roomId}:${monthKey}`;
+
+    /* 항상 최신 사용자의 입력값을 먼저 보호 */
+    pendingReadingsRef.current.set(timerKey, value);
 
     setVillas((previous) =>
       previous.map((villa) =>
@@ -840,19 +1298,23 @@ const WaterMeterReadingMobilePage = () => {
       )
     );
 
-    const timerKey = `${villaId}:${roomId}:${monthKey}`;
-    const previousTimer = saveTimers.current.get(timerKey);
+    scheduleReadingSave(villaId, roomId, monthKey);
+  };
 
-    if (previousTimer) {
-      clearTimeout(previousTimer);
+  const finishReadingInput = (roomId) => {
+    if (!selectedVilla) {
+      return;
     }
 
-    const timer = setTimeout(() => {
-      saveTimers.current.delete(timerKey);
-      persistReading(villaId, roomId, monthKey, value);
-    }, 250);
+    const timerKey = `${selectedVilla.id}:${roomId}:${editableMonthKey}`;
+    const timer = saveTimers.current.get(timerKey);
 
-    saveTimers.current.set(timerKey, timer);
+    if (timer) {
+      clearTimeout(timer);
+      saveTimers.current.delete(timerKey);
+    }
+
+    flushPendingReading(selectedVilla.id, roomId, editableMonthKey);
   };
 
   const handleKeyDown = (event, roomIndex, roomId) => {
@@ -871,12 +1333,14 @@ const WaterMeterReadingMobilePage = () => {
     const timerKey = `${selectedVilla.id}:${roomId}:${monthKey}`;
     const timer = saveTimers.current.get(timerKey);
 
+    pendingReadingsRef.current.set(timerKey, value);
+
     if (timer) {
       clearTimeout(timer);
       saveTimers.current.delete(timerKey);
     }
 
-    persistReading(selectedVilla.id, roomId, monthKey, value);
+    flushPendingReading(selectedVilla.id, roomId, monthKey);
 
     const nextRoom = selectedVilla.rooms?.[roomIndex + 1];
 
@@ -893,6 +1357,32 @@ const WaterMeterReadingMobilePage = () => {
     }
   };
 
+  const toggleReadingKeyboard = (roomId) => {
+    const nextMode =
+      keyboardModeByRoom[roomId] === "text" ? "numeric" : "text";
+
+    setKeyboardModeByRoom((previous) => ({
+      ...previous,
+      [roomId]: nextMode,
+    }));
+
+    setOpenRoomNameId(null);
+
+    window.setTimeout(() => {
+      const input = inputRefs.current.get(roomId);
+
+      if (!input) {
+        return;
+      }
+
+      input.blur();
+      window.setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 30);
+    }, 0);
+  };
+
   const logout = () => {
     localStorage.removeItem(SESSION_KEY);
     setSessionInspector(null);
@@ -902,6 +1392,10 @@ const WaterMeterReadingMobilePage = () => {
     setSearchText("");
     setIsMeterLocationOpen(false);
     setFocusedRoomId(null);
+    setOpenRoomNameId(null);
+    setKeyboardModeByRoom({});
+    pendingReadingsRef.current.clear();
+    savingReadingKeysRef.current.clear();
   };
 
   /* =====================================================
@@ -1012,7 +1506,10 @@ const WaterMeterReadingMobilePage = () => {
           <button
             type="button"
             className="wmrm-status-button"
-            onClick={() => setIsStatusOpen(true)}
+            onClick={() => {
+              setStatusFilter("all");
+              setIsStatusOpen(true);
+            }}
           >
             <FiClipboard />
             검침현황
@@ -1174,7 +1671,15 @@ const WaterMeterReadingMobilePage = () => {
                     : "";
 
                   const complete = cleanText(currentValue) !== "";
-                  const warning = getReadingWarning(room, editableMonthKey);
+                  /*
+                   * 숫자를 입력하는 도중(예: 576 중 첫 자리 5)에는
+                   * 아직 완성된 검침값이 아니므로 경고를 표시하지 않습니다.
+                   * 입력칸을 벗어나거나 Enter로 다음 호실로 이동한 뒤 최종값으로 판정합니다.
+                   */
+                  const warning =
+                    focusedRoomId === room.id
+                      ? null
+                      : getReadingWarning(room, editableMonthKey);
 
                   const articleClassName = [
                     complete ? "complete" : "",
@@ -1189,7 +1694,29 @@ const WaterMeterReadingMobilePage = () => {
                         <span>{roomIndex + 1}</span>
 
                         <div>
-                          <strong>{room.room}</strong>
+                          <div className="wmrm-room-name-wrap">
+                            <button
+                              type="button"
+                              className={`wmrm-room-name-button ${
+                                openRoomNameId === room.id ? "is-open" : ""
+                              }`}
+                              aria-expanded={openRoomNameId === room.id}
+                              onClick={() =>
+                                setOpenRoomNameId((previous) =>
+                                  previous === room.id ? null : room.id
+                                )
+                              }
+                            >
+                              {room.room}
+                            </button>
+
+                            {openRoomNameId === room.id && (
+                              <div className="wmrm-room-name-bubble" role="tooltip">
+                                {room.room}
+                                <i aria-hidden="true" />
+                              </div>
+                            )}
+                          </div>
                           <small>
                             {previousMonthLabel} 검침 ·{" "}
                             {previousValue === "" ? "-" : previousValue}
@@ -1201,7 +1728,18 @@ const WaterMeterReadingMobilePage = () => {
                       </div>
 
                       <div className="wmrm-reading-input">
-                        <label>{editableMonthLabel}</label>
+                        <div className="wmrm-reading-input-head">
+                          <label>{editableMonthLabel}</label>
+                          <button
+                            type="button"
+                            className="wmrm-keyboard-toggle"
+                            onClick={() => toggleReadingKeyboard(room.id)}
+                          >
+                            {keyboardModeByRoom[room.id] === "text"
+                              ? "숫자"
+                              : "한글"}
+                          </button>
+                        </div>
 
                         <input
                           ref={(element) => {
@@ -1212,7 +1750,11 @@ const WaterMeterReadingMobilePage = () => {
                             }
                           }}
                           type="text"
-                          inputMode="numeric"
+                          inputMode={
+                            keyboardModeByRoom[room.id] === "text"
+                              ? "text"
+                              : "numeric"
+                          }
                           enterKeyHint="next"
                           autoComplete="off"
                           value={currentValue}
@@ -1220,10 +1762,16 @@ const WaterMeterReadingMobilePage = () => {
                           aria-label={`${room.room} ${editableMonthLabel} 검침값`}
                           onFocus={(event) => {
                             setIsMeterLocationOpen(false);
+                            setOpenRoomNameId(null);
                             setFocusedRoomId(room.id);
                             event.currentTarget.select();
                           }}
-                          onBlur={() => setFocusedRoomId(null)}
+                          onBlur={() => {
+                            setFocusedRoomId((previous) =>
+                              previous === room.id ? null : previous
+                            );
+                            finishReadingInput(room.id);
+                          }}
                           onChange={(event) =>
                             updateReading(room.id, event.target.value)
                           }
@@ -1279,38 +1827,60 @@ const WaterMeterReadingMobilePage = () => {
             </div>
 
             <div className="wmrm-status-summary">
-              <div>
+              <button
+                type="button"
+                className={statusFilter === "all" ? "is-selected" : ""}
+                onClick={() => setStatusFilter("all")}
+              >
                 <span>총 검침빌라</span>
                 <strong>{inspectionStatus.total}</strong>
                 <em>곳</em>
-              </div>
+              </button>
 
-              <div className="is-complete">
+              <button
+                type="button"
+                className={`is-complete ${
+                  statusFilter === "complete" ? "is-selected" : ""
+                }`}
+                onClick={() => setStatusFilter("complete")}
+              >
                 <span>검침완료</span>
                 <strong>{inspectionStatus.complete}</strong>
                 <em>곳</em>
-              </div>
+              </button>
 
-              <div className="is-progress">
+              <button
+                type="button"
+                className={`is-progress ${
+                  statusFilter === "progress" ? "is-selected" : ""
+                }`}
+                onClick={() => setStatusFilter("progress")}
+              >
                 <span>검침진행중</span>
                 <strong>{inspectionStatus.progress}</strong>
                 <em>곳</em>
-              </div>
+              </button>
 
-              <div className="is-missing">
+              <button
+                type="button"
+                className={`is-missing ${
+                  statusFilter === "missing" ? "is-selected" : ""
+                }`}
+                onClick={() => setStatusFilter("missing")}
+              >
                 <span>검침누락</span>
                 <strong>{inspectionStatus.missing}</strong>
                 <em>곳</em>
-              </div>
+              </button>
             </div>
 
             <div className="wmrm-status-list">
-              {inspectionStatus.items.length === 0 ? (
+              {displayedInspectionItems.length === 0 ? (
                 <div className="wmrm-status-empty">
                   등록된 검침 빌라가 없습니다.
                 </div>
               ) : (
-                inspectionStatus.items.map((villa) => {
+                displayedInspectionItems.map((villa) => {
                   const statusLabel =
                     villa.status === "complete"
                       ? "검침완료"

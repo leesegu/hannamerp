@@ -58,6 +58,9 @@ import MaterialCostPage from "../pages/MaterialCostPage";
 /* ✅ 수도검침조회 */
 import WaterMeterReadingPage from "../pages/WaterMeterReadingPage";
 
+/* ✅ 관리일지 */
+import ManagementLog from "../pages/ManagementLog";
+
 /* ✅ 관리종료 */
 import VillaEndPage from "../pages/VillaEndPage";
 
@@ -1080,6 +1083,7 @@ const TrezoSidebar = ({
                       "입주자카드",
                       "자재비관리대장",
                       "수도검침조회",
+                      "관리일지",
                     ]}
 
                     activeMenu={
@@ -1113,8 +1117,12 @@ const TrezoSidebar = ({
 
                         자재비관리대장:
                           <MaterialCostPage />,
+
                         수도검침조회:
-    <WaterMeterReadingPage />,  
+                          <WaterMeterReadingPage />,
+
+                        관리일지:
+                          <ManagementLog />,
                       };
 
 

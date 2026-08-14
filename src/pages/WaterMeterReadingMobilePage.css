@@ -284,6 +284,14 @@
   padding-top: 12px;
   border-top: 1px solid #eef1f5;
   text-align: center;
+
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .wmrm-login-contact strong {
@@ -1531,7 +1539,7 @@
   padding: 10px 10px 8px;
 }
 
-.wmrm-status-summary > div {
+.wmrm-status-summary > button {
   min-width: 0;
 
   padding: 10px 5px 9px;
@@ -1542,6 +1550,13 @@
   background: #ffffff;
 
   text-align: center;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .wmrm-status-summary span {
@@ -1926,4 +1941,168 @@
     border-left: 1px solid #e2e6ee;
     border-right: 1px solid #e2e6ee;
   }
+}
+
+
+/* =========================================================
+   2026-08-14 호실명 터치 말풍선 / 키보드 전환
+========================================================= */
+
+.wmrm-room-name-wrap {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wmrm-room-name-button {
+  max-width: 100%;
+  display: block;
+  overflow: hidden;
+
+  margin: 0 0 3px;
+  padding: 0;
+
+  border: none;
+  background: transparent;
+
+  color: #344054;
+
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-align: left;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wmrm-room-name-button.is-open {
+  color: #5668dc;
+}
+
+.wmrm-room-name-bubble {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 160;
+
+  width: max-content;
+  max-width: min(280px, calc(100vw - 48px));
+
+  padding: 8px 10px;
+  box-sizing: border-box;
+
+  border: 1px solid #dce2f5;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #344054;
+
+  box-shadow:
+    0 10px 26px rgba(37, 48, 75, 0.15),
+    0 2px 6px rgba(37, 48, 75, 0.07);
+
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.wmrm-room-name-bubble > i {
+  position: absolute;
+  left: 16px;
+  bottom: -5px;
+
+  width: 9px;
+  height: 9px;
+
+  transform: rotate(45deg);
+
+  border-right: 1px solid #dce2f5;
+  border-bottom: 1px solid #dce2f5;
+
+  background: #ffffff;
+}
+
+.wmrm-reading-input-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+
+  margin-bottom: 4px;
+}
+
+.wmrm-reading-input-head label {
+  margin: 0;
+}
+
+.wmrm-keyboard-toggle {
+  min-width: 28px;
+  height: 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 5px;
+
+  border: 1px solid #d9dff0;
+  border-radius: 6px;
+
+  background: #f7f8ff;
+  color: #5d6ed8;
+
+  font-family: inherit;
+  font-size: 8px;
+  font-weight: 850;
+
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wmrm-keyboard-toggle:active {
+  transform: translateY(1px);
+}
+
+
+/* =========================================================
+   2026-08-14 검침현황 요약 박스 선택/정렬
+========================================================= */
+
+.wmrm-status-summary > button:active {
+  transform: translateY(1px);
+}
+
+.wmrm-status-summary > button.is-selected {
+  border-color: #8795ef;
+  box-shadow:
+    0 0 0 2px rgba(95, 114, 238, 0.12),
+    0 5px 14px rgba(50, 63, 120, 0.08);
+}
+
+.wmrm-status-summary > button.is-selected:not(.is-complete):not(.is-progress):not(.is-missing) {
+  background: #f4f6ff;
+}
+
+.wmrm-status-summary > button.is-complete.is-selected {
+  border-color: #87c7aa;
+  background: #f5fcf8;
+}
+
+.wmrm-status-summary > button.is-progress.is-selected {
+  border-color: #dfb46e;
+  background: #fff9ef;
+}
+
+.wmrm-status-summary > button.is-missing.is-selected {
+  border-color: #df9292;
+  background: #fff5f5;
 }

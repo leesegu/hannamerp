@@ -82,6 +82,9 @@ import SettlementDefectCheckPage from "./pages/SettlementDefectCheckPage";
 /* 수도검침조회 */
 import WaterMeterReadingPage from "./pages/WaterMeterReadingPage";
 
+/* 관리일지 */
+import ManagementLog from "./pages/ManagementLog";
+
 import "./App.css";
 
 /* Firebase */
@@ -1150,6 +1153,27 @@ function AppRoutes({
             />
           ) : (
             <WaterMeterReadingPage />
+          )
+        }
+      />
+
+      {/* =====================================================
+          관리일지
+          ===================================================== */}
+      <Route
+        path="/addon/management-log"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
+              replace
+            />
+          ) : (
+            <ManagementLog />
           )
         }
       />

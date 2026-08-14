@@ -62,9 +62,16 @@ const getDefaultPayType = () => {
 /* ✅ 구분별 ERP 자동수집 매핑
    여기 등록된 "구분"으로 건물별 계약 관리를 켜면, villas 컬렉션에서
    matchField 값이 업체명과 일치하는 건물을 자동으로 가져옵니다.
-   전기안전/소방안전 페이지가 준비되면 이 목록에 필드명만 추가하면 됩니다. */
+   ✅ [추가] 전기안전(ElectricSafetyPage)과 소방안전(FireSafetyPage)도
+   승강기와 동일한 방식으로 연결했습니다.
+   - 전기안전: villas 문서의 electricSafety(업체명) / electricSafetyAmount(금액)
+   - 소방안전: villas 문서의 fireSafety(업체명) / fireSafetyAmount(금액)
+   두 페이지 모두 이 필드들을 그대로 사용하고 있어서 별도 데이터 이전 없이
+   바로 연결됩니다. */
 const AUTO_SOURCE_CONFIG = {
   승강기: { matchField: "elevator", amountField: "elevatorAmount" },
+  전기안전: { matchField: "electricSafety", amountField: "electricSafetyAmount" },
+  소방안전: { matchField: "fireSafety", amountField: "fireSafetyAmount" },
 };
 
 /* ✅ 새로 계약을 추가/자동수집할 때 기본으로 잡아줄 부과시작월.
@@ -1027,7 +1034,7 @@ function PayeeManagerModal({ open, onClose, payType, categories, payees }) {
   );
 }
 
-/* ===== 건물별 지급현황 - 목록 모달 (업체명 클릭) =====
+/* ===== 건물별 지급현황 - 목록 모달 (업체명 클릭 / 내용 클릭 공통) =====
    ✅ 금액 통계(납부예정/미납누적액/납부완료금액)는 여기서 빼고,
       "총 건물 수 / 납부완료 수 / 미납 수"만 보여준 뒤, 건물별로
       1월~12월 체크그리드 + 비고 입력을 표시합니다.
@@ -1038,7 +1045,12 @@ function PayeeManagerModal({ open, onClose, payType, categories, payees }) {
       저장하지 않고 그냥 닫습니다.
    ✅ 정렬은 "저장"이 완료된 시점의 데이터를 기준으로만 다시 계산됩니다.
       (체크하는 즉시 목록 순서가 바뀌지 않도록, 정렬 기준값은 별도의
-      baseline 상태(savedBuildings)로 관리합니다) */
+      baseline 상태(savedBuildings)로 관리합니다)
+   ✅ [수정] 상단 "미납" 건수는 조회 중인 달(당월)이 아직 체크되지 않은
+      것까지 포함하면 안 됩니다. 당월은 아직 납부 기한이 남은
+      "납부예정"이지 실제로 밀린 "미납"이 아니기 때문입니다. 그래서
+      "당월보다 이전" 달에 체크가 안 되어 진짜로 밀린 건물만
+      (overdueCount > 0) 미납으로 집계하도록 했습니다. */
 function BuildingListModal({ open, onClose, record }) {
   const [buildings, setBuildings] = useState([]); // 화면에서 편집 중인 값(체크/비고)
   const [savedBuildings, setSavedBuildings] = useState([]); // 정렬 계산용 baseline (로드/저장 시점에만 갱신)
@@ -1115,9 +1127,10 @@ function BuildingListModal({ open, onClose, record }) {
     const paidCount = rows.filter(
       (r) => r.grid.currentApplicable && r.grid.currentChecked
     ).length;
-    const unpaidCount = rows.filter(
-      (r) => r.grid.currentApplicable && !r.grid.currentChecked
-    ).length;
+    // ✅ [수정] 당월이 아직 체크 안 된 것은 "미납"이 아니라 "납부예정"입니다.
+    // 당월보다 "이전" 달에 실제로 밀린 달이 있는 건물(overdueCount > 0)만
+    // 미납으로 집계합니다.
+    const unpaidCount = rows.filter((r) => r.grid.overdueCount > 0).length;
     return { total, paidCount, unpaidCount };
   }, [rows]);
 
@@ -1278,9 +1291,7 @@ function BuildingListModal({ open, onClose, record }) {
         {rows.map((b) => (
           <div
             key={b.id}
-            className={`pmt-monthgrid-card ${
-              b.grid.currentApplicable && !b.grid.currentChecked ? "is-unpaid" : ""
-            }`}
+            className={`pmt-monthgrid-card ${b.grid.overdueCount > 0 ? "is-unpaid" : ""}`}
           >
             <div className="pmt-monthgrid-card-head">
               <span className="pmt-monthgrid-name">{b.buildingName}</span>
@@ -1342,106 +1353,6 @@ function BuildingListModal({ open, onClose, record }) {
   );
 }
 
-/* ===== 결제 요약 모달 (내용 셀의 "납부예정/미납/전체완납" 클릭) =====
-   ✅ 리스트 없이 이번달 납부예정 / 전체 미납 누적액 / 납부완료 처리금액,
-      3개 금액만 보여줍니다. (건물별 1~12월 체크그리드를 기준으로 계산) */
-function PaymentSummaryModal({ open, onClose, record }) {
-  const [buildings, setBuildings] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || !record) return;
-    setLoading(true);
-    (async () => {
-      try {
-        const snap = await getDocs(
-          collection(db, "paymentPayees", record.payeeId, "buildings")
-        );
-        // ✅ 금액이 없거나 0원인 건물은 집계에서 제외합니다.
-        setBuildings(
-          snap.docs
-            .filter((d) => parseNumber(d.data().monthlyAmount) > 0)
-            .map((d) => ({
-              id: d.id,
-              buildingName: d.data().buildingName || "",
-              monthlyAmount: parseNumber(d.data().monthlyAmount),
-              startYearMonth: d.data().startYearMonth || "",
-              paidMonths: d.data().paidMonths || {},
-            }))
-        );
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [open, record]);
-
-  const yearMonth = record?.yearMonth || nowYm();
-
-  const summary = useMemo(() => {
-    let scheduledThisMonth = 0;
-    let overdueTotal = 0;
-    let paidAmount = 0;
-    buildings.forEach((b) => {
-      const grid = buildBuildingMonthGrid(b, yearMonth);
-      if (grid.currentApplicable) {
-        if (grid.currentChecked) {
-          paidAmount += b.monthlyAmount;
-        } else {
-          scheduledThisMonth += b.monthlyAmount;
-        }
-      }
-      overdueTotal += grid.overdueCount * b.monthlyAmount;
-    });
-    return { scheduledThisMonth, overdueTotal, paidAmount };
-  }, [buildings, yearMonth]);
-
-  return (
-    <SimpleModal
-      open={open}
-      title={`결제 요약 - ${record?.name || ""}`}
-      onClose={onClose}
-      size="sm"
-      hideCloseButton
-      headerActions={
-        <button
-          type="button"
-          className="pmt-btn pmt-btn-ghost pmt-btn-sm"
-          onClick={onClose}
-        >
-          닫기
-        </button>
-      }
-    >
-      {loading ? (
-        <div className="pmt-cat-empty">불러오는 중...</div>
-      ) : (
-        <div className="pmt-bstatus-summary pmt-bstatus-summary--stack">
-          <div className="pmt-bstatus-summary-item">
-            <span className="pmt-bstatus-summary-label">이번달 납부예정</span>
-            <span className="pmt-bstatus-summary-value is-scheduled">
-              {fmtWon(summary.scheduledThisMonth)}
-            </span>
-          </div>
-          <div className="pmt-bstatus-summary-item">
-            <span className="pmt-bstatus-summary-label">전체 미납 누적액</span>
-            <span className="pmt-bstatus-summary-value is-overdue">
-              {fmtWon(summary.overdueTotal)}
-            </span>
-          </div>
-          <div className="pmt-bstatus-summary-item">
-            <span className="pmt-bstatus-summary-label">납부완료 처리금액</span>
-            <span className="pmt-bstatus-summary-value is-paid">
-              {fmtWon(summary.paidAmount)}
-            </span>
-          </div>
-        </div>
-      )}
-    </SimpleModal>
-  );
-}
-
 /* ===== 메인 페이지 ===== */
 export default function PaymentSettlementPage() {
   const [payType, setPayType] = useState(getDefaultPayType); // '10일' | '말일' (날짜 기준 자동 선택)
@@ -1454,9 +1365,17 @@ export default function PaymentSettlementPage() {
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [payeeModalOpen, setPayeeModalOpen] = useState(false);
   const [buildingListRecord, setBuildingListRecord] = useState(null);
-  const [summaryRecord, setSummaryRecord] = useState(null);
 
-  const generatingRef = useRef(false);
+  /* ✅ [수정] 예전에는 generatingRef가 boolean 하나였습니다. 즉 "어떤 달이든
+     하나라도" 자동 생성/동기화가 진행 중이면, 그 사이에 다른 달로 이동해서
+     생성이 필요해져도 전부 막혀버렸습니다(같은 변수 하나를 모든 달이
+     공유했기 때문). 이게 바로 "업체가 뜨다 안 뜨다, 뒤죽박죽으로 보이는"
+     원인이었습니다 — 여러 달을 빠르게 넘나들며 확인하면, 먼저 시작된
+     달의 작업이 끝나기 전까지 나중 달의 생성 요청이 통째로 무시됐던
+     것입니다. 이제는 "결제구분_달" 조합별로 별도 키를 두는 Set으로
+     바꿔서, 같은 달에 대한 중복 작업만 막고 서로 다른 달의 작업은
+     독립적으로 진행되도록 했습니다. */
+  const generatingKeysRef = useRef(new Set());
 
   /* 🔁 구분(카테고리) 구독 + 없으면 기본값 자동 생성 */
   useEffect(() => {
@@ -1505,34 +1424,43 @@ export default function PaymentSettlementPage() {
   }, [payType, yearMonth]);
 
   /* 🔁 A. 템플릿에는 있는데 이번 달 기록이 없는 대상 → 자동 생성
-     🔁 B. 아직 확정되지 않은(=완료 처리 안 한) 이번 달/다음 달의 건물계약
-        기록은, 지급 대상 관리에서 건물 목록이 바뀌면 최신 내용으로
-        다시 맞춰줍니다. (이미 지난 달 · 이미 완료 처리한 달은 과거 기록
-        보호를 위해 건드리지 않습니다)
+     🔁 B. 아직 확정되지 않은(=완료 처리 안 한) 달의 건물계약 기록은,
+        지급 대상 관리에서 건물 목록/구성이 바뀌면 최신 내용으로 다시
+        맞춰줍니다.
+        ✅ [수정] 예전에는 "오늘(nowYm) 이전 달"이면 무조건 동기화를
+        건너뛰어서, 지급 대상 관리에서 건물을 추가/수정/삭제해도 이미
+        지나간 달(예: 오늘이 8월이면 1~7월)에는 반영되지 않아 달마다
+        표시가 다르게 나오는 원인이었습니다. 기준을
+        "2026-01(DEFAULT_START_YM) 이전이면 보호"로 바꿔서, 2026년 1월
+        이후 달은 (이미 납부완료 처리된 달만 제외하고) 언제 조회하든
+        항상 최신 건물 구성을 반영하도록 했습니다. 2025-12 이전 달은
+        그대로 보호되어 손대지 않습니다. 또한 "건물별 계약"을 켰다/껐다
+        하는 방향 전환도 함께 반영되도록 조건을 넓혔습니다.
      ℹ️ 이름/은행/계좌/구분은 더 이상 기록(record)에 동기화해서 쓰지
         않습니다. 대신 화면에 표시할 때 항상 "지급 대상 관리"에 저장된
         최신 값을 바로 조회해서 보여주므로(getPayeeDisplay), 별도의
         Firestore 쓰기 없이도 몇 월을 보든 항상 최신 정보가 보입니다. */
   useEffect(() => {
     if (!payees.length) return;
-    if (generatingRef.current) return;
+    const genKey = `${payType}_${yearMonth}`;
+    if (generatingKeysRef.current.has(genKey)) return; // 같은 달의 작업만 중복 방지
 
     const activePayees = payees.filter((p) => p.active !== false);
     const recordMap = new Map(records.map((r) => [r.payeeId, r]));
     const missing = activePayees.filter((p) => !recordMap.has(p.id));
     const needsSync = activePayees.filter((p) => {
       if (payType !== "말일") return false;
-      if (!p.hasBuildings) return false;
       const rec = recordMap.get(p.id);
       if (!rec) return false; // missing 쪽에서 새로 생성됨
       if (rec.paid) return false; // 이미 완료 처리된 달은 건드리지 않음
-      if (yearMonth < nowYm()) return false; // 이미 지난 달(연체 이력)은 보호
+      if (yearMonth < DEFAULT_START_YM) return false; // 2026-01 이전 달은 동기화 대상 아님
+      if (!p.hasBuildings && !rec.hasBuildings) return false; // 둘 다 단순금액이면 동기화 불필요
       return true;
     });
 
     if (!missing.length && !needsSync.length) return;
 
-    generatingRef.current = true;
+    generatingKeysRef.current.add(genKey);
     (async () => {
       const prevYearMonth = shiftYm(yearMonth, -1);
 
@@ -1550,8 +1478,10 @@ export default function PaymentSettlementPage() {
           .filter((d) => d.data().active !== false)
           .filter((d) => parseNumber(d.data().monthlyAmount) > 0) // ✅ 0원/금액없음 건물 제외
           .filter((d) => {
-            const startYm = s(d.data().startYearMonth);
-            return !startYm || startYm <= yearMonth;
+            // ✅ startYearMonth가 비어 있으면 buildBuildingMonthGrid와 동일하게
+            // DEFAULT_START_YM(2026-01) 기준으로 판단합니다. (일관성 유지)
+            const startYm = s(d.data().startYearMonth) || DEFAULT_START_YM;
+            return startYm <= yearMonth;
           })
           .map((d) => {
             const bd = d.data();
@@ -1659,6 +1589,20 @@ export default function PaymentSettlementPage() {
       for (const payee of needsSync) {
         try {
           const rec = recordMap.get(payee.id);
+
+          /* ✅ [추가] "건물별 계약 관리"를 껐을 경우: 기록도 건물계약
+             정보를 지우고 단순 금액 지급 기록으로 맞춰줍니다. */
+          if (!payee.hasBuildings) {
+            if (!rec.hasBuildings) continue; // 이미 단순 금액이면 할 일 없음
+            await updateDoc(doc(db, "paymentRecords", rec.id), {
+              hasBuildings: false,
+              buildingStatus: deleteField(),
+              amount: parseNumber(payee.defaultAmount),
+              updatedAt: serverTimestamp(),
+            });
+            continue;
+          }
+
           const prevId = `말일_${prevYearMonth}_${payee.id}`;
           const prevSnap = await getDoc(doc(db, "paymentRecords", prevId));
           const prevBuildingStatus = prevSnap.exists()
@@ -1671,6 +1615,7 @@ export default function PaymentSettlementPage() {
           );
 
           const isSame =
+            rec.hasBuildings === true &&
             JSON.stringify(buildingStatus) === JSON.stringify(rec.buildingStatus || []);
           if (isSame) continue;
 
@@ -1682,6 +1627,7 @@ export default function PaymentSettlementPage() {
           // ✅ "납부상태"(paid)는 대금결제관리 표의 드롭다운으로 직접 바꾸기
           //    전까지 자동으로 바뀌면 안 되므로, 여기서는 건드리지 않습니다.
           await updateDoc(doc(db, "paymentRecords", rec.id), {
+            hasBuildings: true,
             buildingStatus,
             amount: newAmount,
             updatedAt: serverTimestamp(),
@@ -1691,7 +1637,7 @@ export default function PaymentSettlementPage() {
         }
       }
 
-      generatingRef.current = false;
+      generatingKeysRef.current.delete(genKey);
     })();
   }, [payees, records, payType, yearMonth]);
 
@@ -2476,13 +2422,34 @@ export default function PaymentSettlementPage() {
         {/* ===== 말일 화면 ===== */}
         {payType === "말일" && (
           <>
-            <div className="pmt-table-wrap">
+            {/* ✅ [이동+고정] "이번 달 총액/지급완료 금액/미지급 건수" 박스를
+                표 위쪽으로 옮기고, 표를 내부 스크롤(아래 pmt-table-wrap--scroll)
+                되도록 만들어 박스가 스크롤 범위 밖에 있게 했습니다. 표 안에서
+                아무리 아래로 스크롤해도 이 박스는 그 스크롤 영역 바깥에 있으므로
+                움직이지 않습니다. 혹시 페이지 자체가 길어져 화면 스크롤이 되는
+                경우까지 대비해 sticky도 함께 걸어 이중으로 고정했습니다. */}
+            <div className="pmt-summary-cards pmt-summary-cards--sticky">
+              <div className="pmt-summary-card pmt-summary-card--accent">
+                <div className="pmt-summary-label">이번 달 총액</div>
+                <div className="pmt-summary-value">{fmtWon(summary30.total)}</div>
+              </div>
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">지급완료 금액</div>
+                <div className="pmt-summary-value">{fmtWon(summary30.paidTotal)}</div>
+              </div>
+              <div className="pmt-summary-card">
+                <div className="pmt-summary-label">미지급 건수</div>
+                <div className="pmt-summary-value">{summary30.unpaidCount}건</div>
+              </div>
+            </div>
+
+            <div className="pmt-table-wrap pmt-table-wrap--scroll">
               <table className="pmt-table">
                 <thead>
                   <tr>
                     <th style={{ width: 100 }}>구분</th>
                     <th style={{ width: 150 }}>업체</th>
-                    <th style={{ width: 300 }}>내용</th>
+                    <th style={{ width: 360 }}>내용</th>
                     <th style={{ width: 90 }}>은행</th>
                     <th style={{ width: 170 }}>계좌</th>
                     <th style={{ width: 120 }}>금액</th>
@@ -2504,29 +2471,12 @@ export default function PaymentSettlementPage() {
                     const disp = getPayeeDisplay(row);
                     const isExcluded = !!row.excluded;
                     // ✅ "내용" 열은 [미납 부분] + [납부예정/납부완료 부분] 두 파트를
-                    //    함께 보여줍니다. "금액" 열은 뒤쪽(cycle) 파트의 금액과
-                    //    항상 일치합니다.
+                    //    줄바꿈된 배지 2개로 나눠서 보여줍니다. "금액" 열은
+                    //    뒤쪽(cycle) 파트의 금액과 항상 일치합니다.
                     const unpaid = getRowUnpaidInfo(row);
                     const cycle = getRowCycleInfo(row);
-
-                    let contentLabel = null;
-                    let contentClass = "";
-                    if (row.hasBuildings) {
-                      if (unpaid.count === 0 && cycle.count === 0) {
-                        contentLabel = "전체 완납";
-                      } else {
-                        const unpaidPart =
-                          unpaid.count > 0
-                            ? `${unpaid.count}건 ${fmtComma(unpaid.amount)}원 미납`
-                            : "미납없음";
-                        const cyclePart = row.paid
-                          ? `${cycle.count}건 ${fmtComma(cycle.amount)}원 납부완료`
-                          : `${cycle.count}건 ${fmtComma(cycle.amount)}원 납부예정`;
-                        contentLabel = `${unpaidPart} ${cyclePart}`;
-                        contentClass =
-                          unpaid.count > 0 ? "has-unpaid" : row.paid ? "is-done" : "is-scheduled";
-                      }
-                    }
+                    const isAllPaid =
+                      row.hasBuildings && unpaid.count === 0 && cycle.count === 0;
 
                     return (
                       <tr
@@ -2544,7 +2494,7 @@ export default function PaymentSettlementPage() {
                             row.hasBuildings ? "pmt-td-clickable" : ""
                           }`}
                           onClick={() => row.hasBuildings && setBuildingListRecord(row)}
-                          title={row.hasBuildings ? "건물별 목록 보기" : undefined}
+                          title={row.hasBuildings ? "건물별 지급현황 보기" : undefined}
                         >
                           {disp.name}
                         </td>
@@ -2552,10 +2502,38 @@ export default function PaymentSettlementPage() {
                           {row.hasBuildings ? (
                             <button
                               type="button"
-                              className={`pmt-unpaid-btn ${contentClass}`}
-                              onClick={() => setSummaryRecord(row)}
+                              className="pmt-unpaid-btn"
+                              onClick={() => setBuildingListRecord(row)}
+                              title="건물별 지급현황 보기"
                             >
-                              {contentLabel}
+                              {isAllPaid ? (
+                                <span className="pmt-content-line pmt-content-line--allpaid">
+                                  ✅ 전체 완납
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="pmt-content-line pmt-content-line--unpaid">
+                                    {unpaid.count > 0
+                                      ? `🔴 미납 ${unpaid.count}건 · ${fmtComma(
+                                          unpaid.amount
+                                        )}원`
+                                      : "미납없음"}
+                                  </span>
+                                  <span
+                                    className={`pmt-content-line pmt-content-line--cycle ${
+                                      row.paid ? "is-done" : "is-scheduled"
+                                    }`}
+                                  >
+                                    {row.paid
+                                      ? `🟢 납부완료 ${cycle.count}건 · ${fmtComma(
+                                          cycle.amount
+                                        )}원`
+                                      : `🔵 납부예정 ${cycle.count}건 · ${fmtComma(
+                                          cycle.amount
+                                        )}원`}
+                                  </span>
+                                </>
+                              )}
                             </button>
                           ) : (
                             <span className="pmt-td-muted">-</span>
@@ -2628,21 +2606,6 @@ export default function PaymentSettlementPage() {
                 </tbody>
               </table>
             </div>
-
-            <div className="pmt-summary-cards">
-              <div className="pmt-summary-card pmt-summary-card--accent">
-                <div className="pmt-summary-label">이번 달 총액</div>
-                <div className="pmt-summary-value">{fmtWon(summary30.total)}</div>
-              </div>
-              <div className="pmt-summary-card">
-                <div className="pmt-summary-label">지급완료 금액</div>
-                <div className="pmt-summary-value">{fmtWon(summary30.paidTotal)}</div>
-              </div>
-              <div className="pmt-summary-card">
-                <div className="pmt-summary-label">미지급 건수</div>
-                <div className="pmt-summary-value">{summary30.unpaidCount}건</div>
-              </div>
-            </div>
           </>
         )}
       </div>
@@ -2663,11 +2626,6 @@ export default function PaymentSettlementPage() {
         open={!!buildingListRecord}
         onClose={() => setBuildingListRecord(null)}
         record={buildingListRecord}
-      />
-      <PaymentSummaryModal
-        open={!!summaryRecord}
-        onClose={() => setSummaryRecord(null)}
-        record={summaryRecord}
       />
     </div>
   );
