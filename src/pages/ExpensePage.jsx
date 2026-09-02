@@ -169,7 +169,7 @@ function getMonthMatrix(year, month) {
   const startWeekday = first.getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevDays = startWeekday;
-  const totalCells = Math.ceil((prevDays + daysInMonth) / 7) * 7;
+  const totalCells = 42; // ✅ 달 이동 시 높이가 변하지 않도록 항상 6주 고정
   const cells = [];
   for (let i = 0; i < totalCells; i++) {
     const dayNum = i - prevDays + 1;
@@ -179,11 +179,30 @@ function getMonthMatrix(year, month) {
   }
   return cells;
 }
-function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜 선택" }) {
+function CalendarPopover({ open, defaultDate, onPick, onClose, titleText = "날짜 선택" }) {
   const base = defaultDate ? ymdToDate(defaultDate) : new Date();
   const [view, setView] = useState({ y: base.getFullYear(), m: base.getMonth() });
+  const popoverRef = useRef(null);
   const cells = useMemo(() => getMonthMatrix(view.y, view.m), [view]);
   const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+
+  useEffect(() => {
+    if (!open) return;
+    const nextBase = defaultDate ? ymdToDate(defaultDate) : new Date();
+    setView({ y: nextBase.getFullYear(), m: nextBase.getMonth() });
+  }, [open, defaultDate]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (popoverRef.current?.contains(e.target)) return;
+      if (e.target.closest?.(".xp-side-date")) return;
+      onClose?.();
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, onClose]);
+
   const go = (delta) =>
     setView((v) => {
       const m = v.m + delta;
@@ -192,13 +211,24 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
       return { y, m: nm };
     });
 
+  if (!open) return null;
+
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={titleText}
-      width={380}
+    <div
+      ref={popoverRef}
+      className="xp-calendar-popover"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-label={titleText}
     >
+      <div className="xp-calendar-popover-head">
+        <div className="xp-calendar-popover-title">
+          <i className="ri-calendar-2-line" />
+          <span>{titleText}</span>
+        </div>
+      </div>
+
       <div className="cal-wrap">
         <div className="cal-top">
           <button className="cal-nav" onClick={() => go(-1)} title="이전 달">
@@ -222,10 +252,11 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
         <div className="cal-grid">
           {cells.map((c, idx) => {
             const isToday = toYMD(c.date) === toYMD(new Date());
+            const isSelected = toYMD(c.date) === defaultDate;
             return (
               <button
                 key={idx}
-                className={`cal-cell ${c.inMonth ? "" : "muted"} ${isToday ? "today" : ""}`}
+                className={`cal-cell ${c.inMonth ? "" : "muted"} ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
                 onClick={() => {
                   onPick?.(toYMD(c.date));
                   onClose?.();
@@ -238,10 +269,9 @@ function CalendarModal({ open, defaultDate, onPick, onClose, titleText = "날짜
           })}
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }
-
 
 /** ====== 간단 콤보/검색 콤보/출금확인 콤보 ====== */
 const SimpleCombo = forwardRef(function SimpleCombo(
@@ -713,6 +743,15 @@ export default function ExpensePage() {
   /* ✅ [추가] 카드지출 팝업 상태 */
   const [cardModalOpen, setCardModalOpen] = useState(false);
 
+  /* ✅ [추가] 일 지출 내역(월간 큰 달력) 모달 상태 */
+  const [dailySummaryOpen, setDailySummaryOpen] = useState(false);
+  const [summaryViewMonth, setSummaryViewMonth] = useState(() => {
+    const base = ymdToDate(todayYMD());
+    return { y: base.getFullYear(), m: base.getMonth() };
+  });
+  const [summaryDaysMap, setSummaryDaysMap] = useState({});
+  const [dsumLoading, setDsumLoading] = useState(false);
+
   // ✅ 검색 관련 상태
   const [searchQ, setSearchQ] = useState("");
   const [searching, setSearching] = useState(false);
@@ -842,6 +881,92 @@ export default function ExpensePage() {
       totalSum: totalPending + totalDone,
     };
   }, [rows]);
+
+  /** ▼▼▼ 일 지출 내역 · 월간 큰 달력(날짜별 출금계좌 합계 + 일 합계) ▼▼▼ */
+  const openDailySummary = () => {
+    const base = ymdToDate(date);
+    setSummaryViewMonth({ y: base.getFullYear(), m: base.getMonth() });
+    setDailySummaryOpen(true);
+  };
+
+  const goSummaryMonth = (delta) => {
+    setSummaryViewMonth((v) => {
+      const m = v.m + delta;
+      const y = v.y + Math.floor(m / 12);
+      const nm = ((m % 12) + 12) % 12;
+      return { y, m: nm };
+    });
+  };
+
+  useEffect(() => {
+    if (!dailySummaryOpen) return;
+    let cancelled = false;
+    (async () => {
+      setDsumLoading(true);
+      try {
+        const mk = `${summaryViewMonth.y}-${pad2(summaryViewMonth.m + 1)}`;
+        const { days } = await readMonthJSON(mk);
+        if (!cancelled) setSummaryDaysMap(days || {});
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setSummaryDaysMap({});
+      } finally {
+        if (!cancelled) setDsumLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [dailySummaryOpen, summaryViewMonth]);
+
+  const summaryCells = useMemo(() => {
+    const cells = getMonthMatrix(summaryViewMonth.y, summaryViewMonth.m);
+    const todayStr = todayYMD();
+    return cells.map((c) => {
+      const ymd = toYMD(c.date);
+      let pack = summaryDaysMap[ymd];
+
+      // 현재 화면에 열려 있는 날짜는 아직 자동저장 전 최신 입력값으로 덮어써서 정확히 표시
+      if (ymd === date) {
+        const liveValid = rows
+          .map((r) => ({ ...r, amount: toNumber(r.amount) }))
+          .filter(
+            (r) =>
+              r.mainId || r.mainName || r.subName || r.desc || r.amount ||
+              r.inAccount || r.outMethod || r.paid || r.note
+          )
+          .map(normalizeRow)
+          .filter(isValidForSave);
+        pack = { rows: liveValid, total: liveValid.reduce((acc, r) => acc + toNumber(r.amount), 0) };
+      }
+
+      const accMap = new Map();
+      let dayTotal = 0;
+      (pack?.rows || []).forEach((r) => {
+        const acc = s(r.outMethod);
+        const amt = toNumber(r.amount);
+        if (!acc || !amt) return;
+        accMap.set(acc, (accMap.get(acc) || 0) + amt);
+        dayTotal += amt;
+      });
+
+      const accounts = Array.from(accMap.entries())
+        .map(([account, amount]) => ({ account, amount }))
+        .sort((a, b) => b.amount - a.amount);
+
+      return {
+        ymd,
+        date: c.date,
+        inMonth: c.inMonth,
+        isToday: ymd === todayStr,
+        accounts,
+        total: dayTotal || toNumber(pack?.total || 0),
+      };
+    });
+  }, [summaryViewMonth, summaryDaysMap, date, rows]);
+
+  const summaryMonthTotal = useMemo(
+    () => summaryCells.filter((c) => c.inMonth).reduce((acc, c) => acc + c.total, 0),
+    [summaryCells]
+  );
 
   const persistLocal = (nextDate, nextRows) => {
     try {
@@ -1285,7 +1410,7 @@ export default function ExpensePage() {
 
           {/* 5) 캡쳐 */}
           <button
-            className="xp-btn"
+            className="xp-btn xp-capture"
             onClick={onCapturePage}
             title="현재 페이지 캡쳐/저장"
             style={{
@@ -1294,19 +1419,6 @@ export default function ExpensePage() {
             }}
           >
             <i className="ri-camera-3-line" /> 캡쳐
-          </button>
-
-          {/* 6) 오늘 */}
-          <button
-            className="xp-btn"
-            onClick={onClickTodayQuick}
-            title="오늘로 이동"
-            style={{
-              height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
-              background: "linear-gradient(135deg,#22c55e 0%,#16a34a 100%)",
-            }}
-          >
-            <i className="ri-calendar-event-line" /> 오늘
           </button>
 
           {/* 7) 삭제 */}
@@ -1354,40 +1466,45 @@ export default function ExpensePage() {
             ))}
           </select>
 
-          {/* ✅ [추가] 카드지출 버튼 — 검색창과 날짜 패널 사이 */}
+          {/* ✅ [추가] 카드지출 버튼 — 우측 끝 그룹(카드지출·오늘·지출일자·합계)의 시작점 */}
           <button
-            className="xp-btn"
+            className="xp-btn xp-card"
             onClick={() => setCardModalOpen(true)}
             title="카드지출"
             style={{
               height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
               background: "linear-gradient(135deg,#6C8CF5 0%,#4F73EA 100%)",
-              marginLeft: 40,
+              marginLeft: "auto",
               marginRight: 8
             }}
           >
             <i className="ri-bank-card-line" /> 카드지출
           </button>
 
-          {/* 9) 지출일자/합계 패널 — 더 크게 + 오른쪽 정렬 고정 */}
+          {/* 6) 오늘 — 지출일자 선택 패널 왼쪽에 밀착 */}
+          <button
+            className="xp-btn xp-today"
+            onClick={onClickTodayQuick}
+            title="오늘로 이동"
+            style={{
+              height: 34, padding: "0 12px", borderRadius: 12, gap: 8, fontSize: 13,
+              background: "linear-gradient(135deg,#22c55e 0%,#16a34a 100%)",
+            }}
+          >
+            <i className="ri-calendar-event-line" /> 오늘
+          </button>
+
+          {/* 9) 지출일자/합계 패널 — 우측 끝 고정, 두 패널 사이 여백 유지 (스케일은 두 패널을 하나로 묶어 우측 기준으로 적용) */}
           <div
             className="xp-side fancy-panel narrow mini"
-            role="button"
-            title="날짜 선택"
-            onClick={() => setDateModalOpen(true)}
-            style={{
-              width: 560,
-              padding: 10,
-              gap: 10,
-              marginLeft: "auto",
-              marginRight: 0,
-            }}
+            style={{ gap: 10, transform: "scale(0.92)", transformOrigin: "right center" }}
           >
             <div
               className="xp-side-row xp-side-date"
+              role="button"
+              title="지출일자 선택"
+              onClick={() => setDateModalOpen(true)}
               style={{
-                transform: "scale(0.92)",
-                transformOrigin: "right center",
                 padding: "4px 10px",
                 minWidth: 220
               }}
@@ -1410,13 +1527,22 @@ export default function ExpensePage() {
                 </div>
                 <span className="xp-weekday">{getWeekdayLabel(date)}</span>
               </div>
+
+              <CalendarPopover
+                open={dateModalOpen}
+                defaultDate={date}
+                titleText="지출일자 선택"
+                onPick={(ymd) => switchDate(ymd)}
+                onClose={() => setDateModalOpen(false)}
+              />
             </div>
 
             <div
               className="xp-side-row xp-side-sum"
+              role="button"
+              title="일 지출 내역 보기"
+              onClick={openDailySummary}
               style={{
-                transform: "scale(0.92)",
-                transformOrigin: "right center",
                 padding: "8px 12px",
                 minWidth: 220
               }}
@@ -1541,6 +1667,72 @@ export default function ExpensePage() {
         }} />
       </Modal>
 
+      {/* 일 지출 내역 모달 — 큰 달력에 날짜별 출금계좌 합계 + 일 합계 표시 */}
+      <Modal
+        open={dailySummaryOpen}
+        onClose={() => setDailySummaryOpen(false)}
+        title="일 지출 내역"
+        width={1040}
+        className="xp-dsum-modal"
+      >
+        <div className="xp-dsum-toolbar">
+          <button className="xp-dsum-nav" onClick={() => goSummaryMonth(-1)} title="이전 달">
+            <i className="ri-arrow-left-s-line" />
+          </button>
+          <div className="xp-dsum-title">
+            <span className="xp-dsum-year">{summaryViewMonth.y}년</span>
+            <span className="xp-dsum-month">{summaryViewMonth.m + 1}월</span>
+          </div>
+          <button className="xp-dsum-nav" onClick={() => goSummaryMonth(1)} title="다음 달">
+            <i className="ri-arrow-right-s-line" />
+          </button>
+          <div className="xp-dsum-month-total">
+            월 합계&nbsp;<span>₩{fmtComma(summaryMonthTotal)}</span>
+          </div>
+        </div>
+
+        <div className="xp-dsum-head">
+          {["일", "월", "화", "수", "목", "금", "토"].map((w) => (
+            <div key={w} className="xp-dsum-head-cell">{w}</div>
+          ))}
+        </div>
+
+        {dsumLoading ? (
+          <div className="xp-dsum-loading">
+            <i className="ri-loader-4-line xp-spin" /> 불러오는 중...
+          </div>
+        ) : (
+          <div className="xp-dsum-grid">
+            {summaryCells.map((c, idx) => (
+              <div
+                key={idx}
+                className={`xp-dsum-cell ${c.inMonth ? "" : "muted"} ${c.isToday ? "today" : ""}`}
+              >
+                <div className="xp-dsum-daynum">{c.date.getDate()}</div>
+                {c.accounts.length > 0 ? (
+                  <div className="xp-dsum-accounts">
+                    {c.accounts.slice(0, 4).map((a) => (
+                      <div key={a.account} className="xp-dsum-acc-row">
+                        <span className="xp-dsum-acc-name" title={a.account}>{a.account}</span>
+                        <span className="xp-dsum-acc-amt">{fmtComma(a.amount)}</span>
+                      </div>
+                    ))}
+                    {c.accounts.length > 4 && (
+                      <div className="xp-dsum-acc-more">+{c.accounts.length - 4}개</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="xp-dsum-empty" />
+                )}
+                {c.total > 0 && (
+                  <div className="xp-dsum-daytotal">₩{fmtComma(c.total)}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+
       {/* 메인 테이블 */}
       <div className="xp-table-wrap scrollable" ref={tableWrapRef}>
         <table className="xp-table">
@@ -1581,15 +1773,6 @@ export default function ExpensePage() {
           </tbody>
         </table>
       </div>
-
-      {/* 달력 모달 */}
-      <CalendarModal
-        open={dateModalOpen}
-        defaultDate={date}
-        titleText="지출일자 선택"
-        onPick={(ymd) => switchDate(ymd)}
-        onClose={() => setDateModalOpen(false)}
-      />
 
       {/* 출금보류 모달 */}
       <Modal

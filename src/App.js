@@ -29,6 +29,8 @@ import WaterPage from "./pages/WaterPage";
 import PublicElectricPage from "./pages/PublicElectricPage";
 import CleaningPage from "./pages/CleaningPage";
 import CctvPage from "./pages/CctvPage";
+/* 서비스비용 관리 */
+import ServiceCostPage from "./pages/ServiceCostPage";
 import VendorRegisterPage from "./pages/VendorRegisterPage";
 import EmployeePage from "./pages/EmployeePage";
 
@@ -1051,6 +1053,27 @@ function AppRoutes({
             />
           ) : (
             <CctvPage />
+          )
+        }
+      />
+
+            {/* =====================================================
+          서비스비용 관리
+          ===================================================== */}
+      <Route
+        path="/service-cost"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
+              replace
+            />
+          ) : (
+            <ServiceCostPage />
           )
         }
       />

@@ -1,556 +1,1027 @@
 /* src/pages/AnnualSheetPage.css */
 
-/* ✅ 전역 영향 차단: 변수/리셋을 annual-sheet 스코프로 한정 */
-.annual-sheet{
-  --bg: #f5f3ff;
-  --card: #ffffff;
-  --border: #e9e4ff;
-  --ink: #2f2a49;
-  --muted: #7e76ad;
-  --brand: #6a58ff;
-  --brand2: #a68bff;
-  --good: #17a06a;
-  --bad: #e04e4e;
-  --shadow: 0 14px 36px rgba(106,88,255,.12), 0 2px 10px rgba(0,0,0,.05);
+/* =========================================================
+   연간시트 - 미납관리 페이지 톤을 기준으로 한 시각 리뉴얼
+   기능/데이터 로직에는 영향이 없도록 annual-sheet 스코프 내부만 사용
+========================================================= */
 
-  --grad-1: linear-gradient(135deg,#7b5cff 0%,#5fd4ff 50%,#7bffbe 100%);
-  --grad-2: linear-gradient(135deg,#ff8ad6 0%,#8aa3ff 50%,#7efff2 100%);
-  --grad-3: linear-gradient(135deg,#ffd36e 0%,#ff7ea8 50%,#8a7bff 100%);
-  --glass: rgba(255,255,255,.35);
+.annual-sheet {
+  --as-bg: #f6f8fb;
+  --as-card: #ffffff;
+  --as-border: #e3e8ef;
+  --as-border-soft: #edf1f5;
+  --as-ink: #172033;
+  --as-text: #374154;
+  --as-muted: #7d8798;
+  --as-muted-2: #9aa3b2;
+  --as-orange: #f97316;
+  --as-orange-soft: #fff2e8;
+  --as-orange-border: #ffd9bd;
+  --as-blue: #2563eb;
+  --as-blue-soft: #edf4ff;
+  --as-green: #168443;
+  --as-green-soft: #edf9f1;
+  --as-red: #d94835;
+  --as-red-soft: #fff0ef;
+  --as-amber: #d58c05;
+  --as-amber-soft: #fff7df;
+  --as-violet: #6155d9;
+  --as-violet-soft: #f1efff;
+  --as-shadow: 0 5px 20px rgba(15, 23, 42, 0.045);
+  --as-shadow-hover: 0 10px 26px rgba(15, 23, 42, 0.08);
+  --as-header-height: 112px;
 
-  --ctrl-col-gap: 4px;
-  --ctrl-title-row-gap: 10px;
-  --ctrl-block-gap: 2px;
-
-  background: var(--bg);
-  color: var(--ink);
+  width: 100%;
+  min-width: 1080px;
+  min-height: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #f8fafc 0%, var(--as-bg) 100%);
+  color: var(--as-ink);
 }
 
-.annual-sheet *{ box-sizing: border-box; }
-
-.as-wrap{
-  padding: 18px;
-  display:flex;
-  flex-direction:column;
-  gap:18px;
+.annual-sheet *,
+.annual-sheet *::before,
+.annual-sheet *::after {
+  box-sizing: border-box;
 }
 
-/* ===== Header ===== */
-.as-header{
-  background: var(--card);
-  border:1px solid var(--border);
-  border-radius:18px;
-  box-shadow:var(--shadow);
-  padding:16px 18px;
+/*
+ * ✅ 위쪽 여백(padding-top)을 여기가 아니라 as-sticky-shell 안에
+ * 둡니다. 이 여백이 고정 영역 바깥(as-wrap)에 있으면, 스크롤해서
+ * 고정 영역이 화면 맨 위에 붙는 순간 이 여백 부분만 고정되지 않은
+ * 채로 남아, 그 자리로 스크롤되는 내용이 올라와 보이는 원인이
+ * 됩니다. 여백을 고정 영역 안쪽으로 옮기면 여백까지 통째로
+ * 함께 고정되어 그 위로는 어떤 내용도 보이지 않습니다.
+ */
+.as-wrap {
+  padding: 0 26px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* =========================================================
+   상단 헤더
+========================================================= */
+
+.as-header {
+  min-height: var(--as-header-height);
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(630px, 1.65fr) auto;
+  align-items: center;
+  gap: 18px;
+
+  background: #ffffff;
+  border: 1px solid var(--as-border);
+  border-radius: 16px;
+  box-shadow: var(--as-shadow);
+}
+
+/*
+ * ✅ 헤더 + 공통 월 헤더(as-month-ruler)를 함께 감싸서 하나로만
+ * 고정합니다. 두 영역을 각각 따로 position: sticky로 고정하면
+ * (헤더 높이를 계산해 월 헤더 위치를 맞추는 식) 계산이 실제 렌더링
+ * 높이와 미세하게라도 어긋나는 순간 그 틈으로 스크롤되는 표 내용이
+ * 지나가 보였습니다. 부모 하나만 고정하고 헤더/월 헤더는 그 안에서
+ * 그냥 위아래로 쌓이도록 하면 그런 틈 자체가 생길 수 없습니다.
+ * 배경도 완전히 불투명하게 채워서, 헤더와 월 헤더 사이 여백까지도
+ * 뒤쪽 내용이 비치지 않도록 했습니다.
+ */
+.as-sticky-shell {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  padding-top: 22px;
+  padding-bottom: 2px;
+  background: var(--as-bg);
+}
+
+.as-title-group {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.as-title-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #fff1e8, #ffe2ce);
+  color: var(--as-orange);
+  font-size: 21px;
+  box-shadow: 0 7px 20px rgba(249, 115, 22, 0.12);
+}
+
+.as-title-copy {
+  min-width: 0;
+}
+
+.as-title-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.as-title-line h2 {
+  margin: 0;
+  color: #151c2b;
+  font-size: 24px;
+  font-weight: 850;
+  letter-spacing: -0.7px;
+}
+
+.as-year-pill {
+  height: 25px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--as-orange-border);
+  border-radius: 999px;
+  background: var(--as-orange-soft);
+  color: #d85f0d;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.2px;
+}
+
+.as-title-copy p {
+  margin: 5px 0 0;
+  color: var(--as-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* =========================================================
+   KPI
+========================================================= */
+
+.as-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(190px, 1fr));
+  gap: 9px;
+  min-width: 0;
+}
+
+.as-metric-card {
+  min-height: 76px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+
+  border: 1px solid var(--as-border);
+  border-radius: 13px;
+  background: #ffffff;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.03);
+}
+
+.as-metric-card .as-metric-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 17px;
+}
+
+.as-metric-card > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.as-metric-label {
+  color: var(--as-muted);
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.as-metric-card strong {
+  color: #243047;
+  font-size: clamp(15px, 1.1vw, 20px);
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.as-metric-card.is-income .as-metric-icon {
+  color: var(--as-green);
+  background: var(--as-green-soft);
+}
+
+.as-metric-card.is-income strong {
+  color: var(--as-green);
+}
+
+.as-metric-card.is-expense .as-metric-icon {
+  color: var(--as-red);
+  background: var(--as-red-soft);
+}
+
+.as-metric-card.is-expense strong {
+  color: var(--as-red);
+}
+
+.as-metric-card.is-net .as-metric-icon {
+  color: var(--as-blue);
+  background: var(--as-blue-soft);
+}
+
+.as-metric-card.is-net.is-positive strong {
+  color: var(--as-blue);
+}
+
+.as-metric-card.is-net.is-negative strong {
+  color: var(--as-red);
+}
+
+/* =========================================================
+   헤더 우측 도구
+========================================================= */
+
+.as-header-tools {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.as-jump-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.as-jump-btn {
+  height: 38px;
+  min-width: 64px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  border: 1px solid #dfe5ec;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #596579;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.as-jump-btn svg {
+  font-size: 15px;
+}
+
+.as-jump-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.07);
+}
+
+.as-jump-btn.is-income:hover {
+  color: var(--as-green);
+  border-color: #bfe3cb;
+  background: #f5fbf7;
+}
+
+.as-jump-btn.is-expense:hover {
+  color: var(--as-red);
+  border-color: #f0c9c5;
+  background: #fff7f6;
+}
+
+/* =========================================================
+   커스텀 드롭다운
+========================================================= */
+
+.as-custom-select {
   position: relative;
+  width: 118px;
+  flex: 0 0 118px;
+}
+
+.as-custom-select:last-child {
+  width: 132px;
+  flex-basis: 132px;
+}
+
+.as-select-label {
+  display: block;
+  margin: 0 0 5px 2px;
+  color: #8992a2;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.as-custom-select-trigger {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px 0 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  border: 1px solid #dce2ea;
+  border-radius: 9px;
+  outline: none;
+  background: linear-gradient(180deg, #ffffff, #fafbfc);
+  color: #293246;
+
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.as-custom-select-trigger svg {
+  color: #8a94a7;
+  font-size: 14px;
+  transition: transform 0.15s ease;
+}
+
+.as-custom-select.is-open .as-custom-select-trigger,
+.as-custom-select-trigger:hover,
+.as-custom-select-trigger:focus-visible {
+  border-color: #f4a36b;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.08);
+}
+
+.as-custom-select.is-open .as-custom-select-trigger svg {
+  transform: rotate(180deg);
+}
+
+.as-custom-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 160;
+
+  width: 100%;
+  max-height: 275px;
+  overflow-y: auto;
+  padding: 6px;
+
+  border: 1px solid #e4e8ee;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+
+  animation: asSelectIn 0.12s ease;
+}
+
+@keyframes asSelectIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.as-custom-select-option {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 9px;
+  margin: 1px 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #455065;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: left;
+  cursor: pointer;
+
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.as-custom-select-option:hover {
+  background: #f7f8fa;
+  color: #20293a;
+}
+
+.as-custom-select-option.is-selected {
+  background: var(--as-orange-soft);
+  color: #d85f0d;
+  border-color: var(--as-orange-border);
+  font-weight: 850;
+}
+
+.as-custom-select-option svg {
+  font-size: 14px;
+}
+
+.as-custom-select-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.as-custom-select-menu::-webkit-scrollbar-track {
+  background: #f4f6f8;
+  border-radius: 999px;
+}
+
+.as-custom-select-menu::-webkit-scrollbar-thumb {
+  background: #cbd1d9;
+  border-radius: 999px;
+  border: 2px solid #f4f6f8;
+}
+
+/* =========================================================
+   공통 월 컬럼 헤더
+   - 각 표에서 반복되던 합계/1~12월/평균 제목을 한 곳으로 통합
+========================================================= */
+
+/*
+ * 아래 각 표(as-table)의 컬럼과 정확히 일치하도록, 모든 트랙을
+ * %(퍼센트) 값으로만 구성합니다. as-table 쪽도 동일한 비율의
+ * % 폭을 사용해서, 화면 폭이 달라져도(=좌우 스크롤 없이 한 화면에
+ * 맞추더라도) 두 영역이 항상 같은 비율로 늘어나 열이 어긋나지
+ * 않습니다. (분류 7% + 구분 7% + 합계 7% + 1~12월 각 6% + 평균 7% = 100%)
+ */
+.as-month-ruler {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 7% 7% 7% repeat(12, 6%) 7%;
+
+  overflow: hidden;
+  border: 1px solid #dde3ea;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.07);
+}
+
+.as-month-ruler-label {
+  grid-column: span 2;
+  min-height: 47px;
+  padding: 7px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+
+  background: linear-gradient(180deg, #f7f8fa, #f2f4f7);
+  border-right: 1px solid #dfe4ea;
+}
+
+.as-month-ruler-label span {
+  color: #4f5a6e;
+  font-size: 11.5px;
+  font-weight: 850;
+}
+
+.as-month-ruler-label small {
+  color: #a0a8b5;
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.as-month-ruler-cell {
+  min-height: 47px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: linear-gradient(180deg, #fafbfc, #f5f7f9);
+  border-right: 1px solid #e4e8ed;
+  color: #5f697a;
+
+  font-size: 10.5px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.as-month-ruler-cell.is-total {
+  color: #d65f12;
+  background: linear-gradient(180deg, #fff8f2, #fff3e9);
+}
+
+.as-month-ruler-cell.is-average {
+  color: #4f46b7;
+  background: linear-gradient(180deg, #f8f7ff, #f1efff);
+  border-right: 0;
+}
+
+/* =========================================================
+   섹션
+========================================================= */
+
+.as-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  scroll-margin-top: 180px;
+}
+
+.as-sec-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.as-sec-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  color: #20293a;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+
+.as-sec-title svg {
+  color: var(--as-orange);
+  font-size: 16px;
+}
+
+.as-sec-heading > span {
+  color: #9aa3b2;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+/* =========================================================
+   차트
+========================================================= */
+
+.as-chart-card,
+.as-table-card {
+  width: 100%;
+  background: var(--as-card);
+  border: 1px solid var(--as-border);
+  border-radius: 14px;
+  box-shadow: var(--as-shadow);
+}
+
+/*
+ * ✅ 차트 카드 - 상단에 얇은 그라디언트 포인트 라인을 얹고,
+ * 배경도 은은한 톤으로 바꿔서 좀 더 고급스러운 느낌으로 정리했습니다.
+ */
+.as-chart-card {
+  position: relative;
+  padding: 16px 16px 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fbfcfe 0%, #ffffff 120px);
+  border-radius: 16px;
+}
+
+.as-chart-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    #3b82f6,
+    #22c58f 50%,
+    #f97316
+  );
+}
+
+.as-chart {
+  width: 100%;
+  min-width: 980px;
+  height: 330px;
+  display: block;
+}
+
+.as-chart .grid {
+  stroke: #eef1f5;
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+}
+
+.as-chart .grid-v {
+  stroke: #f4f6f8;
+  stroke-width: 1;
+}
+
+.as-chart .tick {
+  font-size: 11px;
+  fill: #8b95a5;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.as-chart .bar-inc {
+  fill: url(#asIncomeBarGrad);
+  filter: drop-shadow(0 3px 5px rgba(37, 99, 235, 0.22));
+}
+
+.as-chart .bar-exp {
+  fill: url(#asExpenseBarGrad);
+  filter: drop-shadow(0 3px 5px rgba(234, 88, 12, 0.2));
+}
+
+.as-chart .net-area {
+  fill: url(#asNetAreaGrad);
+}
+
+.as-chart .line-net {
+  stroke: url(#asNetLineGrad);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 4px rgba(15, 158, 109, 0.28));
+}
+
+.as-chart .net-point {
+  fill: #ffffff;
+  stroke: #0f9e6d;
+  stroke-width: 2.2;
+}
+
+.legend-left .tick {
+  fill: #4b5568;
+  font-weight: 800;
+}
+
+.legend-left .legend-chip {
+  fill: #fbfcfe;
+  stroke: #e7ebf1;
+  stroke-width: 1;
+}
+
+/* =========================================================
+   표 공통
+========================================================= */
+
+.as-table-card {
+  padding: 0;
   overflow: hidden;
 }
 
-/* Sticky */
-.as-header-sticky{
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-}
-
-.as-header.fancy{
-  background: var(--grad-1);
-  border: 0;
-}
-.as-header.fancy::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:
-    radial-gradient(1200px 300px at 20% -10%, rgba(255,255,255,.35), transparent 60%),
-    radial-gradient(800px 300px at 110% 110%, rgba(255,255,255,.25), transparent 60%);
-  pointer-events:none;
-}
-.as-header.fancy::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
-  pointer-events:none;
-}
-
-/* ✅ 상단 헤더 전체 한 줄 레이아웃 */
-.as-header-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:16px;
-}
-
-/* 연도 블록 */
-.as-year-block{
-  flex:0 0 auto;
-}
-.as-year{
-  display:flex;
-  flex-direction:column;
-  line-height:1;
-}
-.as-year-num{
-  font-size:64px;
-  font-weight:1000;
-  letter-spacing:1.5px;
-  color:#fff;
-  text-shadow: 0 6px 18px rgba(0,0,0,.25);
-}
-.glam-year{
-  background: linear-gradient(90deg,#fff 0%,#f6fffb 50%,#fff 100%);
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent;
-  text-shadow:none;
-}
-.as-year-sub{
-  margin-top:6px;
-  font-weight:900;
-  letter-spacing:.6px;
-  color:#f2f7ff;
-  opacity:.95;
-}
-.glam-sub{
-  background: linear-gradient(90deg,#fff,#ffe8f8);
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent;
-}
-
-/* ===== KPI 카드 ===== */
-.as-metrics{
-  display:grid;
-  grid-template-columns: repeat(3, 300px);
-  gap:10px;
-  justify-content:flex-start;
-}
-.metric{
-  position: relative;
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius:16px;
-  box-shadow:var(--shadow);
-  padding:16px 16px 18px 16px;
-  min-height:88px;
-  width:300px;
-}
-.glam-card{
-  background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.55));
-  border:0;
-  backdrop-filter: blur(6px);
-  overflow:hidden;
-}
-.glam-card::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:
-    radial-gradient(600px 120px at -10% -20%, rgba(255,255,255,.6), transparent 60%),
-    radial-gradient(600px 160px at 120% 120%, rgba(255,255,255,.35), transparent 60%);
-  pointer-events:none;
-}
-.metric.inc{ box-shadow: 0 12px 28px rgba(16,185,129,.18); }
-.metric.exp{ box-shadow: 0 12px 28px rgba(244,63,94,.16); }
-.metric.net.good{ box-shadow: 0 12px 28px rgba(16,185,129,.18); }
-.metric.net.bad{ box-shadow: 0 12px 28px rgba(244,63,94,.16); }
-
-.m-title{
-  font-size:13px;
-  font-weight:900;
-  color:#6f67a8;
-}
-.glam-title{
-  position:absolute;
-  top:12px;
-  left:14px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:15px;
-  font-weight:1000;
-  letter-spacing:.2px;
-  color:#2b235d;
-}
-.glam-title i{
-  font-size:18px;
-  opacity:.9;
-}
-.m-value{
-  margin-top:6px;
-  font-size:26px;
-  font-weight:1000;
-}
-.m-value.m-sm{ font-size:22px; }
-.glam-value{
-  position:absolute;
-  right:14px;
-  bottom:12px;
-  font-size:24px;
-  font-weight:1000;
-  letter-spacing:.2px;
-  text-align:right;
-}
-.metric.inc .glam-value{ color:#059669; }
-.metric.exp .glam-value{ color:#e11d48; }
-.metric.net.good .glam-value{ color:#0ea5e9; }
-.metric.net.bad  .glam-value{ color:#e11d48; }
-
-/* ===== 수입/지출 이동 버튼 ===== */
-.as-nav-buttons{
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  gap:6px;
-  flex:0 0 auto;
-}
-.as-nav-btn{
-  border:none;
-  border-radius:999px;
-  padding:12px 18px;
-  font-size:12px;
-  font-weight:900;
-  letter-spacing:.3px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  background: rgba(255,255,255,.9);
-  color:#1b1e50;
-  box-shadow:0 3px 8px rgba(0,0,0,.12);
-  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-}
-.as-nav-btn.inc-btn{
-  border:1px solid rgba(34,197,94,.55);
-}
-.as-nav-btn.exp-btn{
-  border:1px solid rgba(239,68,68,.55);
-}
-.as-nav-btn:hover{
-  transform: translateY(-1px);
-  box-shadow:0 6px 16px rgba(0,0,0,.18);
-  background:#ffffff;
-}
-.as-nav-btn:active{
-  transform: translateY(0);
-  box-shadow:0 2px 6px rgba(0,0,0,.15);
-}
-
-/* ===== 연도/집계 컨트롤 (제목 위 / 드롭다운 아래, 좌우 배치) ===== */
-.as-controls-inline{
-  display:flex;
-  flex-direction:row;
-  align-items:center;
-  gap:10px;
-  flex:0 0 auto;
-}
-.as-controls-inline .ctrl-block{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:8px;
-}
-.as-controls-inline .ctrl-block .sel-label{
-  padding:8px 30px;
-  border-radius:10px;
-  background: rgba(255,255,255,.2);
-  border:1px solid rgba(255,255,255,.35);
-  color:#0f0f0f;
-  font-weight:800;
-  font-size:14px;
-}
-
-/* 드롭다운 공통 */
-.year-select{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  color:#ffffff;
-  font-weight:800;
-}
-.glam-select{ position:relative; }
-.glam-select::after{
-  content:"▾";
-  position:absolute;
-  right:12px;
-  top:50%;
-  transform: translateY(-50%);
-  font-size:14px;
-  color:#1b1e50;
-  pointer-events:none;
-}
-.year-select select{
-  appearance:none;
-  -webkit-appearance:none;
-  -moz-appearance:none;
-  padding:10px 40px 10px 14px;
-  border-radius:12px;
-  background: var(--glass);
-  color:#0f1240;
-  font-weight:900;
-  letter-spacing:.4px;
-  border:1px solid rgba(255,255,255,.55);
-  outline:none;
-  box-shadow: 0 8px 22px rgba(0,0,0,.12) inset, 0 2px 6px rgba(0,0,0,.06);
-  backdrop-filter: blur(6px);
-  cursor:pointer;
-}
-.year-select select:focus{
-  border-color: rgba(255,255,255,.9);
-  box-shadow:
-    0 0 0 3px rgba(255,255,255,.65),
-    0 0 0 6px rgba(107,90,255,.45),
-    0 8px 22px rgba(0,0,0,.12) inset;
-}
-.year-select select option{
-  background: linear-gradient(180deg,#ffffff 0%,#f5f7ff 100%);
-  color:#1b1e50;
-  font-weight:900;
-  font-size:14px;
-  padding:8px 12px;
-}
-.year-select select option:hover,
-.year-select select option:focus{
-  background: linear-gradient(180deg,#eaf0ff 0%,#fffbe6 100%);
-  color:#0f1240;
-}
-.year-select select option:checked{
-  background: linear-gradient(180deg,#dfe7ff 0%,#e9fff7 100%);
-  color:#0f1240;
-}
-.year-select select::-webkit-scrollbar{ width: 10px; }
-.year-select select::-webkit-scrollbar-track{
-  background: rgba(0,0,0,.06);
-  border-radius: 8px;
-}
-.year-select select::-webkit-scrollbar-thumb{
-  background: linear-gradient(180deg,#7b5cff,#5fd4ff);
-  border-radius: 8px;
-}
-.year-select select::-webkit-scrollbar-thumb:hover{
-  filter: brightness(1.05);
-}
-.year-select select::-ms-expand{ display:none; }
-
-/* ===== Section Titles ===== */
-.as-section{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.as-sec-title{
-  font-weight:1000;
-  color:#4d3eea;
-  padding:6px 12px;
-  border:1px dashed var(--border);
-  border-radius:12px;
-  background:#faf9ff;
-  width:fit-content;
-}
-.glam-sec{
-  border:0;
-  color:#111;
-  background: var(--grad-3);
-  padding:10px 14px;
-  border-radius:14px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.12);
-  font-size:15px;
-  letter-spacing:.3px;
-}
-
-/* ===== Chart ===== */
-.as-chart-card{
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius:18px;
-  box-shadow:var(--shadow);
-  padding:10px;
-  overflow-x: hidden;
-}
-.as-chart{
-  width:100%;
-  max-width:1400px;
-  height:340px;
-  display:block;
-}
-.as-chart .grid{ stroke:#eee9ff; stroke-width:1; }
-.as-chart .grid-v{ stroke:#efeaff; stroke-width:1; }
-.as-chart .tick{ font-size:12px; fill:#8a82bf; }
-.as-chart .bar-inc{ fill:#2a82ff; opacity:.88; }
-.as-chart .bar-exp{ fill:#ff654d; opacity:.88; }
-.as-chart .line-net{ stroke:#20b36a; stroke-width:2.2; }
-.as-chart .net-point{ fill:#20b36a; }
-
-/* 좌측 패딩 범례 */
-.legend-left .tick{
-  font-weight:800;
-  fill:#7f77ba;
-}
-
-/* ===== Tables ===== */
-.as-table-card{
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius:18px;
-  box-shadow:var(--shadow);
-  padding:10px;
-}
-.as-table-wrap{
+.as-table-wrap {
+  width: 100%;
+  overflow-x: auto;
   overflow-y: auto;
-  overflow-x: hidden;
-  border-radius:12px;
-  border:1px solid var(--border);
-  max-height: 70vh;
+  max-height: 72vh;
 }
 
-/* ✅ 수입/지출 패널 : 내부 스크롤 제거 */
-.as-table-wrap.as-table-wrap-full{
-  max-height:none;
-  overflow-y:visible;
+.as-table-wrap.as-table-wrap-full {
+  max-height: none;
+  overflow-y: visible;
 }
 
-.as-table{
-  width:100%;
-  border-collapse: collapse;
-  background:#fff;
-}
-.as-table thead th{
-  position:sticky;
-  top:0;
-  z-index:1;
-  background:linear-gradient(0deg,#f7f5ff,#ffffff 70%);
-  color:#4b3d86;
-  text-align:left;
-  font-weight:1000;
-  font-size:13px;
-  border-bottom:1px solid var(--border);
-  padding:10px 12px;
-  white-space: nowrap;
-}
-.as-table td{
-  border-bottom:1px solid #f1ecff;
-  padding:10px 12px;
-  font-size:14px;
-}
-.as-table .num,
-.as-table .total,
-.as-table .nowrap{
-  white-space: nowrap;
+/*
+ * 위 as-month-ruler와 동일한 %(퍼센트) 폭을 사용해서, 화면 폭에
+ * 맞춰 좌우 스크롤 없이 늘어나면서도 두 영역의 열이 항상 정확히
+ * 일치하도록 했습니다.
+ */
+.as-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #ffffff;
 }
 
-.as-table .m-num-sm{ font-size:11px; }
-
-/* 항목 라벨 */
-.as-table.as-summary .label,
-.as-table.as-income  .label,
-.as-table.as-expense .label,
-.as-table.as-pay     .label{
-  font-size:13px;
-  font-weight:900;
-  color:#3a2f8a;
+/* 실제 화면에서는 공통 월 헤더를 사용하므로 각 표의 반복 헤더는 높이 0으로 유지 */
+.as-local-head th {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  position: static !important;
+  overflow: hidden !important;
 }
 
-.as-table tfoot td{
-  position:sticky;
-  bottom:0;
-  background:#fff;
+.as-table td {
+  height: 43px;
+  padding: 8px 9px;
+  vertical-align: middle;
+
+  border-right: 1px solid #f0f2f5;
+  border-bottom: 1px solid #edf0f3;
+  background: #ffffff;
+  color: var(--as-text);
+
+  font-size: 11.5px;
+  transition: background 0.12s ease;
 }
-.as-table .num{
-  text-align:right;
+
+.as-table td:last-child {
+  border-right: 0;
+}
+
+.as-table tbody tr:last-child td {
+  border-bottom-color: #e7ebf0;
+}
+
+.as-table tbody tr:hover td {
+  background: #fffdfa;
+}
+
+.as-table .label {
+  color: #2b3548;
+  font-weight: 820;
+  text-align: left;
+}
+
+.as-table .num {
+  padding-left: 6px;
+  padding-right: 6px;
+
+  text-align: right;
   font-variant-numeric: tabular-nums;
-}
-.as-table .label{
-  font-weight:900;
-  color:#3a2f8a;
-}
-.as-table .total{
-  font-weight:1000;
-  background:#faf9ff;
-}
-.as-table .empty{
-  text-align:center;
-  color:#9a90c7;
-  padding:18px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ✅ 지출 대분류 소계 강조 */
-.as-table.as-expense tr.as-subtotal td{
-  background:#f9f7ff;
-  font-weight:1000;
-  border-top:1px dashed var(--border);
+.as-table .total {
+  color: #d65f12;
+  background: #fffaf5;
+  font-weight: 900;
 }
 
-/* ✅ 수입정리 tfoot(월별 합계) 음영 */
-.as-table.as-income tfoot tr td{
-  background:#f9f7ff;
-  font-weight:1000;
-  border-top:1px dashed var(--border);
+.as-table .nowrap {
+  white-space: nowrap;
 }
 
-/* ✅ 지출 결제방법 tfoot(합계) 음영 */
-.as-table.as-pay tfoot tr td{
-  background:#f9f7ff;
-  font-weight:1000;
-  border-top:1px dashed var(--border);
+.as-table .m-num-sm {
+  font-size: 10.5px;
+  font-weight: 700;
 }
 
-/* ✅ 요약표의 '수익률' 행 음영 */
-.as-table.as-summary tbody tr.sum-rate td{
-  background:#f9f7ff;
-  font-weight:1000;
-  border-top:1px dashed var(--border);
+.as-table .empty {
+  height: 150px;
+  padding: 30px 10px;
+  text-align: center;
+  color: #9aa3b2;
+  font-size: 12px;
+  font-weight: 650;
+  background: #ffffff;
 }
 
-/* Overlay Loader */
-.as-overlay{
-  position:fixed;
-  inset:0;
-  background:rgba(255,255,255,.55);
-  backdrop-filter: blur(2px);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:60;
+/*
+ * 16개 논리 컬럼 폭 - 공통 월 헤더(as-month-ruler)와 동일한 비율.
+ * 1~12월 칸의 금액이 옆으로 벗어나던 문제를 개선하기 위해, 분류/구분
+ * 칸의 비중을 줄이고 그만큼을 1~12월 칸에 더 배분했습니다.
+ */
+.as-table tr > *:nth-child(1) { width: 7%; }
+.as-table tr > *:nth-child(2) { width: 7%; }
+.as-table tr > *:nth-child(3) { width: 7%; }
+.as-table tr > *:nth-child(n+4):nth-child(-n+15) { width: 6%; }
+.as-table tr > *:nth-child(16) { width: 7%; }
+
+/* colspan=2인 수입/요약/결제방법의 첫 칸 (분류 7% + 구분 7% = 14%) */
+.as-summary tbody td:first-child,
+.as-income tbody td:first-child,
+.as-income tfoot td:first-child,
+.as-pay tbody td:first-child,
+.as-pay tfoot td:first-child {
+  width: 14%;
+  padding-left: 14px;
 }
-.as-overlay.err{
-  background:rgba(255,240,240,.65);
+
+/* =========================================================
+   요약표 상태별 강조
+========================================================= */
+
+.as-summary tbody tr.sum-inc td:first-child {
+  color: #167f43;
+  box-shadow: inset 3px 0 0 #22a75a;
 }
-.as-loader{
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius:14px;
-  box-shadow: var(--shadow);
-  padding:16px 18px;
-  font-weight:900;
-  color:#4f3fe6;
-  display:flex;
-  align-items:center;
-  gap:10px;
+
+.as-summary tbody tr.sum-exp td:first-child {
+  color: #cf4635;
+  box-shadow: inset 3px 0 0 #e7604e;
 }
-.as-loader .spin{
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  border:3px solid #d8d3ff;
-  border-top-color:#6a58ff;
-  display:inline-block;
-  animation: asspin .9s linear infinite;
+
+.as-summary tbody tr.sum-net td:first-child {
+  color: #2563b8;
+  box-shadow: inset 3px 0 0 #3b82f6;
 }
+
+.as-summary tbody tr.sum-rate td {
+  background: #f8f7ff;
+  font-weight: 850;
+}
+
+.as-summary tbody tr.sum-rate td:first-child {
+  color: #5a50b7;
+  box-shadow: inset 3px 0 0 #7568df;
+}
+
+/* =========================================================
+   수입 / 지출 / 결제방법 소계
+========================================================= */
+
+.as-income tfoot td,
+.as-pay tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: #f8fafc;
+  border-top: 1px solid #dfe5ec;
+  border-bottom: 0;
+  font-weight: 900;
+}
+
+.as-income tfoot td:first-child {
+  color: #167f43;
+  box-shadow: inset 3px 0 0 #22a75a;
+}
+
+.as-pay tfoot td:first-child {
+  color: #4f46b7;
+  box-shadow: inset 3px 0 0 #7568df;
+}
+
+.as-expense tr.as-subtotal td {
+  background: #f8fafc;
+  border-top: 1px solid #dfe5ec;
+  font-weight: 900;
+}
+
+.as-expense tr.as-subtotal td:first-child {
+  color: #d15b11;
+}
+
+.as-expense tbody td[rowspan] {
+  background: #fbfcfe;
+  color: #334057;
+  font-weight: 900;
+  vertical-align: top;
+  padding-top: 13px;
+  border-left: 3px solid #f2a36a;
+}
+
+/* =========================================================
+   스크롤바
+========================================================= */
+
+.as-table-wrap::-webkit-scrollbar,
+.as-month-ruler::-webkit-scrollbar {
+  height: 9px;
+  width: 9px;
+}
+
+.as-table-wrap::-webkit-scrollbar-track {
+  background: #f2f4f7;
+}
+
+.as-table-wrap::-webkit-scrollbar-thumb {
+  background: #c9ced7;
+  border-radius: 999px;
+  border: 2px solid #f2f4f7;
+}
+
+.as-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #afb6c2;
+}
+
+/* =========================================================
+   로딩 / 오류
+========================================================= */
+
+.as-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(248, 250, 252, 0.64);
+  backdrop-filter: blur(3px);
+}
+
+.as-overlay.err {
+  background: rgba(255, 245, 245, 0.72);
+}
+
+.as-loader {
+  min-width: 170px;
+  min-height: 54px;
+  padding: 0 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: 1px solid var(--as-border);
+  border-radius: 13px;
+  background: #ffffff;
+  color: #4d586d;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.as-loader .spin {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  border-radius: 50%;
+  border: 3px solid #fbd6bb;
+  border-top-color: var(--as-orange);
+  animation: asspin 0.8s linear infinite;
+}
+
 @keyframes asspin {
   to { transform: rotate(1turn); }
 }
 
-/* Responsive */
-@media (max-width: 1100px){
-  .as-header-row{
-    flex-direction:column;
-    align-items:flex-start;
+/* =========================================================
+   좁은 PC / 태블릿
+========================================================= */
+
+@media (max-width: 1500px) {
+  .as-wrap {
+    padding: 0 20px 32px;
   }
-  .as-metrics{
-    grid-template-columns: 1fr;
+
+  .as-sticky-shell {
+    padding-top: 20px;
   }
-  .as-controls-inline{
-    flex-wrap:wrap;
+
+  .as-header {
+    grid-template-columns: minmax(225px, 0.78fr) minmax(560px, 1.5fr) auto;
+    gap: 12px;
   }
+
+  .as-title-copy p {
+    display: none;
+  }
+
+  .as-metric-card {
+    padding: 11px 12px;
+  }
+
+  .as-header-tools {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 1240px) {
+  .annual-sheet {
+    min-width: 940px;
+    --as-header-height: 156px;
+  }
+
+  .as-header {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "title tools"
+      "metrics metrics";
+    align-items: center;
+  }
+
+  .as-title-group { grid-area: title; }
+  .as-header-tools { grid-area: tools; }
+  .as-metrics { grid-area: metrics; }
 }

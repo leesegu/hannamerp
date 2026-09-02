@@ -1374,8 +1374,19 @@ export default function PaymentSettlementPage() {
      달의 작업이 끝나기 전까지 나중 달의 생성 요청이 통째로 무시됐던
      것입니다. 이제는 "결제구분_달" 조합별로 별도 키를 두는 Set으로
      바꿔서, 같은 달에 대한 중복 작업만 막고 서로 다른 달의 작업은
-     독립적으로 진행되도록 했습니다. */
+     독립적으로 진행되도록 했습니다. 여기에 더해 같은 달 작업 중 발생한
+     후속 스냅샷 갱신은 pendingGenerationKeysRef에 기억했다가 작업 종료 후
+     다시 누락 여부를 검증하도록 보강했습니다. */
   const generatingKeysRef = useRef(new Set());
+
+  /* ✅ 같은 달의 자동생성/동기화가 진행 중일 때 Firestore 스냅샷이나
+     지급대상 변경 이벤트가 다시 들어오면 그 요청을 그냥 버리지 않고
+     "작업 종료 후 재검증 필요" 상태로 기억합니다.
+     이 보강으로 대상관리에서 추가된 대상이 월별 기록 생성 도중 일부만
+     표시되는 현상을 막고, 작업이 끝난 뒤 반드시 한 번 더 누락 여부를
+     확인합니다. */
+  const pendingGenerationKeysRef = useRef(new Set());
+  const [syncRetryTick, setSyncRetryTick] = useState(0);
 
   /* 🔁 구분(카테고리) 구독 + 없으면 기본값 자동 생성 */
   useEffect(() => {
@@ -1443,7 +1454,11 @@ export default function PaymentSettlementPage() {
   useEffect(() => {
     if (!payees.length) return;
     const genKey = `${payType}_${yearMonth}`;
-    if (generatingKeysRef.current.has(genKey)) return; // 같은 달의 작업만 중복 방지
+    if (generatingKeysRef.current.has(genKey)) {
+      // ✅ 진행 중 발생한 후속 변경을 버리지 않고, 종료 후 재검증하도록 예약
+      pendingGenerationKeysRef.current.add(genKey);
+      return;
+    }
 
     const activePayees = payees.filter((p) => p.active !== false);
     const recordMap = new Map(records.map((r) => [r.payeeId, r]));
@@ -1638,8 +1653,16 @@ export default function PaymentSettlementPage() {
       }
 
       generatingKeysRef.current.delete(genKey);
+
+      // ✅ 작업 중 Firestore 스냅샷/대상 변경이 한 번이라도 들어왔다면
+      // 현재 records가 최종 상태인지 한 번 더 검사합니다.
+      // 누락이 이미 모두 해소되었다면 다음 실행은 아무 쓰기 없이 종료됩니다.
+      if (pendingGenerationKeysRef.current.has(genKey)) {
+        pendingGenerationKeysRef.current.delete(genKey);
+        setSyncRetryTick((v) => v + 1);
+      }
     })();
-  }, [payees, records, payType, yearMonth]);
+  }, [payees, records, payType, yearMonth, syncRetryTick]);
 
   /* ✅ 지급 대상(payeeId) → 최신 payee 정보 매핑.
      표에 이름/은행/계좌/구분을 보여줄 때 이 매핑을 사용하면, 몇 월을

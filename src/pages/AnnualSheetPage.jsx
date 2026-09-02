@@ -2,6 +2,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./AnnualSheetPage.css";
 import { getStorage, ref as sRef, getBytes } from "firebase/storage";
+import {
+  FiActivity,
+  FiArrowDownCircle,
+  FiArrowUpCircle,
+  FiCalendar,
+  FiCheck,
+  FiChevronDown,
+  FiDollarSign,
+  FiTrendingUp,
+} from "react-icons/fi";
 
 /* ── 유틸 ── */
 const td = new TextDecoder("utf-8");
@@ -271,6 +281,41 @@ function withdrawAccountMatrixByBuckets(rows, getBucketIdx) {
 }
 
 /* ================= SVG 차트 ================= */
+
+/*
+ * ✅ 순수익 선을 부드러운 곡선으로 그리기 위한 유틸(Catmull-Rom → Bezier 변환).
+ * 원래 데이터 좌표(netPts)는 그대로 두고, 그 점들을 정확히 지나가는
+ * 매끄러운 곡선의 SVG path만 만들어 줍니다. (점의 값/위치 계산 로직은
+ * 변경하지 않고, 화면에 그리는 방식만 부드럽게 바꾼 것입니다)
+ */
+function buildSmoothLinePath(points) {
+  if (!points || points.length === 0) return "";
+  if (points.length === 1) {
+    const [x, y] = points[0];
+    return `M ${x},${y}`;
+  }
+
+  const p = points;
+  const n = p.length;
+  let d = `M ${p[0][0]},${p[0][1]}`;
+
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = p[i === 0 ? 0 : i - 1];
+    const p1 = p[i];
+    const p2 = p[i + 1];
+    const p3 = p[i + 2 < n ? i + 2 : n - 1];
+
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2[0]},${p2[1]}`;
+  }
+
+  return d;
+}
+
 function AnnualChart({ income, expense }) {
   const width = 1400;
   const height = 340;
@@ -301,6 +346,14 @@ function AnnualChart({ income, expense }) {
     yScale(Math.max(0, v)),
   ]);
 
+  const netLinePath = buildSmoothLinePath(netPts);
+  const netAreaPath =
+    netPts.length > 1
+      ? `${netLinePath} L ${netPts[netPts.length - 1][0]},${
+          padT + innerH
+        } L ${netPts[0][0]},${padT + innerH} Z`
+      : "";
+
   return (
     <svg
       className="as-chart"
@@ -308,17 +361,79 @@ function AnnualChart({ income, expense }) {
       role="img"
       aria-label="월별 수입/지출/순수익"
     >
+      <defs>
+        <linearGradient
+          id="asIncomeBarGrad"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop offset="0%" stopColor="#7cb0ff" />
+          <stop offset="100%" stopColor="#2f6fee" />
+        </linearGradient>
+
+        <linearGradient
+          id="asExpenseBarGrad"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop offset="0%" stopColor="#ffb680" />
+          <stop offset="100%" stopColor="#f2660f" />
+        </linearGradient>
+
+        <linearGradient
+          id="asNetLineGrad"
+          x1="0"
+          y1="0"
+          x2="1"
+          y2="0"
+        >
+          <stop offset="0%" stopColor="#22c58f" />
+          <stop offset="100%" stopColor="#0f9e6d" />
+        </linearGradient>
+
+        <linearGradient
+          id="asNetAreaGrad"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop
+            offset="0%"
+            stopColor="#22c58f"
+            stopOpacity="0.28"
+          />
+          <stop
+            offset="100%"
+            stopColor="#22c58f"
+            stopOpacity="0"
+          />
+        </linearGradient>
+      </defs>
+
       <g
         className="legend-left"
-        transform={`translate(10, ${height - padB - 66})`}
+        transform={`translate(10, ${height - padB - 74})`}
       >
+        <rect
+          x="-8"
+          y="-10"
+          width="98"
+          height="76"
+          rx="12"
+          className="legend-chip"
+        />
         <rect
           x="0"
           y="0"
           width="12"
           height="12"
           className="bar-inc"
-          rx="2"
+          rx="3"
         />
         <text x="18" y="10" className="tick">
           수입
@@ -329,7 +444,7 @@ function AnnualChart({ income, expense }) {
           width="12"
           height="12"
           className="bar-exp"
-          rx="2"
+          rx="3"
         />
         <text x="18" y="32" className="tick">
           지출
@@ -392,8 +507,8 @@ function AnnualChart({ income, expense }) {
       })}
 
       {income.map((v, i) => {
-        const x = padL + xStep * i + xStep * 0.1;
-        const w = xStep * 0.28;
+        const x = padL + xStep * i + xStep * 0.13;
+        const w = xStep * 0.3;
         const y = yScale(v);
         const h = padT + innerH - y;
         return (
@@ -404,13 +519,13 @@ function AnnualChart({ income, expense }) {
             width={w}
             height={h}
             className="bar-inc"
-            rx="4"
+            rx="5"
           />
         );
       })}
       {expense.map((v, i) => {
-        const x = padL + xStep * i + xStep * 0.6;
-        const w = xStep * 0.28;
+        const x = padL + xStep * i + xStep * 0.57;
+        const w = xStep * 0.3;
         const y = yScale(v);
         const h = padT + innerH - y;
         return (
@@ -421,15 +536,21 @@ function AnnualChart({ income, expense }) {
             width={w}
             height={h}
             className="bar-exp"
-            rx="4"
+            rx="5"
           />
         );
       })}
 
-      <polyline
-        points={netPts
-          .map(([x, y]) => `${x},${y}`)
-          .join(" ")}
+      {netAreaPath && (
+        <path
+          d={netAreaPath}
+          className="net-area"
+          stroke="none"
+        />
+      )}
+
+      <path
+        d={netLinePath}
         className="line-net"
         fill="none"
       />
@@ -455,6 +576,86 @@ function AnnualChart({ income, expense }) {
         </text>
       ))}
     </svg>
+  );
+}
+
+/* ============ 공통 월 컬럼 헤더 ============ */
+function MonthColumnBar() {
+  return (
+    <div className="as-month-ruler" aria-label="연간 공통 월 컬럼 헤더">
+      <div className="as-month-ruler-label">
+        <span>연간 기준</span>
+        <small>모든 표에 공통 적용</small>
+      </div>
+      <div className="as-month-ruler-cell is-total">합계</div>
+      {MONTH_LABELS.map((month) => (
+        <div key={month} className="as-month-ruler-cell">
+          {month}
+        </div>
+      ))}
+      <div className="as-month-ruler-cell is-average">월평균</div>
+    </div>
+  );
+}
+
+function AnnualSelect({ label, value, options, onChange, ariaLabel }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handleOutside = (event) => {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside, true);
+    return () => document.removeEventListener("mousedown", handleOutside, true);
+  }, [open]);
+
+  const selected = options.find((option) => String(option.value) === String(value));
+
+  return (
+    <div className={`as-custom-select ${open ? "is-open" : ""}`} ref={rootRef}>
+      <span className="as-select-label">{label}</span>
+      <button
+        type="button"
+        className="as-custom-select-trigger"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{selected?.label ?? value}</span>
+        <FiChevronDown />
+      </button>
+
+      {open && (
+        <div className="as-custom-select-menu" role="listbox">
+          {options.map((option) => {
+            const selectedNow = String(option.value) === String(value);
+            return (
+              <button
+                type="button"
+                role="option"
+                aria-selected={selectedNow}
+                key={String(option.value)}
+                className={`as-custom-select-option ${selectedNow ? "is-selected" : ""}`}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                <span>{option.label}</span>
+                {selectedNow && <FiCheck />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -812,139 +1013,99 @@ export default function AnnualSheetPage() {
 
   return (
     <div className="annual-sheet as-wrap">
+      {/*
+        ✅ 헤더 + 공통 월 헤더(as-month-ruler)를 하나의 고정 영역으로
+        묶었습니다. 두 영역을 각각 따로 고정(position: sticky)하면
+        서로 다른 계산값으로 위치를 잡다 보니 그 사이 틈으로 표
+        내용이 지나가 보이는 문제가 있었는데, 하나로 묶어서 통째로
+        고정하면 그 틈 자체가 생기지 않습니다.
+      */}
+      <div className="as-sticky-shell">
       {/* 헤더 */}
-      <header className="as-header fancy as-header-sticky">
-        <div className="as-header-row">
-          {/* 현재 연도 */}
-          <div className="as-year-block">
-            <div className="as-year">
-              <span className="as-year-num glam-year">
-                {year}
-              </span>
-              <span className="as-year-sub glam-sub">
-                Annual Closing
-              </span>
+      <header className="as-header">
+        <div className="as-title-group">
+          <div className="as-title-icon">
+            <FiCalendar />
+          </div>
+
+          <div className="as-title-copy">
+            <div className="as-title-line">
+              <h2>연간시트</h2>
+              <span className="as-year-pill">{year}</span>
+            </div>
+            <p>
+              월별 수입·지출 흐름과 연간 손익을 한 화면에서 비교합니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="as-metrics">
+          <div className="as-metric-card is-income">
+            <span className="as-metric-icon"><FiArrowUpCircle /></span>
+            <div>
+              <span className="as-metric-label">총 수입</span>
+              <strong>₩ {fmtWon(totalIncome)}</strong>
             </div>
           </div>
 
-          {/* 총수입/총지출/순수익 패널 */}
-          <div className="as-metrics glam-metrics">
-            <div className="metric inc glam-card">
-              <div className="m-title glam-title">
-                <i
-                  className="ri-arrow-up-circle-line"
-                  aria-hidden="true"
-                />
-                총 수입
-              </div>
-              <div className="m-value glam-value nowrap">
-                ₩ {fmtWon(totalIncome)}
-              </div>
-            </div>
-            <div className="metric exp glam-card">
-              <div className="m-title glam-title">
-                <i
-                  className="ri-arrow-down-circle-line"
-                  aria-hidden="true"
-                />
-                총 지출
-              </div>
-              <div className="m-value glam-value nowrap">
-                ₩ {fmtWon(totalExpense)}
-              </div>
-            </div>
-            <div
-              className={`metric net glam-card ${
-                netIncome >= 0 ? "good" : "bad"
-              }`}
-            >
-              <div className="m-title glam-title">
-                <i
-                  className="ri-line-chart-line"
-                  aria-hidden="true"
-                />
-                순 수익
-              </div>
-              <div className="m-value glam-value nowrap">
-                ₩ {fmtWon(netIncome)}
-              </div>
+          <div className="as-metric-card is-expense">
+            <span className="as-metric-icon"><FiArrowDownCircle /></span>
+            <div>
+              <span className="as-metric-label">총 지출</span>
+              <strong>₩ {fmtWon(totalExpense)}</strong>
             </div>
           </div>
 
-          {/* 수입이동/지출이동 버튼 (세로) */}
-          <div className="as-nav-buttons">
-            <button
-              type="button"
-              className="as-nav-btn inc-btn"
-              onClick={scrollToIncome}
-            >
-              수입이동
-            </button>
-            <button
-              type="button"
-              className="as-nav-btn exp-btn"
-              onClick={scrollToExpense}
-            >
-              지출이동
-            </button>
-          </div>
-
-          {/* 연도 / 집계 (제목 위, 드롭다운 아래) */}
-          <div className="as-controls-inline glam-controls">
-            <div className="ctrl-block">
-              <span className="sel-label">연도</span>
-              <label className="year-select glam-select">
-                <select
-                  value={year}
-                  onChange={(e) =>
-                    setYear(Number(e.target.value))
-                  }
-                  aria-label="연도 선택"
-                >
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="ctrl-block">
-              <span className="sel-label">집계</span>
-              <label className="year-select glam-select">
-                <select
-                  value={anchorDay}
-                  onChange={(e) =>
-                    setAnchorDay(
-                      clamp(
-                        Number(e.target.value),
-                        1,
-                        31
-                      )
-                    )
-                  }
-                  aria-label="집계 기준일 선택"
-                  title="집계 기준일"
-                >
-                  {Array.from(
-                    { length: 31 },
-                    (_, i) => i + 1
-                  ).map((d) => (
-                    <option key={d} value={d}>
-                      {d}일
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <div className={`as-metric-card is-net ${netIncome >= 0 ? "is-positive" : "is-negative"}`}>
+            <span className="as-metric-icon"><FiTrendingUp /></span>
+            <div>
+              <span className="as-metric-label">순 수익</span>
+              <strong>₩ {fmtWon(netIncome)}</strong>
             </div>
           </div>
         </div>
+
+        <div className="as-header-tools">
+          <div className="as-jump-group">
+            <button type="button" className="as-jump-btn is-income" onClick={scrollToIncome}>
+              <FiArrowUpCircle />
+              수입
+            </button>
+            <button type="button" className="as-jump-btn is-expense" onClick={scrollToExpense}>
+              <FiArrowDownCircle />
+              지출
+            </button>
+          </div>
+
+          <AnnualSelect
+            label="연도"
+            value={year}
+            ariaLabel="연도 선택"
+            options={yearOptions.map((y) => ({ value: y, label: `${y}년` }))}
+            onChange={(nextYear) => setYear(Number(nextYear))}
+          />
+
+          <AnnualSelect
+            label="집계 기준일"
+            value={anchorDay}
+            ariaLabel="집계 기준일 선택"
+            options={Array.from({ length: 31 }, (_, i) => ({
+              value: i + 1,
+              label: `${i + 1}일`,
+            }))}
+            onChange={(nextDay) => setAnchorDay(clamp(Number(nextDay), 1, 31))}
+          />
+        </div>
       </header>
+
+      <MonthColumnBar />
+      </div>
 
       {/* 차트 */}
       <section className="as-section">
-        <div className="as-sec-title glam-sec">
-          월별 수입 / 지출 / 순수익
+        <div className="as-sec-heading">
+          <div className="as-sec-title"><FiActivity /> 월별 수입 / 지출 / 순수익</div>
+          <span>12개월 흐름을 차트로 비교합니다.</span>
         </div>
         <div className="as-chart-card">
           <AnnualChart
@@ -956,15 +1117,17 @@ export default function AnnualSheetPage() {
 
       {/* 요약표 */}
       <section className="as-section">
-        <div className="as-sec-title glam-sec">
-          수입/지출/순수익/수익률 정리
+        <div className="as-sec-heading">
+          <div className="as-sec-title"><FiDollarSign /> 수입 / 지출 / 순수익 / 수익률 정리</div>
+          <span>월별 성과와 연간 누계를 요약합니다.</span>
         </div>
         <div className="as-table-card">
           <div className="as-table-wrap">
-            <table className="as-table sticky as-summary">
-              <thead>
+            <table className="as-table as-summary">
+              <thead className="as-local-head">
                 <tr>
-                  <th style={{ width: 180 }}>항목</th>
+                  <th style={{ width: "7%" }}>항목</th>
+                  <th style={{ width: "7%" }}>구분</th>
                   <th className="num total">합계</th>
                   {MONTH_LABELS.map((m) => (
                     <th key={m} className="num">
@@ -983,7 +1146,7 @@ export default function AnnualSheetPage() {
                       key={row.label}
                       className={row.className}
                     >
-                      <td className="label nowrap">
+                      <td className="label nowrap" colSpan={2}>
                         {row.label}
                       </td>
                       <td className="num total nowrap m-num-sm">
@@ -1020,15 +1183,17 @@ export default function AnnualSheetPage() {
         className="as-section"
         ref={incomeSectionRef}
       >
-        <div className="as-sec-title glam-sec">
-          수입 정리
+        <div className="as-sec-heading">
+          <div className="as-sec-title"><FiArrowUpCircle /> 수입 정리</div>
+          <span>수입 분류별 연간 합계와 월별 실적입니다.</span>
         </div>
         <div className="as-table-card">
           <div className="as-table-wrap as-table-wrap-full">
-            <table className="as-table sticky as-income">
-              <thead>
+            <table className="as-table as-income">
+              <thead className="as-local-head">
                 <tr>
-                  <th style={{ width: 180 }}>분류</th>
+                  <th style={{ width: "7%" }}>분류</th>
+                  <th style={{ width: "7%" }}>구분</th>
                   <th className="num total">합계</th>
                   {MONTH_LABELS.map((m) => (
                     <th key={m} className="num">
@@ -1045,7 +1210,7 @@ export default function AnnualSheetPage() {
                   );
                   return (
                     <tr key={row.category}>
-                      <td className="label nowrap">
+                      <td className="label nowrap" colSpan={2}>
                         {row.category}
                       </td>
                       <td className="num total nowrap m-num-sm">
@@ -1068,7 +1233,7 @@ export default function AnnualSheetPage() {
                 {!incomeMatrix.length && (
                   <tr>
                     <td
-                      colSpan={15}
+                      colSpan={16}
                       className="empty"
                     >
                       표시할 수입 데이터가 없습니다.
@@ -1078,7 +1243,7 @@ export default function AnnualSheetPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="label nowrap">
+                  <td className="label nowrap" colSpan={2}>
                     월별 합계
                   </td>
                   <td className="num total nowrap m-num-sm">
@@ -1107,16 +1272,17 @@ export default function AnnualSheetPage() {
         className="as-section"
         ref={expenseSectionRef}
       >
-        <div className="as-sec-title glam-sec">
-          지출 정리
+        <div className="as-sec-heading">
+          <div className="as-sec-title"><FiArrowDownCircle /> 지출 정리</div>
+          <span>대분류·소분류별 지출 흐름을 확인합니다.</span>
         </div>
         <div className="as-table-card">
           <div className="as-table-wrap as-table-wrap-full">
-            <table className="as-table sticky as-expense">
-              <thead>
+            <table className="as-table as-expense">
+              <thead className="as-local-head as-expense-local-head">
                 <tr>
-                  <th style={{ width: 180 }}>대분류</th>
-                  <th style={{ width: 180 }}>소분류</th>
+                  <th style={{ width: "7%" }}>대분류</th>
+                  <th style={{ width: "7%" }}>소분류</th>
                   <th className="num total">합계</th>
                   {MONTH_LABELS.map((m) => (
                     <th key={m} className="num">
@@ -1238,15 +1404,17 @@ export default function AnnualSheetPage() {
 
       {/* 지출 결제방법 → 출금계좌 기준 */}
       <section className="as-section">
-        <div className="as-sec-title glam-sec">
-          지출 결제방법
+        <div className="as-sec-heading">
+          <div className="as-sec-title"><FiDollarSign /> 지출 결제방법</div>
+          <span>출금계좌 기준으로 월별 지출을 정리합니다.</span>
         </div>
         <div className="as-table-card">
           <div className="as-table-wrap">
-            <table className="as-table sticky as-pay">
-              <thead>
+            <table className="as-table as-pay">
+              <thead className="as-local-head">
                 <tr>
-                  <th style={{ width: 180 }}>분류</th>
+                  <th style={{ width: "7%" }}>분류</th>
+                  <th style={{ width: "7%" }}>구분</th>
                   <th className="num total">합계</th>
                   {MONTH_LABELS.map((m) => (
                     <th key={m} className="num">
@@ -1263,7 +1431,7 @@ export default function AnnualSheetPage() {
                   );
                   return (
                     <tr key={row.name}>
-                      <td className="label nowrap">
+                      <td className="label nowrap" colSpan={2}>
                         {row.name}
                       </td>
                       <td className="num total nowrap m-num-sm">
@@ -1296,7 +1464,7 @@ export default function AnnualSheetPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="label nowrap">
+                  <td className="label nowrap" colSpan={2}>
                     합계
                   </td>
                   <td className="num total nowrap m-num-sm">

@@ -14,6 +14,8 @@ import WaterPage from "../pages/WaterPage";
 import PublicElectricPage from "../pages/PublicElectricPage";
 import CleaningPage from "../pages/CleaningPage";
 import CctvPage from "../pages/CctvPage";
+/* ✅ 서비스비용 관리 */
+import ServiceCostPage from "../pages/ServiceCostPage";
 import VendorRegisterPage from "../pages/VendorRegisterPage";
 import VendorsMainPage from "../pages/VendorsMainPage.js";
 import EmployeePage from "../pages/EmployeePage";
@@ -273,6 +275,9 @@ const TrezoSidebar = ({
 
         CCTV:
           <CctvPage />,
+
+        "서비스비용 관리":
+          <ServiceCostPage />,
 
         관리종료:
           <VillaEndPage />,
@@ -846,6 +851,7 @@ const TrezoSidebar = ({
                       "공용전기",
                       "건물청소",
                       "CCTV",
+                      "서비스비용 관리",
                       "관리종료",
                     ]}
 
@@ -889,6 +895,9 @@ const TrezoSidebar = ({
 
                         CCTV:
                           <CctvPage />,
+
+                        "서비스비용 관리":
+                          <ServiceCostPage />,
 
                         관리종료:
                           <VillaEndPage />,

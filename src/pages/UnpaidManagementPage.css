@@ -18,6 +18,23 @@
 }
 
 
+/*
+ * 검색창을 포함한 위쪽 영역(제목/저장·불러오기 버튼/요약 박스/검색·필터)을
+ * 화면에 고정하고, 아래 미납목록 표만 스크롤되도록 합니다.
+ */
+.unpaid-sticky-top {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 30;
+
+  background: #f7f9fb;
+
+  padding-bottom: 4px;
+}
+
+
 /* =========================================================
    숨김
 ========================================================= */
@@ -86,6 +103,25 @@
   color: #7a8497;
   font-size: 13px;
   font-weight: 500;
+}
+
+
+.unpaid-title-group p:empty {
+  display: none;
+}
+
+
+.unpaid-header-meta::before {
+  content: "· ";
+
+  margin: 0 2px;
+}
+
+
+.unpaid-header-meta:first-child::before {
+  content: "";
+
+  margin: 0;
 }
 
 
@@ -861,18 +897,31 @@ button.unpaid-summary-card:hover {
 
   border-radius: 14px;
 
-  overflow: hidden;
-
   box-shadow:
     0 5px 20px
     rgba(15, 23, 42, 0.035);
 }
 
 
+/*
+ * 표 목록이 실제로 스크롤되는 영역입니다.
+ * (가로 스크롤은 그대로 유지하고, 세로 스크롤은 이 영역 안에서만
+ *  - 아래 JS에서 계산한 max-height 만큼만 - 일어나도록 해서,
+ *  표 제목 줄(thead)이 이 영역 기준으로 위쪽에 고정됩니다)
+ *
+ * 주의: 바깥 카드(unpaid-table-card)에는 overflow: hidden을 걸지
+ * 않았습니다. 그렇게 하면 표 제목 줄의 position: sticky 기준이
+ * 이 영역이 아니라 바깥 카드가 되어버려 정상적으로 고정되지
+ * 않기 때문입니다. 모서리를 둥글게 하는 처리는 이 영역 자체에서
+ * overflow와 함께 담당합니다.
+ */
 .unpaid-table-scroll {
   width: 100%;
+
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: auto;
+
+  border-radius: 14px;
 }
 
 
@@ -888,7 +937,7 @@ button.unpaid-summary-card:hover {
 .unpaid-table {
   width: 100%;
 
-  min-width: 1430px;
+  min-width: 1470px;
 
   border-collapse: separate;
   border-spacing: 0;
@@ -933,7 +982,7 @@ button.unpaid-summary-card:hover {
 
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: 5;
 }
 
 
@@ -1017,11 +1066,11 @@ button.unpaid-summary-card:hover {
 }
 
 .col-unit {
-  width: 205px;
+  width: 305px;
 }
 
 .col-address {
-  width: 190px;
+  width: 130px;
 }
 
 .col-contact {
@@ -2011,6 +2060,7 @@ button.unpaid-summary-card:hover {
 ========================================================= */
 
 .unpaid-table-scroll::-webkit-scrollbar {
+  width: 9px;
   height: 9px;
 }
 
@@ -2365,17 +2415,33 @@ button.unpaid-summary-card:hover {
 
 .unpaid-load-item-stats {
   flex: 1 1 auto;
+  min-width: 0;
 
   display: flex;
   align-items: center;
   gap: 10px;
 
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 
   color: #7a8497;
 
   font-size: 11px;
   font-weight: 700;
+
+  scrollbar-width: none;
+}
+
+
+.unpaid-load-item-stats::-webkit-scrollbar {
+  display: none;
+}
+
+
+.unpaid-load-item-stats span {
+  flex: 0 0 auto;
+
+  white-space: nowrap;
 }
 
 
@@ -2433,14 +2499,6 @@ button.unpaid-summary-card:hover {
 }
 
 
-.unpaid-load-item-note {
-  color: #b7bec9;
-
-  font-size: 10px;
-  font-weight: 600;
-}
-
-
 /* =========================================================
    단수리스트 팝업
 
@@ -2449,9 +2507,9 @@ button.unpaid-summary-card:hover {
 ========================================================= */
 
 .unpaid-water-modal {
-  width: 100%;
-  max-width: 640px;
-  max-height: 84vh;
+  width: 96vw;
+  max-width: 1560px;
+  height: 88vh;
 
   background: #ffffff;
 
@@ -2556,6 +2614,15 @@ button.unpaid-summary-card:hover {
 }
 
 
+.unpaid-water-image-btn:disabled {
+  opacity: 0.6;
+
+  cursor: default;
+
+  transform: none;
+}
+
+
 .unpaid-water-modal-header-actions > button:last-child {
   width: 36px;
   height: 36px;
@@ -2583,16 +2650,27 @@ button.unpaid-summary-card:hover {
 }
 
 
-.unpaid-water-modal-guide {
-  margin: 0;
+.unpaid-water-modal-toolbar {
+  flex: 0 0 auto;
 
   padding: 9px 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 
   background: #fbfcfe;
 
   border-bottom:
     1px solid
     #edf0f3;
+}
+
+
+.unpaid-water-modal-guide {
+  margin: 0;
 
   color: #8992a2;
 
@@ -2601,15 +2679,138 @@ button.unpaid-summary-card:hover {
 }
 
 
-.unpaid-water-modal-body {
-  flex: 1 1 auto;
+.unpaid-water-export-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 
-  overflow-y: auto;
+  color: #9aa2b1;
 
-  padding: 16px 18px 22px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+.unpaid-water-export-picker-item {
+  position: relative;
 
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  padding: 5px 11px 5px 8px;
+
+  border: 1px solid #e5e9f0;
+  border-radius: 999px;
+
+  background: #ffffff;
+
+  color: #4b5568;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.unpaid-water-export-picker-item:hover {
+  border-color: #c7d4ea;
+  background: #f7faff;
+}
+
+
+/*
+ * 세련된 커스텀 체크박스
+ * (기본 체크박스는 화면에서만 숨기고, 옆의 span으로 모양을 대신 그립니다)
+ */
+.unpaid-checkbox-native {
+  position: absolute;
+
+  width: 16px;
+  height: 16px;
+
+  margin: 0;
+
+  opacity: 0;
+
+  cursor: pointer;
+}
+
+
+.unpaid-checkbox-box {
+  position: relative;
+
+  flex: 0 0 auto;
+
+  width: 16px;
+  height: 16px;
+
+  border: 1.5px solid #c7cedb;
+  border-radius: 5px;
+
+  background: #ffffff;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.unpaid-checkbox-native:checked
++ .unpaid-checkbox-box {
+  border-color: #2563eb;
+
+  background:
+    linear-gradient(
+      135deg,
+      #4389ff,
+      #2563eb
+    );
+}
+
+
+.unpaid-checkbox-native:checked
++ .unpaid-checkbox-box::after {
+  content: "";
+
+  position: absolute;
+
+  left: 5px;
+  top: 1px;
+
+  width: 4px;
+  height: 8px;
+
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+
+  transform: rotate(45deg);
+}
+
+
+.unpaid-checkbox-native:focus-visible
++ .unpaid-checkbox-box {
+  box-shadow:
+    0 0 0 3px
+    rgba(37, 99, 235, 0.22);
+}
+
+
+.unpaid-water-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  padding: 16px 18px 20px;
+
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 14px;
 
   background: #ffffff;
@@ -2617,6 +2818,14 @@ button.unpaid-summary-card:hover {
 
 
 .unpaid-water-group {
+  flex: 0 0 240px;
+
+  width: 240px;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
   border:
     1px solid
     #e5e9f0;
@@ -2624,19 +2833,25 @@ button.unpaid-summary-card:hover {
   border-radius: 12px;
 
   overflow: hidden;
+
+  background: #fbfcfe;
+}
+
+
+.unpaid-water-group.is-unassigned {
+  border-color: #f3d19f;
+  background: #fffaf2;
 }
 
 
 .unpaid-water-group-title {
-  width: 100%;
+  flex: 0 0 auto;
 
-  padding: 9px 14px;
+  padding: 10px 12px;
 
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  border: 0;
+  flex-direction: column;
+  gap: 3px;
 
   background:
     linear-gradient(
@@ -2649,61 +2864,52 @@ button.unpaid-summary-card:hover {
 
   font-size: 12.5px;
   font-weight: 800;
-  font-family: inherit;
-
-  cursor: pointer;
-
-  transition: background 0.15s ease;
 }
 
 
-.unpaid-water-group-title:hover {
+.unpaid-water-group.is-unassigned
+.unpaid-water-group-title {
   background:
     linear-gradient(
       135deg,
-      #dfeaff,
-      #eef4ff
+      #fff3df,
+      #fffaf2
     );
+
+  color: #b5690f;
 }
 
 
-.unpaid-water-group-title-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-
-.unpaid-water-group-chevron {
-  font-size: 13px;
-
-  transition: transform 0.15s ease;
-}
-
-
-.unpaid-water-group-chevron.is-open {
-  transform: rotate(180deg);
+.unpaid-water-group-title-name {
+  overflow-wrap: break-word;
 }
 
 
 .unpaid-water-group-title-right {
   color: #6b87c9;
 
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
+}
 
-  white-space: nowrap;
+
+.unpaid-water-group.is-unassigned
+.unpaid-water-group-title-right {
+  color: #c68a3f;
 }
 
 
 .unpaid-water-group-items {
+  flex: 1 1 auto;
+  min-height: 0;
+
   padding: 8px;
 
   display: flex;
   flex-direction: column;
   gap: 6px;
 
-  min-height: 34px;
+  overflow-y: auto;
 }
 
 
@@ -2726,11 +2932,11 @@ button.unpaid-summary-card:hover {
 
 
 .unpaid-water-item {
-  padding: 8px 10px;
+  padding: 8px 9px;
 
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 3px;
 
   border:
     1px solid
@@ -2738,7 +2944,7 @@ button.unpaid-summary-card:hover {
 
   border-radius: 9px;
 
-  background: #fafbfc;
+  background: #ffffff;
 
   cursor: grab;
 
@@ -2759,6 +2965,23 @@ button.unpaid-summary-card:hover {
 }
 
 
+.unpaid-water-item-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+
+.unpaid-water-item-head strong {
+  color: #222b3c;
+
+  font-size: 11.5px;
+  font-weight: 800;
+
+  overflow-wrap: break-word;
+}
+
+
 .unpaid-water-item-handle {
   flex: 0 0 auto;
 
@@ -2768,60 +2991,376 @@ button.unpaid-summary-card:hover {
 
   color: #b7bfcc;
 
-  font-size: 13px;
-}
-
-
-.unpaid-water-item-main {
-  flex: 0 0 auto;
-
-  min-width: 130px;
-
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-
-.unpaid-water-item-main strong {
-  color: #222b3c;
-
   font-size: 12px;
-  font-weight: 800;
 }
 
 
-.unpaid-water-item-main span {
+.unpaid-water-item-sub {
   color: #7d879a;
 
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
+
+  overflow-wrap: break-word;
 }
 
 
 .unpaid-water-item-address {
-  flex: 1 1 auto;
-
   color: #8992a2;
 
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-
-  text-align: right;
 
   overflow-wrap: break-word;
 }
 
 
 .unpaid-water-item-amount {
-  flex: 0 0 auto;
-
   color: #e15b30;
 
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
 
+  text-align: right;
+}
+
+
+/* =========================================================
+   단수리스트 - 이미지 전용 템플릿 (화면 밖에 숨김)
+
+   - 여러 색을 섞지 않고, 하나의 포인트 색과 넉넉한 여백・큰 글씨로
+     정리해서 심플하면서도 한눈에 잘 들어오는 디자인으로 구성했습니다.
+========================================================= */
+
+.unpaid-water-export-template {
+  position: fixed;
+
+  top: 0;
+  left: -10000px;
+
+  width: 900px;
+
+  box-sizing: border-box;
+
+  padding: 32px;
+
+  background: #ffffff;
+}
+
+
+.unpaid-water-export-header {
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+
+  border-bottom:
+    1px solid
+    #e3e7ed;
+}
+
+
+.unpaid-water-export-header strong {
+  color: #1c2437;
+
+  font-size: 25px;
+  font-weight: 900;
+
+  letter-spacing: -0.2px;
+}
+
+
+.unpaid-water-export-header-date {
+  color: #8b93a3;
+
+  font-size: 15px;
+  font-weight: 700;
+}
+
+
+/*
+ * 구별로 한 줄씩(테이블 형태) 표시해서, 카드 형태보다
+ * 훨씬 더 많은 세대를 한 화면(이미지)에 담을 수 있도록 합니다.
+ */
+.unpaid-water-export-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+
+.unpaid-water-export-section {
+  break-inside: avoid;
+}
+
+
+.unpaid-water-export-section-title {
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+
+  border-bottom:
+    2px solid
+    #1c2437;
+}
+
+
+.unpaid-water-export-section-name {
+  color: #1c2437;
+
+  font-size: 19px;
+  font-weight: 900;
+}
+
+
+.unpaid-water-export-section-meta {
+  color: #6b7280;
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+
+.unpaid-water-export-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  table-layout: fixed;
+}
+
+
+.unpaid-water-export-table th,
+.unpaid-water-export-table td {
+  padding: 12px 12px;
+
+  font-size: 15px;
+
+  text-align: left;
+
+  border-bottom:
+    1px solid
+    #eef1f5;
+
+  overflow-wrap: break-word;
+}
+
+
+.unpaid-water-export-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+
+.unpaid-water-export-table thead th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+
+  background: #ffffff;
+
+  color: #9aa2b1;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  letter-spacing: 0.2px;
+
+  border-bottom:
+    1px solid
+    #e3e7ed;
+}
+
+
+.unpaid-water-export-table th:nth-child(1),
+.unpaid-water-export-table td:nth-child(1) {
+  width: 176px;
+}
+
+
+.unpaid-water-export-table th:nth-child(2),
+.unpaid-water-export-table td:nth-child(2) {
+  width: 68px;
+}
+
+
+.unpaid-water-export-table th:nth-child(3),
+.unpaid-water-export-table td:nth-child(3) {
+  width: 190px;
+}
+
+
+.unpaid-water-export-table th:nth-child(4),
+.unpaid-water-export-table td:nth-child(4) {
+  width: 82px;
+}
+
+
+.unpaid-water-export-table th:nth-child(5),
+.unpaid-water-export-table td:nth-child(5) {
+  width: 128px;
+}
+
+
+.unpaid-water-export-table th:nth-child(6),
+.unpaid-water-export-table td:nth-child(6) {
+  width: 140px;
+}
+
+
+.unpaid-water-export-col-villa {
+  color: #1c2437;
+  font-weight: 800;
+}
+
+
+.unpaid-water-export-col-room {
+  color: #374154;
+  font-weight: 700;
+
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+.unpaid-water-export-col-addr {
+  color: #7a8296;
+  font-weight: 500;
+}
+
+
+.unpaid-water-export-col-name {
+  color: #374154;
+  font-weight: 700;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+.unpaid-water-export-col-phone {
+  color: #7a8296;
+  font-weight: 600;
+}
+
+
+.unpaid-water-export-col-amount {
+  color: #1d4ed8;
+  font-weight: 900;
+
+  text-align: right;
+}
+
+
+.unpaid-water-export-empty {
+  padding: 18px 0;
+
+  text-align: center;
+
+  color: #adb4c0;
+
+  font-size: 14px;
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   단수리스트 - 이미지 미리보기 팝업
+========================================================= */
+
+.unpaid-water-preview-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 24px 60px
+    rgba(15, 23, 42, 0.28);
+}
+
+
+.unpaid-water-preview-body {
+  flex: 1 1 auto;
+
+  padding: 16px 18px;
+
+  overflow: auto;
+
+  display: flex;
+  justify-content: center;
+
+  background: #f4f6f9;
+}
+
+
+.unpaid-water-preview-body img {
+  max-width: 100%;
+  height: auto;
+
+  border-radius: 8px;
+
+  box-shadow:
+    0 4px 14px
+    rgba(15, 23, 42, 0.12);
+}
+
+
+.unpaid-water-preview-actions {
+  flex: 0 0 auto;
+
+  padding: 14px 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+
+  border-top:
+    1px solid
+    #edf0f3;
+}
+
+
+.unpaid-water-preview-cancel {
+  height: 34px;
+
+  padding: 0 16px;
+
+  border: 1px solid #e2e6ee;
+  border-radius: 9px;
+
+  background: #ffffff;
+
+  color: #6b7280;
+
+  font-size: 12.5px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.unpaid-water-preview-cancel:hover {
+  background: #f4f6f9;
+  border-color: #d7dce4;
 }
 
 

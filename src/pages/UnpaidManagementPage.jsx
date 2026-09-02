@@ -3,6 +3,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -170,6 +171,22 @@ const extractGu = (address) => {
 
   return found || GU_FALLBACK;
 };
+
+
+/*
+ * 단수리스트 팝업에서 "기타" 구역에 표시할 이름
+ * (아직 구가 정해지지 않아, 왼쪽에서 오른쪽 구역으로 끌어다 놓기 전 단계)
+ */
+const WATER_UNASSIGNED_LABEL =
+  "단수예정리스트";
+
+const getGuDisplayLabel = (
+  gu
+) =>
+  gu ===
+  GU_FALLBACK
+    ? WATER_UNASSIGNED_LABEL
+    : gu;
 
 
 /* =========================================================
@@ -1270,7 +1287,6 @@ const sanitizeRowForSave = (row) => {
     balance: payment.balance,
     status: row.status || payment.status,
     waterCut: Boolean(row.waterCut),
-    waterCutStartDate: row.waterCutStartDate || null,
     partialDate: row.partialDate || "",
     paidDate: row.paidDate || "",
     note: row.note || "",
@@ -1367,6 +1383,29 @@ export default function UnpaidManagementPage() {
   const pageRootRef =
     useRef(null);
 
+  /*
+   * 위쪽 고정 영역(검색창 포함) DOM을 가리키는 ref.
+   */
+  const stickyTopRef =
+    useRef(null);
+
+  /*
+   * 표 목록이 실제로 스크롤되는 영역(unpaid-table-scroll) DOM을 가리키는 ref.
+   * 이 영역의 화면상 시작 위치를 측정해서, 화면(뷰포트) 높이에서 남는
+   * 만큼만 표 영역의 높이로 잡아줍니다.
+   * → 표 영역 자체가 "제목행은 위에 고정된 채, 내용 행만 스크롤되는"
+   *   독립된 스크롤 박스가 되므로, 위쪽 고정 영역과 자리를 두고
+   *   겹치거나 그 틈으로 목록이 지나가 보이는 문제가 생기지 않습니다.
+   */
+  const tableScrollRef =
+    useRef(null);
+
+  const [
+    tableScrollMaxHeight,
+    setTableScrollMaxHeight,
+  ] =
+    useState(null);
+
 
   const [rows, setRows] =
     useState([]);
@@ -1402,6 +1441,17 @@ export default function UnpaidManagementPage() {
     setStatusFilter,
   ] =
     useState("all");
+
+
+  /*
+   * 상단 "단수 조치" 요약 박스를 클릭했을 때만 켜지는 필터
+   * (단수 처리된 목록만 표시)
+   */
+  const [
+    waterCutFilter,
+    setWaterCutFilter,
+  ] =
+    useState(false);
 
 
   /*
@@ -1857,36 +1907,55 @@ export default function UnpaidManagementPage() {
       () => ({})
     );
 
-  const waterListCaptureRef =
-    useRef(null);
-
-  const waterModalRef =
-    useRef(null);
-
   const dragSourceRef =
     useRef(null);
 
   /*
-   * 단수리스트 - 구별로 펼침/접힘 상태
-   * (기본값 : 전부 펼침. 목록이 많은 구는 제목을 눌러 접을 수 있습니다)
+   * 단수리스트 - 이미지 미리보기
+   * { dataUrl, fileName } | null
+   * (null이 아니면 미리보기 팝업이 열립니다)
    */
   const [
-    expandedGuSet,
-    setExpandedGuSet,
+    waterImagePreview,
+    setWaterImagePreview,
+  ] =
+    useState(null);
+
+  const [
+    waterImageGenerating,
+    setWaterImageGenerating,
+  ] =
+    useState(false);
+
+  /*
+   * 단수리스트 - 이미지 저장용 "깨끗한" 전용 템플릿
+   *
+   * 화면에 보이는 인터랙티브한 보드(드래그 핸들, 스크롤 등)를 그대로
+   * 캡쳐하지 않고, 이미지 전용으로 미리 만들어 둔(화면 밖에 숨겨진)
+   * 템플릿만 캡쳐합니다. (단수예정리스트는 이미지에서 항상 제외)
+   */
+  const waterExportRef =
+    useRef(null);
+
+  /*
+   * 이미지에 포함할 구 (기본값 : 5개 구 전부 선택)
+   */
+  const [
+    waterImageGuSelection,
+    setWaterImageGuSelection,
   ] =
     useState(
       () =>
-        new Set([
-          ...GU_LIST,
-          GU_FALLBACK,
-        ])
+        new Set(
+          GU_LIST
+        )
     );
 
-  const toggleWaterGroupExpand =
+  const toggleWaterImageGuSelection =
     (
       gu
     ) => {
-      setExpandedGuSet(
+      setWaterImageGuSelection(
         (
           current
         ) => {
@@ -2035,14 +2104,27 @@ export default function UnpaidManagementPage() {
 
   const saveSnapshot =
     useCallback(
-      async () => {
+      async (
+        options
+      ) => {
+        const {
+          silent =
+            false,
+        } =
+          options ||
+          {};
+
         if (
           rows.length ===
           0
         ) {
-          alert(
-            "저장할 미납관리 자료가 없습니다. 먼저 엑셀을 업로드해 주세요."
-          );
+          if (
+            !silent
+          ) {
+            alert(
+              "저장할 미납관리 자료가 없습니다. 먼저 엑셀을 업로드해 주세요."
+            );
+          }
 
           return false;
         }
@@ -2156,12 +2238,20 @@ export default function UnpaidManagementPage() {
           setCurrentSnapshotLabel(
             `${formatDateTime(
               savedAtMillis
-            )} 저장분`
+            )} ${
+              silent
+                ? "자동 저장됨"
+                : "저장분"
+            }`
           );
 
-          alert(
-            "현재 미납관리 내용을 저장했습니다."
-          );
+          if (
+            !silent
+          ) {
+            alert(
+              "현재 미납관리 내용을 저장했습니다."
+            );
+          }
 
           return true;
         } catch (error) {
@@ -2170,9 +2260,13 @@ export default function UnpaidManagementPage() {
             error
           );
 
-          alert(
-            "저장하지 못했습니다."
-          );
+          if (
+            !silent
+          ) {
+            alert(
+              "저장하지 못했습니다."
+            );
+          }
 
           return false;
         } finally {
@@ -2196,6 +2290,188 @@ export default function UnpaidManagementPage() {
         saveSnapshot;
     },
     [saveSnapshot]
+  );
+
+
+  /* =======================================================
+     실시간 자동 저장
+
+     - 화면 내용이 바뀔 때(수정/삭제/엑셀 업로드 등)마다 바로 Firestore에
+       쓰지 않고, 입력이 잠시(4초) 멈췄을 때 한 번만 저장합니다.
+       → 타이핑처럼 짧은 시간에 여러 번 바뀌어도 Firestore 쓰기 횟수가
+         쓸데없이 늘어나지 않습니다. (요금 절약)
+     - [저장] 버튼과 동일하게 "문서 1개 = 날짜 1일" 방식이라, 그날 안에서는
+       이 문서를 계속 덮어쓰기만 합니다. → 불러오기 목록에는 그날의
+       마지막으로 바뀐 내용만 남습니다.
+     - 실제로 바뀐 내용이 없으면(isDirty가 아니면) 저장을 시도하지 않으므로,
+       페이지만 열어보고 아무것도 바꾸지 않은 날은 문서가 새로 생기지 않습니다.
+  ======================================================= */
+
+  const AUTOSAVE_DEBOUNCE_MS = 4000;
+
+  const autosaveTimerRef =
+    useRef(null);
+
+  useEffect(
+    () => {
+      if (
+        !isDirty ||
+        rows.length ===
+          0
+      ) {
+        return undefined;
+      }
+
+      if (
+        autosaveTimerRef.current
+      ) {
+        clearTimeout(
+          autosaveTimerRef.current
+        );
+      }
+
+      autosaveTimerRef.current =
+        setTimeout(
+          () => {
+            saveSnapshotRef.current?.(
+              {
+                silent: true,
+              }
+            );
+          },
+          AUTOSAVE_DEBOUNCE_MS
+        );
+
+      return () => {
+        if (
+          autosaveTimerRef.current
+        ) {
+          clearTimeout(
+            autosaveTimerRef.current
+          );
+        }
+      };
+    },
+    [
+      rows,
+      isDirty,
+    ]
+  );
+
+
+  /* =======================================================
+     표 목록 영역의 높이를 화면(뷰포트)에 맞춰 계산
+
+     - 표 영역(unpaid-table-scroll)이 화면에서 실제로 시작하는
+       위치를 측정해서, 화면 아래쪽까지 남는 만큼만 표 영역의
+       높이로 잡아줍니다.
+     - 표 영역 자체에 세로 스크롤을 주고(overflow-y: auto),
+       그 안에서 제목 줄(thead)만 top: 0 으로 고정하는 방식이라,
+       위쪽 고정 영역과 자리를 두고 겹칠 일이 없고, 스크롤할 때
+       목록이 고정된 곳 뒤로 지나가 보이는 문제도 생기지 않습니다.
+     - 위쪽 고정 영역의 높이(문구 길이, 요약 숫자 등으로 바뀔 수 있음),
+       창 크기, 스크롤 위치가 바뀔 때마다 다시 계산합니다.
+  ======================================================= */
+
+  useLayoutEffect(
+    () => {
+      const TABLE_BOTTOM_GAP = 24;
+      const MIN_TABLE_HEIGHT = 320;
+
+      let frame = null;
+
+      const measure = () => {
+        const node =
+          tableScrollRef.current;
+
+        if (!node) {
+          return;
+        }
+
+        const top =
+          node.getBoundingClientRect()
+            .top;
+
+        const next = Math.max(
+          MIN_TABLE_HEIGHT,
+          window.innerHeight -
+            top -
+            TABLE_BOTTOM_GAP
+        );
+
+        setTableScrollMaxHeight(
+          next
+        );
+      };
+
+      const scheduleMeasure = () => {
+        if (frame) {
+          cancelAnimationFrame(
+            frame
+          );
+        }
+
+        frame = requestAnimationFrame(
+          measure
+        );
+      };
+
+      measure();
+
+      let resizeObserver = null;
+
+      if (
+        typeof ResizeObserver !==
+        "undefined"
+      ) {
+        resizeObserver =
+          new ResizeObserver(
+            scheduleMeasure
+          );
+
+        if (stickyTopRef.current) {
+          resizeObserver.observe(
+            stickyTopRef.current
+          );
+        }
+      }
+
+      window.addEventListener(
+        "resize",
+        scheduleMeasure
+      );
+
+      window.addEventListener(
+        "scroll",
+        scheduleMeasure,
+        {
+          passive: true,
+        }
+      );
+
+      return () => {
+        if (frame) {
+          cancelAnimationFrame(
+            frame
+          );
+        }
+
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+
+        window.removeEventListener(
+          "resize",
+          scheduleMeasure
+        );
+
+        window.removeEventListener(
+          "scroll",
+          scheduleMeasure
+        );
+      };
+    },
+    []
   );
 
 
@@ -2996,53 +3272,28 @@ export default function UnpaidManagementPage() {
   /* =======================================================
      단수 상태 변경 (화면에서만 즉시 반영)
 
-     - 단수 체크(켜기) : 시작일만 기록해 둡니다.
-     - 단수 해제(끄기) : 시작일 ~ 오늘(해제일)을 "M/D 단수 ~ M/D 해제"
-       형태로 비고 맨 앞에 추가합니다. (이미 비고 내용이 있으면 그 앞에 붙임)
-       이후에는 비고에서 자유롭게 수정/삭제할 수 있습니다.
+     - 단수 체크(켜기) : 체크하는 즉시 "[M/D 단수]"를 비고 맨 앞에 추가합니다.
+     - 단수 해제(끄기) : 해제하는 즉시 "[M/D 해제]"를 비고 맨 앞에 추가합니다.
+     - 이미 비고에 다른 내용이 있으면 그 앞에 붙으며, 이후에는 비고에서
+       자유롭게 수정/삭제할 수 있습니다.
   ======================================================= */
 
   const toggleWaterCut =
     (
       row
     ) => {
-      const now =
-        new Date();
+      const nextOn =
+        !row.waterCut;
 
-      if (
-        !row.waterCut
-      ) {
-        updateLocalRow(
-          row.id,
-          {
-            waterCut:
-              true,
-
-            waterCutStartDate:
-              now.getTime(),
-          }
-        );
-
-        return;
-      }
-
-      const startLabel =
-        row.waterCutStartDate
-          ? formatMonthDay(
-              new Date(
-                row.waterCutStartDate
-              )
-            )
-          : formatMonthDay(
-              now
-            );
-
-      const endLabel =
+      const label =
         formatMonthDay(
-          now
+          new Date()
         );
 
-      const stampText = `[${startLabel} 단수 ~ ${endLabel} 해제] `;
+      const stampText =
+        nextOn
+          ? `[${label} 단수] `
+          : `[${label} 해제] `;
 
       const existingNote =
         row.note ||
@@ -3057,10 +3308,7 @@ export default function UnpaidManagementPage() {
         row.id,
         {
           waterCut:
-            false,
-
-          waterCutStartDate:
-            null,
+            nextOn,
 
           note:
             nextNote,
@@ -3193,11 +3441,10 @@ export default function UnpaidManagementPage() {
         groups
       );
 
-      setExpandedGuSet(
-        new Set([
-          ...GU_LIST,
-          GU_FALLBACK,
-        ])
+      setWaterImageGuSelection(
+        new Set(
+          GU_LIST
+        )
       );
 
       setWaterListModalOpen(
@@ -3368,30 +3615,30 @@ export default function UnpaidManagementPage() {
 
 
   /* =======================================================
-     단수리스트 - 이미지로 저장
+     단수리스트 - 이미지 미리보기 생성
 
-     팝업의 버튼/헤더는 제외하고, 구별 목록 영역만
-     캡쳐해서 PNG 이미지로 다운로드합니다.
+     화면에 보이는 인터랙티브한 보드(드래그 핸들/스크롤 등)를 그대로
+     캡쳐하지 않고, 화면 밖에 별도로 준비해 둔 "이미지 전용 템플릿"
+     (waterExportRef, 선택한 구만 / 단수예정리스트는 항상 제외)만
+     캡쳐해서 PNG 이미지를 만듭니다.
+     (바로 저장하지 않고 먼저 미리보기로 보여줍니다)
   ======================================================= */
 
-  const handleSaveWaterListImage =
+  const generateWaterListImagePreview =
     async () => {
-      const confirmed =
-        window.confirm(
-          "단수리스트 내용을 이미지로 저장하시겠습니까?"
+      if (
+        waterImageGuSelection.size ===
+        0
+      ) {
+        alert(
+          "이미지에 포함할 구를 최소 1개는 선택해 주세요."
         );
 
-      if (
-        !confirmed
-      ) {
         return;
       }
 
       const target =
-        waterListCaptureRef.current;
-
-      const modalEl =
-        waterModalRef.current;
+        waterExportRef.current;
 
       if (
         !target
@@ -3399,54 +3646,13 @@ export default function UnpaidManagementPage() {
         return;
       }
 
-      /*
-       * 이미지에는 접혀있는 구도 전부 펼쳐진 상태로,
-       * 스크롤에 가려지는 부분 없이 전체 내용이 보여야 하므로
-       * - 모든 구를 펼치고
-       * - 팝업/목록 영역의 높이 제한(overflow, max-height)을
-       *   캡쳐 직전에만 잠시 풀어두었다가, 캡쳐 후 원래대로 되돌립니다.
-       */
-      const previousExpanded =
-        expandedGuSet;
-
-      const previousModalMaxHeight =
-        modalEl?.style.maxHeight;
-
-      const previousModalOverflow =
-        modalEl?.style.overflow;
-
-      const previousTargetMaxHeight =
-        target.style.maxHeight;
-
-      const previousTargetOverflow =
-        target.style.overflow;
-
-      setExpandedGuSet(
-        new Set([
-          ...GU_LIST,
-          GU_FALLBACK,
-        ])
+      setWaterImageGenerating(
+        true
       );
 
-      if (
-        modalEl
-      ) {
-        modalEl.style.maxHeight =
-          "none";
-
-        modalEl.style.overflow =
-          "visible";
-      }
-
-      target.style.maxHeight =
-        "none";
-
-      target.style.overflow =
-        "visible";
-
       /*
-       * setExpandedGuSet / 스타일 변경이 화면에 실제로
-       * 반영(리렌더 + 레이아웃 재계산)되기를 두 프레임 기다립니다.
+       * 방금 바뀐 구 선택(waterImageGuSelection)이 이미지 전용
+       * 템플릿에 반영되기를 한 프레임 기다립니다.
        */
       await new Promise(
         (
@@ -3468,14 +3674,6 @@ export default function UnpaidManagementPage() {
               backgroundColor:
                 "#ffffff",
               scale: 2,
-              width:
-                target.scrollWidth,
-              height:
-                target.scrollHeight,
-              windowWidth:
-                target.scrollWidth,
-              windowHeight:
-                target.scrollHeight,
             }
           );
 
@@ -3484,53 +3682,67 @@ export default function UnpaidManagementPage() {
             "image/png"
           );
 
-        const link =
-          document.createElement(
-            "a"
-          );
-
-        link.href =
-          dataUrl;
-
-        link.download = `단수리스트_${formatDateKey(
-          Date.now()
-        )}.png`;
-
-        link.click();
+        setWaterImagePreview(
+          {
+            dataUrl,
+            fileName: `단수리스트_${formatDateKey(
+              Date.now()
+            )}.png`,
+          }
+        );
       } catch (error) {
         console.error(
-          "단수리스트 이미지 저장 오류:",
+          "단수리스트 이미지 생성 오류:",
           error
         );
 
         alert(
-          "이미지로 저장하지 못했습니다."
+          "이미지를 만들지 못했습니다."
         );
       } finally {
-        if (
-          modalEl
-        ) {
-          modalEl.style.maxHeight =
-            previousModalMaxHeight ||
-            "";
-
-          modalEl.style.overflow =
-            previousModalOverflow ||
-            "";
-        }
-
-        target.style.maxHeight =
-          previousTargetMaxHeight ||
-          "";
-
-        target.style.overflow =
-          previousTargetOverflow ||
-          "";
-
-        setExpandedGuSet(
-          previousExpanded
+        setWaterImageGenerating(
+          false
         );
       }
+    };
+
+
+  /*
+   * 단수리스트 - 이미지 미리보기에서 [저장]을 눌렀을 때
+   * 실제 파일 다운로드를 실행합니다.
+   */
+  const confirmSaveWaterListImage =
+    () => {
+      if (
+        !waterImagePreview
+      ) {
+        return;
+      }
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href =
+        waterImagePreview.dataUrl;
+
+      link.download =
+        waterImagePreview.fileName;
+
+      link.click();
+
+      setWaterImagePreview(
+        null
+      );
+    };
+
+
+  const closeWaterListImagePreview =
+    () => {
+      setWaterImagePreview(
+        null
+      );
     };
 
 
@@ -3714,6 +3926,14 @@ export default function UnpaidManagementPage() {
             }
 
 
+            if (
+              waterCutFilter &&
+              !row.waterCut
+            ) {
+              return false;
+            }
+
+
             const unpaidCount =
               row.unpaidCount ||
               0;
@@ -3791,6 +4011,7 @@ export default function UnpaidManagementPage() {
         rows,
         search,
         statusFilter,
+        waterCutFilter,
         monthFilter,
       ]
     );
@@ -3862,6 +4083,16 @@ export default function UnpaidManagementPage() {
 
 
       {/* ===============================================
+          검색창을 포함한 위쪽 영역 전부를 화면에 고정하고,
+          아래 미납목록 표만 스크롤되도록 감싼 영역
+      =============================================== */}
+
+      <div
+        className="unpaid-sticky-top"
+        ref={stickyTopRef}
+      >
+
+      {/* ===============================================
           HEADER
       =============================================== */}
 
@@ -3879,28 +4110,22 @@ export default function UnpaidManagementPage() {
             </h2>
 
             <p>
-              관리비 미납 현황과 입금,
-              잔액 및 단수 상태를 관리합니다.
-
               {currentSnapshotLabel && (
-                <span className="unpaid-current-label">
-                  {" "}
-                  · 표시중 : {currentSnapshotLabel}
+                <span className="unpaid-header-meta unpaid-current-label">
+                  표시중 : {currentSnapshotLabel}
                 </span>
               )}
 
               {isDirty && (
-                <span className="unpaid-dirty-label">
-                  {" "}
-                  · 저장되지 않은 변경사항이 있습니다
+                <span className="unpaid-header-meta unpaid-dirty-label">
+                  저장되지 않은 변경사항이 있습니다
                 </span>
               )}
 
               {selectedRowIds.size >
                 0 && (
-                <span className="unpaid-selected-label">
-                  {" "}
-                  · 선택됨 {selectedRowIds.size}건
+                <span className="unpaid-header-meta unpaid-selected-label">
+                  선택됨 {selectedRowIds.size}건
                   <button
                     type="button"
                     className="unpaid-selected-clear"
@@ -4042,11 +4267,15 @@ export default function UnpaidManagementPage() {
         <button
           type="button"
           className="unpaid-summary-card unpaid-summary-total"
-          onClick={() =>
+          onClick={() => {
             setStatusFilter(
               "all"
-            )
-          }
+            );
+
+            setWaterCutFilter(
+              false
+            );
+          }}
         >
           <div className="unpaid-summary-icon">
             <FiUsers />
@@ -4070,11 +4299,15 @@ export default function UnpaidManagementPage() {
         <button
           type="button"
           className="unpaid-summary-card unpaid-summary-unpaid"
-          onClick={() =>
+          onClick={() => {
             setStatusFilter(
               "unpaid"
-            )
-          }
+            );
+
+            setWaterCutFilter(
+              false
+            );
+          }}
         >
           <div className="unpaid-summary-icon">
             <FiAlertCircle />
@@ -4098,11 +4331,15 @@ export default function UnpaidManagementPage() {
         <button
           type="button"
           className="unpaid-summary-card unpaid-summary-partial"
-          onClick={() =>
+          onClick={() => {
             setStatusFilter(
               "partial"
-            )
-          }
+            );
+
+            setWaterCutFilter(
+              false
+            );
+          }}
         >
           <div className="unpaid-summary-icon">
             <FiDollarSign />
@@ -4126,11 +4363,15 @@ export default function UnpaidManagementPage() {
         <button
           type="button"
           className="unpaid-summary-card unpaid-summary-paid"
-          onClick={() =>
+          onClick={() => {
             setStatusFilter(
               "paid"
-            )
-          }
+            );
+
+            setWaterCutFilter(
+              false
+            );
+          }}
         >
           <div className="unpaid-summary-icon">
             <FiCheckCircle />
@@ -4151,7 +4392,19 @@ export default function UnpaidManagementPage() {
         </button>
 
 
-        <div className="unpaid-summary-card unpaid-summary-water">
+        <button
+          type="button"
+          className="unpaid-summary-card unpaid-summary-water"
+          onClick={() => {
+            setStatusFilter(
+              "all"
+            );
+
+            setWaterCutFilter(
+              true
+            );
+          }}
+        >
           <div className="unpaid-summary-icon">
             <FiDroplet />
           </div>
@@ -4168,7 +4421,7 @@ export default function UnpaidManagementPage() {
               </small>
             </strong>
           </div>
-        </div>
+        </button>
 
 
         <div className="unpaid-summary-card unpaid-summary-balance">
@@ -4210,11 +4463,15 @@ export default function UnpaidManagementPage() {
             }
             onChange={(
               event
-            ) =>
+            ) => {
               setStatusFilter(
                 event.target.value
-              )
-            }
+              );
+
+              setWaterCutFilter(
+                false
+              );
+            }}
           >
             {STATUS_FILTERS.map(
               (option) => (
@@ -4323,6 +4580,8 @@ export default function UnpaidManagementPage() {
 
       </div>
 
+      </div>
+
 
       {/* ===============================================
           TABLE
@@ -4330,7 +4589,17 @@ export default function UnpaidManagementPage() {
 
       <div className="unpaid-table-card">
 
-        <div className="unpaid-table-scroll">
+        <div
+          className="unpaid-table-scroll"
+          ref={tableScrollRef}
+          style={
+            tableScrollMaxHeight
+              ? {
+                  maxHeight: `${tableScrollMaxHeight}px`,
+                }
+              : undefined
+          }
+        >
 
           <table className="unpaid-table">
 
@@ -4931,9 +5200,6 @@ export default function UnpaidManagementPage() {
         >
           <div
             className="unpaid-water-modal"
-            ref={
-              waterModalRef
-            }
             onClick={(
               event
             ) =>
@@ -4953,11 +5219,16 @@ export default function UnpaidManagementPage() {
                   type="button"
                   className="unpaid-water-image-btn"
                   onClick={
-                    handleSaveWaterListImage
+                    generateWaterListImagePreview
+                  }
+                  disabled={
+                    waterImageGenerating
                   }
                 >
                   <FiImage />
-                  이미지 저장
+                  {waterImageGenerating
+                    ? "생성 중..."
+                    : "이미지 저장"}
                 </button>
 
                 <button
@@ -4975,21 +5246,51 @@ export default function UnpaidManagementPage() {
             </div>
 
 
-            <p className="unpaid-water-modal-guide">
-              항목을 마우스로 누른 상태로 위/아래로 끌어서 원하는 구로 옮길 수 있습니다.
-            </p>
+            <div className="unpaid-water-modal-toolbar">
+
+              <p className="unpaid-water-modal-guide">
+                항목을 마우스로 누른 상태로 좌우로 끌어서 원하는 구로 옮길 수 있습니다.
+              </p>
 
 
-            <div
-              className="unpaid-water-modal-body"
-              ref={
-                waterListCaptureRef
-              }
-            >
+              <div className="unpaid-water-export-picker">
+                <span>이미지에 포함할 구</span>
+
+                {GU_LIST.map(
+                  (gu) => (
+                    <label
+                      key={
+                        gu
+                      }
+                      className="unpaid-water-export-picker-item"
+                    >
+                      <input
+                        type="checkbox"
+                        className="unpaid-checkbox-native"
+                        checked={waterImageGuSelection.has(
+                          gu
+                        )}
+                        onChange={() =>
+                          toggleWaterImageGuSelection(
+                            gu
+                          )
+                        }
+                      />
+                      <span className="unpaid-checkbox-box" />
+                      {gu}
+                    </label>
+                  )
+                )}
+              </div>
+
+            </div>
+
+
+            <div className="unpaid-water-modal-body">
 
               {[
-                ...GU_LIST,
                 GU_FALLBACK,
+                ...GU_LIST,
               ].map(
                 (gu) => {
                   const items =
@@ -4997,15 +5298,6 @@ export default function UnpaidManagementPage() {
                       gu
                     ] ||
                     [];
-
-                  if (
-                    gu ===
-                      GU_FALLBACK &&
-                    items.length ===
-                      0
-                  ) {
-                    return null;
-                  }
 
                   const groupTotal =
                     items.reduce(
@@ -5020,17 +5312,17 @@ export default function UnpaidManagementPage() {
                       0
                     );
 
-                  const isExpanded =
-                    expandedGuSet.has(
-                      gu
-                    );
-
                   return (
                     <div
                       key={
                         gu
                       }
-                      className="unpaid-water-group"
+                      className={`unpaid-water-group ${
+                        gu ===
+                        GU_FALLBACK
+                          ? "is-unassigned"
+                          : ""
+                      }`}
                       onDragOver={
                         handleWaterItemDragOver
                       }
@@ -5039,25 +5331,11 @@ export default function UnpaidManagementPage() {
                       )}
                     >
 
-                      <button
-                        type="button"
-                        className="unpaid-water-group-title"
-                        onClick={() =>
-                          toggleWaterGroupExpand(
+                      <div className="unpaid-water-group-title">
+                        <span className="unpaid-water-group-title-name">
+                          {getGuDisplayLabel(
                             gu
-                          )
-                        }
-                      >
-                        <span className="unpaid-water-group-title-left">
-                          <FiChevronDown
-                            className={`unpaid-water-group-chevron ${
-                              isExpanded
-                                ? "is-open"
-                                : ""
-                            }`}
-                          />
-
-                          {gu}
+                          )}
                         </span>
 
                         <span className="unpaid-water-group-title-right">
@@ -5069,88 +5347,337 @@ export default function UnpaidManagementPage() {
                           )}
                           원
                         </span>
-                      </button>
+                      </div>
 
 
-                      {isExpanded && (
-                        <div className="unpaid-water-group-items">
+                      <div className="unpaid-water-group-items">
 
-                          {items.length ===
-                            0 && (
-                            <div className="unpaid-water-group-empty">
-                              이 구역으로 항목을 끌어다 놓으세요
-                            </div>
-                          )}
+                        {items.length ===
+                          0 && (
+                          <div className="unpaid-water-group-empty">
+                            이 구역으로 항목을 끌어다 놓으세요
+                          </div>
+                        )}
 
-                          {items.map(
-                            (
-                              row,
-                              index
-                            ) => (
-                              <div
-                                key={
-                                  row.id
-                                }
-                                className="unpaid-water-item"
-                                draggable
-                                onDragStart={handleWaterItemDragStart(
-                                  gu,
-                                  index
-                                )}
-                                onDragOver={
-                                  handleWaterItemDragOver
-                                }
-                                onDrop={handleWaterItemDrop(
-                                  gu,
-                                  index
-                                )}
-                              >
+                        {items.map(
+                          (
+                            row,
+                            index
+                          ) => (
+                            <div
+                              key={
+                                row.id
+                              }
+                              className="unpaid-water-item"
+                              draggable
+                              onDragStart={handleWaterItemDragStart(
+                                gu,
+                                index
+                              )}
+                              onDragOver={
+                                handleWaterItemDragOver
+                              }
+                              onDrop={handleWaterItemDrop(
+                                gu,
+                                index
+                              )}
+                            >
 
+                              <div className="unpaid-water-item-head">
                                 <span className="unpaid-water-item-handle">
                                   <FiMove />
                                 </span>
 
-                                <div className="unpaid-water-item-main">
-                                  <strong>
-                                    {row.villaName ||
-                                      "-"}{" "}
-                                    {row.room}
-                                    호
-                                  </strong>
-
-                                  <span>
-                                    {row.tenantName ||
-                                      "-"}{" "}
-                                    ·{" "}
-                                    {row.phone ||
-                                      "-"}
-                                  </span>
-                                </div>
-
-                                <span className="unpaid-water-item-address">
-                                  {row.address ||
-                                    "-"}
-                                </span>
-
-                                <span className="unpaid-water-item-amount">
-                                  {formatMoney(
-                                    row.totalUnpaid
-                                  )}
-                                  원
-                                </span>
-
+                                <strong>
+                                  {row.villaName ||
+                                    "-"}{" "}
+                                  {row.room}
+                                  호
+                                </strong>
                               </div>
-                            )
-                          )}
 
-                        </div>
-                      )}
+                              <span className="unpaid-water-item-sub">
+                                {row.tenantName ||
+                                  "-"}{" "}
+                                ·{" "}
+                                {row.phone ||
+                                  "-"}
+                              </span>
+
+                              <span className="unpaid-water-item-address">
+                                {row.address ||
+                                  "-"}
+                              </span>
+
+                              <span className="unpaid-water-item-amount">
+                                {formatMoney(
+                                  row.totalUnpaid
+                                )}
+                                원
+                              </span>
+
+                            </div>
+                          )
+                        )}
+
+                      </div>
 
                     </div>
                   );
                 }
               )}
 
+            </div>
+
+          </div>
+        </div>
+      )}
+
+
+      {/* ===============================================
+          단수리스트 - 이미지 전용 템플릿 (화면 밖에 숨김)
+
+          - 화면에 보이는 인터랙티브한 보드를 그대로 캡쳐하지 않고,
+            이미지 저장 전용으로 깔끔하게 정리한 이 템플릿만 캡쳐합니다.
+          - 단수예정리스트(기타)는 이미지에 항상 포함하지 않으며,
+            체크한 구만 포함합니다.
+      =============================================== */}
+
+      {waterListModalOpen &&
+        createPortal(
+          <div
+            ref={
+              waterExportRef
+            }
+            className="unpaid-water-export-template"
+          >
+
+            <div className="unpaid-water-export-header">
+              <strong>
+                단수리스트
+              </strong>
+
+              <span className="unpaid-water-export-header-date">
+                {formatDateOnly(
+                  Date.now()
+                )}{" "}
+                기준
+              </span>
+            </div>
+
+
+            <div className="unpaid-water-export-grid">
+
+              {GU_LIST.filter(
+                (gu) =>
+                  waterImageGuSelection.has(
+                    gu
+                  )
+              ).map(
+                (gu) => {
+                  const items =
+                    waterListGroups[
+                      gu
+                    ] ||
+                    [];
+
+                  const groupTotal =
+                    items.reduce(
+                      (
+                        sum,
+                        row
+                      ) =>
+                        sum +
+                        onlyNumber(
+                          row.totalUnpaid
+                        ),
+                      0
+                    );
+
+                  return (
+                    <div
+                      key={
+                        gu
+                      }
+                      className="unpaid-water-export-section"
+                    >
+                      <div className="unpaid-water-export-section-title">
+                        <span className="unpaid-water-export-section-name">
+                          {gu}
+                        </span>
+
+                        <span className="unpaid-water-export-section-meta">
+                          {
+                            items.length
+                          }
+                          세대 · {formatMoney(
+                            groupTotal
+                          )}
+                          원
+                        </span>
+                      </div>
+
+                      {items.length ===
+                      0 ? (
+                        <div className="unpaid-water-export-empty">
+                          대상 없음
+                        </div>
+                      ) : (
+                        <table className="unpaid-water-export-table">
+                          <thead>
+                            <tr>
+                              <th>
+                                빌라명
+                              </th>
+                              <th>
+                                호수
+                              </th>
+                              <th>
+                                주소
+                              </th>
+                              <th>
+                                이름
+                              </th>
+                              <th>
+                                연락처
+                              </th>
+                              <th>
+                                금액
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {items.map(
+                              (
+                                row
+                              ) => (
+                                <tr
+                                  key={
+                                    row.id
+                                  }
+                                >
+                                  <td className="unpaid-water-export-col-villa">
+                                    {row.villaName ||
+                                      "-"}
+                                  </td>
+
+                                  <td className="unpaid-water-export-col-room">
+                                    {row.room}
+                                    호
+                                  </td>
+
+                                  <td className="unpaid-water-export-col-addr">
+                                    {row.address ||
+                                      "-"}
+                                  </td>
+
+                                  <td className="unpaid-water-export-col-name">
+                                    {row.tenantName ||
+                                      "-"}
+                                  </td>
+
+                                  <td className="unpaid-water-export-col-phone">
+                                    {row.phone ||
+                                      "-"}
+                                  </td>
+
+                                  <td className="unpaid-water-export-col-amount">
+                                    {formatMoney(
+                                      row.totalUnpaid
+                                    )}
+                                    원
+                                  </td>
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  );
+                }
+              )}
+
+            </div>
+
+          </div>,
+          document.body
+        )}
+
+
+      {/* ===============================================
+          단수리스트 - 이미지 미리보기 팝업
+
+          - [이미지 저장] 버튼을 누르면 바로 파일로 저장하지 않고
+            먼저 만들어진 이미지를 미리 보여준 뒤,
+            여기서 [저장]을 눌러야 실제로 다운로드됩니다.
+      =============================================== */}
+
+      {waterImagePreview && (
+        <div
+          className="unpaid-modal-overlay"
+          onClick={
+            closeWaterListImagePreview
+          }
+        >
+          <div
+            className="unpaid-water-preview-modal"
+            onClick={(
+              event
+            ) =>
+              event.stopPropagation()
+            }
+          >
+
+            <div className="unpaid-water-modal-header">
+              <h3>
+                <FiImage />
+                이미지 미리보기
+              </h3>
+
+              <button
+                type="button"
+                onClick={
+                  closeWaterListImagePreview
+                }
+              >
+                <FiX />
+              </button>
+            </div>
+
+
+            <div className="unpaid-water-preview-body">
+              <img
+                src={
+                  waterImagePreview.dataUrl
+                }
+                alt="단수리스트 미리보기"
+              />
+            </div>
+
+
+            <div className="unpaid-water-preview-actions">
+              <button
+                type="button"
+                className="unpaid-water-preview-cancel"
+                onClick={
+                  closeWaterListImagePreview
+                }
+              >
+                취소
+              </button>
+
+              <button
+                type="button"
+                className="unpaid-water-image-btn"
+                onClick={
+                  confirmSaveWaterListImage
+                }
+              >
+                <FiSave />
+                이미지 저장
+              </button>
             </div>
 
           </div>
@@ -5307,10 +5834,6 @@ export default function UnpaidManagementPage() {
                               .totalBalance
                           )}
                           원
-                        </span>
-
-                        <span className="unpaid-load-item-note">
-                          (3개월 이상 기준)
                         </span>
                       </div>
 
