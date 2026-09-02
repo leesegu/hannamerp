@@ -1,0 +1,2871 @@
+/* =========================================================
+   미납관리
+========================================================= */
+
+.unpaid-page {
+  width: 100%;
+  min-width: 1040px;
+  padding: 24px 28px 34px;
+  box-sizing: border-box;
+  background:
+    linear-gradient(
+      180deg,
+      #f8fafc 0%,
+      #f5f7fb 100%
+    );
+  min-height: 100%;
+  color: #172033;
+}
+
+
+/* =========================================================
+   숨김
+========================================================= */
+
+.unpaid-hidden-file {
+  display: none;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.unpaid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+
+.unpaid-title-group {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+
+.unpaid-title-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff1e8,
+      #ffe2ce
+    );
+
+  color: #f97316;
+  font-size: 21px;
+
+  box-shadow:
+    0 7px 20px
+    rgba(249, 115, 22, 0.12);
+}
+
+
+.unpaid-title-group h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: #151c2b;
+}
+
+
+.unpaid-title-group p {
+  margin: 5px 0 0;
+  color: #7a8497;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+
+.unpaid-current-label {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+
+.unpaid-dirty-label {
+  color: #e0521f;
+  font-weight: 700;
+}
+
+
+.unpaid-selected-label {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+
+.unpaid-selected-clear {
+  margin-left: 6px;
+
+  padding: 1px 8px;
+
+  border: 1px solid #cbdcff;
+  border-radius: 999px;
+
+  background: #eef4ff;
+
+  color: #2563eb;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+.unpaid-selected-clear:hover {
+  background: #dfeaff;
+}
+
+
+.unpaid-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* =========================================================
+   개월수 필터 (불러오기 버튼 좌측)
+========================================================= */
+
+.unpaid-month-filter-wrap {
+  width: 122px;
+  height: 40px;
+
+  position: relative;
+
+  flex: 0 0 122px;
+}
+
+
+.unpaid-month-filter {
+  width: 100%;
+  height: 100%;
+
+  padding: 0 32px 0 13px;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  cursor: pointer;
+
+  outline: none;
+
+  border:
+    1px solid
+    #dce2ea;
+
+  border-radius: 10px;
+
+  background: #ffffff;
+
+  color: #293246;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.unpaid-month-filter:hover,
+.unpaid-month-filter:focus {
+  border-color: #f4a36b;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(249, 115, 22, 0.08);
+}
+
+
+.unpaid-month-filter-wrap > svg {
+  position: absolute;
+
+  right: 11px;
+  top: 50%;
+
+  transform: translateY(-50%);
+
+  pointer-events: none;
+
+  color: #8a94a7;
+
+  font-size: 15px;
+}
+
+
+/* =========================================================
+   BUTTON
+========================================================= */
+
+.unpaid-btn {
+  height: 40px;
+  padding: 0 15px;
+
+  position: relative;
+
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  cursor: pointer;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.unpaid-btn svg {
+  font-size: 17px;
+}
+
+
+.unpaid-btn:hover {
+  transform: translateY(-1px);
+}
+
+
+.unpaid-btn-load {
+  color: #ffffff;
+  border-color: #4f46e5;
+
+  background:
+    linear-gradient(
+      135deg,
+      #6366f1,
+      #4f46e5
+    );
+
+  box-shadow:
+    0 7px 18px
+    rgba(79, 70, 229, 0.22);
+}
+
+
+.unpaid-btn-load:hover {
+  box-shadow:
+    0 10px 24px
+    rgba(79, 70, 229, 0.28);
+}
+
+
+.unpaid-btn-water {
+  color: #ffffff;
+  border-color: #2563eb;
+
+  background:
+    linear-gradient(
+      135deg,
+      #38bdf8,
+      #2563eb
+    );
+
+  box-shadow:
+    0 7px 18px
+    rgba(37, 99, 235, 0.22);
+}
+
+
+.unpaid-btn-water:hover {
+  box-shadow:
+    0 10px 24px
+    rgba(37, 99, 235, 0.28);
+}
+
+
+.unpaid-btn-save {
+  color: #ffffff;
+  border-color: #16a34a;
+
+  background:
+    linear-gradient(
+      135deg,
+      #22c55e,
+      #16a34a
+    );
+
+  box-shadow:
+    0 7px 18px
+    rgba(22, 163, 74, 0.2);
+}
+
+
+.unpaid-btn-save:hover {
+  box-shadow:
+    0 10px 24px
+    rgba(22, 163, 74, 0.26);
+}
+
+
+.unpaid-save-dot {
+  position: absolute;
+
+  top: -3px;
+  right: -3px;
+
+  width: 10px;
+  height: 10px;
+
+  border-radius: 50%;
+
+  background: #ef4444;
+
+  border:
+    2px solid
+    #ffffff;
+
+  box-shadow:
+    0 0 0 2px
+    rgba(239, 68, 68, 0.25);
+}
+
+
+.unpaid-btn-upload {
+  color: #ffffff;
+  border-color: #f97316;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ff8a34,
+      #f97316
+    );
+
+  box-shadow:
+    0 7px 18px
+    rgba(249, 115, 22, 0.2);
+}
+
+
+.unpaid-btn-upload:hover {
+  box-shadow:
+    0 10px 24px
+    rgba(249, 115, 22, 0.26);
+}
+
+
+.unpaid-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+
+/* =========================================================
+   SUMMARY
+========================================================= */
+
+.unpaid-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(150px, 1fr))
+    minmax(190px, 1.2fr)
+    minmax(150px, 1fr);
+
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+
+.unpaid-summary-card {
+  min-height: 82px;
+  padding: 15px 16px;
+
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  text-align: left;
+
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 4px 15px
+    rgba(15, 23, 42, 0.035);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+
+  color: inherit;
+}
+
+
+button.unpaid-summary-card {
+  cursor: pointer;
+}
+
+
+button.unpaid-summary-card:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 8px 22px
+    rgba(15, 23, 42, 0.07);
+}
+
+
+.unpaid-summary-icon {
+  width: 38px;
+  height: 38px;
+
+  flex: 0 0 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 11px;
+
+  font-size: 18px;
+}
+
+
+.unpaid-summary-card > div:last-child {
+  min-width: 0;
+}
+
+
+.unpaid-summary-card span {
+  display: block;
+
+  color: #8790a2;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  margin-bottom: 5px;
+}
+
+
+.unpaid-summary-card strong {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+
+  font-size: 21px;
+  line-height: 1;
+
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+
+
+.unpaid-summary-card small {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c96a7;
+}
+
+
+.unpaid-summary-total
+.unpaid-summary-icon {
+  color: #3b82f6;
+  background: #eef5ff;
+}
+
+
+.unpaid-summary-unpaid
+.unpaid-summary-icon {
+  color: #ef4444;
+  background: #fff0f0;
+}
+
+
+.unpaid-summary-partial
+.unpaid-summary-icon {
+  color: #f59e0b;
+  background: #fff7df;
+}
+
+
+.unpaid-summary-paid
+.unpaid-summary-icon {
+  color: #16a34a;
+  background: #edf9f1;
+}
+
+
+.unpaid-summary-balance
+.unpaid-summary-icon {
+  color: #e15e0d;
+  background: #fff1e7;
+}
+
+
+.unpaid-summary-water
+.unpaid-summary-icon {
+  color: #2563eb;
+  background: #edf4ff;
+}
+
+
+.unpaid-summary-unpaid strong {
+  color: #e23c3c;
+}
+
+
+.unpaid-summary-partial strong {
+  color: #d58c05;
+}
+
+
+.unpaid-summary-paid strong {
+  color: #14843c;
+}
+
+
+.unpaid-summary-balance strong {
+  color: #e15e0d;
+}
+
+
+/* =========================================================
+   TOOLBAR
+========================================================= */
+
+.unpaid-toolbar {
+  min-height: 58px;
+  padding: 9px 11px;
+
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  gap: 9px;
+
+  margin-bottom: 10px;
+
+  background: #ffffff;
+
+  border:
+    1px solid
+    #e5e9f0;
+
+  border-radius: 13px;
+
+  box-shadow:
+    0 3px 14px
+    rgba(15, 23, 42, 0.025);
+}
+
+
+/* =========================================================
+   STATUS SELECT
+========================================================= */
+
+.unpaid-filter-select-wrap {
+  width: 138px;
+  height: 38px;
+
+  position: relative;
+
+  flex: 0 0 138px;
+}
+
+
+.unpaid-filter-select {
+  width: 100%;
+  height: 100%;
+
+  padding:
+    0 36px
+    0 13px;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  cursor: pointer;
+
+  outline: none;
+
+  border:
+    1px solid
+    #dce2ea;
+
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff,
+      #fafbfc
+    );
+
+  color: #293246;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.unpaid-filter-select:hover,
+.unpaid-filter-select:focus {
+  border-color: #f4a36b;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(249, 115, 22, 0.08);
+}
+
+
+.unpaid-filter-select-wrap > svg {
+  position: absolute;
+
+  right: 12px;
+  top: 50%;
+
+  transform:
+    translateY(-50%);
+
+  pointer-events: none;
+
+  color: #8a94a7;
+
+  font-size: 15px;
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+.unpaid-search {
+  height: 38px;
+  flex: 1;
+
+  max-width: 570px;
+
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  border:
+    1px solid
+    #dce2ea;
+
+  background: #fafbfc;
+
+  border-radius: 9px;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.unpaid-search:focus-within {
+  background: #ffffff;
+
+  border-color: #f3a16a;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(249, 115, 22, 0.075);
+}
+
+
+.unpaid-search > svg {
+  margin-left: 12px;
+
+  font-size: 16px;
+
+  color: #929bad;
+
+  flex: 0 0 auto;
+}
+
+
+.unpaid-search input {
+  width: 100%;
+  height: 100%;
+
+  border: 0;
+  outline: 0;
+
+  background: transparent;
+
+  padding: 0 10px;
+
+  box-sizing: border-box;
+
+  color: #273044;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+
+.unpaid-search input::placeholder {
+  color: #a4abba;
+}
+
+
+.unpaid-search button {
+  width: 34px;
+  height: 34px;
+
+  flex: 0 0 34px;
+
+  border: 0;
+  background: transparent;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #9aa3b3;
+
+  cursor: pointer;
+
+  font-size: 15px;
+}
+
+
+.unpaid-toolbar-right {
+  margin-left: auto;
+
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  flex-wrap: wrap;
+}
+
+
+.unpaid-toolbar-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  white-space: nowrap;
+
+  color: #818a9b;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+
+.unpaid-toolbar-count strong {
+  color: #f97316;
+  font-size: 14px;
+}
+
+
+/* =========================================================
+   TOOLBAR 우측 - 미납/입금/잔액 요약
+   (기존에 표 하단에 있던 요약을 검색창 우측으로 이동)
+========================================================= */
+
+.unpaid-toolbar-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  padding-left: 14px;
+
+  border-left:
+    1px solid
+    #e5e9f0;
+
+  white-space: nowrap;
+}
+
+
+.unpaid-toolbar-summary span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+
+  color: #8992a2;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+.unpaid-toolbar-summary strong {
+  color: #434d61;
+
+  font-size: 13px;
+  font-weight: 900;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+.unpaid-toolbar-summary span.paid strong {
+  color: #168443;
+}
+
+
+.unpaid-toolbar-summary span.balance strong {
+  color: #e15f34;
+}
+
+
+/* =========================================================
+   TABLE CARD
+========================================================= */
+
+.unpaid-table-card {
+  width: 100%;
+
+  background: #ffffff;
+
+  border:
+    1px solid
+    #e3e7ed;
+
+  border-radius: 14px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 5px 20px
+    rgba(15, 23, 42, 0.035);
+}
+
+
+.unpaid-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+
+/* =========================================================
+   TABLE
+
+   기존 17개 컬럼(코드/빌라명/호수/이름/연락처/미납월/개월수/월별금액을
+   각각 나눠 표시)을 12개 컬럼으로 통합해 좌우 스크롤 없이
+   한 화면에서 확인할 수 있도록 했습니다.
+   (표시되는 정보는 그대로이며, 배치만 압축했습니다)
+========================================================= */
+
+.unpaid-table {
+  width: 100%;
+
+  min-width: 1430px;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  table-layout: fixed;
+
+  font-size: 12px;
+}
+
+
+.unpaid-table th {
+  height: 45px;
+
+  padding: 7px 8px;
+
+  box-sizing: border-box;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f7f8fa,
+      #f2f4f7
+    );
+
+  border-bottom:
+    1px solid
+    #dfe3e9;
+
+  border-right:
+    1px solid
+    #e6e9ee;
+
+  color: #525d70;
+
+  font-size: 11px;
+  font-weight: 800;
+
+  text-align: center;
+  vertical-align: middle;
+
+  white-space: nowrap;
+
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+
+.unpaid-table th:last-child {
+  border-right: 0;
+}
+
+
+.unpaid-table td {
+  min-height: 48px;
+
+  padding: 7px 8px;
+
+  box-sizing: border-box;
+
+  vertical-align: middle;
+
+  border-bottom:
+    1px solid
+    #edf0f3;
+
+  border-right:
+    1px solid
+    #f0f2f5;
+
+  color: #374154;
+
+  background: #ffffff;
+
+  transition:
+    background 0.12s ease;
+}
+
+
+.unpaid-table td:last-child {
+  border-right: 0;
+}
+
+
+.unpaid-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+
+.unpaid-table tbody tr:hover td {
+  background: #fffdfa;
+}
+
+
+.unpaid-table tbody tr.is-water-cut td {
+  background: #f8fbff;
+}
+
+
+.unpaid-table tbody tr.is-water-cut:hover td {
+  background: #f3f8ff;
+}
+
+
+.unpaid-table tbody tr.is-row-selected td {
+  background: #fff7ec;
+}
+
+
+.unpaid-table tbody tr.is-row-selected:hover td {
+  background: #fff1de;
+}
+
+
+.unpaid-table tbody tr.is-row-selected td:first-child {
+  box-shadow: inset 3px 0 0 #f97316;
+}
+
+
+/* =========================================================
+   COLUMN
+========================================================= */
+
+.col-no {
+  width: 40px;
+}
+
+.col-unit {
+  width: 205px;
+}
+
+.col-address {
+  width: 190px;
+}
+
+.col-contact {
+  width: 150px;
+}
+
+.col-detail {
+  width: 110px;
+}
+
+.col-total {
+  width: 100px;
+}
+
+.col-paid {
+  width: 116px;
+}
+
+.col-status {
+  width: 98px;
+}
+
+.col-balance {
+  width: 100px;
+}
+
+.col-water {
+  width: 76px;
+}
+
+.col-note {
+  width: 195px;
+}
+
+.col-delete {
+  width: 50px;
+}
+
+
+/* =========================================================
+   COMMON CELLS
+========================================================= */
+
+.cell-center {
+  text-align: center;
+}
+
+
+.cell-index {
+  color: #9aa3b2 !important;
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  user-select: none;
+
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.cell-index:hover {
+  color: #f97316 !important;
+  background: #fff6ee !important;
+}
+
+
+.cell-index.is-selected {
+  color: #ffffff !important;
+  background: #f97316 !important;
+
+  border-radius: 6px;
+}
+
+
+.cell-money {
+  text-align: right;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  white-space: nowrap;
+}
+
+
+.cell-money strong {
+  font-size: 13px;
+}
+
+
+.cell-money span {
+  margin-left: 2px;
+  color: #949cab;
+  font-size: 10px;
+}
+
+
+/* =========================================================
+   세대정보 (코드번호 + 빌라명 + 호수 통합)
+========================================================= */
+
+.unpaid-unit-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+
+.unpaid-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  align-self: flex-start;
+
+  min-width: 40px;
+  height: 20px;
+
+  padding: 0 6px;
+
+  border-radius: 6px;
+
+  background: #f1f4f8;
+
+  color: #596579;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+
+.unpaid-unit-name-line {
+  /*
+   * 빌라명이 길어도 잘리지 않고 호수와 함께
+   * 자연스럽게 줄바꿈되도록 flex 대신 일반 텍스트 흐름 사용
+   */
+  min-width: 0;
+}
+
+
+.unpaid-villa-name {
+  color: #222b3c;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  /*
+   * 잘리지 않도록 - 넘치면 줄바꿈
+   */
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+
+.unpaid-room {
+  margin-left: 5px;
+
+  color: #28364f;
+  font-weight: 800;
+
+  font-size: 11px;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   주소
+========================================================= */
+
+.unpaid-address-cell {
+  line-height: 1.5;
+  color: #657084 !important;
+
+  /*
+   * 잘리지 않도록 - 필요하면 자연스럽게 줄바꿈
+   */
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+
+/* =========================================================
+   연락처 (이름 + 전화 통합)
+========================================================= */
+
+.unpaid-contact-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+
+.unpaid-contact-cell strong {
+  color: #28364f;
+  font-size: 12px;
+  font-weight: 800;
+
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+
+.unpaid-contact-cell span {
+  color: #7d879a;
+
+  font-size: 10px;
+  font-weight: 600;
+
+  white-space: normal;
+  overflow-wrap: break-word;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   미납내역 (미납월 + 개월수 + 월별 금액 통합)
+========================================================= */
+
+.unpaid-detail-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+
+.unpaid-count-badge {
+  align-self: center;
+
+  min-width: 47px;
+  height: 24px;
+
+  padding: 0 8px;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  border: 1px solid #ffd9cd;
+  border-radius: 7px;
+
+  background: #fff0ed;
+
+  color: #e34d38;
+
+  font-size: 10.5px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.unpaid-count-badge:hover {
+  background: #ffe4de;
+}
+
+
+.unpaid-count-badge svg {
+  font-size: 11px;
+
+  transition: transform 0.15s ease;
+}
+
+
+.unpaid-count-badge svg.is-open {
+  transform: rotate(180deg);
+}
+
+
+/*
+ * 미납내역 팝업
+ *
+ * 표 안(td)에 그대로 펼치지 않고 document.body 로 포탈시켜
+ * position:fixed 로 표 위에 겹쳐서 보여줍니다.
+ * (열려도 행 높이가 늘어나지 않습니다)
+ */
+.unpaid-detail-popup {
+  position: fixed;
+
+  transform: translateX(-50%);
+
+  z-index: 500;
+
+  min-width: 150px;
+  max-width: 220px;
+  max-height: 240px;
+
+  overflow-y: auto;
+
+  padding: 8px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  background: #ffffff;
+
+  border:
+    1px solid
+    #ecebee;
+
+  border-radius: 10px;
+
+  box-shadow:
+    0 16px 34px
+    rgba(15, 23, 42, 0.18);
+}
+
+
+.unpaid-detail-popup-empty {
+  padding: 8px 4px;
+
+  text-align: center;
+
+  color: #a4abba;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+
+.unpaid-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  white-space: nowrap;
+
+  padding: 2px 7px;
+
+  border-radius: 6px;
+
+  background: #fff8f3;
+}
+
+
+.unpaid-detail-row span {
+  color: #d96721;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+
+.unpaid-detail-row strong {
+  color: #4a5568;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   TOTAL
+========================================================= */
+
+.cell-total-unpaid {
+  color: #d94835 !important;
+
+  background:
+    #fffdfc !important;
+}
+
+
+.cell-total-unpaid strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+
+/* =========================================================
+   PAYMENT INPUT
+========================================================= */
+
+.unpaid-paid-input-wrap {
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+
+  overflow: hidden;
+
+  border:
+    1px solid
+    #d9dfe8;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.unpaid-paid-input-wrap:focus-within {
+  border-color: #f39a5d;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(249, 115, 22, 0.08);
+}
+
+
+/*
+ * 아직 엔터(또는 포커스 아웃)로 확정하지 않은 입력중 상태
+ */
+.unpaid-paid-input-wrap.is-editing {
+  border-color: #f59e0b;
+  border-style: dashed;
+
+  background: #fffdf5;
+}
+
+
+.unpaid-paid-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+
+  border: 0;
+  outline: 0;
+
+  padding: 0 4px 0 9px;
+
+  box-sizing: border-box;
+
+  background: transparent;
+
+  text-align: right;
+
+  color: #222d40;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+.unpaid-paid-input-wrap input::placeholder {
+  color: #c3c9d4;
+
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+
+.unpaid-paid-input-wrap > span {
+  padding-right: 8px;
+
+  color: #9aa2b1;
+
+  font-size: 10px;
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   STATUS (커스텀 드롭다운)
+
+   - 브라우저 기본 <select> 대신, 버튼 + 포탈 팝업으로
+     직접 만든 목록입니다. (미납내역 팝업과 같은 방식)
+========================================================= */
+
+.unpaid-status-trigger {
+  width: 100%;
+  height: 30px;
+
+  padding: 0 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+
+  outline: none;
+
+  border-radius: 999px;
+
+  font-size: 10px;
+  font-weight: 900;
+  font-family: inherit;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+.unpaid-status-trigger:hover {
+  transform: translateY(-1px);
+}
+
+
+.unpaid-status-trigger.is-open {
+  box-shadow:
+    0 0 0 3px
+    rgba(15, 23, 42, 0.08);
+}
+
+
+.unpaid-status-trigger svg {
+  font-size: 11px;
+
+  transition: transform 0.15s ease;
+}
+
+
+.unpaid-status-trigger svg.is-open {
+  transform: rotate(180deg);
+}
+
+
+.unpaid-status-trigger-dot {
+  width: 6px;
+  height: 6px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+}
+
+
+.unpaid-status-trigger-unpaid {
+  color: #d83f36;
+  background: #fff0ef;
+
+  border:
+    1px solid
+    #ffd5d2;
+}
+
+.unpaid-status-trigger-unpaid .unpaid-status-trigger-dot {
+  background: #d83f36;
+}
+
+
+.unpaid-status-trigger-partial {
+  color: #c87d00;
+  background: #fff7df;
+
+  border:
+    1px solid
+    #fce7ac;
+}
+
+.unpaid-status-trigger-partial .unpaid-status-trigger-dot {
+  background: #c87d00;
+}
+
+
+.unpaid-status-trigger-paid {
+  color: #168241;
+  background: #edf9f1;
+
+  border:
+    1px solid
+    #c9ebd5;
+}
+
+.unpaid-status-trigger-paid .unpaid-status-trigger-dot {
+  background: #168241;
+}
+
+
+/*
+ * 상태 선택 팝업 (document.body 포탈, position: fixed)
+ */
+.unpaid-status-popup {
+  position: fixed;
+
+  z-index: 520;
+
+  transform: translateX(-50%);
+
+  width: 220px;
+
+  padding: 8px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+
+  box-shadow:
+    0 18px 40px
+    rgba(15, 23, 42, 0.18);
+
+  animation:
+    unpaidStatusPopupIn 0.12s ease;
+}
+
+
+@keyframes unpaidStatusPopupIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+
+.unpaid-status-option {
+  width: 100%;
+
+  padding: 8px 10px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  background: transparent;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+
+.unpaid-status-option:hover {
+  background: #f7f8fb;
+}
+
+
+.unpaid-status-option-dot {
+  width: 9px;
+  height: 9px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(15, 23, 42, 0.05);
+}
+
+
+.unpaid-status-option-unpaid .unpaid-status-option-dot {
+  background: #d83f36;
+}
+
+.unpaid-status-option-unpaid.is-selected {
+  background: #fff0ef;
+  border-color: #ffd5d2;
+}
+
+
+.unpaid-status-option-partial .unpaid-status-option-dot {
+  background: #c87d00;
+}
+
+.unpaid-status-option-partial.is-selected {
+  background: #fff7df;
+  border-color: #fce7ac;
+}
+
+
+.unpaid-status-option-paid .unpaid-status-option-dot {
+  background: #168241;
+}
+
+.unpaid-status-option-paid.is-selected {
+  background: #edf9f1;
+  border-color: #c9ebd5;
+}
+
+
+.unpaid-status-option-text {
+  flex: 1 1 auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+
+.unpaid-status-option-text strong {
+  color: #1c2437;
+
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+
+.unpaid-status-option-text small {
+  color: #9aa2b1;
+
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+
+.unpaid-status-option-check {
+  flex: 0 0 auto;
+
+  color: #2563eb;
+
+  font-size: 14px;
+}
+
+
+/* =========================================================
+   BALANCE
+========================================================= */
+
+.unpaid-balance {
+  color: #e15b30 !important;
+}
+
+
+.unpaid-balance strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+
+.unpaid-balance.is-zero {
+  color: #188547 !important;
+}
+
+
+/* =========================================================
+   WATER SWITCH
+========================================================= */
+
+.unpaid-switch {
+  width: 40px;
+  height: 22px;
+
+  padding: 0;
+
+  position: relative;
+
+  border: 0;
+  border-radius: 999px;
+
+  cursor: pointer;
+
+  background: #d6dbe3;
+
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+.unpaid-switch.is-on {
+  background:
+    linear-gradient(
+      135deg,
+      #4389ff,
+      #2563eb
+    );
+
+  box-shadow:
+    0 4px 10px
+    rgba(37, 99, 235, 0.2);
+}
+
+
+.unpaid-switch-knob {
+  width: 16px;
+  height: 16px;
+
+  position: absolute;
+
+  top: 3px;
+  left: 3px;
+
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 2px 5px
+    rgba(15, 23, 42, 0.22);
+
+  transition:
+    transform 0.2s ease;
+}
+
+
+.unpaid-switch.is-on
+.unpaid-switch-knob {
+  transform:
+    translateX(18px);
+}
+
+
+.unpaid-water-label {
+  margin-top: 5px;
+
+  display: block;
+
+  color: #9ba3b0;
+
+  font-size: 9px;
+  font-weight: 800;
+}
+
+
+.unpaid-water-label.is-on {
+  color: #2563eb;
+}
+
+
+/* =========================================================
+   NOTE
+========================================================= */
+
+.unpaid-note {
+  width: 100%;
+  height: 40px;
+
+  padding: 6px 9px;
+
+  box-sizing: border-box;
+
+  /*
+   * 마우스로 늘려서 커지지 않도록 - 내용이 길면 내부 스크롤
+   */
+  resize: none;
+  overflow-y: auto;
+
+  outline: none;
+
+  border:
+    1px solid
+    #dde2e9;
+
+  border-radius: 8px;
+
+  background: #fafbfc;
+
+  color: #3a4456;
+
+  font-family: inherit;
+
+  font-size: 11px;
+  line-height: 1.45;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.unpaid-note:focus {
+  background: #ffffff;
+
+  border-color: #f3a16a;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(249, 115, 22, 0.07);
+}
+
+
+.unpaid-note::placeholder {
+  color: #adb4c0;
+}
+
+
+/* =========================================================
+   DELETE
+========================================================= */
+
+.unpaid-delete-btn {
+  width: 32px;
+  height: 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    #f1d5d5;
+
+  border-radius: 8px;
+
+  background: #fffafa;
+
+  color: #d75c5c;
+
+  cursor: pointer;
+
+  font-size: 15px;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+.unpaid-delete-btn:hover {
+  background: #e85050;
+  color: #ffffff;
+
+  border-color: #e85050;
+
+  transform:
+    translateY(-1px);
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.unpaid-empty {
+  height: 260px;
+
+  text-align: center;
+
+  color: #97a0af !important;
+
+  background: #ffffff !important;
+}
+
+
+.unpaid-empty svg {
+  display: block;
+
+  margin: 0 auto 10px;
+
+  font-size: 32px;
+
+  color: #c0c6d0;
+}
+
+
+.unpaid-empty strong {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #697486;
+
+  font-size: 14px;
+}
+
+
+.unpaid-empty span {
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   SCROLL BAR
+========================================================= */
+
+.unpaid-table-scroll::-webkit-scrollbar {
+  height: 9px;
+}
+
+
+.unpaid-table-scroll::-webkit-scrollbar-track {
+  background: #f2f4f7;
+}
+
+
+.unpaid-table-scroll::-webkit-scrollbar-thumb {
+  background: #c9ced7;
+
+  border-radius: 999px;
+
+  border:
+    2px solid
+    #f2f4f7;
+}
+
+
+.unpaid-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #afb6c2;
+}
+
+
+/* =========================================================
+   MODAL 공통 (불러오기 팝업 / 저장확인 팝업)
+========================================================= */
+
+.unpaid-modal-overlay {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(15, 23, 42, 0.45);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 200;
+
+  padding: 20px;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   저장하지 않은 변경사항 확인 팝업
+========================================================= */
+
+.unpaid-confirm-modal {
+  width: 100%;
+  max-width: 400px;
+
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  padding: 28px 26px 22px;
+
+  box-sizing: border-box;
+
+  text-align: center;
+
+  box-shadow:
+    0 24px 60px
+    rgba(15, 23, 42, 0.28);
+}
+
+
+.unpaid-confirm-icon {
+  width: 52px;
+  height: 52px;
+
+  margin: 0 auto 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #fff3e2;
+
+  color: #f59e0b;
+
+  font-size: 24px;
+}
+
+
+.unpaid-confirm-modal h3 {
+  margin: 0 0 8px;
+
+  font-size: 16px;
+  font-weight: 800;
+
+  color: #1c2437;
+}
+
+
+.unpaid-confirm-modal p {
+  margin: 0 0 20px;
+
+  color: #7a8497;
+
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+
+.unpaid-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+
+.unpaid-confirm-btn {
+  height: 42px;
+
+  border-radius: 10px;
+  border: 1px solid transparent;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+
+.unpaid-confirm-btn:hover {
+  transform: translateY(-1px);
+}
+
+
+.unpaid-confirm-cancel {
+  background: #ffffff;
+  color: #6b7488;
+  border-color: #e1e5ec;
+}
+
+
+.unpaid-confirm-discard {
+  background: #fff2f0;
+  color: #d8483a;
+  border-color: #ffd7d0;
+}
+
+
+.unpaid-confirm-save {
+  color: #ffffff;
+  border-color: #16a34a;
+
+  background:
+    linear-gradient(
+      135deg,
+      #22c55e,
+      #16a34a
+    );
+
+  box-shadow:
+    0 8px 18px
+    rgba(22, 163, 74, 0.22);
+}
+
+
+/* =========================================================
+   불러오기 팝업
+========================================================= */
+
+.unpaid-load-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 78vh;
+
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 24px 60px
+    rgba(15, 23, 42, 0.28);
+}
+
+
+.unpaid-load-modal-header {
+  height: 58px;
+
+  padding: 0 10px 0 20px;
+
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom:
+    1px solid
+    #edf0f3;
+}
+
+
+.unpaid-load-modal-header h3 {
+  margin: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  color: #1c2437;
+}
+
+
+.unpaid-load-modal-header button {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+  background: transparent;
+
+  border-radius: 9px;
+
+  color: #8992a2;
+
+  cursor: pointer;
+
+  font-size: 17px;
+}
+
+
+.unpaid-load-modal-header button:hover {
+  background: #f4f6f9;
+  color: #495266;
+}
+
+
+.unpaid-load-modal-body {
+  flex: 1 1 auto;
+
+  overflow-y: auto;
+
+  padding: 14px 18px 20px;
+}
+
+
+.unpaid-load-empty {
+  padding: 50px 0;
+
+  text-align: center;
+
+  color: #97a0af;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+.unpaid-load-item {
+  width: 100%;
+
+  padding: 12px 14px;
+
+  margin-bottom: 8px;
+
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  flex-wrap: wrap;
+
+  border:
+    1px solid
+    #e5e9f0;
+
+  border-radius: 10px;
+
+  background: #fafbfc;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+.unpaid-load-item:hover {
+  border-color: #f3a16a;
+  background: #fffaf5;
+
+  transform: translateY(-1px);
+}
+
+
+.unpaid-load-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  flex: 0 0 auto;
+
+  min-width: 150px;
+}
+
+
+.unpaid-load-item-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  color: #1c2437;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+
+.unpaid-load-item-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  color: #8992a2;
+
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+
+.unpaid-load-item-stats {
+  flex: 1 1 auto;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex-wrap: wrap;
+
+  color: #7a8497;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+.unpaid-load-item-delete {
+  flex: 0 0 auto;
+
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    #f1d5d5;
+
+  border-radius: 8px;
+
+  background: #fffafa;
+
+  color: #d75c5c;
+
+  cursor: pointer;
+
+  font-size: 14px;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.unpaid-load-item-delete:hover {
+  background: #e85050;
+  color: #ffffff;
+
+  border-color: #e85050;
+}
+
+
+.unpaid-load-item-stats .is-unpaid {
+  color: #d83f36;
+}
+
+
+.unpaid-load-item-stats .is-water {
+  color: #2563eb;
+}
+
+
+.unpaid-load-item-stats .is-balance {
+  color: #e15e0d;
+}
+
+
+.unpaid-load-item-note {
+  color: #b7bec9;
+
+  font-size: 10px;
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   단수리스트 팝업
+
+   - 번호를 클릭해 선택한 행들을 구(서구/중구/동구/대덕구/유성구)별로
+     묶어서 보여주고, 마우스로 끌어서 순서/구를 바꿀 수 있습니다.
+========================================================= */
+
+.unpaid-water-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 84vh;
+
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 24px 60px
+    rgba(15, 23, 42, 0.28);
+}
+
+
+.unpaid-water-modal-header {
+  height: 58px;
+
+  padding: 0 12px 0 20px;
+
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom:
+    1px solid
+    #edf0f3;
+}
+
+
+.unpaid-water-modal-header h3 {
+  margin: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  color: #1c2437;
+}
+
+
+.unpaid-water-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+.unpaid-water-image-btn {
+  height: 34px;
+
+  padding: 0 13px;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  border: 1px solid #0e9f8f;
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #22d3c5,
+      #0e9f8f
+    );
+
+  color: #ffffff;
+
+  font-size: 12.5px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 6px 14px
+    rgba(14, 159, 143, 0.22);
+
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+.unpaid-water-image-btn:hover {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 9px 18px
+    rgba(14, 159, 143, 0.28);
+}
+
+
+.unpaid-water-image-btn svg {
+  font-size: 14px;
+}
+
+
+.unpaid-water-modal-header-actions > button:last-child {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+  background: transparent;
+
+  border-radius: 9px;
+
+  color: #8992a2;
+
+  cursor: pointer;
+
+  font-size: 17px;
+}
+
+
+.unpaid-water-modal-header-actions > button:last-child:hover {
+  background: #f4f6f9;
+  color: #495266;
+}
+
+
+.unpaid-water-modal-guide {
+  margin: 0;
+
+  padding: 9px 20px;
+
+  background: #fbfcfe;
+
+  border-bottom:
+    1px solid
+    #edf0f3;
+
+  color: #8992a2;
+
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+
+.unpaid-water-modal-body {
+  flex: 1 1 auto;
+
+  overflow-y: auto;
+
+  padding: 16px 18px 22px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  background: #ffffff;
+}
+
+
+.unpaid-water-group {
+  border:
+    1px solid
+    #e5e9f0;
+
+  border-radius: 12px;
+
+  overflow: hidden;
+}
+
+
+.unpaid-water-group-title {
+  width: 100%;
+
+  padding: 9px 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border: 0;
+
+  background:
+    linear-gradient(
+      135deg,
+      #eaf2ff,
+      #f5f9ff
+    );
+
+  color: #1d4ed8;
+
+  font-size: 12.5px;
+  font-weight: 800;
+  font-family: inherit;
+
+  cursor: pointer;
+
+  transition: background 0.15s ease;
+}
+
+
+.unpaid-water-group-title:hover {
+  background:
+    linear-gradient(
+      135deg,
+      #dfeaff,
+      #eef4ff
+    );
+}
+
+
+.unpaid-water-group-title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
+.unpaid-water-group-chevron {
+  font-size: 13px;
+
+  transition: transform 0.15s ease;
+}
+
+
+.unpaid-water-group-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+
+.unpaid-water-group-title-right {
+  color: #6b87c9;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+
+.unpaid-water-group-items {
+  padding: 8px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  min-height: 34px;
+}
+
+
+.unpaid-water-group-empty {
+  padding: 12px;
+
+  text-align: center;
+
+  border:
+    1px dashed
+    #d7dee8;
+
+  border-radius: 8px;
+
+  color: #a4abba;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+
+.unpaid-water-item {
+  padding: 8px 10px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border:
+    1px solid
+    #edf0f3;
+
+  border-radius: 9px;
+
+  background: #fafbfc;
+
+  cursor: grab;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.unpaid-water-item:active {
+  cursor: grabbing;
+}
+
+
+.unpaid-water-item:hover {
+  border-color: #c8d6f7;
+  background: #f5f9ff;
+}
+
+
+.unpaid-water-item-handle {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #b7bfcc;
+
+  font-size: 13px;
+}
+
+
+.unpaid-water-item-main {
+  flex: 0 0 auto;
+
+  min-width: 130px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+
+.unpaid-water-item-main strong {
+  color: #222b3c;
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+.unpaid-water-item-main span {
+  color: #7d879a;
+
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+
+.unpaid-water-item-address {
+  flex: 1 1 auto;
+
+  color: #8992a2;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  text-align: right;
+
+  overflow-wrap: break-word;
+}
+
+
+.unpaid-water-item-amount {
+  flex: 0 0 auto;
+
+  color: #e15b30;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   좁은 PC / 태블릿
+========================================================= */
+
+@media (
+  max-width: 1550px
+) {
+
+  .unpaid-page {
+    padding:
+      20px
+      20px
+      30px;
+  }
+
+
+  .unpaid-summary {
+    grid-template-columns:
+      repeat(
+        3,
+        minmax(
+          170px,
+          1fr
+        )
+      );
+  }
+
+}
+
+
+@media (
+  max-width: 1200px
+) {
+
+  .unpaid-page {
+    min-width: 900px;
+  }
+
+
+  .unpaid-title-group p {
+    display: none;
+  }
+
+}

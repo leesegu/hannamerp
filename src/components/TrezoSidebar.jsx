@@ -34,6 +34,9 @@ import PaymentSettlementPage from "../pages/PaymentSettlementPage.jsx";
 /* 손익계산 */
 import ProfitLossPage from "../pages/ProfitLossPage";
 
+/* 미납관리 */
+import UnpaidManagementPage from "../pages/UnpaidManagementPage";
+
 /* 전기요금 추출 / 공용전기 계산 */
 import MessageExtractor from "../pages/MessageExtractor";
 import PublicElectricCalcPage from "../pages/PublicElectricCalcPage";
@@ -1201,6 +1204,7 @@ const TrezoSidebar = ({
                       "연간시트",
                       "대금결제 관리",
                       "손익계산",
+                      "미납관리",
                     ]}
 
                     activeMenu={
@@ -1297,6 +1301,19 @@ const TrezoSidebar = ({
                       ) {
                         handleNavigate(
                           <ProfitLossPage />,
+                          item
+                        );
+
+                        return;
+                      }
+
+
+                      if (
+                        item ===
+                        "미납관리"
+                      ) {
+                        handleNavigate(
+                          <UnpaidManagementPage />,
                           item
                         );
 

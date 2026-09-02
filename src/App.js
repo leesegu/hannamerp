@@ -49,6 +49,9 @@ import PaymentSettlementPage from "./pages/PaymentSettlementPage.jsx";
 /* 손익계산 */
 import ProfitLossPage from "./pages/ProfitLossPage";
 
+/* 미납관리 */
+import UnpaidManagementPage from "./pages/UnpaidManagementPage";
+
 import MessageExtractor from "./pages/MessageExtractor";
 
 /* 공용전기 계산 */
@@ -653,6 +656,27 @@ function AppRoutes({
             />
           ) : (
             <ProfitLossPage />
+          )
+        }
+      />
+
+{/* =====================================================
+          미납관리
+          ===================================================== */}
+      <Route
+        path="/accounting/unpaid-management"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
+              replace
+            />
+          ) : (
+            <UnpaidManagementPage />
           )
         }
       />
