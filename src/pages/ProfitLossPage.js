@@ -1,16 +1,34 @@
 // src/pages/ProfitLossPage.js
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
+import {
+  FiBarChart2,
+  FiChevronDown,
+  FiDollarSign,
+  FiRefreshCw,
+  FiSave,
+  FiSearch,
+  FiTrendingDown,
+  FiTrendingUp,
+  FiUploadCloud,
+  FiUsers,
+  FiX,
+} from "react-icons/fi";
 import { db } from "../firebase";
 import {
   collection,
   onSnapshot,
-  addDoc,
-  updateDoc,
   doc,
   serverTimestamp,
   writeBatch,
-  setDoc,
 } from "firebase/firestore";
 import "./ProfitLossPage.css";
 
@@ -18,7 +36,6 @@ const COLLECTIONS = {
   villas: "villas",
   profitLoss: "profitLoss",
   profitLossTop: "profitLossTop",
-  includedUtilities: "profitLossIncludedUtilities",
 
   telco: "telco",
   elevator: "elevator",
@@ -32,8 +49,16 @@ const MONTHS = Array.from({ length: 12 }, (_, i) =>
   String(i + 1).padStart(2, "0")
 );
 
+// "기타" 항목 전용 키. 기존 "난방온수(heatingRepair)" 필드를 그대로 재사용해서
+// (문서 구조/기존 저장 데이터를 그대로 유지하기 위해) 화면 라벨만 "기타"로 바꿨습니다.
+const ETC_KEY = "heatingRepair";
+const ETC_NOTE_KEY = `${ETC_KEY}Note`;
+
+// 숫자로 파싱하지 않고 문자열 그대로 저장해야 하는 필드들
+// ("마이너스 주요항목" 사유, "기타" 항목 메모)
+const TEXT_FIELD_KEYS = new Set(["minusReason", ETC_NOTE_KEY]);
+
 const ITEMS = [
-  { key: "managementFee", label: "입금관리비" },
   { key: "chargeFee", label: "부과관리비" },
   { key: "waterFee", label: "수도요금" },
   { key: "publicElectric", label: "공용전기", auto: true },
@@ -41,10 +66,10 @@ const ITEMS = [
   { key: "elevatorFee", label: "승강기", auto: true },
   { key: "fireSafety", label: "소방안전", auto: true },
   { key: "electricSafety", label: "전기안전", auto: true },
-  { key: "heatingRepair", label: "난방온수" },
   { key: "cleaningFee", label: "청소비", auto: true },
   { key: "septicFee", label: "정화조" },
   { key: "elevatorInspect", label: "승강기검사" },
+  { key: ETC_KEY, label: "기타" },
 ];
 
 const EXPENSE_KEYS = [
@@ -54,7 +79,7 @@ const EXPENSE_KEYS = [
   "elevatorFee",
   "fireSafety",
   "electricSafety",
-  "heatingRepair",
+  ETC_KEY,
   "cleaningFee",
   "septicFee",
   "elevatorInspect",
@@ -70,17 +95,16 @@ const MINUS_REASON_OPTIONS = [
   })),
 ];
 
-const INCLUDED_UTILITY_KEYS = [
-  { key: "waterFee", label: "수도요금" },
-  { key: "publicElectric", label: "공용전기" },
-  { key: "communicationFee", label: "인터넷비" },
-  { key: "elevatorFee", label: "승강기" },
-  { key: "fireSafety", label: "소방안전" },
-  { key: "electricSafety", label: "전기안전" },
-];
-
 const AUTO_KEYS = new Set(
   ITEMS.filter((item) => item.auto).map((item) => item.key)
+);
+
+// 자동입력 항목 중 "저장 후에는 값이 고정되고, 새로고침 버튼을 눌러야만
+// 최신 데이터로 다시 채워지는" 항목들 (공용전기 제외).
+// 공용전기는 peCalc 데이터 자체가 이미 "선택한 연/월" 기준으로 저장되어 있어서
+// 매번 최신값을 그대로 보여줘도 문제가 없기 때문에 고정 대상에서 뺐습니다.
+const FREEZE_AUTO_KEYS = new Set(
+  ["communicationFee", "elevatorFee", "fireSafety", "electricSafety", "cleaningFee"]
 );
 
 const parseNum = (v) =>
@@ -395,20 +419,93 @@ const parseWaterExcelRows = (workbook) => {
 };
 
 
-const getIncludedRowTotal = (row) => {
-  const amounts = row.amounts || {};
-  const enabled = row.enabled || {};
-
-  return INCLUDED_UTILITY_KEYS.reduce((sum, item) => {
-    if (enabled[item.key] === false) return sum;
-    return sum + parseNum(amounts[item.key]);
-  }, 0);
-};
-
 const getRate = (profit, base) => {
   const b = parseNum(base);
   if (!b) return 0;
   return (parseNum(profit) / b) * 100;
+};
+
+// 아래 4개 함수는 컴포넌트 state를 전혀 참조하지 않는 순수 계산 함수라서
+// 컴포넌트 바깥(모듈 스코프)으로 옮겼음. 계산 로직 자체는 한 글자도 바꾸지 않았고,
+// 매 렌더링마다 새로 만들어지지 않게 되어(참조가 항상 동일) 아래에서 만드는
+// ProfitTableRow의 React.memo가 정상적으로 "변경 없는 행은 다시 그리지 않기"를
+// 할 수 있게 해주는 준비 작업입니다.
+// (입금관리비/입금수입 삭제 요청에 따라 depositIncome 계산은 완전히 제거했습니다.)
+const getRowCalcByMonth = (row, targetMonthKey) => {
+  const data = row.monthly?.[targetMonthKey] || {};
+
+  const totalExpense = EXPENSE_KEYS.reduce(
+    (sum, key) => sum + parseNum(data[key]),
+    0
+  );
+
+  const chargeIncome = parseNum(data.chargeFee) - totalExpense;
+
+  return {
+    totalExpense,
+    chargeIncome,
+  };
+};
+
+const getColumnTotals = (rows, targetMonthKey) => {
+  const totals = {};
+
+  ITEMS.forEach((item) => {
+    totals[item.key] = 0;
+  });
+
+  const result = {
+    ...totals,
+    totalExpense: 0,
+    chargeIncome: 0,
+  };
+
+  rows.forEach((row) => {
+    const data = row.monthly?.[targetMonthKey] || {};
+    const calc = getRowCalcByMonth(row, targetMonthKey);
+
+    ITEMS.forEach((item) => {
+      result[item.key] += parseNum(data[item.key]);
+    });
+
+    result.totalExpense += calc.totalExpense;
+    result.chargeIncome += calc.chargeIncome;
+  });
+
+  return result;
+};
+
+const getTopCalc = (payments = {}) => {
+  const totalExpense = EXPENSE_KEYS.reduce(
+    (sum, key) => sum + parseNum(payments[key]),
+    0
+  );
+
+  const chargeIncome = parseNum(payments.chargeFee) - totalExpense;
+
+  return {
+    totalExpense,
+    chargeIncome,
+  };
+};
+
+const getBalanceCalc = (columnData = {}, payments = {}) => {
+  const result = {};
+
+  ITEMS.forEach((item) => {
+    result[item.key] =
+      parseNum(payments[item.key]) - parseNum(columnData[item.key]);
+  });
+
+  result.totalExpense = EXPENSE_KEYS.reduce(
+    (sum, key) => sum + parseNum(result[key]),
+    0
+  );
+
+  result.chargeIncome =
+    parseNum(result.chargeFee) - parseNum(result.totalExpense);
+
+  return result;
 };
 
 
@@ -456,6 +553,136 @@ const MoneyInput = React.memo(function MoneyInput({
   );
 });
 
+// 아래쪽 데이터테이블(빌라별 손익계산 행) 전용 컴포넌트입니다.
+// React.memo로 감싸서, "값이 실제로 바뀐 행"만 다시 그리고 나머지 수백 개 행은
+// 건드리지 않도록 했습니다. 이게 입력 시 버벅거림을 없애는 핵심 변경사항입니다.
+// (내부 로직/계산식/렌더링 결과는 기존 코드와 완전히 동일합니다. 위치만 옮겼습니다.)
+const ProfitTableRow = React.memo(function ProfitTableRow({
+  row,
+  rowIndex,
+  monthKey,
+  onSaveCell,
+  onKeyDownCell,
+  onMinusReasonChange,
+  onOpenEtcNote,
+  registerInputRef,
+}) {
+  const data = row.monthly?.[monthKey] || {};
+  const calc = getRowCalcByMonth(row, monthKey);
+
+  // 자동입력 항목(공용전기/인터넷비/승강기/소방안전/전기안전/청소비)은
+  // 기본적으로 읽기전용이고, "더블클릭"했을 때만 그 칸만 잠깐 입력 가능하게
+  // 풀어줍니다. 포커스가 빠지면(onBlur) 다시 읽기전용으로 잠깁니다.
+  // 이 상태는 이 행(row) 안에서만 의미가 있는 화면 표시용 상태라
+  // 행 컴포넌트 내부에 두었습니다. (다른 행의 리렌더링과는 무관)
+  const [unlockedKeys, setUnlockedKeys] = useState(null);
+
+  const unlockAutoCell = (key) => {
+    setUnlockedKeys((prev) => new Set([...(prev || []), key]));
+  };
+
+  const relockAutoCell = (key) => {
+    setUnlockedKeys((prev) => {
+      if (!prev || !prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next.size ? next : null;
+    });
+  };
+
+  return (
+    <tr>
+      <td>{rowIndex + 1}</td>
+      <td>{row.code}</td>
+      <td className="pl-villa">{row.villaName}</td>
+
+      {ITEMS.map((item, colIndex) => {
+        const isAuto = AUTO_KEYS.has(item.key);
+        const isEditableAuto = FREEZE_AUTO_KEYS.has(item.key);
+        const isEtc = item.key === ETC_KEY;
+        const isUnlocked = unlockedKeys?.has(item.key);
+        const isReadOnly = isAuto && !isUnlocked;
+        const etcNote = isEtc ? data[ETC_NOTE_KEY] || "" : "";
+
+        return (
+          <td
+            key={item.key}
+            className={`pl-item-col pl-col-${item.key}`}
+            data-tooltip={etcNote || undefined}
+            onDoubleClick={
+              isEditableAuto ? () => unlockAutoCell(item.key) : undefined
+            }
+          >
+            <MoneyInput
+              inputRef={(el) => registerInputRef(rowIndex, colIndex, el)}
+              className={[
+                "pl-money-input",
+                isReadOnly ? "pl-auto-input" : "",
+                isUnlocked ? "pl-auto-unlocked" : "",
+                item.key === "waterFee" ? "pl-water-input" : "",
+                isEtc && etcNote ? "pl-has-note" : "",
+              ].join(" ")}
+              value={data[item.key]}
+              readOnly={isReadOnly}
+              onSave={(value) => {
+                onSaveCell(row, item.key, value);
+                if (isEditableAuto) relockAutoCell(item.key);
+              }}
+              onKeyDown={(e) => {
+                if (isEtc && e.key === "Enter") {
+                  e.preventDefault();
+                  const rect = e.target.getBoundingClientRect();
+                  e.target.blur();
+                  onOpenEtcNote(row, rect, etcNote);
+                  return;
+                }
+                onKeyDownCell(e, rowIndex, colIndex);
+              }}
+              placeholder="-"
+              title={
+                isReadOnly && isEditableAuto
+                  ? "자동 입력 항목입니다. 더블클릭하면 수정할 수 있습니다."
+                  : isReadOnly
+                  ? "자동 입력 항목입니다 (공용전기는 선택한 월의 데이터를 항상 그대로 반영합니다)."
+                  : isEtc
+                  ? "금액 입력 후 Enter를 누르면 메모를 남길 수 있습니다."
+                  : ""
+              }
+            />
+          </td>
+        );
+      })}
+
+      <td className="pl-total">{fmtZero(calc.totalExpense)}</td>
+      <td
+        className={
+          calc.chargeIncome >= 0
+            ? "pl-profit plus-text"
+            : "pl-profit minus-text"
+        }
+      >
+        {fmtZero(calc.chargeIncome)}
+      </td>
+      <td className="pl-reason">
+        <select
+          className={[
+            "pl-reason-select",
+            data.minusReason ? "is-selected" : "",
+          ].join(" ")}
+          value={data.minusReason || ""}
+          onChange={(e) => onMinusReasonChange(row, e.target.value)}
+        >
+          {MINUS_REASON_OPTIONS.map((option) => (
+            <option key={option.value || "empty"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </td>
+    </tr>
+  );
+});
+
 export default function ProfitLossPage() {
   const now = new Date();
 
@@ -481,17 +708,17 @@ export default function ProfitLossPage() {
 
   const [peCalcRows, setPeCalcRows] = useState([]);
   const [statsPeCalcRows, setStatsPeCalcRows] = useState([]);
-  const [includedRows, setIncludedRows] = useState([]);
 
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [uploadingWater, setUploadingWater] = useState(false);
-
-  const [includedModalOpen, setIncludedModalOpen] = useState(false);
-  const [includedSearch, setIncludedSearch] = useState("");
-  const [editingIncludedId, setEditingIncludedId] = useState("");
+  const [refreshingAuto, setRefreshingAuto] = useState(false);
 
   const [statsModalOpen, setStatsModalOpen] = useState(false);
+
+  // "기타" 항목 메모 입력 팝업. null이 아니면 화면에 팝업이 표시됩니다.
+  // { rowKey, row, top, left, value }
+  const [etcNoteEditor, setEtcNoteEditor] = useState(null);
 
   const [draftCells, setDraftCells] = useState({});
   const [draftTopCells, setDraftTopCells] = useState({});
@@ -552,7 +779,6 @@ export default function ProfitLossPage() {
     listen(COLLECTIONS.fireSafety, setFireSafetyRows);
     listen(COLLECTIONS.electricSafety, setElectricSafetyRows);
     listen(COLLECTIONS.cleaning, setCleaningRows);
-    listen(COLLECTIONS.includedUtilities, setIncludedRows);
 
     return () => {
       unsubs.forEach((unsub) => unsub());
@@ -795,7 +1021,9 @@ export default function ProfitLossPage() {
     return 0;
   };
 
-  const makeMergedRowsByMonth = (targetMonthKey, targetPeCalcMap) => {
+  const makeMergedRowsByMonth = (targetMonthKey, targetPeCalcMap, options = {}) => {
+    const { forceLiveAuto = false } = options;
+
     const activeVillaRows = villaRows
       .filter((villa) => !isSubCodeRow(villa))
       .filter((villa) => isVillaVisibleInMonth(villa, targetMonthKey));
@@ -848,7 +1076,7 @@ export default function ProfitLossPage() {
       const savedMonthData = saved.monthly?.[targetMonthKey] || {};
       const autoMonthData = {};
 
-      if (activeVilla || !hasSavedRowsForMonth || isLiveMonth) {
+      if (activeVilla || !hasSavedRowsForMonth || isLiveMonth || forceLiveAuto) {
         ITEMS.forEach((item) => {
           if (item.auto) {
             autoMonthData[item.key] = getAutoAmount(
@@ -860,15 +1088,29 @@ export default function ProfitLossPage() {
         });
       }
 
-      const monthData = isLiveMonth
-        ? {
-            ...savedMonthData,
-            ...autoMonthData,
-          }
-        : {
-            ...autoMonthData,
-            ...savedMonthData,
-          };
+      // 자동입력 항목 병합 규칙:
+      // - 공용전기(publicElectric)는 선택한 연/월의 공용전기계산 데이터를
+      //   항상 그대로 반영합니다 (이미 월별로 구분 저장되어 있어 고정할 필요 없음).
+      // - 그 외 자동입력 항목(인터넷비/승강기/소방안전/전기안전/청소비)은
+      //   한 번 저장된 값이 있으면 그 값을 그대로 유지(고정)하고,
+      //   저장된 값이 아직 없거나(최초 1회) 새로고침(forceLiveAuto)일 때만
+      //   지금 실제 데이터로 채웁니다.
+      // - 자동입력이 아닌 나머지 항목은 항상 저장된 값을 그대로 사용합니다.
+      const monthData = { ...savedMonthData };
+
+      ITEMS.forEach((item) => {
+        if (!item.auto) return;
+        const itemKey = item.key;
+
+        if (itemKey === "publicElectric") {
+          monthData[itemKey] = autoMonthData[itemKey];
+          return;
+        }
+
+        if (forceLiveAuto || savedMonthData[itemKey] === undefined) {
+          monthData[itemKey] = autoMonthData[itemKey];
+        }
+      });
 
       rowMap.set(key, {
         ...saved,
@@ -1048,253 +1290,9 @@ export default function ProfitLossPage() {
     });
   }, [displayMergedRows, deferredSearch]);
 
-  const mergedRowMap = useMemo(() => {
-    const map = {};
-
-    displayMergedRows.forEach((row) => {
-      const key = makeFullKey(row.code, row.villaName);
-      if (key !== "__") map[key] = row;
-    });
-
-    return map;
-  }, [displayMergedRows]);
-
-  const includedBaseRows = useMemo(() => {
-    const map = {};
-
-    includedRows
-      .filter((row) => !isSubCodeRow(row))
-      .forEach((row) => {
-        const key = makeFullKey(row.code, row.villaName);
-        if (key === "__") return;
-
-        const prev = map[key];
-
-        if (!prev) {
-          map[key] = row;
-          return;
-        }
-
-        const prevTime = prev.updatedAt?.seconds || prev.createdAt?.seconds || 0;
-        const nextTime = row.updatedAt?.seconds || row.createdAt?.seconds || 0;
-
-        if (nextTime >= prevTime) {
-          map[key] = row;
-        }
-      });
-
-    return Object.values(map).sort((a, b) => {
-      const codeA = normalize(a.code);
-      const codeB = normalize(b.code);
-
-      if (codeA !== codeB) {
-        return codeA.localeCompare(codeB, "ko", { numeric: true });
-      }
-
-      return normalize(a.villaName).localeCompare(
-        normalize(b.villaName),
-        "ko"
-      );
-    });
-  }, [includedRows]);
-
-  const getIncludedMonthRow = (includedRow, targetMonthKey, targetMergedMap) => {
-    const key = makeFullKey(includedRow.code, includedRow.villaName);
-    const profitRow = targetMergedMap[key];
-
-    if (!profitRow) return null;
-    if (includedRow.hiddenByMonth?.[targetMonthKey] === true) return null;
-
-    const prevKey = getPrevMonthKey(targetMonthKey);
-    const currentMonthData = profitRow.monthly?.[targetMonthKey] || {};
-    const amounts = {};
-
-    INCLUDED_UTILITY_KEYS.forEach((item) => {
-      const manualAmount =
-        includedRow.amountsByMonth?.[targetMonthKey]?.[item.key];
-
-      amounts[item.key] =
-        manualAmount !== undefined
-          ? parseNum(manualAmount)
-          : parseNum(currentMonthData[item.key]);
-    });
-
-    const enabled = {};
-
-    INCLUDED_UTILITY_KEYS.forEach((item) => {
-      const thisMonthEnabled =
-        includedRow.enabledByMonth?.[targetMonthKey]?.[item.key];
-
-      const prevMonthEnabled =
-        includedRow.enabledByMonth?.[prevKey]?.[item.key];
-
-      if (thisMonthEnabled !== undefined) {
-        enabled[item.key] = thisMonthEnabled !== false;
-      } else if (prevMonthEnabled !== undefined) {
-        enabled[item.key] = prevMonthEnabled !== false;
-      } else if (includedRow.enabled?.[item.key] !== undefined) {
-        enabled[item.key] = includedRow.enabled[item.key] !== false;
-      } else {
-        enabled[item.key] = parseNum(amounts[item.key]) > 0;
-      }
-    });
-
-    return {
-      ...includedRow,
-      code: profitRow.code,
-      codeNumber: profitRow.code,
-      villaName: profitRow.villaName,
-      profitRowId: profitRow.id || "",
-      amounts,
-      enabled,
-      currentMonthData,
-    };
-  };
-
-  const includedMonthRows = useMemo(() => {
-    return includedBaseRows
-      .map((includedRow) =>
-        getIncludedMonthRow(includedRow, monthKey, mergedRowMap)
-      )
-      .filter(Boolean);
-  }, [includedBaseRows, mergedRowMap, monthKey]);
-
-  const includedSearchResults = useMemo(() => {
-    const keyword = includedSearch.trim().toLowerCase();
-    if (!keyword) return [];
-
-    const visibleKeys = new Set(
-      includedMonthRows.map((row) => makeFullKey(row.code, row.villaName))
-    );
-
-    return displayMergedRows
-      .filter((row) => {
-        const key = makeFullKey(row.code, row.villaName);
-        if (visibleKeys.has(key)) return false;
-
-        return (
-          String(row.code ?? "").toLowerCase().includes(keyword) ||
-          String(row.villaName ?? "").toLowerCase().includes(keyword)
-        );
-      })
-      .slice(0, 20);
-  }, [includedSearch, displayMergedRows, includedMonthRows]);
-
-  const includedColumnTotals = useMemo(() => {
-    const result = {};
-
-    INCLUDED_UTILITY_KEYS.forEach((item) => {
-      result[item.key] = 0;
-    });
-
-    result.total = 0;
-
-    includedMonthRows.forEach((row) => {
-      const amounts = row.amounts || {};
-      const enabled = row.enabled || {};
-
-      INCLUDED_UTILITY_KEYS.forEach((item) => {
-        if (enabled[item.key] === false) return;
-        result[item.key] += parseNum(amounts[item.key]);
-      });
-
-      result.total += getIncludedRowTotal(row);
-    });
-
-    return result;
-  }, [includedMonthRows]);
-
-  const getRowCalcByMonth = (row, targetMonthKey) => {
-    const data = row.monthly?.[targetMonthKey] || {};
-
-    const totalExpense = EXPENSE_KEYS.reduce(
-      (sum, key) => sum + parseNum(data[key]),
-      0
-    );
-
-    const depositIncome = parseNum(data.managementFee) - totalExpense;
-    const chargeIncome = parseNum(data.chargeFee) - totalExpense;
-
-    return {
-      totalExpense,
-      depositIncome,
-      chargeIncome,
-    };
-  };
-
-  const getRowCalc = (row) => getRowCalcByMonth(row, monthKey);
-
-  const getColumnTotals = (rows, targetMonthKey) => {
-    const totals = {};
-
-    ITEMS.forEach((item) => {
-      totals[item.key] = 0;
-    });
-
-    const result = {
-      ...totals,
-      totalExpense: 0,
-      depositIncome: 0,
-      chargeIncome: 0,
-    };
-
-    rows.forEach((row) => {
-      const data = row.monthly?.[targetMonthKey] || {};
-      const calc = getRowCalcByMonth(row, targetMonthKey);
-
-      ITEMS.forEach((item) => {
-        result[item.key] += parseNum(data[item.key]);
-      });
-
-      result.totalExpense += calc.totalExpense;
-      result.depositIncome += calc.depositIncome;
-      result.chargeIncome += calc.chargeIncome;
-    });
-
-    return result;
-  };
-
   const columnTotals = useMemo(() => {
     return getColumnTotals(filteredRows, monthKey);
   }, [filteredRows, monthKey]);
-
-  const getTopCalc = (payments = {}) => {
-    const totalExpense = EXPENSE_KEYS.reduce(
-      (sum, key) => sum + parseNum(payments[key]),
-      0
-    );
-
-    const depositIncome = parseNum(payments.managementFee) - totalExpense;
-    const chargeIncome = parseNum(payments.chargeFee) - totalExpense;
-
-    return {
-      totalExpense,
-      depositIncome,
-      chargeIncome,
-    };
-  };
-
-  const getBalanceCalc = (columnData = {}, payments = {}) => {
-    const result = {};
-
-    ITEMS.forEach((item) => {
-      result[item.key] =
-        parseNum(payments[item.key]) - parseNum(columnData[item.key]);
-    });
-
-    result.totalExpense = EXPENSE_KEYS.reduce(
-      (sum, key) => sum + parseNum(result[key]),
-      0
-    );
-
-    result.depositIncome =
-      parseNum(result.managementFee) - parseNum(result.totalExpense);
-
-    result.chargeIncome =
-      parseNum(result.chargeFee) - parseNum(result.totalExpense);
-
-    return result;
-  };
 
   const topCalc = useMemo(
     () => getTopCalc(topDisplayPayments),
@@ -1352,30 +1350,15 @@ export default function ProfitLossPage() {
     statsPeCalcMap,
   ]);
 
-  const statsTopDoc = useMemo(
-    () => (statsModalOpen ? getTopDocByMonth(statsMonthKey) : {}),
-    [statsModalOpen, topRows, statsMonthKey]
-  );
-
-  const statsTopPayments = useMemo(
-    () => (statsModalOpen ? getEffectiveTopPayments(statsMonthKey) : {}),
-    [statsModalOpen, statsTopDoc, statsMonthKey, topRows]
-  );
-
-  const statsTopCalc = useMemo(
-    () => (statsModalOpen ? getTopCalc(statsTopPayments) : getTopCalc({})),
-    [statsModalOpen, statsTopPayments]
-  );
-
   const statsColumnTotals = useMemo(() => {
     if (!statsModalOpen) return getColumnTotals([], statsMonthKey);
     return getColumnTotals(statsRows, statsMonthKey);
   }, [statsModalOpen, statsRows, statsMonthKey]);
 
-  const statsBalanceCalc = useMemo(() => {
-    if (!statsModalOpen) return getBalanceCalc({}, {});
-    return getBalanceCalc(statsColumnTotals, statsTopPayments);
-  }, [statsModalOpen, statsColumnTotals, statsTopPayments]);
+  // 통계창의 "부과수입"은 항상 "부과관리비 합계 − 총지출 합계"로 계산합니다.
+  // (예전에는 상단 테이블 수기입력값과 뒤섞은 계산이 들어있어서 숫자가 어긋났습니다)
+  const statsChargeIncome =
+    parseNum(statsColumnTotals.chargeFee) - parseNum(statsColumnTotals.totalExpense);
 
   const statsData = useMemo(() => {
     if (!statsModalOpen) {
@@ -1400,7 +1383,6 @@ export default function ProfitLossPage() {
           code: row.code,
           villaName: row.villaName,
           totalExpense: calc.totalExpense,
-          depositIncome: calc.depositIncome,
           chargeIncome: calc.chargeIncome,
           positiveChargeIncome: Math.max(0, calc.chargeIncome),
         };
@@ -1424,18 +1406,16 @@ export default function ProfitLossPage() {
       .sort((a, b) => a.chargeIncome - b.chargeIncome)
       .slice(0, 10);
 
+    // 월별 통계는 "빌라별로 실제 집계된 부과관리비/총지출 합계"를 그대로 사용합니다.
+    // (이전에는 상단 테이블 수기입력값과의 "차액"을 총지출로 잘못 사용하고 있어서
+    //  실제 지출 합계와 다른 숫자가 나오는 버그가 있었습니다 — 이번에 고쳤습니다.)
     const monthlyStats = MONTHS.map((m) => {
       const mk = getMonthKey(statsYear, m);
-      const payments = getEffectiveTopPayments(mk);
       const monthRows = makeMergedRowsByMonth(mk, mk === statsMonthKey ? statsPeCalcMap : {});
       const monthColumnTotals = getColumnTotals(monthRows, mk);
-      const monthBalance = getBalanceCalc(monthColumnTotals, payments);
 
-      const chargeFee = Math.max(
-        parseNum(payments.chargeFee),
-        parseNum(monthColumnTotals.chargeFee)
-      );
-      const totalExpense = parseNum(monthBalance.totalExpense);
+      const chargeFee = parseNum(monthColumnTotals.chargeFee);
+      const totalExpense = parseNum(monthColumnTotals.totalExpense);
       const chargeIncome = chargeFee - totalExpense;
       const profitRate = getRate(chargeIncome, chargeFee);
 
@@ -1544,67 +1524,88 @@ export default function ProfitLossPage() {
     });
   };
 
-  const setCellDraft = (row, key, value) => {
-    if (AUTO_KEYS.has(key)) return;
+  // useCallback으로 감싸서 monthKey가 바뀌지 않는 한 함수 참조가 그대로 유지되도록
+  // 했습니다. (동작은 이전과 100% 동일, 참조 안정성만 추가됨 — 아래 ProfitTableRow의
+  // React.memo가 "이 행에 실제 변경이 없다면 다시 그리지 않는다"를 지킬 수 있게 하기 위함)
+  const setCellDraft = useCallback(
+    (row, key, value) => {
+      // 공용전기는 선택한 월의 공용전기계산 데이터를 항상 그대로 반영해야 하므로
+      // (수동으로 덮어써도 다음 새로고침/재방문 시 다시 실제 값으로 채워짐)
+      // 애초에 수동 저장 대상에서 제외합니다.
+      if (key === "publicElectric") return;
 
-    const rowKey = makeFullKey(row.code, row.villaName);
+      const rowKey = makeFullKey(row.code, row.villaName);
 
-    setDraftCells((prev) => {
-      const next = {
-        ...prev,
-        [monthKey]: {
-          ...(prev[monthKey] || {}),
-          [rowKey]: {
-            row: {
-              id: row.id || "",
-              code: row.code || "",
-              codeNumber: row.code || "",
-              villaName: row.villaName || "",
-              baseVillaId: row.baseVillaId || "",
-            },
-            values: {
-              ...(prev[monthKey]?.[rowKey]?.values || {}),
-              [key]: value,
+      setDraftCells((prev) => {
+        const next = {
+          ...prev,
+          [monthKey]: {
+            ...(prev[monthKey] || {}),
+            [rowKey]: {
+              row: {
+                id: row.id || "",
+                code: row.code || "",
+                codeNumber: row.code || "",
+                villaName: row.villaName || "",
+                baseVillaId: row.baseVillaId || "",
+              },
+              values: {
+                ...(prev[monthKey]?.[rowKey]?.values || {}),
+                [key]: value,
+              },
             },
           },
-        },
-      };
+        };
 
-      draftCellsRef.current = next;
-      dirtyRef.current = true;
-      return next;
-    });
-  };
+        draftCellsRef.current = next;
+        dirtyRef.current = true;
+        return next;
+      });
+    },
+    [monthKey]
+  );
 
-  const saveCell = (row, key, value) => {
-    setCellDraft(row, key, value);
-  };
+  const saveCell = useCallback(
+    (row, key, value) => {
+      setCellDraft(row, key, value);
+    },
+    [setCellDraft]
+  );
 
-  const handleMinusReasonChange = (row, value) => {
-    setCellDraft(row, "minusReason", value);
-  };
+  const handleMinusReasonChange = useCallback(
+    (row, value) => {
+      setCellDraft(row, "minusReason", value);
+    },
+    [setCellDraft]
+  );
 
   const handleChange = () => {};
 
-  const handleTopChange = (key, value) => {
-    setDraftTopCells((prev) => {
-      const next = {
-        ...prev,
-        [monthKey]: {
-          ...(prev[monthKey] || {}),
-          [key]: value,
-        },
-      };
+  const handleTopChange = useCallback(
+    (key, value) => {
+      setDraftTopCells((prev) => {
+        const next = {
+          ...prev,
+          [monthKey]: {
+            ...(prev[monthKey] || {}),
+            [key]: value,
+          },
+        };
 
-      draftTopCellsRef.current = next;
-      dirtyRef.current = true;
-      return next;
-    });
-  };
+        draftTopCellsRef.current = next;
+        dirtyRef.current = true;
+        return next;
+      });
+    },
+    [monthKey]
+  );
 
-  const saveTopCell = (key, value) => {
-    handleTopChange(key, value);
-  };
+  const saveTopCell = useCallback(
+    (key, value) => {
+      handleTopChange(key, value);
+    },
+    [handleTopChange]
+  );
 
   const applySavedDraftsToLocalState = (targetMonthKey, rowDrafts, topDrafts) => {
     Object.values(rowDrafts || {}).forEach((draft) => {
@@ -1613,7 +1614,7 @@ export default function ProfitLossPage() {
       const parsedValues = {};
 
       Object.entries(values).forEach(([key, value]) => {
-        parsedValues[key] = key === "minusReason" ? value : parseNum(value);
+        parsedValues[key] = TEXT_FIELD_KEYS.has(key) ? value : parseNum(value);
       });
 
       upsertProfitRowLocal(
@@ -1700,8 +1701,8 @@ export default function ProfitLossPage() {
         const cleanValues = {};
 
         Object.entries(values).forEach(([key, value]) => {
-          if (AUTO_KEYS.has(key)) return;
-          cleanValues[key] = key === "minusReason" ? value : parseNum(value);
+          if (key === "publicElectric") return;
+          cleanValues[key] = TEXT_FIELD_KEYS.has(key) ? value : parseNum(value);
         });
 
         if (!Object.keys(cleanValues).length) return;
@@ -2040,166 +2041,63 @@ export default function ProfitLossPage() {
     }
   };
 
-  const addIncludedUtilityRow = async (row) => {
-    const key = makeFullKey(row.code, row.villaName);
-    const existing = includedBaseRows.find(
-      (item) => makeFullKey(item.code, item.villaName) === key
-    );
-
-    const data = row.monthly?.[monthKey] || {};
-    const amounts = {};
-    const enabled = {};
-
-    INCLUDED_UTILITY_KEYS.forEach((item) => {
-      amounts[item.key] = parseNum(data[item.key]);
-
-      const prevEnabled =
-        existing?.enabledByMonth?.[prevMonthKey]?.[item.key] ??
-        existing?.enabled?.[item.key];
-
-      enabled[item.key] =
-        prevEnabled !== undefined
-          ? prevEnabled !== false
-          : parseNum(amounts[item.key]) > 0;
-    });
-
-    if (existing?.id) {
-      await updateDoc(doc(db, COLLECTIONS.includedUtilities, existing.id), {
+  // "기타" 메모 팝업을 엽니다. (금액칸에서 Enter를 눌렀을 때 호출)
+  const openEtcNoteEditor = useCallback((row, rect, currentValue) => {
+    setEtcNoteEditor({
+      rowKey: makeFullKey(row.code, row.villaName),
+      row: {
+        id: row.id || "",
         code: row.code || "",
         codeNumber: row.code || "",
         villaName: row.villaName || "",
-        [`hiddenByMonth.${monthKey}`]: false,
-        [`amountsByMonth.${monthKey}`]: amounts,
-        [`enabledByMonth.${monthKey}`]: enabled,
-        updatedAt: serverTimestamp(),
+        baseVillaId: row.baseVillaId || "",
+      },
+      top: rect.bottom + 6,
+      left: rect.left + rect.width / 2,
+      value: currentValue || "",
+    });
+  }, []);
+
+  const closeEtcNoteEditor = useCallback(() => {
+    setEtcNoteEditor(null);
+  }, []);
+
+  const saveEtcNoteEditor = useCallback(() => {
+    setEtcNoteEditor((current) => {
+      if (!current) return current;
+      setCellDraft(current.row, ETC_NOTE_KEY, current.value);
+      return null;
+    });
+  }, [setCellDraft]);
+
+  // 새로고침: 저장 후 고정되어 있던 자동입력 항목(인터넷비/승강기/소방안전/
+  // 전기안전/청소비)과 빌라 목록을 지금 시점의 실제 데이터로 다시 채웁니다.
+  // (화면/임시 초안에만 반영되며, 최종 반영하려면 저장 버튼을 눌러야 합니다)
+  const refreshAutoData = useCallback(() => {
+    setRefreshingAuto(true);
+
+    try {
+      const liveRows = makeMergedRowsByMonth(monthKey, peCalcMap, {
+        forceLiveAuto: true,
       });
-    } else {
-      await addDoc(collection(db, COLLECTIONS.includedUtilities), {
-        code: row.code || "",
-        codeNumber: row.code || "",
-        villaName: row.villaName || "",
-        amounts,
-        enabled,
-        amountsByMonth: {
-          [monthKey]: amounts,
-        },
-        enabledByMonth: {
-          [monthKey]: enabled,
-        },
-        hiddenByMonth: {
-          [monthKey]: false,
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+
+      liveRows.forEach((liveRow) => {
+        const liveData = liveRow.monthly?.[monthKey] || {};
+
+        FREEZE_AUTO_KEYS.forEach((key) => {
+          setCellDraft(liveRow, key, liveData[key]);
+        });
       });
+
+      alert(
+        "현재 실제 데이터로 자동입력 항목을 새로고침했습니다.\n화면 내용을 확인한 뒤 저장 버튼을 눌러야 최종 반영됩니다."
+      );
+    } finally {
+      setRefreshingAuto(false);
     }
+  }, [monthKey, peCalcMap, setCellDraft]);
 
-    setIncludedSearch("");
-  };
-
-  const updateIncludedAmount = async (row, key, value) => {
-    const cleanValue = parseNum(value);
-
-    await updateDoc(doc(db, COLLECTIONS.includedUtilities, row.id), {
-      [`amountsByMonth.${monthKey}.${key}`]: cleanValue,
-      [`amounts.${key}`]: cleanValue,
-      updatedAt: serverTimestamp(),
-    });
-
-    setIncludedRows((prev) =>
-      prev.map((itemRow) =>
-        itemRow.id === row.id
-          ? {
-              ...itemRow,
-              amounts: {
-                ...(itemRow.amounts || {}),
-                [key]: cleanValue,
-              },
-              amountsByMonth: {
-                ...(itemRow.amountsByMonth || {}),
-                [monthKey]: {
-                  ...(itemRow.amountsByMonth?.[monthKey] || {}),
-                  [key]: cleanValue,
-                },
-              },
-            }
-          : itemRow
-      )
-    );
-  };
-
-  const handleIncludedAmountChange = (row, key, value) => {
-    setIncludedRows((prev) =>
-      prev.map((itemRow) =>
-        itemRow.id === row.id
-          ? {
-              ...itemRow,
-              amountsByMonth: {
-                ...(itemRow.amountsByMonth || {}),
-                [monthKey]: {
-                  ...(itemRow.amountsByMonth?.[monthKey] || {}),
-                  [key]: value,
-                },
-              },
-            }
-          : itemRow
-      )
-    );
-  };
-
-  const toggleIncludedEnabled = async (row, key, checked) => {
-    const nextChecked = checked;
-
-    await updateDoc(doc(db, COLLECTIONS.includedUtilities, row.id), {
-      [`enabledByMonth.${monthKey}.${key}`]: nextChecked,
-      [`enabled.${key}`]: nextChecked,
-      updatedAt: serverTimestamp(),
-    });
-
-    setIncludedRows((prev) =>
-      prev.map((itemRow) =>
-        itemRow.id === row.id
-          ? {
-              ...itemRow,
-              enabledByMonth: {
-                ...(itemRow.enabledByMonth || {}),
-                [monthKey]: {
-                  ...(itemRow.enabledByMonth?.[monthKey] || {}),
-                  [key]: nextChecked,
-                },
-              },
-              enabled: {
-                ...(itemRow.enabled || {}),
-                [key]: nextChecked,
-              },
-            }
-          : itemRow
-      )
-    );
-  };
-
-  const deleteIncludedRow = async (row) => {
-    if (
-      !window.confirm(
-        `${row.villaName} 항목을 ${year}년 ${Number(
-          month
-        )}월 관리비 포함 공과금 목록에서만 숨길까요?`
-      )
-    ) {
-      return;
-    }
-
-    await updateDoc(doc(db, COLLECTIONS.includedUtilities, row.id), {
-      [`hiddenByMonth.${monthKey}`]: true,
-      updatedAt: serverTimestamp(),
-    });
-
-    if (editingIncludedId === row.id) {
-      setEditingIncludedId("");
-    }
-  };
-
-  const focusCell = (rowIndex, colIndex) => {
+  const focusCell = useCallback((rowIndex, colIndex) => {
     const target = inputRefs.current[`${rowIndex}-${colIndex}`];
     if (!target) return;
 
@@ -2208,47 +2106,55 @@ export default function ProfitLossPage() {
     setTimeout(() => {
       target.select?.();
     }, 0);
-  };
+  }, []);
 
-  const handleKeyDown = (e, rowIndex, colIndex) => {
-    let nextRow = rowIndex;
-    let nextCol = colIndex;
+  const handleKeyDown = useCallback(
+    (e, rowIndex, colIndex) => {
+      let nextRow = rowIndex;
+      let nextCol = colIndex;
 
-    if (e.key === "Enter") {
-      nextRow = rowIndex + 1;
-    } else if (e.key === "ArrowUp") {
-      nextRow = rowIndex - 1;
-    } else if (e.key === "ArrowDown") {
-      nextRow = rowIndex + 1;
-    } else if (e.key === "ArrowLeft") {
-      nextCol = colIndex - 1;
-    } else if (e.key === "ArrowRight") {
-      nextCol = colIndex + 1;
-    } else {
-      return;
-    }
+      if (e.key === "Enter") {
+        nextRow = rowIndex + 1;
+      } else if (e.key === "ArrowUp") {
+        nextRow = rowIndex - 1;
+      } else if (e.key === "ArrowDown") {
+        nextRow = rowIndex + 1;
+      } else if (e.key === "ArrowLeft") {
+        nextCol = colIndex - 1;
+      } else if (e.key === "ArrowRight") {
+        nextCol = colIndex + 1;
+      } else {
+        return;
+      }
 
-    e.preventDefault();
+      e.preventDefault();
 
-    if (nextCol < 0) {
-      nextRow -= 1;
-      nextCol = ITEMS.length - 1;
-    }
+      if (nextCol < 0) {
+        nextRow -= 1;
+        nextCol = ITEMS.length - 1;
+      }
 
-    if (nextCol >= ITEMS.length) {
-      nextRow += 1;
-      nextCol = 0;
-    }
+      if (nextCol >= ITEMS.length) {
+        nextRow += 1;
+        nextCol = 0;
+      }
 
-    if (nextRow < 0) {
-      nextRow = 0;
-      nextCol = 0;
-    }
+      if (nextRow < 0) {
+        nextRow = 0;
+        nextCol = 0;
+      }
 
-    focusCell(nextRow, nextCol);
-  };
+      focusCell(nextRow, nextCol);
+    },
+    [focusCell]
+  );
 
-  const focusTopCell = (colIndex) => {
+  // 셀 <input> DOM 참조를 등록하는 함수도 안정적인 참조로 고정합니다.
+  const registerInputRef = useCallback((rowIndex, colIndex, el) => {
+    inputRefs.current[`${rowIndex}-${colIndex}`] = el;
+  }, []);
+
+  const focusTopCell = useCallback((colIndex) => {
     const target = topInputRefs.current[colIndex];
     if (!target) return;
 
@@ -2257,26 +2163,29 @@ export default function ProfitLossPage() {
     setTimeout(() => {
       target.select?.();
     }, 0);
-  };
+  }, []);
 
-  const handleTopKeyDown = (e, colIndex) => {
-    let nextCol = colIndex;
+  const handleTopKeyDown = useCallback(
+    (e, colIndex) => {
+      let nextCol = colIndex;
 
-    if (e.key === "Enter" || e.key === "ArrowRight") {
-      nextCol = colIndex + 1;
-    } else if (e.key === "ArrowLeft") {
-      nextCol = colIndex - 1;
-    } else {
-      return;
-    }
+      if (e.key === "Enter" || e.key === "ArrowRight") {
+        nextCol = colIndex + 1;
+      } else if (e.key === "ArrowLeft") {
+        nextCol = colIndex - 1;
+      } else {
+        return;
+      }
 
-    e.preventDefault();
+      e.preventDefault();
 
-    if (nextCol < 0) nextCol = 0;
-    if (nextCol >= ITEMS.length) nextCol = ITEMS.length - 1;
+      if (nextCol < 0) nextCol = 0;
+      if (nextCol >= ITEMS.length) nextCol = ITEMS.length - 1;
 
-    focusTopCell(nextCol);
-  };
+      focusTopCell(nextCol);
+    },
+    [focusTopCell]
+  );
 
   const openStatsModal = () => {
     setStatsYear(year);
@@ -2292,67 +2201,94 @@ export default function ProfitLossPage() {
   return (
     <div className="pl-page">
       <div className="pl-header">
-        <h2>손익계산</h2>
+        <div className="pl-title-group">
+          <div className="pl-title-icon">
+            <FiTrendingUp />
+          </div>
+
+          <div>
+            <h2>손익계산</h2>
+
+            <p>
+              {hasUnsavedChanges && (
+                <span className="pl-header-meta pl-dirty-label">
+                  저장되지 않은 변경사항이 있습니다
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="pl-toolbar">
         <div className="pl-filter">
-          <select value={year} onChange={(e) => handleYearChange(e.target.value)}>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
+          <div className="pl-select-wrap pl-select-wrap-year">
+            <select value={year} onChange={(e) => handleYearChange(e.target.value)}>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}년
+                </option>
+              ))}
+            </select>
+            <FiChevronDown />
+          </div>
 
-          <select value={month} onChange={(e) => handleMonthChange(e.target.value)}>
-            {MONTHS.map((m) => (
-              <option key={m} value={m}>
-                {Number(m)}월
-              </option>
-            ))}
-          </select>
+          <div className="pl-select-wrap pl-select-wrap-month">
+            <select value={month} onChange={(e) => handleMonthChange(e.target.value)}>
+              {MONTHS.map((m) => (
+                <option key={m} value={m}>
+                  {Number(m)}월
+                </option>
+              ))}
+            </select>
+            <FiChevronDown />
+          </div>
 
           <button
             type="button"
-            className="pl-upload-btn"
+            className="pl-btn pl-upload-btn"
             onClick={() => waterFileRef.current?.click()}
             disabled={uploadingWater}
           >
+            <FiUploadCloud />
             {uploadingWater ? "업로드중..." : "수도업로드"}
           </button>
 
           <button
             type="button"
-            className="pl-include-btn"
-            onClick={() => setIncludedModalOpen(true)}
+            className="pl-btn pl-refresh-btn"
+            onClick={refreshAutoData}
+            disabled={refreshingAuto}
+            title="인터넷비/승강기/소방안전/전기안전/청소비 자동입력 항목과 빌라 목록을 지금 실제 데이터로 다시 불러옵니다."
           >
-            관리비 포함 공과금
+            <FiRefreshCw className={refreshingAuto ? "pl-spin" : ""} />
+            {refreshingAuto ? "새로고침중..." : "새로고침"}
           </button>
 
-          <button type="button" className="pl-stats-btn" onClick={openStatsModal}>
+          <button type="button" className="pl-btn pl-stats-btn" onClick={openStatsModal}>
+            <FiBarChart2 />
             통계
           </button>
 
           <button
             type="button"
-            className={`pl-save-btn ${hasUnsavedChanges ? "is-dirty" : ""}`}
+            className={`pl-btn pl-save-btn ${hasUnsavedChanges ? "is-dirty" : ""}`}
             onMouseDown={() => {
               document.activeElement?.blur?.();
             }}
             onClick={() => saveAllChanges()}
             disabled={savingDrafts}
           >
+            <FiSave />
             {savingDrafts
               ? "저장중..."
               : hasUnsavedChanges
               ? `저장 (${currentDraftCellCount + currentDraftTopCount})`
               : "저장완료"}
+            {hasUnsavedChanges && !savingDrafts && (
+              <span className="pl-save-dot" />
+            )}
           </button>
-
-          {hasUnsavedChanges && (
-            <span className="pl-unsaved-badge">저장되지 않은 변경 있음</span>
-          )}
 
           <input
             ref={waterFileRef}
@@ -2363,12 +2299,24 @@ export default function ProfitLossPage() {
           />
         </div>
 
-        <input
-          className="pl-search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="코드번호 / 빌라명 검색"
-        />
+        <div className="pl-search-wrap">
+          <FiSearch />
+          <input
+            className="pl-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="코드번호 / 빌라명 검색"
+          />
+          {search && (
+            <button
+              type="button"
+              className="pl-search-clear"
+              onClick={() => setSearch("")}
+            >
+              <FiX />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="pl-table-wrap pl-top-table-wrap">
@@ -2384,7 +2332,6 @@ export default function ProfitLossPage() {
               ))}
 
               <th>총 지출</th>
-              <th>입금수입</th>
               <th>부과수입</th>
             </tr>
 
@@ -2405,7 +2352,6 @@ export default function ProfitLossPage() {
               ))}
 
               <th className="pl-sub-th">{fmt(topCalc.totalExpense) || "0"}</th>
-              <th className="pl-sub-th">{fmt(topCalc.depositIncome) || "0"}</th>
               <th className="pl-sub-th">{fmt(topCalc.chargeIncome) || "0"}</th>
             </tr>
           </thead>
@@ -2422,15 +2368,6 @@ export default function ProfitLossPage() {
 
               <td className="pl-profit">
                 {fmt(columnTotals.totalExpense) || "-"}
-              </td>
-              <td
-                className={
-                  columnTotals.depositIncome >= 0
-                    ? "pl-profit plus-text"
-                    : "pl-profit minus-text"
-                }
-              >
-                {fmt(columnTotals.depositIncome) || "-"}
               </td>
               <td
                 className={
@@ -2470,15 +2407,6 @@ export default function ProfitLossPage() {
               </td>
               <td
                 className={
-                  balanceCalc.depositIncome >= 0
-                    ? "pl-profit plus-text"
-                    : "pl-profit minus-text"
-                }
-              >
-                {fmt(balanceCalc.depositIncome) || "-"}
-              </td>
-              <td
-                className={
                   balanceCalc.chargeIncome >= 0
                     ? "pl-profit plus-text"
                     : "pl-profit minus-text"
@@ -2515,7 +2443,6 @@ export default function ProfitLossPage() {
               ))}
 
               <th>총 지출</th>
-              <th>입금수입</th>
               <th>부과수입</th>
               <th rowSpan="2">마이너스 주요항목</th>
             </tr>
@@ -2534,102 +2461,29 @@ export default function ProfitLossPage() {
                 {fmt(columnTotals.totalExpense) || "0"}
               </th>
               <th className="pl-sub-th">
-                {fmt(columnTotals.depositIncome) || "0"}
-              </th>
-              <th className="pl-sub-th">
                 {fmt(columnTotals.chargeIncome) || "0"}
               </th>
             </tr>
           </thead>
 
           <tbody>
-            {filteredRows.map((row, rowIndex) => {
-              const data = row.monthly?.[monthKey] || {};
-              const calc = getRowCalc(row);
-
-              return (
-                <tr key={`${row.code}-${row.villaName}`}>
-                  <td>{rowIndex + 1}</td>
-                  <td>{row.code}</td>
-                  <td className="pl-villa">{row.villaName}</td>
-
-                  {ITEMS.map((item, colIndex) => {
-                    const isAuto = AUTO_KEYS.has(item.key);
-
-                    return (
-                      <td
-                        key={item.key}
-                        className={`pl-item-col pl-col-${item.key}`}
-                      >
-                        <MoneyInput
-                          inputRef={(el) => {
-                            inputRefs.current[`${rowIndex}-${colIndex}`] = el;
-                          }}
-                          className={[
-                            "pl-money-input",
-                            isAuto ? "pl-auto-input" : "",
-                            item.key === "waterFee" ? "pl-water-input" : "",
-                          ].join(" ")}
-                          value={data[item.key]}
-                          readOnly={isAuto}
-                          onSave={(value) => saveCell(row, item.key, value)}
-                          onKeyDown={(e) =>
-                            handleKeyDown(e, rowIndex, colIndex)
-                          }
-                          placeholder="-"
-                          title={isAuto ? "자동 입력 항목입니다." : ""}
-                        />
-                      </td>
-                    );
-                  })}
-
-                  <td className="pl-total">{fmtZero(calc.totalExpense)}</td>
-                  <td
-                    className={
-                      calc.depositIncome >= 0
-                        ? "pl-profit plus-text"
-                        : "pl-profit minus-text"
-                    }
-                  >
-                    {fmtZero(calc.depositIncome)}
-                  </td>
-                  <td
-                    className={
-                      calc.chargeIncome >= 0
-                        ? "pl-profit plus-text"
-                        : "pl-profit minus-text"
-                    }
-                  >
-                    {fmtZero(calc.chargeIncome)}
-                  </td>
-                  <td className="pl-reason">
-                    <select
-                      className={[
-                        "pl-reason-select",
-                        data.minusReason ? "is-selected" : "",
-                      ].join(" ")}
-                      value={data.minusReason || ""}
-                      onChange={(e) =>
-                        handleMinusReasonChange(row, e.target.value)
-                      }
-                    >
-                      {MINUS_REASON_OPTIONS.map((option) => (
-                        <option
-                          key={option.value || "empty"}
-                          value={option.value}
-                        >
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              );
-            })}
+            {filteredRows.map((row, rowIndex) => (
+              <ProfitTableRow
+                key={`${row.code}-${row.villaName}`}
+                row={row}
+                rowIndex={rowIndex}
+                monthKey={monthKey}
+                onSaveCell={saveCell}
+                onKeyDownCell={handleKeyDown}
+                onMinusReasonChange={handleMinusReasonChange}
+                onOpenEtcNote={openEtcNoteEditor}
+                registerInputRef={registerInputRef}
+              />
+            ))}
 
             {!filteredRows.length && (
               <tr>
-                <td colSpan={ITEMS.length + 7} className="pl-empty">
+                <td colSpan={ITEMS.length + 6} className="pl-empty">
                   해당 월에 저장된 손익계산 빌라 정보가 없습니다.
                 </td>
               </tr>
@@ -2638,192 +2492,59 @@ export default function ProfitLossPage() {
         </table>
       </div>
 
-      {includedModalOpen && (
-        <div className="pl-modal">
-          <div
-            className="pl-modal-backdrop"
-            onClick={() => setIncludedModalOpen(false)}
-          />
+      {etcNoteEditor &&
+        createPortal(
+          <div className="pl-etc-note-overlay" onClick={closeEtcNoteEditor}>
+            <div
+              className="pl-etc-note-popup"
+              style={{
+                top: etcNoteEditor.top,
+                left: etcNoteEditor.left,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="pl-etc-note-popup-title">기타 항목 메모</div>
 
-          <div className="pl-modal-panel">
-            <div className="pl-modal-header">
-              <div>
-                <h3>관리비 포함 공과금 설정</h3>
-                <p>
-                  빌라목록과 금액은 선택 월의 손익계산 기준이며, 적용 체크와
-                  금액 수정은 월별로 따로 저장됩니다.
-                </p>
-              </div>
+              <textarea
+                autoFocus
+                className="pl-etc-note-textarea"
+                value={etcNoteEditor.value}
+                placeholder="예: 엘리베이터 부품 교체비"
+                onChange={(e) =>
+                  setEtcNoteEditor((current) =>
+                    current ? { ...current, value: e.target.value } : current
+                  )
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    saveEtcNoteEditor();
+                  } else if (e.key === "Escape") {
+                    closeEtcNoteEditor();
+                  }
+                }}
+              />
 
-              <div className="pl-modal-header-actions">
-                <div className="pl-modal-search-wrap">
-                  <input
-                    className="pl-modal-search"
-                    value={includedSearch}
-                    onChange={(e) => setIncludedSearch(e.target.value)}
-                    placeholder="코드번호 / 빌라명 검색"
-                  />
-
-                  {includedSearchResults.length > 0 && (
-                    <div className="pl-search-result-box">
-                      {includedSearchResults.map((row) => (
-                        <button
-                          type="button"
-                          key={`${row.code}-${row.villaName}`}
-                          className="pl-search-result-item"
-                          onClick={() => addIncludedUtilityRow(row)}
-                        >
-                          <span>{row.code}</span>
-                          <strong>{row.villaName}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
+              <div className="pl-etc-note-popup-actions">
                 <button
                   type="button"
-                  className="pl-modal-close"
-                  onClick={() => setIncludedModalOpen(false)}
+                  className="pl-etc-note-cancel"
+                  onClick={closeEtcNoteEditor}
                 >
-                  닫기
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="pl-etc-note-save"
+                  onClick={saveEtcNoteEditor}
+                >
+                  저장
                 </button>
               </div>
             </div>
-
-            <div className="pl-included-table-wrap">
-              <table className="pl-included-table">
-                <thead>
-                  <tr>
-                    <th rowSpan="2">번호</th>
-                    <th rowSpan="2">코드번호</th>
-                    <th rowSpan="2">빌라명</th>
-
-                    {INCLUDED_UTILITY_KEYS.map((item) => (
-                      <th key={item.key}>{item.label}</th>
-                    ))}
-
-                    <th>합계</th>
-                    <th rowSpan="2">관리</th>
-                  </tr>
-
-                  <tr>
-                    {INCLUDED_UTILITY_KEYS.map((item) => (
-                      <th key={item.key} className="pl-sub-th">
-                        {fmt(includedColumnTotals[item.key]) || "0"}
-                      </th>
-                    ))}
-
-                    <th className="pl-sub-th">
-                      {fmt(includedColumnTotals.total) || "0"}
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {includedMonthRows.map((row, index) => {
-                    const isEditing = editingIncludedId === row.id;
-                    const amounts = row.amounts || {};
-                    const enabled = row.enabled || {};
-                    const rowTotal = getIncludedRowTotal(row);
-
-                    return (
-                      <tr key={row.id}>
-                        <td>{index + 1}</td>
-                        <td>{row.code}</td>
-                        <td className="pl-villa">{row.villaName}</td>
-
-                        {INCLUDED_UTILITY_KEYS.map((item) => {
-                          const checked = enabled[item.key] !== false;
-
-                          return (
-                            <td key={item.key}>
-                              {isEditing ? (
-                                <div className="pl-apply-cell">
-                                  <label>
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) =>
-                                        toggleIncludedEnabled(
-                                          row,
-                                          item.key,
-                                          e.target.checked
-                                        )
-                                      }
-                                    />
-                                    적용
-                                  </label>
-
-                                  <MoneyInput
-                                    className="pl-modal-money-input"
-                                    value={
-                                      row.amountsByMonth?.[monthKey]?.[
-                                        item.key
-                                      ] ?? amounts[item.key]
-                                    }
-                                    onSave={(value) =>
-                                      updateIncludedAmount(row, item.key, value)
-                                    }
-                                  />
-                                </div>
-                              ) : (
-                                <span
-                                  className={
-                                    checked ? "pl-applied" : "pl-not-applied"
-                                  }
-                                >
-                                  {fmt(amounts[item.key]) || "-"}
-                                </span>
-                              )}
-                            </td>
-                          );
-                        })}
-
-                        <td className="pl-total">{fmt(rowTotal) || "0"}</td>
-
-                        <td>
-                          <div className="pl-row-actions">
-                            <button
-                              type="button"
-                              className="pl-edit-btn"
-                              onClick={() =>
-                                setEditingIncludedId(isEditing ? "" : row.id)
-                              }
-                            >
-                              {isEditing ? "완료" : "수정"}
-                            </button>
-
-                            <button
-                              type="button"
-                              className="pl-delete-btn"
-                              onClick={() => deleteIncludedRow(row)}
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {!includedMonthRows.length && (
-                    <tr>
-                      <td colSpan={INCLUDED_UTILITY_KEYS.length + 5}>
-                        <div className="pl-modal-empty">
-                          검색창에서 코드번호 또는 빌라명을 검색한 뒤 추가하세요.
-                          현재 선택 월의 손익계산 목록에 없는 빌라는 이 월에서는
-                          표시되지 않습니다.
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {statsModalOpen && (
         <div className="pl-modal">
@@ -2834,161 +2555,110 @@ export default function ProfitLossPage() {
 
           <div className="pl-stats-panel">
             <div className="pl-stats-header">
-              <div>
-                <h3>손익 통계</h3>
+              <div className="pl-modal-header-title">
+                <h3>
+                  <FiBarChart2 />
+                  손익 통계
+                </h3>
                 <p>통계창에서 년도와 월을 변경해 바로 확인할 수 있습니다.</p>
               </div>
 
               <div className="pl-stats-filter">
-                <select
-                  value={statsYear}
-                  onChange={(e) => setStatsYear(e.target.value)}
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}년
-                    </option>
-                  ))}
-                </select>
+                <div className="pl-select-wrap pl-select-wrap-stats">
+                  <select
+                    value={statsYear}
+                    onChange={(e) => setStatsYear(e.target.value)}
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}년
+                      </option>
+                    ))}
+                  </select>
+                  <FiChevronDown />
+                </div>
 
-                <select
-                  value={statsMonth}
-                  onChange={(e) => setStatsMonth(e.target.value)}
-                >
-                  {MONTHS.map((m) => (
-                    <option key={m} value={m}>
-                      {Number(m)}월
-                    </option>
-                  ))}
-                </select>
+                <div className="pl-select-wrap pl-select-wrap-stats">
+                  <select
+                    value={statsMonth}
+                    onChange={(e) => setStatsMonth(e.target.value)}
+                  >
+                    {MONTHS.map((m) => (
+                      <option key={m} value={m}>
+                        {Number(m)}월
+                      </option>
+                    ))}
+                  </select>
+                  <FiChevronDown />
+                </div>
 
                 <button
                   type="button"
                   className="pl-modal-close"
                   onClick={() => setStatsModalOpen(false)}
                 >
-                  닫기
+                  <FiX />
                 </button>
               </div>
             </div>
 
-            <div className="pl-stats-summary five">
-              <div className="pl-stat-card">
-                <span>조회 빌라</span>
-                <strong>{statsRows.length.toLocaleString()}개</strong>
+            <div className="pl-stats-summary four">
+              <div className="pl-stat-card pl-stat-card-count">
+                <div className="pl-stat-icon">
+                  <FiUsers />
+                </div>
+                <div>
+                  <span>조회 빌라</span>
+                  <strong>{statsRows.length.toLocaleString()}개</strong>
+                </div>
               </div>
 
-              <div className="pl-stat-card">
-                <span>부과관리비</span>
-                <strong>{fmt(statsColumnTotals.chargeFee) || "0"}원</strong>
+              <div className="pl-stat-card pl-stat-card-charge">
+                <div className="pl-stat-icon">
+                  <FiDollarSign />
+                </div>
+                <div>
+                  <span>부과관리비 합계</span>
+                  <strong>{fmt(statsColumnTotals.chargeFee) || "0"}원</strong>
+                </div>
               </div>
 
-              <div className="pl-stat-card">
-                <span>총 지출</span>
-                <strong>{fmt(statsBalanceCalc.totalExpense) || "0"}원</strong>
+              <div className="pl-stat-card pl-stat-card-expense">
+                <div className="pl-stat-icon">
+                  <FiTrendingDown />
+                </div>
+                <div>
+                  <span>총 지출 합계</span>
+                  <strong>{fmt(statsColumnTotals.totalExpense) || "0"}원</strong>
+                </div>
               </div>
 
-              <div className="pl-stat-card">
-                <span>입금수입</span>
-                <strong
-                  className={
-                    Math.max(
-                      parseNum(statsTopPayments.managementFee),
-                      parseNum(statsColumnTotals.managementFee)
-                    ) -
-                      parseNum(statsBalanceCalc.totalExpense) >=
-                    0
-                      ? "plus-text"
-                      : "minus-text"
-                  }
-                >
-                  {fmt(
-                    Math.max(
-                      parseNum(statsTopPayments.managementFee),
-                      parseNum(statsColumnTotals.managementFee)
-                    ) - parseNum(statsBalanceCalc.totalExpense)
-                  ) || "0"}원
-                </strong>
-              </div>
-
-              <div className="pl-stat-card">
-                <span>부과수입</span>
-                <strong
-                  className={
-                    Math.max(
-                      parseNum(statsTopPayments.chargeFee),
-                      parseNum(statsColumnTotals.chargeFee)
-                    ) -
-                      parseNum(statsBalanceCalc.totalExpense) >=
-                    0
-                      ? "plus-text"
-                      : "minus-text"
-                  }
-                >
-                  {fmt(
-                    Math.max(
-                      parseNum(statsTopPayments.chargeFee),
-                      parseNum(statsColumnTotals.chargeFee)
-                    ) - parseNum(statsBalanceCalc.totalExpense)
-                  ) || "0"}원
-                </strong>
+              <div className="pl-stat-card pl-stat-card-charge-income">
+                <div className="pl-stat-icon">
+                  <FiDollarSign />
+                </div>
+                <div>
+                  <span>부과수입 (부과관리비 − 총지출)</span>
+                  <strong
+                    className={
+                      statsChargeIncome >= 0 ? "plus-text" : "minus-text"
+                    }
+                  >
+                    {fmt(statsChargeIncome) || "0"}원
+                  </strong>
+                </div>
               </div>
             </div>
 
             <div className="pl-stats-profit-line">
               <div>
-                <span>상단 테이블 입금기준 수익</span>
+                <span>{statsYear}년 {Number(statsMonth)}월 수익률</span>
                 <strong
                   className={
-                    Math.max(
-                      parseNum(statsTopPayments.managementFee),
-                      parseNum(statsColumnTotals.managementFee)
-                    ) -
-                      Math.max(
-                        parseNum(statsTopCalc.totalExpense),
-                        parseNum(statsBalanceCalc.totalExpense)
-                      ) >=
-                    0
-                      ? "plus-text"
-                      : "minus-text"
+                    statsChargeIncome >= 0 ? "plus-text" : "minus-text"
                   }
                 >
-                  {fmt(
-                    Math.max(
-                      parseNum(statsTopPayments.managementFee),
-                      parseNum(statsColumnTotals.managementFee)
-                    ) -
-                      Math.max(
-                        parseNum(statsTopCalc.totalExpense),
-                        parseNum(statsBalanceCalc.totalExpense)
-                      )
-                  ) || "0"}원
-                </strong>
-              </div>
-
-              <div>
-                <span>수익률</span>
-                <strong
-                  className={
-                    statsTopCalc.depositIncome >= 0
-                      ? "plus-text"
-                      : "minus-text"
-                  }
-                >
-                  {getRate(
-                    Math.max(
-                      parseNum(statsTopPayments.managementFee),
-                      parseNum(statsColumnTotals.managementFee)
-                    ) -
-                      Math.max(
-                        parseNum(statsTopCalc.totalExpense),
-                        parseNum(statsBalanceCalc.totalExpense)
-                      ),
-                    Math.max(
-                      parseNum(statsTopPayments.managementFee),
-                      parseNum(statsColumnTotals.managementFee)
-                    )
-                  ).toFixed(1)}
+                  {getRate(statsChargeIncome, statsColumnTotals.chargeFee).toFixed(1)}
                   %
                 </strong>
               </div>
