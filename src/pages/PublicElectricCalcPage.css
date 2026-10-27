@@ -1,290 +1,1460 @@
-/* src/pages/PublicElectricCalcPage.css */
+/* =========================================================
+   공용전기 계산 페이지
+   - 서비스비용 관리 페이지(ServiceCostPage)의 디자인 언어를
+     그대로 반영해 전면 리뉴얼한 스타일입니다.
+   - 기능/동작은 변경하지 않고 화면 디자인만 새로 작성했습니다.
+========================================================= */
 
-/* ===== 라이트 테마 베이스 ===== */
-.pe-page.light {
+.pec-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  background:
-    radial-gradient(1200px 600px at -10% -10%, rgba(125, 106, 255, .08), transparent),
-    radial-gradient(1200px 600px at 110% -10%, rgba(236, 72, 153, .08), transparent),
-    linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
-  min-height: 100%;
+
+  width: 100%;
+  min-width: 0;
+  height: calc(100vh - 0px);
+  min-height: 0;
+
+  overflow: hidden;
+
+  color: #182338;
+
   box-sizing: border-box;
-  color: #0f172a;
 }
 
-/* ===== 스크롤바(전역 통일: 공용전기 고객번호 색 #6366f1) ===== */
-.pe-page.light,
-.pe-table-scroll,
-.pe-modal-body {
-  scrollbar-width: thin;               /* Firefox */
-  scrollbar-color: #6366f1 #e5e7eb;    /* thumb, track */
-}
-.pe-page.light::-webkit-scrollbar,
-.pe-table-scroll::-webkit-scrollbar,
-.pe-modal-body::-webkit-scrollbar { height: 10px; width: 10px; }
-.pe-page.light::-webkit-scrollbar-thumb,
-.pe-table-scroll::-webkit-scrollbar-thumb,
-.pe-modal-body::-webkit-scrollbar-thumb {
-  background: #6366f1;
-  border-radius: 12px;
-  border: 2px solid #e5e7eb;
-}
-.pe-page.light::-webkit-scrollbar-track,
-.pe-table-scroll::-webkit-scrollbar-track,
-.pe-modal-body::-webkit-scrollbar-track { background: #e5e7eb; }
 
-/* ===== 툴바 ===== */
-.pe-toolbar {
-  display: grid;
-  grid-template-columns: 1fr max-content;
-  gap: 12px;
+/* =========================================================
+   HERO (페이지 타이틀)
+========================================================= */
+
+.pec-hero {
+  display: flex;
   align-items: center;
-  padding: 12px;
-  border-radius: 18px;
+  justify-content: space-between;
+  gap: 26px;
+  flex: 0 0 auto;
+
+  min-height: 56px;
+  margin-bottom: 14px;
+  padding: 12px 24px;
+
+  border: 1px solid #dce4ee;
+  border-radius: 16px;
+
   background:
-    radial-gradient(900px 300px at -10% -10%, rgba(125, 106, 255, .12), transparent),
-    radial-gradient(900px 300px at 110% -10%, rgba(236, 72, 153, .10), transparent),
-    #ffffff;
+    linear-gradient(
+      110deg,
+      #ffffff 0%,
+      #fbfcfe 60%,
+      #f5f8fc 100%
+    );
+
   box-shadow:
-    0 10px 30px rgba(15, 23, 42, .06),
-    inset 0 0 0 1px rgba(2, 6, 23, .04);
+    0 8px 24px rgba(15, 23, 42, 0.045);
 }
-.pe-toolbar.fancy { border: 1px solid rgba(2, 6, 23, .06); }
 
-.pe-left { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
-.pe-right { display: flex; align-items: center; gap: 12px; }
+.pec-hero__content {
+  min-width: 0;
+}
 
-/* ===== 버튼 & 드롭다운 ===== */
-.pe-btn {
-  display: inline-flex;
+.pec-hero__eyebrow {
+  margin-bottom: 4px;
+
+  color: #76849a;
+
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.pec-hero h2 {
+  margin: 0;
+
+  color: #172238;
+
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+
+
+/* =========================================================
+   TOOLBAR (년/월 선택 · 업로드 · 부과설정 · 수정 · 삭제 · 검색)
+========================================================= */
+
+.pec-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: 0 0 auto;
+
+  margin-bottom: 14px;
+}
+
+.pec-toolbar__left {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.pec-select-group {
+  display: flex;
+  align-items: center;
+
+  margin-right: 4px;
+  padding: 3px;
+
+  border: 1px solid #d8e0e9;
+  border-radius: 12px;
+
+  background: #fbfcfe;
+
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.035);
+}
+
+.pec-select {
+  height: 40px;
+  padding: 0 32px 0 12px;
+
+  border: 1px solid #d8e0e9;
+  border-radius: 9px;
+  outline: none;
+
+  background-color: #fbfcfe;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235c6b80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  color: #2c3a52;
+
+  font-size: 12.5px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: all 0.15s ease;
+}
+
+.pec-select:hover {
+  border-color: #b9c4d3;
+  background-color: #f4f7fa;
+}
+
+.pec-select:focus {
+  border-color: #8fa5c0;
+  background-color: #ffffff;
+
+  box-shadow:
+    0 0 0 3px rgba(100, 125, 160, 0.08);
+}
+
+
+/* ===== 툴 버튼 ===== */
+
+.pec-tool-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
   height: 40px;
   padding: 0 16px;
-  border: 1px solid rgba(2, 6, 23, .08);
-  border-radius: 12px;
+
+  border: 1px solid #d8e0e9;
+  border-radius: 9px;
+
+  background: #fbfcfe;
+
+  color: #46566d;
+
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #0f172a;
-  background: #ffffff;
+
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(2, 6, 23, .06);
-  transition: transform .08s ease, box-shadow .2s ease, opacity .2s ease;
-}
-.pe-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(2, 6, 23, .08); }
-.pe-btn:active { transform: translateY(0); opacity: .95; }
 
-/* 업로드/저장용 그라디언트 */
-.pe-btn.gradient { 
-  color: #fff; border: 0;
-  background-image: linear-gradient(90deg, #7c3aed, #4f46e5, #06b6d4);
-  background-size: 100% 100%;
-  animation: none;
-  box-shadow: 0 8px 20px rgba(99, 102, 241, .25);
+  transition: all 0.15s ease;
 }
 
-/* (변경) 부과설정 버튼: 덜 눈부신 인디고 톤 다운 */
-.pe-btn.accent-muted {
-  color: #1e1b4b;
-  border-color: #c7d2fe;
-  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, .15), inset 0 0 0 1px rgba(79, 70, 229, .10);
+.pec-tool-button i {
+  font-size: 13px;
+  line-height: 1;
 }
 
-/* (변경) 수정 버튼: 밝은 회색 톤, 두꺼운 외곽광 제거 */
-.pe-btn.edit-soft {
-  background: #018cff;
-  color: #ffffff;
-  border: 1px solid #e5e7eb;   /* 다른 버튼과 동일 두께 */
-  box-shadow: 0 3px 10px rgba(2, 6, 23, .04);
-}
-.pe-btn.edit-soft.active {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  box-shadow: 0 4px 12px rgba(2, 6, 23, .06);
+.pec-tool-button:hover {
+  border-color: #b9c4d3;
+  background: #f4f7fa;
+  transform: translateY(-1px);
 }
 
-/* (유지) 삭제 버튼 예쁜 스타일 */
-.pe-btn.danger.pretty {
-  color: #fff;
+.pec-tool-button:active {
+  transform: translateY(0);
+}
+
+/* 엑셀 업로드: 그라디언트 강조 */
+.pec-tool-button.is-upload {
   border: 0;
+  color: #ffffff;
+
+  background-image: linear-gradient(90deg, #7c3aed, #4f46e5, #06b6d4);
+
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+}
+
+.pec-tool-button.is-upload:hover {
+  filter: brightness(1.04);
+}
+
+/* 부과설정: 인디고 톤 */
+.pec-tool-button.is-settings {
+  border-color: #d8dbf0;
+  background: #f5f6fd;
+  color: #4c53a8;
+}
+
+.pec-tool-button.is-settings:hover {
+  border-color: #c1c6ee;
+  background: #edeffc;
+}
+
+/* 수정 토글 */
+.pec-tool-button.is-edit {
+  border-color: #cfe0d3;
+  background: #f2faf5;
+  color: #2f7a52;
+}
+
+.pec-tool-button.is-edit:hover {
+  border-color: #a9d3b3;
+  background: #e8f7ec;
+}
+
+.pec-tool-button.is-edit.is-active {
+  border-color: #2f7a52;
+  background: #2f7a52;
+  color: #ffffff;
+}
+
+/* 전체 삭제: 위험 강조 */
+.pec-tool-button.is-danger {
+  border: 0;
+  color: #ffffff;
+
   background: linear-gradient(90deg, #ef4444, #dc2626);
-  box-shadow: 0 8px 18px rgba(220, 38, 38, .25);
-}
-.pe-btn.danger.pretty:hover { box-shadow: 0 10px 22px rgba(220, 38, 38, .3); transform: translateY(-1px); }
 
-.pe-actions { display: inline-grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 8px; }
-
-.pe-select-wrap { display: grid; gap: 6px; }
-.pe-select-wrap label { font-size: 12px; color: #475569; }
-
-.pe-select {
-  height: 40px; border-radius: 12px; border: 1px solid rgba(2, 6, 23, .12);
-  padding: 0 12px; background: #ffffff; color: #0f172a; outline: none; font-weight: 700;
-  box-shadow: inset 0 0 0 1px rgba(2, 6, 23, .02);
-}
-.pe-select:focus { border-color: rgba(99, 102, 241, .5); box-shadow: 0 0 0 3px rgba(99, 102, 241, .2); }
-
-.pe-select.method.danger {
-  background: #fff5f5; border-color: #fecaca; color: #b91c1c; font-weight: 900;
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.25);
 }
 
-/* ===== 요약 배지 ===== */
-.pe-badges { display: inline-grid; grid-auto-flow: column; grid-auto-columns: max-content; gap: 8px; }
-.pe-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 36px; padding: 0 14px; border-radius: 999px;
-  background: #ffffff; color: #334155; border: 1px solid rgba(2, 6, 23, .08);
-  box-shadow: inset 0 0 0 1px rgba(2, 6, 23, .02); font-size: 13px;
+.pec-tool-button.is-danger:hover {
+  box-shadow: 0 10px 22px rgba(220, 38, 38, 0.3);
 }
-.pe-badge b { font-weight: 900; color: #0f172a; padding-left: 4px; }
 
-/* ===== 테이블 카드 ===== */
-.pe-grid { display: grid; }
-.pe-table-card {
-  background:
-    radial-gradient(1200px 500px at -10% 0%, rgba(99, 102, 241, .08), transparent),
-    radial-gradient(1000px 500px at 110% 10%, rgba(236, 72, 153, .07), transparent),
-    #ffffff;
-  border-radius: 18px; border: 1px solid rgba(2, 6, 23, .08);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, .06), inset 0 0 0 1px rgba(2, 6, 23, .02);
-  overflow: hidden;
-}
-.pe-table-scroll { overflow: auto; max-height: calc(100vh - 240px); }
 
-/* ===== 테이블 ===== */
-.pe-table {
-  width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1140px; color: #0f172a;
-}
-.pe-table thead th {
-  position: sticky; top: 0; z-index: 2; text-align: center; height: 42px;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
-  border-bottom: 1px solid rgba(2, 6, 23, .08); font-weight: 900; letter-spacing: .2px;
-}
-.pe-table tbody td { height: 46px; border-bottom: 1px dashed rgba(2, 6, 23, .08); padding: 0 10px; }
-.pe-table td.c { text-align: center; }
-.pe-table td.l { text-align: left; }
-.pe-table td.r { text-align: right; }
-.pe-table td.muted { color: #94a3b8; }
-.pe-table tbody tr:hover td { background: rgba(59, 130, 246, .06); }
+/* ===== 검색창 ===== */
 
-/* 행 제외(부과안함) — 더 진한 회색 */
-.row-excluded td {
-  background: #e5e7eb !important;
-  color: #6b7280;
+.pec-search {
+  position: relative;
+
+  flex: 0 0 auto;
+
+  width: 300px;
 }
-.row-excluded .pe-input,
-.row-excluded .pe-select {
-  background: #e5e7eb;
-  color: #6b7280;
-  border-color: #d1d5db;
+
+.pec-search__icon {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+
+  transform: translateY(-50%);
+
+  color: #8c99aa;
+
+  font-size: 18px;
+
   pointer-events: none;
 }
-.pe-tag-excluded {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 900;
-  color: #6b7280;
-  background: #d1d5db;
-  padding: 2px 8px;
-  border-radius: 999px;
+
+.pec-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 34px 0 39px;
+
+  border: 1px solid #d8e0e9;
+  border-radius: 10px;
+  outline: none;
+
+  background: #fbfcfe;
+
+  color: #233149;
+
+  font-size: 13px;
+
+  transition: all 0.15s ease;
+
+  box-sizing: border-box;
 }
+
+.pec-search input:focus {
+  border-color: #8fa5c0;
+  background: #ffffff;
+
+  box-shadow:
+    0 0 0 3px rgba(100, 125, 160, 0.08);
+}
+
+.pec-search__clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+
+  width: 24px;
+  height: 24px;
+
+  transform: translateY(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 6px;
+
+  background: transparent;
+
+  color: #9aa4b3;
+
+  font-size: 11px;
+
+  cursor: pointer;
+}
+
+.pec-search__clear:hover {
+  background: #eef1f5;
+  color: #5d6878;
+}
+
+
+/* =========================================================
+   요약 카드
+========================================================= */
+
+.pec-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+  flex: 0 0 auto;
+
+  margin-bottom: 14px;
+}
+
+.pec-summary-card {
+  position: relative;
+
+  min-height: 92px;
+  padding: 15px 16px;
+
+  overflow: hidden;
+
+  border: 1px solid #e1e7ee;
+  border-radius: 13px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.035);
+}
+
+.pec-summary-card::before {
+  content: "";
+
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  width: 100%;
+  height: 3px;
+
+  background: #9aa7b8;
+}
+
+.pec-summary-card--billed::before {
+  background: #e57474;
+}
+
+.pec-summary-card--assessed::before {
+  background: #4f94df;
+}
+
+.pec-summary-card--diff-pos::before {
+  background: #df9d42;
+}
+
+.pec-summary-card--diff-neg::before {
+  background: #32a675;
+}
+
+.pec-summary-card__label {
+  margin-bottom: 9px;
+
+  color: #718095;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pec-summary-card__number {
+  overflow: hidden;
+
+  color: #1b2940;
+
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: -0.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pec-summary-card--billed .pec-summary-card__number {
+  color: #c76060;
+}
+
+.pec-summary-card--assessed .pec-summary-card__number {
+  color: #4383c7;
+}
+
+.pec-summary-card--diff-pos .pec-summary-card__number {
+  color: #d18a31;
+}
+
+.pec-summary-card--diff-neg .pec-summary-card__number {
+  color: #29946a;
+}
+
+.pec-summary-card__number span {
+  margin-left: 3px;
+
+  color: #78869a;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   데이터 테이블 카드
+========================================================= */
+
+.pec-table-card {
+  display: flex;
+  flex-direction: column;
+
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow: hidden;
+
+  border: 1px solid #dfe5ec;
+  border-radius: 15px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 5px 18px rgba(15, 23, 42, 0.04);
+}
+
+.pec-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+
+  min-height: 56px;
+  padding: 0 18px;
+
+  border-bottom: 1px solid #e7ebf0;
+}
+
+.pec-table-head h3 {
+  margin: 0;
+
+  color: #1e2b42;
+
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.pec-table-count {
+  padding: 6px 10px;
+
+  border: 1px solid #dfe6ed;
+  border-radius: 999px;
+
+  background: #f7f9fb;
+
+  color: #65768d;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   테이블 스크롤 / 스크롤바
+========================================================= */
+
+.pec-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow: auto;
+}
+
+.pec-table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.pec-table-scroll::-webkit-scrollbar-track {
+  background: #f3f5f7;
+}
+
+.pec-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid #f3f5f7;
+  border-radius: 10px;
+
+  background: #cbd3dc;
+}
+
+.pec-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #abb6c3;
+}
+
+
+/* =========================================================
+   테이블
+========================================================= */
+
+.pec-table {
+  width: 100%;
+  min-width: 1040px;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  table-layout: fixed;
+}
+
+.pec-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+
+  height: 42px;
+  padding: 0 10px;
+
+  border-bottom: 1px solid #dde4ec;
+
+  background: #f6f8fb;
+
+  color: #637187;
+
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pec-table .col-no {
+  width: 4%;
+}
+
+.pec-table .col-code {
+  width: 6%;
+}
+
+.pec-table .col-villa {
+  width: 14%;
+}
+
+.pec-table .col-households {
+  width: 8%;
+}
+
+.pec-table .col-billed {
+  width: 11%;
+}
+
+.pec-table .col-assessed {
+  width: 9%;
+}
+
+.pec-table .col-diff {
+  width: 8%;
+}
+
+.pec-table .col-method {
+  width: 9%;
+}
+
+.pec-table .col-memo {
+  width: 31%;
+}
+
+.pec-table tbody td {
+  height: 52px;
+  padding: 7px 10px;
+
+  border-bottom: 1px solid #edf0f4;
+
+  background: #ffffff;
+
+  color: #46546a;
+
+  font-size: 12px;
+
+  transition: background 0.12s ease;
+}
+
+.pec-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.pec-table td.c {
+  text-align: center;
+}
+
+.pec-table td.l {
+  text-align: left;
+}
+
+.pec-table td.muted,
+.pec-empty-cell {
+  color: #9aa5b3 !important;
+}
+
+
+/* 부과안함 행 */
+.pec-table tbody tr.row-excluded td {
+  background: #eef0f3;
+  color: #808b9c;
+}
+
+.pec-table tbody tr.row-excluded:hover td {
+  background: #e8ebef;
+}
+
+.pec-table tr.row-excluded .pec-input,
+.pec-table tr.row-excluded .pec-select,
+.pec-table tr.row-excluded .pec-method-trigger {
+  background: #eef0f3;
+  color: #808b9c;
+  border-color: #dbe0e6;
+  pointer-events: none;
+}
+
+.pec-tag-excluded {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 2px 8px;
+
+  border-radius: 999px;
+
+  background: #dfe3e8;
+
+  color: #626f81;
+
+  font-size: 9.5px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+
+/* ===== 번호 / 코드 ===== */
+
+.pec-no-cell {
+  color: #9aa5b6 !important;
+
+  font-size: 11px !important;
+  font-weight: 700;
+}
+
+.pec-code-cell {
+  color: #6f7d91 !important;
+
+  font-size: 11px !important;
+  font-weight: 750;
+}
+
 
 /* ===== 빌라 표시 ===== */
-.pe-villa { display: grid; line-height: 1.22; }
-.pe-villa-line { display: inline-flex; align-items: center; gap: 6px; }
-.pe-villa-name { font-weight: 900; color: #0f172a; }
-.pe-villa-cust { font-size: 12px; color: #6366f1; }
-.pe-villa-cust.empty { color: #dc2626; }
 
-/* ===== 입력 ===== */
-.pe-input {
-  width: 100%; height: 36px; border-radius: 10px; border: 1px solid rgba(2, 6, 23, .12);
-  padding: 0 10px; background: #ffffff; color: #0f172a; outline: none; font-weight: 700;
+.pec-villa-cell {
+  min-width: 0;
 }
-.pe-input:focus { border-color: rgba(99, 102, 241, .5); box-shadow: 0 0 0 3px rgba(99, 102, 241, .2); }
-.pe-input.num { text-align: right; }
 
-.pe-money-edit { display: grid; grid-template-columns: 1fr max-content; align-items: center; gap: 8px; }
-.pe-money-edit .unit { font-size: 12px; color: #64748b; opacity: .9; }
-
-/* ===== 강조/상태 ===== */
-.strong { font-weight: 900; color: #0f172a; }
-
-/* ✅ 차액 +값 */
-td.pos { color: #22c55e; font-weight: 900; }
-td.neg { color: #dc2626; font-weight: 900; }
-
-/* ✅ 청구요금 비어있을 때 붉은 배경 */
-.cell-required { background: #fef2f2; }
-
-/* ✅ 부과요금 파란색 */
-.assessed-blue { color: #014ef3; font-weight: 900; }
-
-/* ===== 모달 ===== */
-.pe-modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(2, 6, 23, .4);
-  display: grid; place-items: center;
-  z-index: 1000;
+.pec-villa-cell__name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
-.pe-modal {
-  width: min(900px, 92vw);
-  max-height: 82vh;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(2, 6, 23, .3);
-  display: grid; grid-template-rows: max-content 1fr max-content;
+
+.pec-villa-cell__name-row strong {
   overflow: hidden;
-  border: 1px solid rgba(2, 6, 23, .08);
-}
-.pe-modal-header {
-  position: sticky; top: 0; z-index: 5; /* 제목헤더 최상단 */
-  padding: 14px 16px;
-  background: #ffffff; /* 불투명 */
-  border-bottom: 1px solid rgba(2, 6, 23, .12);
-  box-shadow: 0 2px 8px rgba(2, 6, 23, .06);
-}
-.pe-modal-header h3 { margin: 0; font-size: 16px; font-weight: 900; color: #0f172a; }
 
-.pe-modal-body {
-  padding: 12px;
-  overflow: auto; /* 스크롤 컨테이너 */
+  color: #25344a;
+
+  font-size: 12.5px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.pe-modal-table {
+.pec-villa-cell__sub {
+  display: block;
+  margin-top: 3px;
+
+  overflow: hidden;
+
+  color: #4c84bd;
+
+  font-size: 10.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pec-villa-cell__sub.is-empty {
+  color: #c76060;
+}
+
+
+/* =========================================================
+   입력 / 드롭다운 (표 안)
+========================================================= */
+
+.pec-input {
   width: 100%;
-  border-collapse: separate; border-spacing: 0;
-  min-width: 640px;
-}
-.pe-modal-table thead th {
-  position: sticky; top: 0; z-index: 4; /* 제목헤더 아래, 목록 위 */
-  height: 40px; text-align: center;
-  background: #f8fafc; /* 불투명 */
-  border-bottom: 1px solid rgba(2, 6, 23, .1);
-  font-weight: 900;
-}
-.pe-modal-table tbody td {
-  height: 44px; border-bottom: 1px dashed rgba(2, 6, 23, .08); padding: 0 10px;
-}
-.pe-modal-table td.c { text-align: center; }
-.pe-modal-table td.l { text-align: left; }
+  height: 36px;
 
-.pe-modal-footer {
-  display: flex; justify-content: flex-end; gap: 8px;
-  padding: 12px;
-  border-top: 1px solid rgba(2, 6, 23, .08);
+  padding: 0 10px;
+
+  border: 1px solid #d7dfe8;
+  border-radius: 8px;
+  outline: none;
+
   background: #ffffff;
+
+  color: #2f3d53;
+
+  font-size: 11.5px;
+  font-weight: 700;
+
+  box-sizing: border-box;
+
+  transition: all 0.15s ease;
 }
 
-/* 미묘한 회색 버튼 */
-.pe-btn.subtle {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #e5e7eb;
-  box-shadow: none;
+.pec-input:focus {
+  border-color: #8ba0ba;
+
+  box-shadow: 0 0 0 3px rgba(86, 113, 145, 0.08);
+}
+
+.pec-input.num {
+  text-align: right;
+}
+
+.pec-input:disabled {
+  cursor: default;
+}
+
+.pec-money-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pec-money-edit .pec-input {
+  flex: 1;
+}
+
+.pec-money-edit .unit {
+  flex: 0 0 auto;
+
+  color: #8390a0;
+
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   금액 표시
+========================================================= */
+
+.pec-money {
+  font-variant-numeric: tabular-nums;
+
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pec-money.billed-money {
+  color: #c76060;
+}
+
+.pec-money.assessed-money {
+  color: #4383c7;
+}
+
+.pec-money.pos {
+  color: #d18a31;
+}
+
+.pec-money.neg {
+  color: #29946a;
+}
+
+.cell-required {
+  background: #fef2f2 !important;
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.pec-empty-cell {
+  height: 120px !important;
+
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+  text-align: center !important;
+}
+
+
+/* =========================================================
+   부과설정 모달
+========================================================= */
+
+.pec-modal-overlay {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(15, 23, 42, 0.45);
+
+  backdrop-filter: blur(2px);
+}
+
+.pec-modal {
+  display: flex;
+  flex-direction: column;
+
+  width: min(760px, 92vw);
+  max-height: 82vh;
+
+  overflow: hidden;
+
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 30px 70px rgba(15, 23, 42, 0.28);
+
+  animation: pecModalPop 0.16s ease;
+}
+
+@keyframes pecModalPop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pec-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 20px 22px 16px;
+
+  border-bottom: 1px solid #eceff3;
+}
+
+.pec-modal-head h3 {
+  margin: 0;
+
+  color: #1c283f;
+
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.pec-modal-head p {
+  margin: 4px 0 0;
+
+  color: #8794a6;
+
+  font-size: 11px;
+}
+
+.pec-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+
+  border: 1px solid #e5e9ee;
+  border-radius: 9px;
+
+  background: #f8fafc;
+
+  color: #5c6b80;
+
+  font-size: 13px;
+
+  cursor: pointer;
+
+  transition: all 0.15s ease;
+}
+
+.pec-modal-close:hover {
+  border-color: #c7cedb;
+  background: #eef1f5;
+}
+
+.pec-modal-body {
+  overflow-y: auto;
+
+  padding: 16px 22px;
+}
+
+.pec-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pec-modal-body::-webkit-scrollbar-track {
+  background: #f3f5f7;
+}
+
+.pec-modal-body::-webkit-scrollbar-thumb {
+  border: 2px solid #f3f5f7;
+  border-radius: 10px;
+
+  background: #cbd3dc;
+}
+
+.pec-modal-table {
+  width: 100%;
+
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pec-modal-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+
+  height: 38px;
+  padding: 0 10px;
+
+  border-bottom: 1px solid #dfe4ec;
+
+  background: #f6f8fb;
+
+  color: #637187;
+
+  font-size: 10.5px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pec-modal-table tbody td {
+  height: 50px;
+  padding: 7px 10px;
+
+  border-bottom: 1px solid #edf0f4;
+
+  color: #46546a;
+
+  font-size: 11.5px;
+}
+
+.pec-modal-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.pec-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+
+  padding: 14px 22px;
+
+  border-top: 1px solid #eceff3;
+
+  background: #fafbfd;
+}
+
+.pec-modal-cancel,
+.pec-modal-save {
+  height: 38px;
+  padding: 0 18px;
+
+  border-radius: 9px;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: all 0.15s ease;
+}
+
+.pec-modal-cancel {
+  border: 1px solid #d8e0e9;
+
+  background: #ffffff;
+
+  color: #58677c;
+}
+
+.pec-modal-cancel:hover {
+  background: #f6f8fb;
+}
+
+.pec-modal-save {
+  border: 0;
+
+  background: linear-gradient(135deg, #5b7fd6, #4a67c2);
+
+  color: #ffffff;
+}
+
+.pec-modal-save:hover {
+  filter: brightness(1.06);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 1650px) {
+  .pec-summary-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1280px) {
+  .pec-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pec-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pec-search {
+    width: 100%;
+
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 900px) {
+  .pec-summary-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
+
+  .pec-toolbar__left {
+    flex-wrap: wrap;
+  }
+}
+
+
+/* =========================================================
+   년/월 · 계산방법 커스텀 드롭다운
+   - 미납관리 페이지의 "상태" 드롭다운과 동일한 방식입니다.
+     (브라우저 기본 <select> 대신, 버튼 + document.body 포탈 팝업)
+========================================================= */
+
+/* ===== 년/월 트리거 버튼 ===== */
+
+.pec-picker-trigger {
+  height: 34px;
+
+  padding: 0 14px;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  border: 0;
+  border-radius: 9px;
+  outline: none;
+
+  background-color: transparent;
+
+  color: #2c3a52;
+
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: all 0.15s ease;
+}
+
+.pec-picker-trigger:hover {
+  background-color: #eef2f7;
+}
+
+.pec-picker-trigger.is-open {
+  background-color: #ffffff;
+
+  box-shadow:
+    0 0 0 2px rgba(100, 125, 160, 0.18);
+}
+
+.pec-picker-trigger i {
+  font-size: 15px;
+
+  color: #8390a0;
+
+  transition: transform 0.15s ease;
+}
+
+.pec-picker-trigger i.is-open {
+  transform: rotate(180deg);
+}
+
+.pec-picker-trigger-year {
+  border-radius: 9px 0 0 9px;
+}
+
+.pec-picker-trigger-month {
+  margin-left: 2px;
+
+  border-left: 1px solid #e2e8f0;
+  border-radius: 0 9px 9px 0;
+}
+
+
+/* ===== 년/월 선택 팝업 (document.body 포탈, position: fixed) ===== */
+
+.pec-picker-popup {
+  position: fixed;
+  z-index: 520;
+
+  transform: translateX(-50%);
+
+  width: 132px;
+  max-height: 280px;
+
+  overflow-y: auto;
+
+  padding: 6px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.18);
+
+  animation: pecPickerPopupIn 0.12s ease;
+}
+
+@keyframes pecPickerPopupIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.pec-picker-popup::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pec-picker-popup::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pec-picker-popup::-webkit-scrollbar-thumb {
+  background: #d9dee7;
+  border-radius: 10px;
+}
+
+.pec-picker-option {
+  width: 100%;
+  height: 34px;
+
+  padding: 0 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  border: 1px solid transparent;
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #344258;
+
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.pec-picker-option:hover {
+  background: #f7f8fb;
+}
+
+.pec-picker-option.is-selected {
+  border-color: #d7e0fb;
+  background: #eef2ff;
+
+  color: #3949ab;
+  font-weight: 850;
+}
+
+.pec-picker-option-check {
+  flex: 0 0 auto;
+
+  color: #4a67c2;
+
+  font-size: 14px;
+}
+
+
+/* ===== 계산방법 트리거 버튼 (미납관리 상태 배지와 동일한 형태) ===== */
+
+.pec-method-trigger {
+  width: 100%;
+  height: 32px;
+
+  padding: 0 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+
+  outline: none;
+
+  border-radius: 999px;
+
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+
+  cursor: pointer;
+  white-space: nowrap;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.pec-method-trigger:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.pec-method-trigger.is-open {
+  box-shadow:
+    0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+.pec-method-trigger i {
+  font-size: 13px;
+
+  transition: transform 0.15s ease;
+}
+
+.pec-method-trigger i.is-open {
+  transform: rotate(180deg);
+}
+
+.pec-method-trigger-dot {
+  width: 6px;
+  height: 6px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+}
+
+.pec-method-trigger-on {
+  border: 1px solid #cfe0f5;
+  background: #eef6ff;
+
+  color: #3f7ebc;
+}
+
+.pec-method-trigger-on .pec-method-trigger-dot {
+  background: #3f7ebc;
+}
+
+.pec-method-trigger-off {
+  border: 1px solid #f0c5c5;
+  background: #fff0f0;
+
+  color: #c05757;
+}
+
+.pec-method-trigger-off .pec-method-trigger-dot {
+  background: #c05757;
+}
+
+.pec-method-trigger:disabled {
+  opacity: 0.65;
+
+  cursor: default;
+  transform: none !important;
+}
+
+
+/* ===== 계산방법 선택 팝업 ===== */
+
+.pec-method-popup {
+  width: 232px;
+}
+
+.pec-method-option {
+  width: 100%;
+
+  padding: 8px 10px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  background: transparent;
+
+  font-family: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.pec-method-option:hover {
+  background: #f7f8fb;
+}
+
+.pec-method-option-dot {
+  width: 9px;
+  height: 9px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 0 3px rgba(15, 23, 42, 0.05);
+}
+
+.pec-method-option-on .pec-method-option-dot {
+  background: #3f7ebc;
+}
+
+.pec-method-option-on.is-selected {
+  border-color: #cfe0f5;
+  background: #eef6ff;
+}
+
+.pec-method-option-off .pec-method-option-dot {
+  background: #c05757;
+}
+
+.pec-method-option-off.is-selected {
+  border-color: #f0c5c5;
+  background: #fff0f0;
+}
+
+.pec-method-option-text {
+  flex: 1 1 auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pec-method-option-text strong {
+  color: #1c2437;
+
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.pec-method-option-text small {
+  color: #9aa2b1;
+
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.pec-method-option-check {
+  flex: 0 0 auto;
+
+  color: #2563eb;
+
+  font-size: 14px;
 }

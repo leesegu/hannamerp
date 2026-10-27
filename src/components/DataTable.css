@@ -1,264 +1,940 @@
-/* ✅ Pretendard Variable 웹폰트 불러오기 */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css');
+/* ==========================================================================
+   DataTable.css
+   한남 ERP 공용 데이터테이블 — ServiceCostPage 디자인 언어 기반 리뉴얼
+   --------------------------------------------------------------------------
+   중요:
+   1) DataTable의 기능 로직은 건드리지 않습니다.
+   2) 모든 스타일을 .data-table-wrapper 안으로 한정해 다른 페이지와 충돌 방지.
+   3) 전역 button / th / input 스타일을 사용하지 않습니다.
+   4) 검색, 정렬, 페이지네이션, 엑셀, 행 포커스 기능과 호환됩니다.
+   ========================================================================== */
 
-.data-table {
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css");
+
+/* ==========================================================================
+   DESIGN TOKENS
+   ========================================================================== */
+
+.data-table-wrapper {
+  --dt-bg: #ffffff;
+  --dt-bg-soft: #f8fafc;
+  --dt-bg-soft-2: #f4f7fa;
+  --dt-bg-hover: #f6f9fc;
+  --dt-bg-selected: #eef4fa;
+
+  --dt-text: #26364c;
+  --dt-text-strong: #18263a;
+  --dt-text-soft: #6f7f93;
+  --dt-text-muted: #94a0af;
+
+  --dt-border: #dfe5ec;
+  --dt-border-soft: #e9edf2;
+  --dt-border-faint: #f0f3f6;
+
+  --dt-accent: #5c7fa8;
+  --dt-accent-strong: #486d99;
+  --dt-accent-soft: #eef4fb;
+  --dt-accent-ring: rgba(92, 127, 168, 0.13);
+
+  --dt-green: #3f8f68;
+  --dt-green-strong: #317a57;
+  --dt-green-soft: #eef8f2;
+
+  --dt-red: #bb6262;
+  --dt-red-soft: #fff3f3;
+
+  --dt-orange: #cf8740;
+  --dt-orange-soft: #fff8ef;
+
+  --dt-shadow:
+    0 5px 18px rgba(15, 23, 42, 0.04),
+    0 1px 2px rgba(15, 23, 42, 0.025);
+
+  --dt-shadow-float:
+    0 12px 30px rgba(15, 23, 42, 0.08);
+
   width: 100%;
-  border-collapse: collapse;
-  font-family: 'Pretendard Variable', 'Noto Sans KR', 'Inter', 'Apple SD Gothic Neo', sans-serif;
-  font-size: 13px;
-  font-weight: 400; /* 너무 얇지 않게 조정 */
-  border-radius: 0;
-  overflow: hidden;
-  background-color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border-bottom: 2px solid #ddd3c5; /* 따뜻한 베이지 테두리 */
+  min-width: 0;
+  box-sizing: border-box;
 
-  /* ▼ 가독성/선명도 강화 */
+  font-family:
+    "Pretendard Variable",
+    "Noto Sans KR",
+    "Inter",
+    "Apple SD Gothic Neo",
+    sans-serif;
+
+  color: var(--dt-text);
+
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-variant-numeric: tabular-nums;
-  line-height: 1.5;
 }
 
-/* ▼ 헤더를 보라색으로 변경 */
-.data-table thead {
-  background-color: #7e57c2; /* 보라색 */
+/* DataTable 내부 모든 요소만 border-box 적용 */
+.data-table-wrapper,
+.data-table-wrapper *,
+.data-table-wrapper *::before,
+.data-table-wrapper *::after {
+  box-sizing: border-box;
 }
 
-.data-table th {
-  padding: 8px 10px;
+
+/* ==========================================================================
+   TOP CONTROLS
+   ========================================================================== */
+
+.data-table-wrapper .table-controls {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+
+  min-height: 58px;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+
+  border: 1px solid var(--dt-border);
+  border-radius: 13px;
+
+  background:
+    linear-gradient(
+      110deg,
+      #ffffff 0%,
+      #fbfcfe 70%,
+      #f7f9fc 100%
+    );
+
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.03);
+}
+
+.data-table-wrapper .control-left-slot,
+.data-table-wrapper .control-left,
+.data-table-wrapper .control-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.data-table-wrapper .control-left-slot {
+  flex: 1 1 auto;
+}
+
+.data-table-wrapper .control-right {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+
+/* ==========================================================================
+   COMMON CONTROL BUTTONS
+   - DataTable 내부에만 적용
+   ========================================================================== */
+
+.data-table-wrapper .table-controls button {
+  min-height: 36px;
+  padding: 0 12px;
+
+  border: 1px solid var(--dt-border);
+  border-radius: 9px;
+
+  background: #ffffff;
+
+  color: #526277;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease,
+    transform 0.14s ease;
+}
+
+.data-table-wrapper .table-controls button:hover:not(:disabled) {
+  border-color: #c7d1dc;
+  background: #f7f9fb;
+  color: #34445a;
+  transform: translateY(-1px);
+}
+
+.data-table-wrapper .table-controls button:focus-visible {
+  outline: none;
+  border-color: var(--dt-accent);
+  box-shadow: 0 0 0 3px var(--dt-accent-ring);
+}
+
+.data-table-wrapper .table-controls button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+
+/* ==========================================================================
+   REGISTER BUTTON
+   ========================================================================== */
+
+.data-table-wrapper .register-button {
+  position: relative;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  min-height: 38px;
+  margin: 0;
+  padding: 0 14px;
+
+  border: 1px solid #bfcfe0;
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f8fbff 0%,
+      #eef4fa 100%
+    );
+
+  color: #456b97;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 6px rgba(69, 107, 151, 0.06);
+}
+
+.data-table-wrapper .register-button:hover:not(:disabled) {
+  border-color: #9eb5cf;
+  background:
+    linear-gradient(
+      180deg,
+      #f3f8fd 0%,
+      #e5eef8 100%
+    );
+  color: #315a88;
+  box-shadow: 0 5px 12px rgba(69, 107, 151, 0.11);
+}
+
+
+/* ==========================================================================
+   SEARCH
+   ========================================================================== */
+
+.data-table-wrapper .search-input {
+  width: 240px;
+  max-width: 100%;
+  height: 38px;
+
+  padding: 0 38px 0 12px;
+
+  border: 1px solid #d7dfe8;
+  border-radius: 9px;
+  outline: none;
+
+  background-color: #fbfcfe;
+
+  background-image:
+    url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='11' cy='11' r='6.7' stroke='%2378879A' stroke-width='1.7'/%3E%3Cpath d='M16.1 16.1L21 21' stroke='%2378879A' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 17px 17px;
+
+  color: #2f3d53;
+
+  font-family: inherit;
+  font-size: 12.5px;
   font-weight: 600;
-  font-size: 14px;
-  border-bottom: 0.5px solid #6f4dbc; /* 보라색 계열 테두리 */
-  background-color: inherit; /* thead 배경 상속 */
-  color: #ffffff; /* 헤더 글자 흰색 */
-  white-space: nowrap;
-  text-align: center;
+
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease,
+    box-shadow 0.14s ease;
 }
 
-/* 헤더 안의 정렬 화살표도 흰색으로 */
-.data-table thead .sort-arrow {
-  color: #ffffff;
+.data-table-wrapper .search-input::placeholder {
+  color: #9ca7b5;
+  font-weight: 550;
 }
 
-.data-table td {
-  padding: 5px 10px;
-  text-align: center;
-  font-size: 14px;
-
-  /* ▼ 본문 텍스트를 더 선명하게 */
-  color: #1f2937;         /* 조금 더 진한 딥 그레이 */
-  font-weight: 500;       /* 너무 굵지 않게 선명도 향상 */
-  border-bottom: 0.5px solid #ececec;
-  transition: none;
-}
-
-.data-table tbody tr:nth-child(odd) {
+.data-table-wrapper .search-input:hover {
+  border-color: #c4cfda;
   background-color: #ffffff;
 }
 
-.data-table tbody tr:nth-child(even) {
-  background-color: #f7f7f7;
+.data-table-wrapper .search-input:focus {
+  border-color: #91a7c0;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(86, 113, 145, 0.08);
 }
 
-/* ✅ 여기만 퍼플톤으로 변경 */
-.data-table tbody tr:hover {
-  background-color: #f3eaff !important;   /* 옅은 퍼플 배경 */
-  outline: 2px solid #cdb6ff;             /* 은은한 퍼플 아웃라인 */
-  outline-offset: -1px;
-  transition: background-color 0.2s ease, outline 0.2s ease;
-}
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 0 1px #ccc;
-}
+/* ==========================================================================
+   TABLE OUTER SHELL
+   ========================================================================== */
 
-button {
-  font-size: 12px;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  background-color: white;
-  border-radius: 5px;
-  cursor: pointer;
-}
+.data-table-wrapper .scroll-table {
+  position: relative;
 
-button:hover {
-  background-color: #f3f4f6;
-}
-
-.filled-button {
-  background-color: #ff8c00;
-  color: white;
-  border: none;
-  padding: 4px 8px;
-  font-size: 12px;
-  border-radius: 5px;
-}
-
-.filled-button:hover {
-  background-color: #e57600;
-}
-
-/* ✅ 상단 컨트롤 전체 정렬 */
-.table-controls {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
-/* ✅ 등록 + 검색창 좌우 배치 */
-.control-left {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-}
-
-.register-button {
-  background-color: transparent;
-  color: #7e57c2;
-  border: 1px solid #7e57c2;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  margin-right: 10px
-}
-
-.register-button:hover {
-  background-color: #f3eaff;
-  border-color: #673ab7;
-  color: #673ab7;
-}
-
-.search-input {
-  width: 220px;
-  padding: 6px 30px 6px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-image: url("data:image/svg+xml,%3Csvg fill='%237e57c2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 2a8 8 0 105.293 14.293l4.707 4.707 1.414-1.414-4.707-4.707A8 8 0 0010 2zm0 2a6 6 0 110 12A6 6 0 0110 4z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 20px 20px;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #7e57c2;
-  box-shadow: 0 0 0 2px #f3eaff;
-}
-
-.icon-button {
-  background: none;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.icon-button:hover {
-  opacity: 0.7;
-}
-
-.pagination {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-  gap: 6px;
-}
-
-.pagination button {
-  padding: 4px 10px;
-  border: 1px solid #7e57c2;
-  background: transparent;
-  color: #7e57c2;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 13px;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.pagination button:hover {
-  background-color: #f3eaff;
-  color: #673ab7;
-  border-color: #673ab7;
-}
-
-.pagination button.active {
-  background-color: #7e57c2;
-  color: white;
-  font-weight: bold;
-  border-color: #7e57c2;
-}
-
-.pagination button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.scroll-table {
-  overflow-x: auto;
+  width: 100%;
+  min-width: 0;
   max-height: none;
+
+  overflow-x: auto;
+  overflow-y: visible;
+
+  border: 1px solid var(--dt-border);
+  border-radius: 13px;
+
+  background: var(--dt-bg);
+
+  box-shadow: var(--dt-shadow);
+
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-th {
+/* 상단에 아주 얇은 포인트 라인 */
+.data-table-wrapper .scroll-table::before {
+  content: "";
+
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 2px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #7892b1 0%,
+      #a8bacd 48%,
+      #d8e2ec 100%
+    );
+
+  pointer-events: none;
+}
+
+
+/* ==========================================================================
+   TABLE
+   ========================================================================== */
+
+.data-table-wrapper .data-table {
+  width: 100%;
+  min-width: max-content;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  background: #ffffff;
+
+  color: var(--dt-text);
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.45;
+
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+
+  table-layout: auto;
+}
+
+
+/* ==========================================================================
+   HEADER
+   ========================================================================== */
+
+.data-table-wrapper .data-table thead {
+  background: #f5f8fb;
+}
+
+.data-table-wrapper .data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+
+  height: 42px;
+  padding: 0 11px;
+
+  border: 0;
+  border-right: 1px solid #e4e9ef;
+  border-bottom: 1px solid #dbe3eb;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f8fafc 0%,
+      #f3f6f9 100%
+    );
+
+  color: #5d6c81;
+
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 820;
+  letter-spacing: -0.08px;
+
+  text-align: center;
+  white-space: nowrap;
+
   user-select: none;
+
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.data-table-wrapper .data-table th:first-child {
+  min-width: 54px;
+}
+
+.data-table-wrapper .data-table th:last-child {
+  border-right: 0;
+}
+
+.data-table-wrapper .data-table th[style*="pointer"]:hover {
+  background:
+    linear-gradient(
+      180deg,
+      #f1f6fb 0%,
+      #eaf1f8 100%
+    );
+
+  color: #3e6085;
+}
+
+
+/* ==========================================================================
+   SORT INDICATOR
+   ========================================================================== */
+
+.data-table-wrapper .sort-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-left: 4px;
+
+  color: #557ca9;
+
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+
+  vertical-align: 1px;
+}
+
+
+/* ==========================================================================
+   BODY CELLS
+   ========================================================================== */
+
+.data-table-wrapper .data-table td {
+  position: relative;
+
+  height: 42px;
+  padding: 7px 11px;
+
+  border: 0;
+  border-right: 1px solid #f0f2f5;
+  border-bottom: 1px solid #ebeff3;
+
+  background: #ffffff;
+
+  color: #334258;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 580;
+
+  text-align: center;
+  vertical-align: middle;
+
+  transition:
+    background-color 0.11s ease,
+    color 0.11s ease;
+}
+
+.data-table-wrapper .data-table td:last-child {
+  border-right: 0;
+}
+
+.data-table-wrapper .data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.data-table-wrapper .data-table tbody tr:nth-child(even) td {
+  background: #fbfcfd;
+}
+
+
+/* ==========================================================================
+   ROW HOVER
+   - outline을 사용하지 않아 인접 행/스크롤 계산에 영향 없음
+   ========================================================================== */
+
+.data-table-wrapper .data-table tbody tr {
   position: relative;
 }
 
-.sort-arrow {
-  margin-left: 4px;
-  color: #7e57c2; /* 기본 색 (헤더 밖에서 사용할 때) */
-  font-size: 11px;
+.data-table-wrapper .data-table tbody tr:hover td {
+  background: #f5f8fb !important;
 }
 
-/* ===== Excel 버튼 공통 스타일 ===== */
-.excel-btn-group {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+.data-table-wrapper .data-table tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 #8aa3be;
 }
 
-.excel-btn {
-  background-color: #4caf50;
-  color: #fff;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
+.data-table-wrapper .data-table tbody tr:hover td {
+  color: #26364c;
+}
+
+
+/* ==========================================================================
+   FIRST COLUMN / MANAGEMENT COLUMN
+   ========================================================================== */
+
+.data-table-wrapper .data-table tbody td:first-child {
+  color: #8996a7;
+  font-size: 10.5px;
+  font-weight: 760;
+}
+
+.data-table-wrapper .data-table thead th:last-child,
+.data-table-wrapper .data-table tbody td:last-child {
+  /* 관리 열이 아니더라도 과도한 강조가 생기지 않게 중립 유지 */
+}
+
+
+/* ==========================================================================
+   ICON BUTTONS - 수정 / 삭제
+   ========================================================================== */
+
+.data-table-wrapper .icon-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  user-select: none;
-  text-decoration: none;
+  justify-content: center;
+
+  width: 30px;
+  min-width: 30px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+
+  border: 1px solid #dde4eb;
+  border-radius: 7px;
+
+  background: #f9fafc;
+
+  color: #607086;
+
+  font-size: 13px;
+  line-height: 1;
+
+  cursor: pointer;
+
+  box-shadow: none;
+
+  transition:
+    border-color 0.12s ease,
+    background-color 0.12s ease,
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
-.excel-btn:hover {
-  background-color: #43a047;
+.data-table-wrapper .icon-button:hover {
+  border-color: #c8d2dd;
+  background: #f1f5f8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 9px rgba(15, 23, 42, 0.06);
 }
 
-.excel-btn:active {
-  transform: translateY(0.5px);
-}
-
-.excel-btn[role="button"] {
+.data-table-wrapper .icon-button:focus-visible {
   outline: none;
+  border-color: #8fa6be;
+  box-shadow: 0 0 0 3px rgba(86, 113, 145, 0.1);
 }
 
-/* 푸터(엑셀+페이지네이션) 정렬 */
-.table-footer {
+
+/* ==========================================================================
+   EMPTY STATE
+   ========================================================================== */
+
+.data-table-wrapper .data-table tbody tr:only-child td[colspan] {
+  height: 120px;
+  padding: 28px 20px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fbfcfd 100%
+    ) !important;
+
+  color: #98a3b2;
+
+  font-size: 12px;
+  font-weight: 650;
+
+  text-align: center;
+}
+
+
+/* ==========================================================================
+   FOCUS FLASH
+   - DataTable.js가 추가/삭제하는 기존 .row-flash와 호환
+   ========================================================================== */
+
+.data-table-wrapper .data-table tbody tr.row-flash td {
+  background: #fff7e8 !important;
+}
+
+.data-table-wrapper .data-table tbody tr.row-flash td:first-child {
+  box-shadow: inset 3px 0 0 #d69a45;
+}
+
+
+/* ==========================================================================
+   FOOTER
+   ========================================================================== */
+
+.data-table-wrapper .table-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-top: 15px;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 10px 14px;
+
+  min-height: 52px;
+  margin-top: 10px;
+  padding: 7px 9px;
+
+  border: 1px solid var(--dt-border);
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fafbfd 100%
+    );
+
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.025);
+}
+
+
+/* ==========================================================================
+   EXCEL BUTTONS
+   ========================================================================== */
+
+.data-table-wrapper .excel-btn-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.data-table-wrapper .excel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  min-height: 34px;
+  padding: 0 12px;
+
+  border: 1px solid #c8dfd1;
+  border-radius: 8px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f5fbf7 0%,
+      #edf8f1 100%
+    );
+
+  color: #347553;
+
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+
+  cursor: pointer;
+
+  text-decoration: none;
+  user-select: none;
+
+  transition:
+    border-color 0.13s ease,
+    background-color 0.13s ease,
+    color 0.13s ease,
+    transform 0.13s ease,
+    box-shadow 0.13s ease;
+}
+
+.data-table-wrapper .excel-btn:hover {
+  border-color: #acd0bb;
+
+  background:
+    linear-gradient(
+      180deg,
+      #eff9f3 0%,
+      #e3f3e9 100%
+    );
+
+  color: #286643;
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 5px 12px rgba(52, 117, 83, 0.08);
+}
+
+.data-table-wrapper .excel-btn:active {
+  transform: translateY(0);
+}
+
+.data-table-wrapper .excel-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(63, 143, 104, 0.11);
+}
+
+
+/* ==========================================================================
+   PAGINATION
+   ========================================================================== */
+
+.data-table-wrapper .pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+
+  margin: 0;
+}
+
+.data-table-wrapper .pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+
+  border: 1px solid #dce3ea;
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #68778b;
+
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.12s ease,
+    background-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+
+.data-table-wrapper .pagination button:hover:not(:disabled):not(.active) {
+  border-color: #bac8d7;
+  background: #f2f6fa;
+  color: #456789;
+  transform: translateY(-1px);
+}
+
+.data-table-wrapper .pagination button.active {
+  border-color: #6787aa;
+
+  background:
+    linear-gradient(
+      135deg,
+      #708fac 0%,
+      #58799d 100%
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 4px 10px rgba(88, 121, 157, 0.2);
+
+  font-weight: 850;
+}
+
+.data-table-wrapper .pagination button:disabled {
+  border-color: #e7ebef;
+  background: #f7f8fa;
+  color: #b3bbc5;
+
+  opacity: 1;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+.data-table-wrapper .pagination button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(86, 113, 145, 0.1);
+}
+
+
+/* ==========================================================================
+   SCROLLBAR
+   ========================================================================== */
+
+.data-table-wrapper .scroll-table::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.data-table-wrapper .scroll-table::-webkit-scrollbar-track {
+  background: #f3f5f7;
+}
+
+.data-table-wrapper .scroll-table::-webkit-scrollbar-thumb {
+  border: 2px solid #f3f5f7;
+  border-radius: 10px;
+
+  background: #c9d2dc;
+}
+
+.data-table-wrapper .scroll-table::-webkit-scrollbar-thumb:hover {
+  background: #aebac7;
+}
+
+
+/* ==========================================================================
+   CONTENT ELEMENTS INSIDE CELLS
+   - 각 페이지 render()가 반환하는 뱃지/버튼/select 등을 과도하게 덮어쓰지 않음
+   ========================================================================== */
+
+.data-table-wrapper .data-table td > span,
+.data-table-wrapper .data-table td > strong,
+.data-table-wrapper .data-table td > em {
+  vertical-align: middle;
+}
+
+.data-table-wrapper .data-table td input,
+.data-table-wrapper .data-table td select {
+  font-family: inherit;
+}
+
+
+/* ==========================================================================
+   ACCESSIBILITY
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .data-table-wrapper *,
+  .data-table-wrapper *::before,
+  .data-table-wrapper *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 1280px) {
+  .data-table-wrapper .table-controls {
+    align-items: stretch;
+  }
+
+  .data-table-wrapper .control-left-slot,
+  .data-table-wrapper .control-right {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .data-table-wrapper .control-right {
+    justify-content: flex-end;
+  }
+
+  .data-table-wrapper .search-input {
+    width: min(280px, 100%);
+  }
+}
+
+@media (max-width: 760px) {
+  .data-table-wrapper .table-controls {
+    padding: 8px;
+  }
+
+  .data-table-wrapper .control-right {
+    justify-content: stretch;
+  }
+
+  .data-table-wrapper .search-input {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .data-table-wrapper .register-button {
+    flex: 0 0 auto;
+  }
+
+  .data-table-wrapper .table-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .data-table-wrapper .excel-btn-group {
+    width: 100%;
+  }
+
+  .data-table-wrapper .excel-btn {
+    flex: 1 1 auto;
+  }
+
+  .data-table-wrapper .pagination {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .data-table-wrapper .data-table th {
+    height: 40px;
+    padding: 0 9px;
+    font-size: 10.5px;
+  }
+
+  .data-table-wrapper .data-table td {
+    height: 40px;
+    padding: 6px 9px;
+    font-size: 11.5px;
+  }
 }

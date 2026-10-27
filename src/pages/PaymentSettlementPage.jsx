@@ -17,7 +17,6 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-import PageTitle from "../components/PageTitle";
 import "./PaymentSettlementPage.css";
 
 /* ✅ 부과시작월 선택용 - 스타일 적용된 달력 */
@@ -34,6 +33,50 @@ const fmtComma = (n) => {
   return num === 0 ? "" : num.toLocaleString();
 };
 const fmtWon = (n) => `${parseNumber(n).toLocaleString()}원`;
+
+/* ===== 다중 계좌 유틸 =====
+   기존 bank/account 필드는 첫 번째(기본) 계좌로 계속 유지하여
+   이전 데이터/기존 기능과 완전히 호환되도록 하고, 추가 계좌는 accounts 배열에 저장합니다. */
+const normalizeAccounts = (value, legacyBank = "", legacyAccount = "") => {
+  const raw = Array.isArray(value) ? value : [];
+  const cleaned = raw
+    .map((item) => ({ bank: s(item?.bank), account: s(item?.account) }))
+    .filter((item) => item.bank || item.account);
+
+  if (!cleaned.length && (s(legacyBank) || s(legacyAccount))) {
+    cleaned.push({ bank: s(legacyBank), account: s(legacyAccount) });
+  }
+  return cleaned;
+};
+
+function AccountDisplay({ accounts, bank, account }) {
+  const list = normalizeAccounts(accounts, bank, account);
+  const primary = list[0];
+  if (!primary) return <span className="pmt-td-muted">-</span>;
+
+  return (
+    <span className="pmt-account-display">
+      <span className="pmt-account-primary">
+        {primary.account || "-"}
+      </span>
+      {list.length > 1 && (
+        <span className="pmt-account-more" tabIndex={0}>
+          +{list.length - 1}
+          <span className="pmt-account-tooltip" role="tooltip">
+            <strong>등록 계좌 {list.length}개</strong>
+            {list.map((item, index) => (
+              <span key={`${item.bank}-${item.account}-${index}`} className="pmt-account-tooltip-row">
+                <em>{index === 0 ? "기본" : `${index + 1}`}</em>
+                <span>{item.bank || "은행 미입력"}</span>
+                <b>{item.account || "계좌 미입력"}</b>
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const nowYm = () => {
@@ -332,6 +375,10 @@ function PayeeFormModal({ open, onClose, onSaved, payType, categories, initial }
     name: initial?.name || "",
     bank: initial?.bank || "",
     account: initial?.account || "",
+    accounts: (() => {
+      const list = normalizeAccounts(initial?.accounts, initial?.bank, initial?.account);
+      return list.length ? list : [{ bank: "", account: "" }];
+    })(),
     note: initial?.note || "",
     active: initial?.active !== false,
     defaultCleaningFee: fmtComma(initial?.defaultCleaningFee) || "",
@@ -449,6 +496,28 @@ function PayeeFormModal({ open, onClose, onSaved, payType, categories, initial }
   const handleChange = (key, val) => setForm((p) => ({ ...p, [key]: val }));
   const handleAmount = (key, val) => handleChange(key, fmtComma(parseNumber(val)));
 
+  const updateAccountRow = (index, key, value) => {
+    setForm((prev) => {
+      const next = [...(prev.accounts || [])];
+      next[index] = { ...(next[index] || { bank: "", account: "" }), [key]: value };
+      return { ...prev, accounts: next };
+    });
+  };
+
+  const addAccountRow = () => {
+    setForm((prev) => ({
+      ...prev,
+      accounts: [...(prev.accounts || []), { bank: "", account: "" }],
+    }));
+  };
+
+  const removeAccountRow = (index) => {
+    setForm((prev) => {
+      const next = (prev.accounts || []).filter((_, i) => i !== index);
+      return { ...prev, accounts: next.length ? next : [{ bank: "", account: "" }] };
+    });
+  };
+
   const updateBuildingRow = (id, key, val) => {
     setBuildings((prev) =>
       prev.map((b) =>
@@ -469,12 +538,16 @@ function PayeeFormModal({ open, onClose, onSaved, payType, categories, initial }
       return;
     }
 
+    const accountList = normalizeAccounts(form.accounts);
+    const primaryAccount = accountList[0] || { bank: "", account: "" };
+
     const payload = {
       payType,
       category: s(form.category),
       name: s(form.name),
-      bank: s(form.bank),
-      account: s(form.account),
+      bank: s(primaryAccount.bank),
+      account: s(primaryAccount.account),
+      accounts: accountList,
       note: s(form.note),
       active: !!form.active,
       updatedAt: serverTimestamp(),
@@ -673,25 +746,50 @@ function PayeeFormModal({ open, onClose, onSaved, payType, categories, initial }
           </div>
         </div>
 
-        <div className="pmt-form-row">
-          <div className="pmt-form-field">
-            <label className="pmt-form-label">은행</label>
-            <input
-              type="text"
-              value={form.bank}
-              onChange={(e) => handleChange("bank", e.target.value)}
-              className="pmt-input"
-            />
+        <div className="pmt-account-editor">
+          <div className="pmt-account-editor-head">
+            <div>
+              <label className="pmt-form-label">지급 계좌</label>
+              <p>첫 번째 계좌가 대금결제 표에 기본 계좌로 표시됩니다.</p>
+            </div>
           </div>
-          <div className="pmt-form-field">
-            <label className="pmt-form-label">계좌</label>
-            <input
-              type="text"
-              value={form.account}
-              onChange={(e) => handleChange("account", e.target.value)}
-              className="pmt-input"
-            />
-          </div>
+
+          {(form.accounts || []).map((item, index) => (
+            <div className="pmt-account-edit-row" key={`account-${index}`}>
+              <div className="pmt-account-index">{index === 0 ? "기본" : index + 1}</div>
+              <input
+                type="text"
+                value={item.bank || ""}
+                onChange={(e) => updateAccountRow(index, "bank", e.target.value)}
+                className="pmt-input"
+                placeholder="은행"
+              />
+              <div className="pmt-account-input-actions">
+                <input
+                  type="text"
+                  value={item.account || ""}
+                  onChange={(e) => updateAccountRow(index, "account", e.target.value)}
+                  className="pmt-input"
+                  placeholder="계좌번호"
+                />
+                {index === (form.accounts || []).length - 1 && (
+                  <button type="button" className="pmt-account-add-btn" onClick={addAccountRow}>
+                    + 추가
+                  </button>
+                )}
+                {(form.accounts || []).length > 1 && (
+                  <button
+                    type="button"
+                    className="pmt-account-remove-btn"
+                    onClick={() => removeAccountRow(index)}
+                    aria-label="계좌 삭제"
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
         {payType === "10일" && form.tableGroup === "청소비" && (
@@ -982,8 +1080,8 @@ function PayeeManagerModal({ open, onClose, payType, categories, payees }) {
                     <tr key={p.id}>
                       <td>{p.category || "-"}</td>
                       <td className="pmt-payee-name">{p.name}</td>
-                      <td>{p.bank || "-"}</td>
-                      <td>{p.account || "-"}</td>
+                      <td>{normalizeAccounts(p.accounts, p.bank, p.account)[0]?.bank || "-"}</td>
+                      <td><AccountDisplay accounts={p.accounts} bank={p.bank} account={p.account} /></td>
                       <td>{amountLabel}</td>
                       <td>
                         <span
@@ -1060,10 +1158,63 @@ function BuildingListModal({ open, onClose, record }) {
 
   const yearMonth = record?.yearMonth || nowYm();
 
+  /* ✅ ERP에 최근 추가된 빌라까지 건물별 지급현황에 즉시 반영합니다.
+     지급대상 수정창을 다시 저장하지 않아도, 현황 창을 열 때 ERP(villas)와
+     paymentPayees/{payeeId}/buildings를 villaId 기준으로 대조해 누락 건물을
+     추가하고 금액/주소/건물명을 최신화합니다. paidMonths와 note는 보존합니다. */
+  const syncLinkedBuildingsFromErp = async () => {
+    if (!record?.payeeId) return;
+
+    const payeeRef = doc(db, "paymentPayees", record.payeeId);
+    const payeeSnap = await getDoc(payeeRef);
+    if (!payeeSnap.exists()) return;
+
+    const payee = payeeSnap.data();
+    const cfg = AUTO_SOURCE_CONFIG[s(payee.category)];
+    if (!payee.hasBuildings || !cfg || !s(payee.name)) return;
+
+    const [villaSnap, buildingSnap] = await Promise.all([
+      getDocs(query(collection(db, "villas"), where(cfg.matchField, "==", s(payee.name)))),
+      getDocs(collection(db, "paymentPayees", record.payeeId, "buildings")),
+    ]);
+
+    const existingByVillaId = new Map();
+    buildingSnap.docs.forEach((d) => {
+      const villaId = s(d.data().villaId);
+      if (villaId) existingByVillaId.set(villaId, d);
+    });
+
+    const writes = villaSnap.docs
+      .filter((villaDoc) => parseNumber(villaDoc.data()[cfg.amountField]) > 0)
+      .map((villaDoc) => {
+        const v = villaDoc.data();
+        const existing = existingByVillaId.get(villaDoc.id);
+        const targetRef = existing
+          ? doc(db, "paymentPayees", record.payeeId, "buildings", existing.id)
+          : doc(db, "paymentPayees", record.payeeId, "buildings", `villa_${villaDoc.id}`);
+
+        return setDoc(
+          targetRef,
+          {
+            villaId: villaDoc.id,
+            buildingName: s(v.name) || s(v.code) || "이름없음",
+            address: s(v.address) || s(v.addr) || s(v.roadAddress) || "",
+            monthlyAmount: parseNumber(v[cfg.amountField]),
+            startYearMonth: s(existing?.data()?.startYearMonth) || DEFAULT_START_YM,
+            active: true,
+          },
+          { merge: true }
+        );
+      });
+
+    await Promise.all(writes);
+  };
+
   const loadBuildings = async () => {
     if (!record) return;
     setLoading(true);
     try {
+      await syncLinkedBuildingsFromErp();
       const snap = await getDocs(
         collection(db, "paymentPayees", record.payeeId, "buildings")
       );
@@ -1072,7 +1223,9 @@ function BuildingListModal({ open, onClose, record }) {
         .filter((d) => parseNumber(d.data().monthlyAmount) > 0)
         .map((d) => ({
           id: d.id,
+          villaId: d.data().villaId || null,
           buildingName: d.data().buildingName || "",
+          address: d.data().address || "",
           monthlyAmount: parseNumber(d.data().monthlyAmount),
           startYearMonth: d.data().startYearMonth || "",
           paidMonths: { ...(d.data().paidMonths || {}) },
@@ -1484,10 +1637,11 @@ export default function PaymentSettlementPage() {
         const buildingsSnap = await getDocs(
           collection(db, "paymentPayees", payee.id, "buildings")
         );
+        const statusKey = (b) => s(b?.villaId) || s(b?.buildingId) || s(b?.buildingName);
         const prevMap = new Map();
-        (prevBuildingStatusForCarry || []).forEach((b) => prevMap.set(b.buildingName, b));
+        (prevBuildingStatusForCarry || []).forEach((b) => prevMap.set(statusKey(b), b));
         const existingMap = new Map();
-        (existingBuildingStatus || []).forEach((b) => existingMap.set(b.buildingName, b));
+        (existingBuildingStatus || []).forEach((b) => existingMap.set(statusKey(b), b));
 
         return buildingsSnap.docs
           .filter((d) => d.data().active !== false)
@@ -1508,10 +1662,15 @@ export default function PaymentSettlementPage() {
 
             // 이번 조회 달에 이미 만들어져 있던 기록이 있으면(=동기화 케이스)
             // 사용자가 이미 체크해둔 지급 여부를 그대로 유지합니다.
-            const existing = existingMap.get(buildingName);
+            const buildingId = d.id;
+            const villaId = s(bd.villaId);
+            const stableKey = villaId || buildingId || buildingName;
+            const existing = existingMap.get(stableKey) || existingMap.get(buildingName);
             if (existing) {
               const paid = paidFromGrid || !!existing.paid;
               return {
+                buildingId,
+                villaId: villaId || null,
                 buildingName,
                 monthlyAmount,
                 startYearMonth: s(bd.startYearMonth),
@@ -1521,9 +1680,11 @@ export default function PaymentSettlementPage() {
             }
 
             // 새로 추가된 건물: 지난 달 기록을 보고 미납 개월수를 이어서 계산
-            const prev = prevMap.get(buildingName);
+            const prev = prevMap.get(stableKey) || prevMap.get(buildingName);
             const prevStreak = prev && !prev.paid ? parseNumber(prev.unpaidStreak) : 0;
             return {
+              buildingId,
+              villaId: villaId || null,
               buildingName,
               monthlyAmount,
               startYearMonth: s(bd.startYearMonth),
@@ -1545,6 +1706,7 @@ export default function PaymentSettlementPage() {
             name: s(payee.name),
             bank: s(payee.bank),
             account: s(payee.account),
+            accounts: normalizeAccounts(payee.accounts, payee.bank, payee.account),
             note: "",
             paid: false,
             excluded: false,
@@ -1679,6 +1841,7 @@ export default function PaymentSettlementPage() {
       name: p ? p.name : row.name,
       bank: p ? p.bank : row.bank,
       account: p ? p.account : row.account,
+      accounts: p ? normalizeAccounts(p.accounts, p.bank, p.account) : normalizeAccounts(row.accounts, row.bank, row.account),
       category: p ? p.category : row.category,
     };
   };
@@ -2141,7 +2304,17 @@ export default function PaymentSettlementPage() {
 
   return (
     <div className="page-wrapper pmt-page">
-      <PageTitle>대금결제관리</PageTitle>
+      <section className="pmt-hero">
+        <div className="pmt-hero-copy">
+          <div className="pmt-hero-eyebrow">PAYMENT SETTLEMENT MANAGEMENT</div>
+          <h2>대금결제 관리</h2>
+          <p>정기 지급대상, 건물별 계약금액, 미지급 현황을 월 단위로 체계적으로 관리합니다.</p>
+        </div>
+        <div className="pmt-hero-status">
+          <span>조회 기준</span>
+          <strong>{ymLabel(yearMonth)} · {payType}</strong>
+        </div>
+      </section>
 
       <div className="pmt-card">
         {/* 상단 툴바 */}
@@ -2228,8 +2401,8 @@ export default function PaymentSettlementPage() {
                     >
                       <td>{disp.category || "-"}</td>
                       <td className="pmt-td-left">{disp.name}</td>
-                      <td>{disp.bank || "-"}</td>
-                      <td>{disp.account || "-"}</td>
+                      <td>{disp.accounts?.[0]?.bank || disp.bank || "-"}</td>
+                      <td><AccountDisplay accounts={disp.accounts} bank={disp.bank} account={disp.account} /></td>
                       <td>
                         <input
                           type="text"
@@ -2363,8 +2536,8 @@ export default function PaymentSettlementPage() {
                     >
                       <td>월급</td>
                       <td className="pmt-td-left">{disp.name}</td>
-                      <td>{disp.bank || "-"}</td>
-                      <td>{disp.account || "-"}</td>
+                      <td>{disp.accounts?.[0]?.bank || disp.bank || "-"}</td>
+                      <td><AccountDisplay accounts={disp.accounts} bank={disp.bank} account={disp.account} /></td>
                       <td>
                         <input
                           type="text"
@@ -2562,8 +2735,8 @@ export default function PaymentSettlementPage() {
                             <span className="pmt-td-muted">-</span>
                           )}
                         </td>
-                        <td>{disp.bank || "-"}</td>
-                        <td>{disp.account || "-"}</td>
+                        <td>{disp.accounts?.[0]?.bank || disp.bank || "-"}</td>
+                        <td><AccountDisplay accounts={disp.accounts} bank={disp.bank} account={disp.account} /></td>
                         <td>
                           {row.hasBuildings ? (
                             <span className="pmt-td-amount">{fmtComma(cycle.amount)}</span>

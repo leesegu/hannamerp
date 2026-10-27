@@ -53,7 +53,7 @@
   --pl-col-no: 44px;
   --pl-col-code: 64px;
   --pl-col-villa: 132px;
-  --pl-col-item: 92px;
+  --pl-col-item: 100px;
 }
 
 * {
@@ -426,6 +426,27 @@
   font-size: 12px;
 }
 
+/* ---------- <colgroup> : 상단/하단 표의 각 열 폭을 동일하게 고정 ----------
+   table-layout: fixed 상태에서는 <col> 요소로 지정한 폭이 셀 개별 폭보다
+   우선 적용되므로, 상단 테이블과 하단 테이블에 똑같은 <colgroup>을 넣어
+   두 표의 세로 열이 정확히 일치하도록 만들었습니다. (예: 공용전기 칸만
+   유독 넓어지던 문제, 상/하단 표 열이 안 맞던 문제 모두 이 방식으로 해결) */
+.pl-col-g-no {
+  width: var(--pl-col-no);
+}
+.pl-col-g-code {
+  width: var(--pl-col-code);
+}
+.pl-col-g-villa {
+  width: var(--pl-col-villa);
+}
+.pl-col-g-item {
+  width: var(--pl-col-item);
+}
+.pl-col-g-reason {
+  width: 108px;
+}
+
 .pl-table th,
 .pl-table td {
   min-width: var(--pl-col-item);
@@ -435,14 +456,28 @@
 }
 
 .pl-item-col {
-  width: var(--pl-col-item);
-  min-width: var(--pl-col-item);
-  max-width: var(--pl-col-item);
+  width: var(--pl-col-item) !important;
+  min-width: var(--pl-col-item) !important;
+  max-width: var(--pl-col-item) !important;
   position: relative;
 }
 
-/* "기타" 항목에 메모가 있으면, 그 칸에 마우스를 올렸을 때만
-   말풍선 형태로 메모 내용을 보여줍니다. (평소에는 금액만 보임) */
+/* 항목(부과관리비~기타) 칸에는 주황색 테두리가 나타나지 않도록 명시적으로
+   고정합니다. 주황색 굵은 테두리는 "빌라명" 칸과 스티키 경계 표시에만
+   써야 하는데, 이전에는 이 규칙이 없어서 화면에 따라 다른 항목 칸에도
+   테두리 색이 번져 보이는 경우가 있었습니다. */
+.pl-table th.pl-item-col,
+.pl-table td.pl-item-col {
+  border-left: none !important;
+}
+.pl-main-table th.pl-item-col,
+.pl-main-table td.pl-item-col {
+  border-right: 1px solid var(--pl-border-4) !important;
+}
+.pl-top-table th.pl-item-col {
+  border-right: 1px solid var(--pl-border-3) !important;
+}
+
 /* "기타" 항목에 메모가 있으면, 그 칸에 마우스를 올렸을 때만
    말풍선 형태로 메모 내용을 보여줍니다. (평소에는 금액만 보임)
    ⚠️ 아래쪽 "성능 개선" 구역의 contain:paint 규칙은 셀 밖으로 넘치는
@@ -644,7 +679,7 @@
 .pl-money-input,
 .pl-note-input {
   width: 100%;
-  max-width: 86px;
+  max-width: 94px;
   height: 27px;
   border: none;
   background: transparent;
@@ -1012,10 +1047,6 @@
   color: var(--pl-text);
 }
 
-.pl-stat-card-count .pl-stat-icon {
-  color: var(--pl-blue);
-  background: #eef5ff;
-}
 .pl-stat-card-charge .pl-stat-icon {
   color: var(--pl-orange);
   background: var(--pl-orange-soft);
@@ -1024,43 +1055,13 @@
   color: #e15e0d;
   background: #fff1e7;
 }
-.pl-stat-card-deposit .pl-stat-icon {
-  color: var(--pl-green);
-  background: var(--pl-green-soft);
-}
 .pl-stat-card-charge-income .pl-stat-icon {
   color: #7c3aed;
   background: #f2edff;
 }
-
-.pl-stats-profit-line {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 14px 20px 0;
-}
-
-.pl-stats-profit-line > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--pl-surface);
-  border: 1px solid var(--pl-border-1);
-  border-radius: 14px;
-  padding: 14px 16px;
-  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.035);
-}
-
-.pl-stats-profit-line span {
-  color: var(--pl-soft-1);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.pl-stats-profit-line strong {
-  font-size: 19px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
+.pl-stat-card-rate .pl-stat-icon {
+  color: var(--pl-green);
+  background: var(--pl-green-soft);
 }
 
 .pl-stats-grid {
@@ -1216,36 +1217,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.pl-year-summary {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.pl-year-summary > div {
-  background: #fafbfc;
-  border: 1px solid var(--pl-border-1);
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.pl-year-summary span {
-  display: block;
-  color: var(--pl-soft-1);
-  font-size: 12px;
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-.pl-year-summary strong {
-  display: block;
-  color: var(--pl-text);
-  font-size: 16px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
 .pl-month-stat-table-wrap {
   overflow: auto;
   border: 1px solid var(--pl-border-1);
@@ -1281,6 +1252,26 @@
   color: var(--pl-orange);
 }
 
+.pl-collection-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.pl-collection-cell span {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-collection-cell em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  opacity: 0.75;
+}
+
 .pl-month-stat-table tr:hover td {
   background: var(--pl-row-hover);
 }
@@ -1297,6 +1288,126 @@
   color: var(--pl-soft-5);
   font-size: 13px;
   font-weight: 700;
+}
+
+/* ---------- 새로고침 확인 팝업 ---------- */
+
+.pl-refresh-confirm-panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(440px, 92vw);
+  transform: translate(-50%, -50%);
+  background: var(--pl-surface);
+  border-radius: 18px;
+  border: 1px solid var(--pl-border-1);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  padding: 26px 24px 22px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.pl-refresh-confirm-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eef0ff;
+  color: var(--pl-indigo);
+  font-size: 22px;
+}
+
+.pl-refresh-confirm-panel h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pl-heading);
+}
+
+.pl-refresh-confirm-panel p {
+  margin: 0 0 18px;
+  color: var(--pl-soft-1);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.pl-refresh-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pl-refresh-confirm-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--pl-border-1);
+  background: #fafbfc;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.pl-refresh-confirm-btn:hover {
+  transform: translateY(-1px);
+}
+
+.pl-refresh-confirm-btn strong {
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.pl-refresh-confirm-btn span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-soft-1);
+  line-height: 1.4;
+}
+
+.pl-refresh-confirm-live {
+  border-color: #c7d2fe;
+  background: #eef0ff;
+}
+.pl-refresh-confirm-live strong {
+  color: var(--pl-indigo);
+}
+.pl-refresh-confirm-live:hover {
+  background: #e2e6ff;
+}
+
+.pl-refresh-confirm-delete {
+  border-color: #ffd5d2;
+  background: #fff5f4;
+}
+.pl-refresh-confirm-delete strong {
+  color: #d75c5c;
+}
+.pl-refresh-confirm-delete:hover {
+  background: #ffe9e7;
+}
+
+.pl-refresh-confirm-cancel {
+  margin-top: 4px;
+  height: 38px;
+  border: 1px solid var(--pl-border-1);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pl-soft-1);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.pl-refresh-confirm-cancel:hover {
+  background: #f4f6f9;
 }
 
 /* ---------- "기타" 항목 메모 입력 팝업 ---------- */
@@ -1384,7 +1495,7 @@
 
 @media (max-width: 1680px) {
   :root {
-    --pl-col-item: 84px;
+    --pl-col-item: 92px;
     --pl-col-villa: 118px;
   }
   .pl-table {
@@ -1392,7 +1503,7 @@
   }
   .pl-money-input {
     font-size: 11.5px;
-    max-width: 78px;
+    max-width: 86px;
   }
 }
 
@@ -1432,10 +1543,6 @@
   .pl-stats-grid,
   .pl-stats-grid.single {
     grid-template-columns: 1fr;
-  }
-
-  .pl-year-summary {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1571,3 +1678,71 @@
 .pl-stats-box {
   box-shadow: none !important;
 }
+
+
+/* =========================================================================
+   손익계산 표 정렬 보정
+   - 상단/하단 항목 열을 동일한 기준으로 정렬
+   - 상단 직접입력칸의 박스형 테두리 제거
+   - 공용전기 합계 헤더의 잘못된 3열(sticky villa) 스타일 제거
+   ========================================================================= */
+
+/* 상단 왼쪽의 년월 영역은 고정 240px가 아니라
+   하단의 번호 + 코드번호 + 빌라명 실제 열 폭의 합계와 항상 같게 맞춥니다.
+   따라서 1680px 이하에서 빌라명 폭이 줄어들어도 두 표가 어긋나지 않습니다. */
+.pl-top-table .pl-top-month,
+.pl-top-table .pl-charge-sum-row th,
+.pl-top-table .pl-diff-row th {
+  width: calc(var(--pl-col-no) + var(--pl-col-code) + var(--pl-col-villa)) !important;
+  min-width: calc(var(--pl-col-no) + var(--pl-col-code) + var(--pl-col-villa)) !important;
+  max-width: calc(var(--pl-col-no) + var(--pl-col-code) + var(--pl-col-villa)) !important;
+}
+
+/* 상단 입력칸을 하단 입력칸과 같은 형태로 표시합니다.
+   셀 자체의 열 폭은 colgroup/--pl-col-item 기준을 그대로 사용합니다. */
+.pl-top-table .pl-money-input {
+  width: 100% !important;
+  max-width: 100% !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+
+/* 포커스 시에도 상단 입력칸만 박스 모양 테두리가 생기지 않도록 처리 */
+.pl-top-table .pl-money-input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: #fffaf5 !important;
+  border-radius: 0 !important;
+}
+
+/* 하단 표 두 번째 헤더 행의 세 번째 th는 '공용전기'입니다.
+   기존 nth-child(3) 빌라명 고정열 규칙이 잘못 적용되지 않도록 해제합니다. */
+.pl-main-table thead tr:nth-child(2) th.pl-col-publicElectric {
+  width: var(--pl-col-item) !important;
+  min-width: var(--pl-col-item) !important;
+  max-width: var(--pl-col-item) !important;
+
+  position: sticky !important;
+  left: auto !important;
+  right: auto !important;
+
+  border-left: none !important;
+  border-right: 1px solid var(--pl-border-4) !important;
+  box-shadow: none !important;
+}
+
+/* 상/하단의 모든 항목 열은 동일한 폭 기준을 강제 */
+.pl-top-table th.pl-item-col,
+.pl-top-table td.pl-item-col,
+.pl-main-table th.pl-item-col,
+.pl-main-table td.pl-item-col {
+  width: var(--pl-col-item) !important;
+  min-width: var(--pl-col-item) !important;
+  max-width: var(--pl-col-item) !important;
+}
+

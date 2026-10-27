@@ -1470,3 +1470,291 @@
     grid-template-columns: repeat(6, 1fr);
   }
 }
+
+/* =========================================================
+   2026-09 서비스비용 관리 페이지 기반 전문형 리디자인
+   기존 기능 클래스는 유지하고 시각 체계만 재정의
+========================================================= */
+
+.pmt-page {
+  --pmt-ink: #182338;
+  --pmt-muted: #76849a;
+  --pmt-line: #dfe5ec;
+  --pmt-bg: #ffffff;
+  --pmt-brand: #557fae;
+  --pmt-brand-dark: #426b99;
+  --pmt-brand-light: #88a7c9;
+  --pmt-violet: #6269b4;
+  --pmt-teal: #3f8b73;
+  --pmt-amber: #c58a3a;
+  --pmt-danger: #c65f5f;
+  --pmt-success: #39896a;
+  --pmt-shadow-soft: 0 5px 18px rgba(15, 23, 42, 0.04);
+  --pmt-shadow-lift: 0 10px 24px rgba(60, 88, 120, 0.12);
+  --pmt-radius-lg: 15px;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100vh - 20px);
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--pmt-ink);
+}
+
+.pmt-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex: 0 0 auto;
+  min-height: 72px;
+  margin-bottom: 14px;
+  padding: 13px 22px;
+  border: 1px solid #dce4ee;
+  border-radius: 16px;
+  background: linear-gradient(110deg, #ffffff 0%, #fbfcfe 62%, #f5f8fc 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.045);
+  box-sizing: border-box;
+}
+.pmt-hero-eyebrow {
+  margin-bottom: 3px;
+  color: #76849a;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 1.45px;
+}
+.pmt-hero h2 {
+  margin: 0;
+  color: #172238;
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: -0.6px;
+}
+.pmt-hero p {
+  margin: 4px 0 0;
+  color: #8a96a6;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.pmt-hero-status {
+  min-width: 190px;
+  padding: 9px 13px;
+  border: 1px solid #dfe6ed;
+  border-radius: 10px;
+  background: #f8fafc;
+  text-align: right;
+}
+.pmt-hero-status span { display:block; color:#8a96a6; font-size:9.5px; font-weight:750; }
+.pmt-hero-status strong { display:block; margin-top:2px; color:#33445c; font-size:12px; font-weight:850; }
+
+.pmt-card {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  padding: 16px 17px 18px;
+  border: 1px solid #dfe5ec;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: var(--pmt-shadow-soft);
+}
+.pmt-card::before { display:none; }
+
+.pmt-toolbar {
+  margin-bottom: 14px;
+  padding: 0 0 13px;
+  border-bottom: 1px solid #e7ebf0;
+}
+.pmt-toggle-group {
+  padding: 3px;
+  border: 1px solid #dfe5eb;
+  border-radius: 9px;
+  background: #f6f8fb;
+  box-shadow: none;
+}
+.pmt-toggle-btn {
+  min-width: 72px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 7px;
+  color: #758398;
+  font-size: 11px;
+  font-weight: 850;
+}
+.pmt-toggle-btn.is-active {
+  background: #fff;
+  color: #2d4058;
+  box-shadow: 0 3px 10px rgba(15,23,42,.09);
+}
+.pmt-month-btn {
+  width: 31px; height:31px; border-radius:8px;
+  border-color:#dbe2ea; color:#52647a; background:#f8fafc;
+}
+.pmt-month-btn:hover { border-color:#aebccd; background:#eef3f8; color:#2f4b6b; }
+.pmt-month-label { color:#24344a; font-size:13px; font-weight:850; }
+.pmt-month-today { border-radius:8px; background:#fff; color:#66768b; }
+
+.pmt-btn {
+  height: 36px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 850;
+  box-shadow: none;
+}
+.pmt-btn:hover { transform: translateY(-1px); }
+.pmt-btn-primary {
+  background: linear-gradient(135deg,#5b7fd6,#4a67c2);
+  color:#fff;
+  box-shadow: 0 7px 16px rgba(74,103,194,.18);
+}
+.pmt-btn-secondary { background:#f2faf5; border-color:#cfe0d3; color:#2f7a52; }
+.pmt-btn-ghost { background:#fbfcfe; border-color:#d8e0e9; color:#526176; }
+.pmt-btn-danger { background:#fff7f7; border-color:#ecd2d2; color:#b95b5b; }
+.pmt-btn-sm { height:30px; font-size:10.5px; }
+
+.pmt-section-title { color:#26354a; font-size:12.5px; font-weight:850; margin:16px 0 7px; }
+.pmt-table-wrap { border-radius:12px; border-color:#dfe5ec; box-shadow:none; }
+.pmt-table-wrap--scroll { max-height: calc(100vh - 330px); }
+.pmt-table { font-size:11px; table-layout:fixed; }
+.pmt-table thead, .pmt-table-wrap--scroll .pmt-table thead th { background:#f6f8fb; color:#637187; }
+.pmt-table thead th { height:38px; padding:0 7px; border-bottom:1px solid #dde4ec; font-size:10px; font-weight:850; }
+.pmt-table td { height:44px; padding:5px 7px; border-bottom:1px solid #edf0f4; background:#fff; }
+.pmt-table tbody tr:nth-child(even), .pmt-table tbody tr:nth-child(odd) { background:#fff; }
+.pmt-table tbody tr:hover td { background:#f8fafc; }
+.pmt-table-input { height:31px; border-radius:7px; font-size:10.5px; }
+.pmt-table-input:focus { border-color:#8ba0ba; box-shadow:0 0 0 3px rgba(86,113,145,.08); }
+.pmt-td-amount { color:#d18a31; }
+
+.pmt-summary-cards { gap:9px; margin-top:11px; }
+.pmt-summary-cards--sticky { padding:0 0 10px; margin-bottom:0; background:#fff; }
+.pmt-summary-card {
+  min-height:82px;
+  padding:12px 14px;
+  border-radius:11px;
+  border-color:#e1e7ee;
+  background:#fff;
+  box-shadow:0 4px 14px rgba(15,23,42,.035);
+}
+.pmt-summary-card::before { top:0; left:0; right:0; bottom:auto; width:100%; height:3px; background:#8ea1b6; opacity:1; }
+.pmt-summary-card--accent { background:#fff; border-color:#e1e7ee; }
+.pmt-summary-card--accent::before { width:100%; background:#557fae; }
+.pmt-summary-label { color:#718095; font-size:10px; letter-spacing:0; text-transform:none; }
+.pmt-summary-value { margin-top:7px; color:#1b2940; font-size:17px; }
+
+.pmt-modal-backdrop { background:rgba(15,23,42,.45); backdrop-filter:blur(2px); }
+.pmt-modal-panel { border-radius:18px; box-shadow:0 30px 70px rgba(15,23,42,.28); }
+.pmt-modal-panel--xl { width:min(980px, calc(100vw - 32px)); }
+.pmt-modal-panel--wide { width:min(1180px, calc(100vw - 32px)); }
+.pmt-modal-header { padding:17px 20px 14px; border-radius:18px 18px 0 0; background:#fff; }
+.pmt-modal-title { color:#1c283f; font-size:15px; font-weight:850; }
+.pmt-modal-body { padding:17px 20px 20px; }
+.pmt-modal-close { border:1px solid #e5e9ee; border-radius:9px; background:#f8fafc; }
+
+.pmt-input { height:36px; border-radius:8px; border-color:#d7dfe8; color:#2f3d53; font-size:11px; }
+.pmt-input:focus { border-color:#8ba0ba; box-shadow:0 0 0 3px rgba(86,113,145,.08); }
+.pmt-input-select { font-weight:750; }
+.pmt-form { gap:12px; }
+.pmt-form-label { color:#69778b; font-size:10px; font-weight:850; }
+.pmt-switch-text { color:#637187; font-size:10.5px; }
+.pmt-switch input:checked + .pmt-switch-track { background:#557fae; box-shadow:none; }
+
+/* 다중 계좌 편집 */
+.pmt-account-editor {
+  padding:13px;
+  border:1px solid #dfe5ec;
+  border-radius:11px;
+  background:#f9fafc;
+}
+.pmt-account-editor-head { margin-bottom:8px; }
+.pmt-account-editor-head p { margin:3px 0 0; color:#929dad; font-size:9.5px; }
+.pmt-account-edit-row {
+  display:grid;
+  grid-template-columns:46px minmax(110px,.55fr) minmax(260px,1.45fr);
+  gap:8px;
+  align-items:center;
+  margin-top:7px;
+}
+.pmt-account-index {
+  display:flex; align-items:center; justify-content:center; height:30px;
+  border:1px solid #dfe6ed; border-radius:7px; background:#fff;
+  color:#718095; font-size:9.5px; font-weight:850;
+}
+.pmt-account-input-actions { display:flex; gap:6px; align-items:center; min-width:0; }
+.pmt-account-input-actions .pmt-input { flex:1; min-width:0; }
+.pmt-account-add-btn,.pmt-account-remove-btn {
+  flex:0 0 auto; height:36px; padding:0 11px; border-radius:8px;
+  font-size:10px; font-weight:850; cursor:pointer;
+}
+.pmt-account-add-btn { border:1px solid #cfe0d3; background:#f2faf5; color:#2f7a52; }
+.pmt-account-remove-btn { border:1px solid #ecd2d2; background:#fff7f7; color:#b65d5d; }
+
+/* 기본 계좌 + 추가계좌 툴팁 */
+.pmt-account-display { display:inline-flex; align-items:center; justify-content:center; gap:5px; max-width:100%; }
+.pmt-account-primary { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pmt-account-more {
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  min-width:27px; height:20px; padding:0 6px; border:1px solid #d8dbf0;
+  border-radius:999px; background:#f5f6fd; color:#4c53a8; font-size:9px; font-weight:850; cursor:help;
+}
+.pmt-account-tooltip {
+  position:absolute; z-index:80; left:50%; bottom:calc(100% + 9px); transform:translateX(-50%) translateY(3px);
+  display:none; width:310px; padding:11px; border:1px solid #dfe5ec; border-radius:11px;
+  background:#fff; box-shadow:0 18px 40px rgba(15,23,42,.18); text-align:left; color:#35415a;
+}
+.pmt-account-tooltip::after {
+  content:""; position:absolute; left:50%; top:100%; transform:translateX(-50%);
+  border:6px solid transparent; border-top-color:#fff;
+}
+.pmt-account-more:hover .pmt-account-tooltip,.pmt-account-more:focus .pmt-account-tooltip { display:block; }
+.pmt-account-tooltip > strong { display:block; margin-bottom:7px; color:#24344a; font-size:10.5px; }
+.pmt-account-tooltip-row { display:grid; grid-template-columns:34px 62px 1fr; gap:6px; align-items:center; padding:6px 0; border-top:1px solid #eef1f5; font-size:9.5px; }
+.pmt-account-tooltip-row em { font-style:normal; color:#7d8a9c; }
+.pmt-account-tooltip-row span { color:#5d6d82; }
+.pmt-account-tooltip-row b { color:#28384e; font-size:10px; overflow-wrap:anywhere; }
+
+.pmt-buildings-editor { border-style:solid; border-color:#dfe5ec; border-radius:11px; background:#f9fafc; }
+.pmt-buildings-hint { border-color:#dce7f3; background:#f3f7fb; color:#4c6480; }
+.pmt-erp-chip { background:#557fae; }
+.pmt-month-picker-btn.has-value { border-color:#cbd9e8; background:#f3f7fb; color:#466987; }
+.react-datepicker__header { background:#536f8f; }
+.react-datepicker__month-text--keyboard-selected,.react-datepicker__month--selected { background:#557fae; }
+
+.pmt-payee-table { border-radius:11px; border-color:#dfe5ec; font-size:10.5px; }
+.pmt-payee-table thead { background:#f6f8fb; }
+.pmt-payee-table th { color:#637187; font-size:10px; }
+.pmt-payee-table td { border-bottom-color:#edf0f4; }
+.pmt-active-badge { border-radius:6px; font-size:9.5px; }
+
+.pmt-bcount-summary { gap:8px; }
+.pmt-bcount-item { border-radius:11px; background:#fafbfd; }
+.pmt-bcount-item.is-paid { background:#f2faf5; }
+.pmt-bcount-item.is-unpaid { background:#fff6f6; }
+.pmt-bcount-value { font-size:16px; }
+.pmt-monthgrid-card { border-radius:11px; background:#fafbfd; }
+.pmt-monthgrid-card.is-unpaid { background:#fffafa; box-shadow:none; }
+.pmt-month-chip { height:43px; border-radius:8px; font-size:10px; }
+.pmt-month-chip:hover:not(:disabled) { transform:translateY(-1px); border-color:#9db0c4; box-shadow:0 6px 14px rgba(70,95,125,.10); }
+.pmt-month-chip.is-checked { background:#4e9a78; border-color:#3f8568; box-shadow:none; }
+.pmt-month-chip.is-overdue { background:#fff0f0; border-color:#e4b6b6; color:#a45151; box-shadow:none; }
+.pmt-month-chip.is-current:not(.is-checked) { box-shadow:0 0 0 2px rgba(85,127,174,.28); }
+.pmt-next-chip { background:#fff8ea; border-color:#ead6ad; color:#9a6b28; }
+
+.pmt-unpaid-btn { border-radius:8px; border-color:#dbe3eb; background:#fbfcfe; }
+.pmt-content-line { border-radius:6px; font-size:9.5px; }
+.pmt-content-line--unpaid { background:#fff0f0; color:#b05252; }
+.pmt-content-line--cycle.is-scheduled { background:#eef6ff; color:#467db5; }
+.pmt-content-line--cycle.is-done,.pmt-content-line--allpaid { background:#edf9f3; color:#388864; }
+.pmt-status-select { border-radius:7px; }
+.pmt-status-select.is-scheduled { background:#eef6ff; border-color:#cbdff2; color:#467db5; }
+.pmt-status-select.is-done { background:#edf9f3; border-color:#cfe7db; color:#388864; }
+.pmt-row-del { border-radius:7px; background:#fff7f7; color:#b65d5d; }
+.pmt-row-restore { border-radius:7px; background:#f2faf5; color:#2f7a52; }
+.pmt-row-drag { border-radius:7px; }
+
+@media (max-width: 1000px) {
+  .pmt-hero { align-items:flex-start; flex-direction:column; }
+  .pmt-hero-status { width:100%; text-align:left; box-sizing:border-box; }
+  .pmt-account-edit-row { grid-template-columns:1fr; }
+  .pmt-account-index { width:46px; }
+}

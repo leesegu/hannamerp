@@ -120,10 +120,10 @@ const getMonthLabelFromKey = (monthKey) => {
 
    PC 수도검침조회 > 검침원관리와 완전히 동일한 기준을 사용합니다.
 
-   - 매월 25일 ~ 말일 : 자동 로그인 허용
-   - 매월 1일 : 자동 로그인 허용
-   - 그 외 날짜 : PC에서 해당 검침원의 토글을 켠 당일만 허용
-   - 기존 active / 모바일 자체 날짜판단 방식은 로그인 기준으로 사용하지 않음
+   - 날짜 제한 없이 항상 로그인 가능 (기본값)
+   - PC 검침원관리에서 토글을 수동으로 끄면 로그인 차단
+   - 한 번 켜거나 끈 상태는 다시 바꿀 때까지 계속 유지
+     (mobileLoginEnabled === false 인 경우에만 차단)
 ========================================================= */
 
 const pad2 = (value) => String(value).padStart(2, "0");
@@ -133,21 +133,8 @@ const getLocalDateKey = (date = new Date()) =>
     date.getDate()
   )}`;
 
-const isAutomaticInspectorAccessDate = (date = new Date()) => {
-  const day = date.getDate();
-
-  return day >= 25 || day === 1;
-};
-
-const isInspectorLoginAllowed = (inspector, date = new Date()) => {
-  if (isAutomaticInspectorAccessDate(date)) {
-    return true;
-  }
-
-  return (
-    cleanText(inspector?.manualAccessDate) === getLocalDateKey(date)
-  );
-};
+const isInspectorLoginAllowed = (inspector) =>
+  inspector?.mobileLoginEnabled !== false;
 
 const getPreviousMonthKey = (monthKey) => {
   if (monthKey === "prev12") {
@@ -176,12 +163,12 @@ const getPreviousMonthKey = (monthKey) => {
 
    - 매월 25일 ~ 말일 : 현재 달 검침 입력
    - 다음 달 1일       : 직전 달 검침 계속 입력
-   - 그 외 날짜에 PC에서 수동 접속 허용 시 : 현재 달 검침 입력
+   - 그 외 날짜 : 현재 달 검침 입력
 
    예)
    8월 25~31일 -> 8월 입력
    9월 1일     -> 8월 입력
-   9월 2~24일  -> PC 토글 ON인 경우 9월 입력
+   9월 2~24일  -> 9월 입력
    9월 25일부터 -> 9월 입력
 ========================================================= */
 
@@ -692,9 +679,9 @@ const WaterMeterReadingMobilePage = () => {
          2. 모바일 로그인 허용 여부
       ===================================================== */
 
-      if (!isInspectorLoginAllowed(matched, loginDate)) {
+      if (!isInspectorLoginAllowed(matched)) {
         setLoginError(
-          "현재 모바일 로그인이 허용되어 있지 않습니다. PC 검침원관리에서 모바일 로그인을 허용한 후 다시 시도해주세요."
+          "현재 모바일 로그인이 차단되어 있습니다. PC 검침원관리에서 모바일 로그인을 허용한 후 다시 시도해주세요."
         );
         return;
       }
@@ -783,7 +770,7 @@ const WaterMeterReadingMobilePage = () => {
 
      - 검침원이 삭제되면 즉시 로그아웃
      - PC에서 수동 토글을 OFF하면 즉시 로그아웃
-     - 자동 허용기간이 끝나 날짜가 바뀌면 자동 로그아웃
+     - 날짜에 따른 자동 로그아웃은 없음
      - 기존 active 필드는 접속 판단에 사용하지 않음
   ===================================================== */
 
@@ -813,7 +800,7 @@ const WaterMeterReadingMobilePage = () => {
 
         setSessionInspector(inspector);
 
-        if (!isInspectorLoginAllowed(inspector, new Date())) {
+        if (!isInspectorLoginAllowed(inspector)) {
           localStorage.removeItem(SESSION_KEY);
           setSessionInspector(null);
           setSession(null);
@@ -832,7 +819,7 @@ const WaterMeterReadingMobilePage = () => {
       return;
     }
 
-    if (isInspectorLoginAllowed(sessionInspector, now)) {
+    if (isInspectorLoginAllowed(sessionInspector)) {
       return;
     }
 
@@ -860,6 +847,11 @@ const WaterMeterReadingMobilePage = () => {
       collection(db, WATER_VILLA_COLLECTION),
       (snapshot) => {
         const next = snapshot.docs
+          /*
+           * PC에서 '관리종료'로 설정한 빌라는 모바일 검침 화면에 표시하지 않음
+           * (빌라 목록 / 검색 / 검침현황 모두 제외)
+           */
+          .filter((item) => item.data()?.managementEnded !== true)
           .map((item) => {
             const serverVilla = {
               id: item.id,
@@ -942,8 +934,12 @@ const WaterMeterReadingMobilePage = () => {
     return () => {
       unsubscribe();
 
-      saveTimers.current.forEach((timer) => clearTimeout(timer));
-      saveTimers.current.clear();
+      /*
+       * 구독이 끊기기 전(월 전환, 화면 이탈 등) 아직 저장되지 않은
+       * 검침값이 있다면 먼저 저장을 시도한 뒤 타이머를 정리합니다.
+       * (기존에는 저장 시도 없이 타이머만 취소하여 값이 사라질 수 있었습니다.)
+       */
+      flushAllPendingReadings();
     };
   }, [
     session,
@@ -1255,6 +1251,76 @@ const WaterMeterReadingMobilePage = () => {
     saveTimers.current.set(timerKey, timer);
   };
 
+
+  /* =====================================================
+     저장 대기(디바운스) 중인 모든 검침값을 즉시 Firestore로 전송
+
+     다음 상황에서 방금 입력한 값이 저장되지 않고 사라지는 것을
+     막기 위한 안전장치입니다.
+
+     - 검침값을 입력한 직후(0.55초 이내) "종료" 버튼을 눌러 로그아웃하는 경우
+     - 값을 입력한 직후 앱을 백그라운드로 전환하거나 화면을 벗어나는 경우
+     - 자정 등으로 입력 가능 월이 바뀌어 실시간 구독이 재연결되는 경우
+
+     saveTimers에 남아있는(아직 저장되지 않은) 항목만 대상으로 하므로,
+     이미 저장이 진행 중이거나 완료된 값에는 영향을 주지 않습니다.
+  ===================================================== */
+
+  const flushAllPendingReadings = () => {
+    saveTimers.current.forEach((timer, timerKey) => {
+      clearTimeout(timer);
+      saveTimers.current.delete(timerKey);
+
+      const firstSeparator = timerKey.indexOf(":");
+      const secondSeparator = timerKey.indexOf(":", firstSeparator + 1);
+
+      if (firstSeparator === -1 || secondSeparator === -1) {
+        return;
+      }
+
+      const villaId = timerKey.slice(0, firstSeparator);
+      const roomId = timerKey.slice(firstSeparator + 1, secondSeparator);
+      const monthKey = timerKey.slice(secondSeparator + 1);
+
+      flushPendingReading(villaId, roomId, monthKey);
+    });
+  };
+
+
+  /*
+   * visibilitychange / pagehide 이벤트는 컴포넌트 마운트 시 한 번만 등록되므로,
+   * 이벤트 발생 시 항상 "최신 렌더"의 flushAllPendingReadings를 사용하도록
+   * ref에 매 렌더마다 최신 함수를 보관해둡니다.
+   */
+  const flushAllPendingReadingsRef = useRef(() => {});
+
+  useEffect(() => {
+    flushAllPendingReadingsRef.current = flushAllPendingReadings;
+  });
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushAllPendingReadingsRef.current();
+      }
+    };
+
+    const handlePageHide = () => {
+      flushAllPendingReadingsRef.current();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
+
   const updateReading = (roomId, rawValue) => {
     if (!selectedVilla) {
       return;
@@ -1384,6 +1450,13 @@ const WaterMeterReadingMobilePage = () => {
   };
 
   const logout = () => {
+    /*
+     * 로그아웃 직전(0.55초 디바운스 대기 중) 아직 저장되지 않은 검침값이
+     * 있다면 먼저 저장을 시도합니다. 이 처리가 없으면 값을 입력한 직후
+     * 바로 "종료"를 눌렀을 때 마지막 검침값이 저장되지 않고 사라질 수 있습니다.
+     */
+    flushAllPendingReadings();
+
     localStorage.removeItem(SESSION_KEY);
     setSessionInspector(null);
     setSession(null);

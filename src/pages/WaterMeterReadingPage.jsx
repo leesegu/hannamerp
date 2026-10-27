@@ -39,6 +39,8 @@ import {
   FiUsers,
   FiPhone,
   FiUserCheck,
+  FiClipboard,
+  FiPower,
 } from "react-icons/fi";
 
 import "./WaterMeterReadingPage.css";
@@ -65,37 +67,52 @@ const normalizePhone = (value) =>
   String(value ?? "").replace(/\D/g, "");
 
 /* =========================================================
-   검침원 모바일 로그인 허용 날짜
+   검침원 모바일 로그인 허용 여부
 
-   - 매월 25일 ~ 말일: 자동 허용
-   - 매월 1일: 자동 허용
-   - 그 외 날짜: PC에서 수동으로 켠 당일만 허용
+   - 날짜 제한 없이 항상 로그인 가능 (기본값)
+   - PC 검침원관리에서 토글을 수동으로 끄면 로그인 차단
+   - 한 번 켜거나 끈 상태는 다시 바꿀 때까지 계속 유지
+     (mobileLoginEnabled 필드에 저장)
 ========================================================= */
 
 const pad2 = (value) =>
   String(value).padStart(2, "0");
 
-const getLocalDateKey = (date = new Date()) =>
-  `${date.getFullYear()}-${pad2(
-    date.getMonth() + 1
-  )}-${pad2(date.getDate())}`;
+const isInspectorLoginAllowed = (inspector) =>
+  inspector?.mobileLoginEnabled !== false;
 
-const isAutomaticInspectorAccessDate = (date = new Date()) => {
-  const day = date.getDate();
+/* =========================================================
+   검침현황 기본 기준월
 
-  return day >= 25 || day === 1;
-};
+   모바일 입력월 규칙과 동일
+   - 매월 1일 : 직전 달
+   - 그 외    : 현재 달
+========================================================= */
 
-const isInspectorLoginAllowed = (inspector, date = new Date()) => {
-  if (isAutomaticInspectorAccessDate(date)) {
-    return true;
+const getInspectionStatusPeriod = (date = new Date()) => {
+  let year = date.getFullYear();
+  let month = date.getMonth() + 1;
+
+  if (date.getDate() === 1) {
+    if (month === 1) {
+      year -= 1;
+      month = 12;
+    } else {
+      month -= 1;
+    }
   }
 
-  return (
-    cleanText(inspector?.manualAccessDate) ===
-    getLocalDateKey(date)
-  );
+  return {
+    year,
+    month,
+  };
 };
+
+const STATUS_MONTH_OPTIONS =
+  Array.from(
+    { length: 12 },
+    (_, index) => index + 1
+  );
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -1981,6 +1998,26 @@ const WaterMeterReadingPage = () => {
   });
 
 
+  /* =======================================================
+     호실 등록 목록 드래그 순서 변경
+
+     - draggedRoomIndex : 현재 드래그 중인 호실의 원래 위치
+     - dragOverRoomIndex : 드래그한 항목이 현재 겹쳐있는 위치
+       (드롭 위치 미리보기 표시용)
+  ======================================================= */
+
+  const [
+    draggedRoomIndex,
+    setDraggedRoomIndex,
+  ] = useState(null);
+
+
+  const [
+    dragOverRoomIndex,
+    setDragOverRoomIndex,
+  ] = useState(null);
+
+
   const [
     uploadMessage,
     setUploadMessage,
@@ -2057,10 +2094,38 @@ const WaterMeterReadingPage = () => {
   });
 
 
+  /* =======================================================
+     검침현황 팝업
+  ======================================================= */
+
   const [
-    inspectorAccessNow,
-    setInspectorAccessNow,
-  ] = useState(() => new Date());
+    isStatusOpen,
+    setIsStatusOpen,
+  ] = useState(false);
+
+
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState("all");
+
+
+  const [
+    statusYear,
+    setStatusYear,
+  ] = useState(
+    () =>
+      getInspectionStatusPeriod().year
+  );
+
+
+  const [
+    statusMonth,
+    setStatusMonth,
+  ] = useState(
+    () =>
+      getInspectionStatusPeriod().month
+  );
 
 
   const readingInputRefs =
@@ -2073,46 +2138,6 @@ const WaterMeterReadingPage = () => {
 
   const migrationAttemptedRef =
     useRef(false);
-
-
-  /* =======================================================
-     검침원 로그인 허용상태 날짜 갱신
-
-     자정을 지나도 새로고침 없이 토글 표시가 자동으로 바뀌도록
-     1분마다 현재 시간을 갱신한다.
-  ======================================================= */
-
-  useEffect(() => {
-    const refreshNow = () =>
-      setInspectorAccessNow(new Date());
-
-    const timer = setInterval(
-      refreshNow,
-      60 * 1000
-    );
-
-    window.addEventListener(
-      "focus",
-      refreshNow
-    );
-
-    document.addEventListener(
-      "visibilitychange",
-      refreshNow
-    );
-
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener(
-        "focus",
-        refreshNow
-      );
-      document.removeEventListener(
-        "visibilitychange",
-        refreshNow
-      );
-    };
-  }, []);
 
 
   /* =======================================================
@@ -2408,6 +2433,171 @@ const WaterMeterReadingPage = () => {
     }, [
       villas,
       searchText,
+    ]);
+
+
+  /* =======================================================
+     총빌라 / 검침빌라(관리종료 제외) 갯수
+  ======================================================= */
+
+  const activeVillaCount =
+    useMemo(
+      () =>
+        villas.filter(
+          (villa) =>
+            !villa.managementEnded
+        ).length,
+      [villas]
+    );
+
+
+  /* =======================================================
+     전체 빌라 검침현황
+
+     - 이미 실시간 구독 중인 villas 데이터로 계산
+       (Firestore 추가 읽기 없음)
+     - 관리종료 빌라는 제외
+     - 빈칸이 아니면 검침 완료 (0 / 숫자 / 한글 모두 완료)
+     - 전체 빈칸: 검침누락 / 일부 입력: 검침진행중 / 전체 입력: 검침완료
+  ======================================================= */
+
+  const inspectionStatus =
+    useMemo(() => {
+      const monthKey =
+        `m${statusMonth}`;
+
+      const items =
+        villas
+          .filter(
+            (villa) =>
+              !villa.managementEnded
+          )
+          .map((villa) => {
+            const rooms =
+              Array.isArray(
+                villa.rooms
+              )
+                ? villa.rooms
+                : [];
+
+            const isDone = (room) =>
+              cleanText(
+                getRoomYearReading(
+                  room,
+                  statusYear,
+                  monthKey
+                )
+              ) !== "";
+
+            const completedRooms =
+              rooms.filter(isDone);
+
+            const missingRooms =
+              rooms.filter(
+                (room) =>
+                  !isDone(room)
+              );
+
+            let status =
+              "missing";
+
+            if (
+              rooms.length > 0 &&
+              completedRooms.length ===
+                rooms.length
+            ) {
+              status =
+                "complete";
+            } else if (
+              completedRooms.length >
+              0
+            ) {
+              status =
+                "progress";
+            }
+
+            const rate =
+              rooms.length
+                ? Math.round(
+                    (completedRooms.length /
+                      rooms.length) *
+                      100
+                  )
+                : 0;
+
+            return {
+              ...villa,
+              status,
+              roomCount:
+                rooms.length,
+              completedRoomCount:
+                completedRooms.length,
+              missingRooms,
+              rate,
+            };
+          });
+
+      return {
+        items,
+        total:
+          items.length,
+        complete:
+          items.filter(
+            (item) =>
+              item.status ===
+              "complete"
+          ).length,
+        progress:
+          items.filter(
+            (item) =>
+              item.status ===
+              "progress"
+          ).length,
+        missing:
+          items.filter(
+            (item) =>
+              item.status ===
+              "missing"
+          ).length,
+      };
+    }, [
+      villas,
+      statusYear,
+      statusMonth,
+    ]);
+
+
+  /*
+   * 요약 박스 선택 시 해당 상태 빌라를 최상단으로 정렬.
+   * 나머지 빌라는 기존 등록 순서를 유지한 채 아래에 표시.
+   */
+  const displayedInspectionItems =
+    useMemo(() => {
+      const originalItems =
+        inspectionStatus.items ||
+        [];
+
+      if (
+        statusFilter === "all"
+      ) {
+        return originalItems;
+      }
+
+      return [
+        ...originalItems.filter(
+          (item) =>
+            item.status ===
+            statusFilter
+        ),
+        ...originalItems.filter(
+          (item) =>
+            item.status !==
+            statusFilter
+        ),
+      ];
+    }, [
+      inspectionStatus.items,
+      statusFilter,
     ]);
 
 
@@ -3242,6 +3432,161 @@ const WaterMeterReadingPage = () => {
 
 
   /* =======================================================
+     호실 순서 변경 (드래그 앤 드롭)
+
+     번호 배지를 마우스로 눌러 이동한 뒤
+     원하는 호실 위치에 놓으면 순서가 바뀐다.
+  ======================================================= */
+
+  const reorderRoomInputs =
+    (
+      fromIndex,
+      toIndex
+    ) => {
+      if (
+        fromIndex === null ||
+        fromIndex === undefined ||
+        toIndex === null ||
+        toIndex === undefined ||
+        fromIndex === toIndex
+      ) {
+        return;
+      }
+
+      setVillaForm(
+        (previous) => {
+          const rooms = [
+            ...previous.rooms,
+          ];
+
+          if (
+            fromIndex < 0 ||
+            fromIndex >=
+              rooms.length ||
+            toIndex < 0 ||
+            toIndex >=
+              rooms.length
+          ) {
+            return previous;
+          }
+
+          const [moved] =
+            rooms.splice(
+              fromIndex,
+              1
+            );
+
+          rooms.splice(
+            toIndex,
+            0,
+            moved
+          );
+
+          return {
+            ...previous,
+
+            rooms,
+          };
+        }
+      );
+    };
+
+
+  const handleRoomDragStart =
+    (
+      event,
+      index
+    ) => {
+      setDraggedRoomIndex(
+        index
+      );
+
+      if (
+        event.dataTransfer
+      ) {
+        event.dataTransfer.effectAllowed =
+          "move";
+
+        try {
+          event.dataTransfer.setData(
+            "text/plain",
+            String(index)
+          );
+        } catch {}
+      }
+    };
+
+
+  const handleRoomDragEnter =
+    (
+      event,
+      index
+    ) => {
+      event.preventDefault();
+
+      if (
+        draggedRoomIndex ===
+          null ||
+        draggedRoomIndex ===
+          index
+      ) {
+        return;
+      }
+
+      setDragOverRoomIndex(
+        index
+      );
+    };
+
+
+  const handleRoomDragOver =
+    (event) => {
+      event.preventDefault();
+
+      if (
+        event.dataTransfer
+      ) {
+        event.dataTransfer.dropEffect =
+          "move";
+      }
+    };
+
+
+  const handleRoomDrop =
+    (
+      event,
+      index
+    ) => {
+      event.preventDefault();
+
+      reorderRoomInputs(
+        draggedRoomIndex,
+        index
+      );
+
+      setDraggedRoomIndex(
+        null
+      );
+
+      setDragOverRoomIndex(
+        null
+      );
+    };
+
+
+  const handleRoomDragEnd =
+    () => {
+      setDraggedRoomIndex(
+        null
+      );
+
+      setDragOverRoomIndex(
+        null
+      );
+    };
+
+
+  /* =======================================================
      빌라 저장
   ======================================================= */
 
@@ -3500,6 +3845,95 @@ const WaterMeterReadingPage = () => {
 
         alert(
           "빌라 삭제 중 오류가 발생했습니다."
+        );
+      }
+    };
+
+
+  /* =======================================================
+     관리종료 설정 / 해제
+
+     - PC에서는 내용이 그대로 표시됨
+     - 모바일에서는 관리종료 빌라가 표시되지 않음
+     - 버튼 1회 클릭 = Firestore 문서 1건 쓰기
+  ======================================================= */
+
+  const toggleManagementEnded =
+    async (villa) => {
+      if (!villa) {
+        return;
+      }
+
+      const villaId =
+        villa.id;
+
+      const previousValue =
+        Boolean(
+          villa.managementEnded
+        );
+
+      const nextValue =
+        !previousValue;
+
+      setVillas(
+        (previous) =>
+          previous.map(
+            (item) =>
+              item.id ===
+              villaId
+                ? {
+                    ...item,
+                    managementEnded:
+                      nextValue,
+                  }
+                : item
+          )
+      );
+
+      try {
+        await setDoc(
+          doc(
+            db,
+            WATER_VILLA_COLLECTION,
+            villaId
+          ),
+          {
+            managementEnded:
+              nextValue,
+            managementEndedAt:
+              nextValue
+                ? serverTimestamp()
+                : null,
+            updatedAt:
+              serverTimestamp(),
+          },
+          {
+            merge: true,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "관리종료 설정 오류:",
+          error
+        );
+
+        setVillas(
+          (previous) =>
+            previous.map(
+              (item) =>
+                item.id ===
+                villaId
+                  ? {
+                      ...item,
+                      managementEnded:
+                        previousValue,
+                    }
+                  : item
+            )
+        );
+
+        alert(
+          "관리종료 설정 중 오류가 발생했습니다."
         );
       }
     };
@@ -4005,6 +4439,57 @@ const WaterMeterReadingPage = () => {
 
 
   /* =======================================================
+     검침현황 팝업 열기 / 닫기 / 빌라 이동
+  ======================================================= */
+
+  const openStatusModal =
+    () => {
+      const period =
+        getInspectionStatusPeriod(
+          new Date()
+        );
+
+      setStatusYear(
+        period.year
+      );
+
+      setStatusMonth(
+        period.month
+      );
+
+      setStatusFilter(
+        "all"
+      );
+
+      setIsStatusOpen(
+        true
+      );
+    };
+
+
+  const closeStatusModal =
+    () => {
+      setIsStatusOpen(
+        false
+      );
+    };
+
+
+  const openVillaFromStatus =
+    (villaId) => {
+      setSearchText("");
+
+      setSelectedVillaId(
+        villaId
+      );
+
+      setIsStatusOpen(
+        false
+      );
+    };
+
+
+  /* =======================================================
      검침원 관리
   ======================================================= */
 
@@ -4148,31 +4633,38 @@ const WaterMeterReadingPage = () => {
     };
 
 
+  /* =======================================================
+     검침원 모바일 로그인 허용 / 차단 토글
+
+     - 날짜와 관계없이 수동으로 켜고 끈 상태가 계속 유지됨
+     - mobileLoginEnabled === false 인 경우에만 로그인 차단
+     - 토글 1회 = Firestore 문서 1건 쓰기
+  ======================================================= */
+
   const toggleInspectorMobileAccess =
     async (inspector) => {
-      const now =
-        new Date();
-
-      /*
-       * 매월 25일~말일 및 매월 1일은 자동 허용 기간이므로
-       * 관리자가 임의로 끌 수 없도록 고정한다.
-       */
-      if (
-        isAutomaticInspectorAccessDate(
-          now
-        )
-      ) {
-        return;
-      }
-
-      const todayKey =
-        getLocalDateKey(now);
-
-      const currentlyAllowed =
+      const previousValue =
         isInspectorLoginAllowed(
-          inspector,
-          now
+          inspector
         );
+
+      const nextValue =
+        !previousValue;
+
+      setInspectors(
+        (previous) =>
+          previous.map(
+            (item) =>
+              item.id ===
+              inspector.id
+                ? {
+                    ...item,
+                    mobileLoginEnabled:
+                      nextValue,
+                  }
+                : item
+          )
+      );
 
       try {
         await setDoc(
@@ -4182,10 +4674,8 @@ const WaterMeterReadingPage = () => {
             inspector.id
           ),
           {
-            manualAccessDate:
-              currentlyAllowed
-                ? ""
-                : todayKey,
+            mobileLoginEnabled:
+              nextValue,
             updatedAt:
               serverTimestamp(),
           },
@@ -4193,14 +4683,25 @@ const WaterMeterReadingPage = () => {
             merge: true,
           }
         );
-
-        setInspectorAccessNow(
-          new Date()
-        );
       } catch (error) {
         console.error(
           "검침원 모바일 로그인 토글 저장 오류:",
           error
+        );
+
+        setInspectors(
+          (previous) =>
+            previous.map(
+              (item) =>
+                item.id ===
+                inspector.id
+                  ? {
+                      ...item,
+                      mobileLoginEnabled:
+                        previousValue,
+                    }
+                  : item
+            )
         );
 
         alert(
@@ -4329,11 +4830,20 @@ const WaterMeterReadingPage = () => {
                 </button>
               )}
             </div>
-
-            <span className="wmr-header-search-count">
-              {filteredVillas.length}개
-            </span>
           </div>
+
+
+          <button
+            type="button"
+            className="wmr-btn wmr-btn-status"
+            onClick={
+              openStatusModal
+            }
+          >
+            <FiClipboard />
+
+            검침현황
+          </button>
 
 
           <button
@@ -4403,11 +4913,25 @@ const WaterMeterReadingPage = () => {
               검침 빌라
             </strong>
 
-            <span>
-              {
-                filteredVillas.length
-              }
-            </span>
+            <div className="wmr-villa-list-counts">
+              <span className="wmr-count-chip is-total">
+                총빌라
+                <b>
+                  {
+                    villas.length
+                  }
+                </b>
+              </span>
+
+              <span className="wmr-count-chip is-active">
+                검침빌라
+                <b>
+                  {
+                    activeVillaCount
+                  }
+                </b>
+              </span>
+            </div>
           </div>
 
 
@@ -4519,6 +5043,30 @@ const WaterMeterReadingPage = () => {
 
 
                   <div className="wmr-villa-manage-buttons">
+                    <button
+                      type="button"
+                      className={`wmr-end-btn ${
+                        selectedVilla.managementEnded
+                          ? "active"
+                          : ""
+                      }`}
+                      title={
+                        selectedVilla.managementEnded
+                          ? "관리종료 해제 (모바일 검침 목록에 다시 표시)"
+                          : "관리종료 (모바일 검침 목록에서 숨김)"
+                      }
+                      onClick={() =>
+                        toggleManagementEnded(
+                          selectedVilla
+                        )
+                      }
+                    >
+                      <FiPower />
+
+                      관리종료
+                    </button>
+
+
                     <button
                       type="button"
                       className="wmr-icon-btn"
@@ -5215,6 +5763,368 @@ const WaterMeterReadingPage = () => {
 
 
       {/* ===================================================
+          검침현황 MODAL
+      =================================================== */}
+
+      {isStatusOpen && (
+        <div
+          className="wmr-modal-backdrop"
+          onMouseDown={
+            closeStatusModal
+          }
+        >
+          <div
+            className="wmr-modal wmr-status-modal"
+            onMouseDown={(
+              event
+            ) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="wmr-modal-header">
+              <div>
+                <h3>
+                  전체 검침현황
+                </h3>
+
+                <p>
+                  {statusYear}년 {statusMonth}월 수도검침 기준 · 관리종료 빌라는 제외됩니다.
+                </p>
+              </div>
+
+              <div className="wmr-status-header-actions">
+                <div className="wmr-status-period">
+                  <select
+                    value={
+                      statusYear
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setStatusYear(
+                        Number(
+                          event
+                            .target
+                            .value
+                        )
+                      )
+                    }
+                  >
+                    {YEAR_OPTIONS.map(
+                      (year) => (
+                        <option
+                          key={
+                            year
+                          }
+                          value={
+                            year
+                          }
+                        >
+                          {year}년
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  <select
+                    value={
+                      statusMonth
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setStatusMonth(
+                        Number(
+                          event
+                            .target
+                            .value
+                        )
+                      )
+                    }
+                  >
+                    {STATUS_MONTH_OPTIONS.map(
+                      (month) => (
+                        <option
+                          key={
+                            month
+                          }
+                          value={
+                            month
+                          }
+                        >
+                          {month}월
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  className="wmr-modal-close"
+                  onClick={
+                    closeStatusModal
+                  }
+                >
+                  <FiX />
+                </button>
+              </div>
+            </div>
+
+
+            <div className="wmr-modal-body wmr-status-body">
+              <div className="wmr-status-summary">
+                <button
+                  type="button"
+                  className={
+                    statusFilter ===
+                    "all"
+                      ? "is-selected"
+                      : ""
+                  }
+                  onClick={() =>
+                    setStatusFilter(
+                      "all"
+                    )
+                  }
+                >
+                  <span>
+                    총 검침빌라
+                  </span>
+
+                  <strong>
+                    {
+                      inspectionStatus.total
+                    }
+                    <em>곳</em>
+                  </strong>
+                </button>
+
+                <button
+                  type="button"
+                  className={`is-complete ${
+                    statusFilter ===
+                    "complete"
+                      ? "is-selected"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    setStatusFilter(
+                      "complete"
+                    )
+                  }
+                >
+                  <span>
+                    검침완료
+                  </span>
+
+                  <strong>
+                    {
+                      inspectionStatus.complete
+                    }
+                    <em>곳</em>
+                  </strong>
+                </button>
+
+                <button
+                  type="button"
+                  className={`is-progress ${
+                    statusFilter ===
+                    "progress"
+                      ? "is-selected"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    setStatusFilter(
+                      "progress"
+                    )
+                  }
+                >
+                  <span>
+                    검침진행중
+                  </span>
+
+                  <strong>
+                    {
+                      inspectionStatus.progress
+                    }
+                    <em>곳</em>
+                  </strong>
+                </button>
+
+                <button
+                  type="button"
+                  className={`is-missing ${
+                    statusFilter ===
+                    "missing"
+                      ? "is-selected"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    setStatusFilter(
+                      "missing"
+                    )
+                  }
+                >
+                  <span>
+                    검침누락
+                  </span>
+
+                  <strong>
+                    {
+                      inspectionStatus.missing
+                    }
+                    <em>곳</em>
+                  </strong>
+                </button>
+              </div>
+
+
+              <div className="wmr-status-list">
+                {displayedInspectionItems.length ===
+                0 ? (
+                  <div className="wmr-status-empty">
+                    등록된 검침 빌라가 없습니다.
+                  </div>
+                ) : (
+                  displayedInspectionItems.map(
+                    (villa) => {
+                      const statusLabel =
+                        villa.status ===
+                        "complete"
+                          ? "검침완료"
+                          : villa.status ===
+                            "progress"
+                          ? "검침진행중"
+                          : "검침누락";
+
+                      return (
+                        <button
+                          key={
+                            villa.id
+                          }
+                          type="button"
+                          className={`wmr-status-item is-${villa.status}`}
+                          onClick={() =>
+                            openVillaFromStatus(
+                              villa.id
+                            )
+                          }
+                        >
+                          <div className="wmr-status-item-main">
+                            <div className="wmr-status-item-title">
+                              <strong>
+                                {
+                                  villa.villaName
+                                }
+                              </strong>
+
+                              <span>
+                                {
+                                  statusLabel
+                                }
+                              </span>
+                            </div>
+
+                            <small>
+                              {
+                                villa.address ||
+                                "주소 미등록"
+                              }
+                            </small>
+
+                            {villa.status ===
+                              "progress" && (
+                              <div className="wmr-status-missing-rooms">
+                                <b>
+                                  미검침 호실
+                                </b>
+
+                                <span>
+                                  {villa.missingRooms
+                                    .map(
+                                      (room) =>
+                                        room.room
+                                    )
+                                    .join(
+                                      ", "
+                                    )}
+                                </span>
+                              </div>
+                            )}
+
+                            {villa.status ===
+                              "missing" && (
+                              <div className="wmr-status-missing-rooms">
+                                <b>
+                                  미검침
+                                </b>
+
+                                <span>
+                                  전체 호실
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="wmr-status-item-progress">
+                            <strong>
+                              {
+                                villa.completedRoomCount
+                              }
+                              /
+                              {
+                                villa.roomCount
+                              }
+                            </strong>
+
+                            <span>
+                              {
+                                villa.rate
+                              }
+                              %
+                            </span>
+
+                            <i>
+                              <b
+                                style={{
+                                  width: `${villa.rate}%`,
+                                }}
+                              />
+                            </i>
+                          </div>
+
+                          <FiChevronRight className="wmr-status-item-arrow" />
+                        </button>
+                      );
+                    }
+                  )
+                )}
+              </div>
+            </div>
+
+
+            <div className="wmr-modal-footer">
+              <span className="wmr-auto-save-note">
+                빌라를 누르면 해당 빌라 검침표로 이동합니다.
+              </span>
+
+              <button
+                type="button"
+                className="wmr-modal-cancel"
+                onClick={
+                  closeStatusModal
+                }
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ===================================================
           INSPECTOR MANAGER MODAL
       =================================================== */}
 
@@ -5240,7 +6150,7 @@ const WaterMeterReadingPage = () => {
                 </h3>
 
                 <p>
-                  매월 25일~말일과 매월 1일은 자동 로그인 허용, 그 외에는 수동 토글을 켠 당일만 접속할 수 있습니다.
+                  검침원은 날짜 제한 없이 모바일 로그인할 수 있으며, 토글을 끄면 다시 켤 때까지 로그인이 차단됩니다.
                 </p>
               </div>
 
@@ -5456,42 +6366,24 @@ const WaterMeterReadingPage = () => {
                           <label
                             className={`wmr-access-toggle ${
                               isInspectorLoginAllowed(
-                                inspector,
-                                inspectorAccessNow
+                                inspector
                               )
                                 ? "active"
                                 : ""
-                            } ${
-                              isAutomaticInspectorAccessDate(
-                                inspectorAccessNow
-                              )
-                                ? "automatic"
-                                : ""
                             }`}
                             title={
-                              isAutomaticInspectorAccessDate(
-                                inspectorAccessNow
+                              isInspectorLoginAllowed(
+                                inspector
                               )
-                                ? "매월 25일~말일 및 매월 1일은 자동으로 로그인 허용됩니다."
-                                : isInspectorLoginAllowed(
-                                    inspector,
-                                    inspectorAccessNow
-                                  )
-                                ? "오늘 자정까지 모바일 로그인 허용"
-                                : "오늘 하루 모바일 로그인 허용"
+                                ? "모바일 로그인 허용 중 (끄면 로그인 차단)"
+                                : "모바일 로그인 차단 중 (켜면 로그인 허용)"
                             }
                           >
                             <input
                               type="checkbox"
                               checked={
                                 isInspectorLoginAllowed(
-                                  inspector,
-                                  inspectorAccessNow
-                                )
-                              }
-                              disabled={
-                                isAutomaticInspectorAccessDate(
-                                  inspectorAccessNow
+                                  inspector
                                 )
                               }
                               onChange={() =>
@@ -5508,8 +6400,7 @@ const WaterMeterReadingPage = () => {
                             <em>
                               {
                                 isInspectorLoginAllowed(
-                                  inspector,
-                                  inspectorAccessNow
+                                  inspector
                                 )
                                   ? "로그인 가능"
                                   : "로그인 차단"
@@ -5766,7 +6657,7 @@ const WaterMeterReadingPage = () => {
                     </strong>
 
                     <span>
-                      입력한 순서 그대로 표시됩니다.
+                      입력한 순서 그대로 표시됩니다. 번호를 눌러 드래그하면 순서를 바꿀 수 있습니다.
                     </span>
                   </div>
 
@@ -5795,9 +6686,57 @@ const WaterMeterReadingPage = () => {
                         key={
                           index
                         }
-                        className="wmr-room-input-row"
+                        className={`wmr-room-input-row ${
+                          draggedRoomIndex ===
+                          index
+                            ? "is-dragging"
+                            : ""
+                        } ${
+                          dragOverRoomIndex ===
+                            index &&
+                          draggedRoomIndex !==
+                            null &&
+                          draggedRoomIndex !==
+                            index
+                            ? "is-drag-over"
+                            : ""
+                        }`}
+                        onDragEnter={(
+                          event
+                        ) =>
+                          handleRoomDragEnter(
+                            event,
+                            index
+                          )
+                        }
+                        onDragOver={
+                          handleRoomDragOver
+                        }
+                        onDrop={(
+                          event
+                        ) =>
+                          handleRoomDrop(
+                            event,
+                            index
+                          )
+                        }
                       >
-                        <span className="wmr-room-number">
+                        <span
+                          className="wmr-room-number"
+                          draggable
+                          title="눌러서 순서 변경"
+                          onDragStart={(
+                            event
+                          ) =>
+                            handleRoomDragStart(
+                              event,
+                              index
+                            )
+                          }
+                          onDragEnd={
+                            handleRoomDragEnd
+                          }
+                        >
                           {
                             index +
                             1

@@ -3327,3 +3327,691 @@
 
   pointer-events: none;
 }
+
+
+/* =========================================================
+   2026-09 추가 수정
+   - 수도검침 빌라 추가/수정 창의 호실 등록 목록
+     번호를 마우스로 눌러 드래그하면 순서를 바꿀 수 있도록 지원
+========================================================= */
+
+/* 번호 배지 = 드래그 손잡이 */
+.wmr-room-number {
+  cursor: grab;
+  user-select: none;
+
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.wmr-room-number:hover {
+  background: #e7ebf5;
+  color: #566274;
+}
+
+.wmr-room-number:active {
+  cursor: grabbing;
+}
+
+/* 드래그 중인 행: 살짝 투명하게 표시 */
+.wmr-room-input-row.is-dragging {
+  opacity: 0.45;
+}
+
+.wmr-room-input-row.is-dragging .wmr-room-number {
+  background: #d9dfea;
+  box-shadow: 0 0 0 2px rgba(93, 112, 238, 0.28);
+}
+
+/* 드래그한 항목이 현재 겹쳐있는 위치: 놓을 위치 미리보기 */
+.wmr-room-input-row.is-drag-over {
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px #7180f2 inset;
+  background: #f2f4ff;
+}
+
+.wmr-room-input-row.is-drag-over .wmr-room-number {
+  background: #dde3fb;
+  color: #4657c7;
+}
+
+
+/* =========================================================
+   2026-10 추가 수정
+   - 관리종료 버튼 (선택 시 빨간 배경)
+   - 좌측 목록 헤더: 총빌라 / 검침빌라 갯수 표시
+   - 상단 검침현황 버튼 + 검침현황 팝업
+========================================================= */
+
+/* ---------- 관리종료 버튼 ---------- */
+
+.wmr-end-btn {
+  height: 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding: 0 11px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #687588;
+
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 750;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.wmr-end-btn svg {
+  font-size: 13px;
+}
+
+.wmr-end-btn:hover {
+  border-color: #f3c5c5;
+
+  background: #fff6f6;
+
+  color: #dc4c4c;
+}
+
+.wmr-end-btn.active {
+  border-color: #d63c3c;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ef5a5a 0%,
+      #d93636 100%
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 4px 10px
+    rgba(217, 54, 54, 0.22);
+}
+
+.wmr-end-btn.active:hover {
+  border-color: #c42f2f;
+
+  background:
+    linear-gradient(
+      180deg,
+      #e84c4c 0%,
+      #c92f2f 100%
+    );
+
+  color: #ffffff;
+}
+
+
+/* ---------- 좌측 목록 헤더 갯수 ---------- */
+
+.wmr-villa-list-header {
+  gap: 8px;
+}
+
+.wmr-villa-list-header > strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.wmr-villa-list-counts {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 4px;
+}
+
+.wmr-villa-list-header .wmr-count-chip {
+  min-width: 0;
+  height: 23px;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 3px;
+
+  padding: 0 7px;
+
+  box-sizing: border-box;
+
+  border-radius: 20px;
+
+  font-size: 9.5px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.wmr-villa-list-header .wmr-count-chip b {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.wmr-villa-list-header .wmr-count-chip.is-total {
+  background: #f0f2f6;
+  color: #7b8798;
+}
+
+.wmr-villa-list-header .wmr-count-chip.is-total b {
+  color: #475467;
+}
+
+.wmr-villa-list-header .wmr-count-chip.is-active {
+  background: #edf0ff;
+  color: #6b79d8;
+}
+
+.wmr-villa-list-header .wmr-count-chip.is-active b {
+  color: #4f60e0;
+}
+
+
+/* ---------- 상단 검침현황 버튼 ---------- */
+
+.wmr-btn-status {
+  border: 1px solid #ccd4fb;
+
+  background: #f5f7ff;
+
+  color: #5668dc;
+}
+
+.wmr-btn-status:hover {
+  border-color: #b9c3f7;
+
+  background: #eef1ff;
+}
+
+
+/* ---------- 검침현황 팝업 ---------- */
+
+.wmr-status-modal {
+  width: min(760px, 96vw);
+}
+
+.wmr-status-header-actions {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.wmr-status-period {
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+}
+
+.wmr-status-period select {
+  height: 32px;
+
+  padding: 0 24px 0 10px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #344054;
+
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.wmr-status-period select:focus {
+  border-color: #7180f2;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(102, 120, 243, 0.08);
+}
+
+.wmr-modal-body.wmr-status-body {
+  display: flex;
+  flex-direction: column;
+
+  gap: 12px;
+
+  background: #f7f8fc;
+}
+
+.wmr-status-summary {
+  flex: 0 0 auto;
+
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  gap: 8px;
+}
+
+.wmr-status-summary > button {
+  min-width: 0;
+
+  padding: 12px 8px 11px;
+
+  border: 1px solid #e1e6ee;
+  border-radius: 11px;
+
+  background: #ffffff;
+
+  font-family: inherit;
+  text-align: center;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.wmr-status-summary > button:hover {
+  transform: translateY(-1px);
+}
+
+.wmr-status-summary span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #8a95a7;
+
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.wmr-status-summary strong {
+  color: #344054;
+
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+}
+
+.wmr-status-summary em {
+  margin-left: 2px;
+
+  color: #8d98a8;
+
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.wmr-status-summary .is-complete {
+  border-color: #d4eadf;
+  background: #fbfffd;
+}
+
+.wmr-status-summary .is-complete strong {
+  color: #238b62;
+}
+
+.wmr-status-summary .is-progress {
+  border-color: #f1d8ae;
+  background: #fffdf8;
+}
+
+.wmr-status-summary .is-progress strong {
+  color: #b46c12;
+}
+
+.wmr-status-summary .is-missing {
+  border-color: #efcccc;
+  background: #fffafa;
+}
+
+.wmr-status-summary .is-missing strong {
+  color: #c84646;
+}
+
+.wmr-status-summary > button.is-selected {
+  border-color: #8795ef;
+
+  box-shadow:
+    0 0 0 2px rgba(95, 114, 238, 0.12),
+    0 5px 14px rgba(50, 63, 120, 0.08);
+}
+
+.wmr-status-summary > button.is-selected:not(.is-complete):not(.is-progress):not(.is-missing) {
+  background: #f4f6ff;
+}
+
+.wmr-status-summary > button.is-complete.is-selected {
+  border-color: #87c7aa;
+  background: #f5fcf8;
+}
+
+.wmr-status-summary > button.is-progress.is-selected {
+  border-color: #dfb46e;
+  background: #fff9ef;
+}
+
+.wmr-status-summary > button.is-missing.is-selected {
+  border-color: #df9292;
+  background: #fff5f5;
+}
+
+.wmr-status-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.wmr-status-empty {
+  padding: 40px 12px;
+
+  border: 1px dashed #dde2ea;
+  border-radius: 10px;
+
+  background: #ffffff;
+
+  color: #98a2b3;
+
+  font-size: 11.5px;
+  font-weight: 650;
+
+  text-align: center;
+}
+
+.wmr-status-item {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    82px
+    16px;
+
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 11px 13px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #e1e6ed;
+  border-radius: 11px;
+
+  background: #ffffff;
+
+  font-family: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+
+.wmr-status-item:hover {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 6px 16px rgba(30, 41, 59, 0.07);
+}
+
+.wmr-status-item.is-missing {
+  border-color: #efcaca;
+  background: #fffafa;
+}
+
+.wmr-status-item.is-progress {
+  border-color: #eed2a4;
+  background: #fffdf8;
+}
+
+.wmr-status-item.is-complete {
+  border-color: #d8e8e0;
+  background: #fcfffd;
+}
+
+.wmr-status-item-main {
+  min-width: 0;
+}
+
+.wmr-status-item-title {
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+}
+
+.wmr-status-item-title strong {
+  min-width: 0;
+
+  overflow: hidden;
+
+  color: #344054;
+
+  font-size: 12.5px;
+  font-weight: 850;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-status-item-title span {
+  flex: 0 0 auto;
+
+  padding: 3px 7px;
+
+  border-radius: 20px;
+
+  background: #eef1f5;
+
+  color: #778296;
+
+  font-size: 9.5px;
+  font-weight: 850;
+}
+
+.wmr-status-item.is-missing .wmr-status-item-title span {
+  background: #ffeded;
+  color: #c84b4b;
+}
+
+.wmr-status-item.is-progress .wmr-status-item-title span {
+  background: #fff1d9;
+  color: #ad6814;
+}
+
+.wmr-status-item.is-complete .wmr-status-item-title span {
+  background: #eaf7f0;
+  color: #278b63;
+}
+
+.wmr-status-item-main > small {
+  display: block;
+
+  overflow: hidden;
+
+  margin-top: 3px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 600;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmr-status-missing-rooms {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 6px;
+
+  margin-top: 6px;
+}
+
+.wmr-status-missing-rooms b {
+  flex: 0 0 auto;
+
+  color: #b15b2f;
+
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.wmr-status-missing-rooms span {
+  min-width: 0;
+
+  display: -webkit-box;
+  overflow: hidden;
+
+  color: #687588;
+
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.4;
+
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.wmr-status-item-progress {
+  min-width: 0;
+
+  text-align: right;
+}
+
+.wmr-status-item-progress > strong {
+  display: block;
+
+  color: #536074;
+
+  font-size: 11.5px;
+  font-weight: 850;
+}
+
+.wmr-status-item-progress > span {
+  display: block;
+
+  margin: 2px 0 5px;
+
+  color: #8d98a9;
+
+  font-size: 9.5px;
+  font-weight: 750;
+}
+
+.wmr-status-item-progress > i {
+  width: 100%;
+  height: 5px;
+
+  display: block;
+  overflow: hidden;
+
+  border-radius: 20px;
+
+  background: #e9edf2;
+}
+
+.wmr-status-item-progress > i > b {
+  height: 100%;
+
+  display: block;
+
+  border-radius: inherit;
+
+  background: #6a7bf0;
+}
+
+.wmr-status-item.is-complete .wmr-status-item-progress > i > b {
+  background: #2fa173;
+}
+
+.wmr-status-item.is-progress .wmr-status-item-progress > i > b {
+  background: #d18a2f;
+}
+
+.wmr-status-item.is-missing .wmr-status-item-progress > i > b {
+  background: #d85a5a;
+}
+
+.wmr-status-item-arrow {
+  color: #b1bac7;
+  font-size: 15px;
+}
+
+
+/* ---------- 반응형 ---------- */
+
+@media (max-width: 1100px) {
+  .wmr-villa-list-header .wmr-count-chip {
+    padding: 0 5px;
+    font-size: 8.5px;
+  }
+
+  .wmr-villa-list-header .wmr-count-chip b {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 800px) {
+  .wmr-villa-list-header > strong {
+    display: none;
+  }
+
+  .wmr-villa-list-counts {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .wmr-end-btn {
+    padding: 0 8px;
+    font-size: 10.5px;
+  }
+
+  .wmr-status-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wmr-status-item {
+    grid-template-columns:
+      minmax(0, 1fr)
+      66px
+      14px;
+
+    gap: 8px;
+  }
+}

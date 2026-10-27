@@ -1,8 +1,8 @@
 // src/pages/PublicElectricCalcPage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import "./PublicElectricCalcPage.css";
 import * as XLSX from "xlsx";
-import PageTitle from "../components/PageTitle";
 import { db } from "../firebase";
 import {
   collection,
@@ -28,6 +28,20 @@ const YEARS = (() => {
   return [y + 1, y, y - 1, y - 2, y - 3];
 })();
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+/* ===== 계산방법 드롭다운 옵션 (미납관리 상태 드롭다운과 같은 형태) ===== */
+const METHOD_OPTIONS = [
+  {
+    value: "계산",
+    label: "계산",
+    description: "부과요금 자동 계산",
+  },
+  {
+    value: "계산안함",
+    label: "계산안함",
+    description: "부과요금을 계산하지 않아요",
+  },
+];
 
 /* ===== 유틸 ===== */
 const toInt = (v) => {
@@ -185,6 +199,131 @@ export default function PublicElectricCalcPage() {
   /* 테이블 상태 */
   const [rows, setRows] = useState([]);
   const [editBilled, setEditBilled] = useState(false); // 청구요금 편집 토글
+
+  /* ✅ 검색 (코드번호 / 빌라명 / 공용전기번호 / 비고) */
+  const [searchText, setSearchText] = useState("");
+
+  /* =========================================================
+     ✅ 년/월 · 계산방법 커스텀 드롭다운
+     (미납관리 페이지의 "상태" 드롭다운과 동일한 방식:
+      버튼을 누르면 document.body 로 포탈시킨 목록 팝업이 뜨는 구조)
+  ========================================================= */
+
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
+  const [yearPickerPos, setYearPickerPos] = useState({ top: 0, left: 0 });
+  const yearPickerRef = useRef(null);
+
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [monthPickerPos, setMonthPickerPos] = useState({ top: 0, left: 0 });
+  const monthPickerRef = useRef(null);
+
+  const [openMethodRowId, setOpenMethodRowId] = useState(null);
+  const [methodPickerPos, setMethodPickerPos] = useState({ top: 0, left: 0 });
+  const methodPickerRef = useRef(null);
+
+  const toggleYearPicker = (event) => {
+    if (yearPickerOpen) {
+      setYearPickerOpen(false);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setYearPickerPos({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
+    setYearPickerOpen(true);
+  };
+
+  const toggleMonthPicker = (event) => {
+    if (monthPickerOpen) {
+      setMonthPickerOpen(false);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMonthPickerPos({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
+    setMonthPickerOpen(true);
+  };
+
+  const toggleMethodPicker = (row, event) => {
+    if (openMethodRowId === row.id) {
+      setOpenMethodRowId(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMethodPickerPos({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
+    setOpenMethodRowId(row.id);
+  };
+
+  const handleMethodSelect = (row, value) => {
+    updateCell(row.id, "method", value);
+    setOpenMethodRowId(null);
+  };
+
+  /* 년도 팝업 - 바깥 클릭 / 스크롤 / 리사이즈 시 닫기 */
+  useEffect(() => {
+    if (!yearPickerOpen) return undefined;
+
+    const handleOutsideClick = (event) => {
+      const popupEl = yearPickerRef.current;
+      if (popupEl && popupEl.contains(event.target)) return;
+      if (event.target?.closest?.(".pec-picker-trigger-year")) return;
+      setYearPickerOpen(false);
+    };
+    const handleClose = () => setYearPickerOpen(false);
+
+    document.addEventListener("mousedown", handleOutsideClick, true);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick, true);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
+  }, [yearPickerOpen]);
+
+  /* 월 팝업 - 바깥 클릭 / 스크롤 / 리사이즈 시 닫기 */
+  useEffect(() => {
+    if (!monthPickerOpen) return undefined;
+
+    const handleOutsideClick = (event) => {
+      const popupEl = monthPickerRef.current;
+      if (popupEl && popupEl.contains(event.target)) return;
+      if (event.target?.closest?.(".pec-picker-trigger-month")) return;
+      setMonthPickerOpen(false);
+    };
+    const handleClose = () => setMonthPickerOpen(false);
+
+    document.addEventListener("mousedown", handleOutsideClick, true);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick, true);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
+  }, [monthPickerOpen]);
+
+  /* 계산방법 팝업 - 바깥 클릭 / 스크롤 / 리사이즈 시 닫기 */
+  useEffect(() => {
+    if (!openMethodRowId) return undefined;
+
+    const handleOutsideClick = (event) => {
+      const popupEl = methodPickerRef.current;
+      if (popupEl && popupEl.contains(event.target)) return;
+      if (event.target?.closest?.(".pec-method-trigger")) return;
+      setOpenMethodRowId(null);
+    };
+    const handleClose = () => setOpenMethodRowId(null);
+
+    document.addEventListener("mousedown", handleOutsideClick, true);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick, true);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
+  }, [openMethodRowId]);
 
   /* 부과설정 모달 상태 */
   const [chargeModalOpen, setChargeModalOpen] = useState(false);
@@ -478,6 +617,27 @@ export default function PublicElectricCalcPage() {
     return { totalBilled, totalAssessed, totalDiff };
   }, [rows]);
 
+  /* ✅ 검색 필터 (화면 표시용 - rows 원본/저장/계산에는 영향 없음) */
+  const filteredRows = useMemo(() => {
+    const keyword = searchText.trim().toLowerCase();
+    if (!keyword) return rows;
+    return rows.filter((r) => {
+      const target = [r.code, r.name, r.pubNo, r.memo]
+        .map((v) => String(v ?? "").toLowerCase())
+        .join(" ");
+      return target.includes(keyword);
+    });
+  }, [rows, searchText]);
+
+  /* ✅ 계산방법 팝업에 표시할 행 (열려있는 경우에만) */
+  const openMethodRow = useMemo(
+    () =>
+      openMethodRowId
+        ? filteredRows.find((r) => r.id === openMethodRowId)
+        : null,
+    [filteredRows, openMethodRowId]
+  );
+
   /* === 전체 삭제 === */
   const onClearAll = () => {
     if (!rows.length) return;
@@ -588,41 +748,55 @@ export default function PublicElectricCalcPage() {
   };
 
   return (
-    <div className="pe-page light">
-      <PageTitle title="공용전기 계산" />
+    <div className="pec-page">
+      {/* ===== 히어로 타이틀 ===== */}
+      <section className="pec-hero">
+        <div className="pec-hero__content">
+          <div className="pec-hero__eyebrow">PUBLIC ELECTRICITY CALCULATION</div>
+          <h2>공용전기 계산</h2>
+        </div>
+      </section>
 
-      <div className="pe-toolbar fancy">
-        <div className="pe-left">
-          {/* 라벨 제거: 드롭다운만 표시 */}
-          <div className="pe-select-wrap no-label">
-            <select
-              className="pe-select"
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              aria-label="년도"
-              title="년도"
+      {/* ===== 툴바 (년/월 선택 · 업로드 · 부과설정 · 수정 · 삭제 · 검색) ===== */}
+      <section className="pec-toolbar">
+        <div className="pec-toolbar__left">
+          <div className="pec-select-group">
+            <button
+              type="button"
+              className={`pec-picker-trigger pec-picker-trigger-year ${
+                yearPickerOpen ? "is-open" : ""
+              }`}
+              onClick={toggleYearPicker}
             >
-              {YEARS.map((y) => (
-                <option key={y} value={y}>{y}년</option>
-              ))}
-            </select>
-          </div>
-          <div className="pe-select-wrap no-label">
-            <select
-              className="pe-select"
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-              aria-label="월"
-              title="월"
+              {year}년
+              <i
+                className={`ri-arrow-down-s-line ${
+                  yearPickerOpen ? "is-open" : ""
+                }`}
+              />
+            </button>
+
+            <button
+              type="button"
+              className={`pec-picker-trigger pec-picker-trigger-month ${
+                monthPickerOpen ? "is-open" : ""
+              }`}
+              onClick={toggleMonthPicker}
             >
-              {MONTHS.map((m) => (
-                <option key={m} value={m}>{m}월</option>
-              ))}
-            </select>
+              {month}월
+              <i
+                className={`ri-arrow-down-s-line ${
+                  monthPickerOpen ? "is-open" : ""
+                }`}
+              />
+            </button>
           </div>
 
-          {/* 업로드 */}
-          <button className="pe-btn gradient no-anim" onClick={() => fileInputRef.current?.click()}>
+          <button
+            type="button"
+            className="pec-tool-button is-upload"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <i className="ri-upload-2-line" />
             엑셀 업로드
           </button>
@@ -634,208 +808,379 @@ export default function PublicElectricCalcPage() {
             onChange={(e) => handleExcel(e.target.files?.[0])}
           />
 
-          {/* 부과설정 버튼 */}
-          <button className="pe-btn accent-muted" onClick={openChargeModal} title="부과 대상 설정">
+          <button
+            type="button"
+            className="pec-tool-button is-settings"
+            onClick={openChargeModal}
+            title="부과 대상 설정"
+          >
             <i className="ri-settings-3-line" />
             부과설정
           </button>
+
+          <button
+            type="button"
+            className={`pec-tool-button is-edit ${editBilled ? "is-active" : ""}`}
+            onClick={onToggleEditBilled}
+            title="청구요금 인라인 수정 토글"
+          >
+            <i className="ri-edit-2-line" />
+            {editBilled ? "수정 종료" : "수정"}
+          </button>
+
+          <button
+            type="button"
+            className="pec-tool-button is-danger"
+            onClick={onClearAll}
+            title="전체 삭제"
+          >
+            <i className="ri-delete-bin-6-line" />
+            전체 삭제
+          </button>
         </div>
 
-        <div className="pe-right">
-          <div className="pe-actions">
+        <div className="pec-search">
+          <span className="pec-search__icon">⌕</span>
+
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="코드번호, 빌라명, 공용전기번호 검색"
+          />
+
+          {searchText && (
             <button
-              className={`pe-btn edit-soft ${editBilled ? "active" : ""}`}
-              onClick={onToggleEditBilled}
-              title="청구요금 인라인 수정 토글"
+              type="button"
+              className="pec-search__clear"
+              onClick={() => setSearchText("")}
+              aria-label="검색어 지우기"
             >
-              <i className="ri-edit-2-line" />
-              {editBilled ? "수정 종료" : "수정"}
+              ✕
             </button>
+          )}
+        </div>
+      </section>
 
-            <button className="pe-btn danger pretty" onClick={onClearAll} title="전체 삭제">
-              <i className="ri-delete-bin-6-line" />
-              전체 삭제
-            </button>
-          </div>
-
-          <div className="pe-badges">
-            <span className="pe-badge">
-              청구요금 합계 <b>{fmt(summary.totalBilled)}원</b>
-            </span>
-            <span className="pe-badge">
-              부과요금 합계 <b>{fmt(summary.totalAssessed)}원</b>
-            </span>
-            <span className="pe-badge">
-              차액 합계 <b>{fmt(summary.totalDiff)}원</b>
-            </span>
+      {/* ===== 요약 카드 ===== */}
+      <section className="pec-summary-grid">
+        <div className="pec-summary-card pec-summary-card--billed">
+          <div className="pec-summary-card__label">청구요금 합계</div>
+          <div className="pec-summary-card__number">
+            {fmt(summary.totalBilled)}
+            <span>원</span>
           </div>
         </div>
-      </div>
 
-      <div className="pe-grid">
-        <div className="pe-table-card">
-          <div className="pe-table-scroll">
-            <table className="pe-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 80 }}>번호</th>
-                  <th style={{ width: 120 }}>코드번호</th>
-                  <th style={{ width: 320 }}>빌라명</th>
-                  <th style={{ width: 120 }}>적용세대수*</th>
-                  <th style={{ width: 160 }}>청구요금{editBilled ? "*" : ""}</th>
-                  <th style={{ width: 140 }}>부과요금</th>
-                  <th style={{ width: 120 }}>차액</th>
-                  <th style={{ width: 150 }}>계산방법*</th>
-                  <th>비고</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, idx) => {
-                  const readOnly = r.charge === "부과안함";
-                  return (
-                    <tr key={r.id} className={readOnly ? "row-excluded" : ""}>
-                      <td className="c">{idx + 1}</td>
-                      <td className="c">{String(r.code ?? "")}</td>
-                      <td className="l">
-                        <div className="pe-villa">
-                          <span className="pe-villa-line">
-                            <span className="pe-villa-name">{r.name || "-"}</span>
-                            {r.charge === "부과안함" && (
-                              <span className="pe-tag-excluded">부과안함</span>
-                            )}
-                          </span>
-                          {r.pubNo ? (
-                            <span className="pe-villa-cust">공용전기 {r.pubNo}</span>
-                          ) : (
-                            <span className="pe-villa-cust empty">공용전기 없음</span>
+        <div className="pec-summary-card pec-summary-card--assessed">
+          <div className="pec-summary-card__label">부과요금 합계</div>
+          <div className="pec-summary-card__number">
+            {fmt(summary.totalAssessed)}
+            <span>원</span>
+          </div>
+        </div>
+
+        <div
+          className={`pec-summary-card ${
+            summary.totalDiff < 0
+              ? "pec-summary-card--diff-neg"
+              : "pec-summary-card--diff-pos"
+          }`}
+        >
+          <div className="pec-summary-card__label">차액 합계</div>
+          <div className="pec-summary-card__number">
+            {fmt(summary.totalDiff)}
+            <span>원</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== 데이터 테이블 ===== */}
+      <section className="pec-table-card">
+        <div className="pec-table-head">
+          <h3>빌라별 공용전기 부과 내역</h3>
+          <span className="pec-table-count">{filteredRows.length}건</span>
+        </div>
+
+        <div className="pec-table-scroll">
+          <table className="pec-table">
+            <thead>
+              <tr>
+                <th className="col-no">번호</th>
+                <th className="col-code">코드번호</th>
+                <th className="col-villa">빌라명</th>
+                <th className="col-households">적용세대수*</th>
+                <th className="col-billed">청구요금{editBilled ? "*" : ""}</th>
+                <th className="col-assessed">부과요금</th>
+                <th className="col-diff">차액</th>
+                <th className="col-method">계산방법*</th>
+                <th className="col-memo">비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((r, idx) => {
+                const readOnly = r.charge === "부과안함";
+                return (
+                  <tr key={r.id} className={readOnly ? "row-excluded" : ""}>
+                    <td className="c pec-no-cell">{idx + 1}</td>
+                    <td className="c pec-code-cell">{String(r.code ?? "")}</td>
+                    <td className="l">
+                      <div className="pec-villa-cell">
+                        <div className="pec-villa-cell__name-row">
+                          <strong>{r.name || "-"}</strong>
+                          {r.charge === "부과안함" && (
+                            <span className="pec-tag-excluded">부과안함</span>
                           )}
                         </div>
-                      </td>
-
-                      {/* 적용세대수 */}
-                      <td className="c">
-                        <input
-                          ref={(el) => (householdsRefs.current[idx] = el)}
-                          className="pe-input num"
-                          inputMode="numeric"
-                          value={r.households || ""}
-                          onChange={(e) => updateCell(r.id, "households", e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const next = householdsRefs.current[idx + 1];
-                              if (next) next.focus();
-                            }
-                          }}
-                          placeholder="0"
-                          disabled={readOnly}
-                        />
-                      </td>
-
-                      {/* 청구요금 */}
-                      <td className={`c ${!toInt(r.billed) ? "cell-required" : ""}`}>
-                        {editBilled ? (
-                          <div className="pe-money-edit">
-                            <input
-                              className="pe-input num"
-                              inputMode="numeric"
-                              value={r.billed ? fmt(r.billed) : ""}
-                              onChange={(e) => updateCell(r.id, "billed", e.target.value)}
-                              placeholder="0"
-                              disabled={readOnly}
-                            />
-                            <span className="unit">원</span>
-                          </div>
+                        {r.pubNo ? (
+                          <span className="pec-villa-cell__sub">
+                            공용전기 {r.pubNo}
+                          </span>
                         ) : (
-                          <span className="strong">
-                            {r.billed ? `${fmt(r.billed)}원` : "-"}
+                          <span className="pec-villa-cell__sub is-empty">
+                            공용전기 없음
                           </span>
                         )}
-                      </td>
+                      </div>
+                    </td>
 
-                      {/* 부과요금 */}
-                      <td className="c strong assessed-blue">
+                    {/* 적용세대수 */}
+                    <td className="c">
+                      <input
+                        ref={(el) => (householdsRefs.current[idx] = el)}
+                        className="pec-input num"
+                        inputMode="numeric"
+                        value={r.households || ""}
+                        onChange={(e) => updateCell(r.id, "households", e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const next = householdsRefs.current[idx + 1];
+                            if (next) next.focus();
+                          }
+                        }}
+                        placeholder="0"
+                        disabled={readOnly}
+                      />
+                    </td>
+
+                    {/* 청구요금 */}
+                    <td className={`c ${!toInt(r.billed) ? "cell-required" : ""}`}>
+                      {editBilled ? (
+                        <div className="pec-money-edit">
+                          <input
+                            className="pec-input num"
+                            inputMode="numeric"
+                            value={r.billed ? fmt(r.billed) : ""}
+                            onChange={(e) => updateCell(r.id, "billed", e.target.value)}
+                            placeholder="0"
+                            disabled={readOnly}
+                          />
+                          <span className="unit">원</span>
+                        </div>
+                      ) : (
+                        <span className="pec-money billed-money">
+                          {r.billed ? `${fmt(r.billed)}원` : "-"}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 부과요금 */}
+                    <td className="c">
+                      <span className="pec-money assessed-money">
                         {r.assessed ? `${fmt(r.assessed)}원` : "-"}
-                      </td>
+                      </span>
+                    </td>
 
-                      {/* 차액 */}
-                      <td className={`c ${r.diff >= 0 ? "pos" : "neg"}`}>
+                    {/* 차액 */}
+                    <td className="c">
+                      <span className={`pec-money ${r.diff >= 0 ? "pos" : "neg"}`}>
                         {r.diff ? `${fmt(r.diff)}원` : "-"}
-                      </td>
+                      </span>
+                    </td>
 
-                      {/* 계산방법 */}
-                      <td className="c">
-                        <select
-                          className={`pe-select method ${r.method === "계산안함" ? "danger" : ""}`}
-                          value={r.method}
-                          onChange={(e) => updateCell(r.id, "method", e.target.value)}
-                          disabled={readOnly}
-                        >
-                          <option value="계산">계산</option>
-                          <option value="계산안함">계산안함</option>
-                        </select>
-                      </td>
-
-                      {/* 비고 */}
-                      <td className="l">
-                        <input
-                          className="pe-input"
-                          value={r.memo}
-                          onChange={(e) => updateCell(r.id, "memo", e.target.value)}
-                          disabled={readOnly}
+                    {/* 계산방법 */}
+                    <td className="c">
+                      <button
+                        type="button"
+                        className={`pec-method-trigger pec-method-trigger-${
+                          r.method === "계산안함" ? "off" : "on"
+                        } ${openMethodRowId === r.id ? "is-open" : ""}`}
+                        onClick={(e) => toggleMethodPicker(r, e)}
+                        disabled={readOnly}
+                      >
+                        <span className="pec-method-trigger-dot" />
+                        {r.method}
+                        <i
+                          className={`ri-arrow-down-s-line ${
+                            openMethodRowId === r.id ? "is-open" : ""
+                          }`}
                         />
-                      </td>
-                    </tr>
-                  );
-                })}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="c muted">
-                      공용전기 등록된 빌라가 없습니다.
+                      </button>
+                    </td>
+
+                    {/* 비고 */}
+                    <td className="l">
+                      <input
+                        className="pec-input"
+                        value={r.memo}
+                        onChange={(e) => updateCell(r.id, "memo", e.target.value)}
+                        disabled={readOnly}
+                      />
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+              {filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="pec-empty-cell">
+                    {rows.length === 0
+                      ? "공용전기 등록된 빌라가 없습니다."
+                      : "검색 결과가 없습니다."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </section>
+
+      {/* ===== 년도 선택 팝업 ===== */}
+      {yearPickerOpen &&
+        createPortal(
+          <div
+            ref={yearPickerRef}
+            className="pec-picker-popup"
+            style={{ top: yearPickerPos.top, left: yearPickerPos.left }}
+          >
+            {YEARS.map((y) => (
+              <button
+                key={y}
+                type="button"
+                className={`pec-picker-option ${year === y ? "is-selected" : ""}`}
+                onClick={() => {
+                  setYear(y);
+                  setYearPickerOpen(false);
+                }}
+              >
+                <span className="pec-picker-option-text">{y}년</span>
+                {year === y && <i className="ri-check-line pec-picker-option-check" />}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
+
+      {/* ===== 월 선택 팝업 ===== */}
+      {monthPickerOpen &&
+        createPortal(
+          <div
+            ref={monthPickerRef}
+            className="pec-picker-popup"
+            style={{ top: monthPickerPos.top, left: monthPickerPos.left }}
+          >
+            {MONTHS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`pec-picker-option ${month === m ? "is-selected" : ""}`}
+                onClick={() => {
+                  setMonth(m);
+                  setMonthPickerOpen(false);
+                }}
+              >
+                <span className="pec-picker-option-text">{m}월</span>
+                {month === m && <i className="ri-check-line pec-picker-option-check" />}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
+
+      {/* ===== 계산방법 선택 팝업 ===== */}
+      {openMethodRowId &&
+        openMethodRow &&
+        createPortal(
+          <div
+            ref={methodPickerRef}
+            className="pec-picker-popup pec-method-popup"
+            style={{ top: methodPickerPos.top, left: methodPickerPos.left }}
+          >
+            {METHOD_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`pec-method-option pec-method-option-${
+                  option.value === "계산안함" ? "off" : "on"
+                } ${openMethodRow.method === option.value ? "is-selected" : ""}`}
+                onClick={() => handleMethodSelect(openMethodRow, option.value)}
+              >
+                <span className="pec-method-option-dot" />
+                <span className="pec-method-option-text">
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+                {openMethodRow.method === option.value && (
+                  <i className="ri-check-line pec-method-option-check" />
+                )}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
 
       {/* ===== 부과설정 모달 ===== */}
       {chargeModalOpen && (
-        <div className="pe-modal-overlay" onClick={() => setChargeModalOpen(false)}>
-          <div className="pe-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="pe-modal-header">
-              <h3>부과설정</h3>
+        <div className="pec-modal-overlay" onClick={() => setChargeModalOpen(false)}>
+          <div className="pec-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="pec-modal-head">
+              <div>
+                <h3>부과설정</h3>
+                <p>빌라별 공용전기 요금 부과 여부를 설정합니다.</p>
+              </div>
+
+              <button
+                type="button"
+                className="pec-modal-close"
+                onClick={() => setChargeModalOpen(false)}
+                aria-label="닫기"
+              >
+                ✕
+              </button>
             </div>
-            <div className="pe-modal-body">
-              <table className="pe-modal-table">
+
+            <div className="pec-modal-body">
+              <table className="pec-modal-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 120 }}>코드번호</th>
+                    <th style={{ width: 110 }}>코드번호</th>
                     <th>빌라명</th>
-                    <th style={{ width: 160 }}>부과설정</th>
+                    <th style={{ width: 150 }}>부과설정</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
-                      <td className="c">{String(r.code ?? "")}</td>
+                      <td className="c pec-code-cell">{String(r.code ?? "")}</td>
                       <td className="l">
-                        <div className="pe-villa">
-                          <span className="pe-villa-line">
-                            <span className="pe-villa-name">{r.name || "-"}</span>
-                          </span>
+                        <div className="pec-villa-cell">
+                          <div className="pec-villa-cell__name-row">
+                            <strong>{r.name || "-"}</strong>
+                          </div>
                           {r.pubNo ? (
-                            <span className="pe-villa-cust">공용전기 {r.pubNo}</span>
+                            <span className="pec-villa-cell__sub">
+                              공용전기 {r.pubNo}
+                            </span>
                           ) : (
-                            <span className="pe-villa-cust empty">공용전기 없음</span>
+                            <span className="pec-villa-cell__sub is-empty">
+                              공용전기 없음
+                            </span>
                           )}
                         </div>
                       </td>
                       <td className="c">
                         <select
-                          className="pe-select"
+                          className="pec-select"
                           value={chargeDraft[r.id] || "부과"}
                           onChange={(e) =>
                             setChargeDraft((old) => ({ ...old, [r.id]: e.target.value }))
@@ -849,7 +1194,7 @@ export default function PublicElectricCalcPage() {
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="c muted">
+                      <td colSpan={3} className="pec-empty-cell">
                         설정할 빌라가 없습니다.
                       </td>
                     </tr>
@@ -857,12 +1202,22 @@ export default function PublicElectricCalcPage() {
                 </tbody>
               </table>
             </div>
-            <div className="pe-modal-footer">
-              <button className="pe-btn gradient" onClick={saveChargeModal}>
-                저장
+
+            <div className="pec-modal-foot">
+              <button
+                type="button"
+                className="pec-modal-cancel"
+                onClick={() => setChargeModalOpen(false)}
+              >
+                취소
               </button>
-              <button className="pe-btn subtle" onClick={() => setChargeModalOpen(false)}>
-                닫기
+
+              <button
+                type="button"
+                className="pec-modal-save"
+                onClick={saveChargeModal}
+              >
+                저장
               </button>
             </div>
           </div>

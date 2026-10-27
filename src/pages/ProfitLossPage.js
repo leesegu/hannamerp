@@ -19,7 +19,6 @@ import {
   FiTrendingDown,
   FiTrendingUp,
   FiUploadCloud,
-  FiUsers,
   FiX,
 } from "react-icons/fi";
 import { db } from "../firebase";
@@ -27,6 +26,7 @@ import {
   collection,
   onSnapshot,
   doc,
+  deleteField,
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
@@ -37,7 +37,6 @@ const COLLECTIONS = {
   profitLoss: "profitLoss",
   profitLossTop: "profitLossTop",
 
-  telco: "telco",
   elevator: "elevator",
   fireSafety: "fireSafety",
   electricSafety: "electricSafety",
@@ -52,6 +51,9 @@ const MONTHS = Array.from({ length: 12 }, (_, i) =>
 // "기타" 항목 전용 키. 기존 "난방온수(heatingRepair)" 필드를 그대로 재사용해서
 // (문서 구조/기존 저장 데이터를 그대로 유지하기 위해) 화면 라벨만 "기타"로 바꿨습니다.
 const ETC_KEY = "heatingRepair";
+// 통계창 월별 표의 "수납률 수익" 계산에 쓰는 수납률(90%로 가정).
+// 수납률 수익 = 부과관리비 × 90% − 총지출
+const COLLECTION_RATE = 0.9;
 const ETC_NOTE_KEY = `${ETC_KEY}Note`;
 
 // 숫자로 파싱하지 않고 문자열 그대로 저장해야 하는 필드들
@@ -350,32 +352,80 @@ const getSourceByCode = (map, code) => {
 };
 
 const makePeCalcMap = (rows = []) => {
-  const map = {
-    byId: {},
-    byCode: {},
-  };
+  // ⚠️ 공용전기계산 페이지(PublicElectricCalcPage.jsx)가 peCalcs/{yyyymm}/rows
+  // 문서의 ID로 쓰는 값은 "빌라 문서 id" 또는 "빌라의 code 필드값(원본,
+  // 3자리 패딩 없음)" 둘 중 하나입니다. 손익계산 쪽 코드 표기가 3자리로
+  // 패딩되어 있을 수 있어("011") 원본 그대로("11")로 저장된 문서와 안
+  // 맞을 수 있으므로, 문서 ID가 "짧고 숫자 위주(코드처럼 생긴 값)"일
+  // 때만 3자리로 패딩한 형태도 함께 색인해서 양쪽 표기를 모두 찾을 수
+  // 있게 합니다. (빌라 문서 id처럼 길고 무작위인 문자열은 패딩 대상에서
+  // 제외해서 다른 빌라의 코드와 우연히 겹치는 일이 없도록 했습니다)
+  const map = { byDocId: {} };
 
   rows.forEach((row) => {
     if (isSubCodeRow(row)) return;
 
-    const docKey = normalizeLoose(row.id);
-    const codeKey = normalizeLoose(normalizeCode(row.code));
+    const rawIdKey = String(row.id ?? "");
+    if (!rawIdKey) return;
 
-    if (docKey) map.byId[docKey] = row;
-    if (codeKey) map.byCode[codeKey] = row;
+    map.byDocId[rawIdKey] = row;
+
+    if (/^\d{1,3}(-\d+)?$/.test(rawIdKey)) {
+      const paddedKey = normalizeCode(rawIdKey);
+      if (paddedKey && paddedKey !== rawIdKey && !map.byDocId[paddedKey]) {
+        map.byDocId[paddedKey] = row;
+      }
+    }
   });
 
   return map;
 };
 
+// 공용전기계산 페이지에 입력되어 있는 "청구요금" 값을 코드번호 기준으로
+// 그대로 가져옵니다. (부과요금 계산 없이 청구요금 원본 그대로 표시)
+// 비정상적으로 큰 값이 들어오면(매칭 오류 등) 화면이 깨지지 않도록
+// 안전장치만 둡니다.
+const PE_MAX_BILLED = 30000000; // 청구요금이 이보다 크면 매칭 오류로 보고 0 처리
+
 const getPublicElectricAmount = (peCalcMap, villa) => {
-  const villaIdKey = normalizeLoose(villa.id);
-  const codeKey = normalizeLoose(getCode(villa));
+  // 빌라 코드가 실제로 어느 필드에 들어있는지 확실하지 않으므로 여러
+  // 후보를 순서대로 시도합니다(코드번호 컬럼에 보이는 값과 동일한
+  // 방식으로 찾은 코드를 최우선으로 사용).
+  const candidates = [];
 
-  const source =
-    peCalcMap.byId?.[villaIdKey] || peCalcMap.byCode?.[codeKey] || null;
+  const directCode = String(villa.code ?? "");
+  if (directCode) candidates.push(directCode);
 
-  return parseNum(source?.billed);
+  const rawCode = getRawCode(villa);
+  if (rawCode && !candidates.includes(rawCode)) candidates.push(rawCode);
+
+  [directCode, rawCode].forEach((c) => {
+    if (!c) return;
+    const padded = normalizeCode(c);
+    if (padded && !candidates.includes(padded)) candidates.push(padded);
+  });
+
+  let source = null;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const found = peCalcMap.byDocId?.[candidates[i]];
+    if (found) {
+      source = found;
+      break;
+    }
+  }
+
+  if (!source) {
+    const villaIdStr = String(villa.id ?? "");
+    if (villaIdStr) source = peCalcMap.byDocId?.[villaIdStr] || null;
+  }
+
+  if (!source) return 0;
+
+  const billed = parseNum(source.billed);
+  if (billed < 0 || billed > PE_MAX_BILLED) return 0;
+
+  return billed;
 };
 
 const getExcelCellValue = (sheet, address) => {
@@ -692,15 +742,13 @@ export default function ProfitLossPage() {
   );
 
   const [statsYear, setStatsYear] = useState(String(now.getFullYear()));
-  const [statsMonth, setStatsMonth] = useState(
-    String(now.getMonth() + 1).padStart(2, "0")
-  );
+  // 기본값은 "전체"(1년 전체 통계). "01".."12" 특정 월을 선택할 수도 있습니다.
+  const [statsMonth, setStatsMonth] = useState("all");
 
   const [villaRows, setVillaRows] = useState([]);
   const [profitRows, setProfitRows] = useState([]);
   const [topRows, setTopRows] = useState([]);
 
-  const [telcoRows, setTelcoRows] = useState([]);
   const [elevatorRows, setElevatorRows] = useState([]);
   const [fireSafetyRows, setFireSafetyRows] = useState([]);
   const [electricSafetyRows, setElectricSafetyRows] = useState([]);
@@ -708,11 +756,18 @@ export default function ProfitLossPage() {
 
   const [peCalcRows, setPeCalcRows] = useState([]);
   const [statsPeCalcRows, setStatsPeCalcRows] = useState([]);
+  // 통계창의 월별 수익표는 선택한 월과 무관하게 각 월의 공용전기 데이터를
+  // 독립적으로 유지해야 하므로, 선택한 통계 연도의 1~12월 peCalc 데이터를
+  // 월별로 따로 보관합니다.
+  const [statsYearPeCalcRows, setStatsYearPeCalcRows] = useState({});
 
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [uploadingWater, setUploadingWater] = useState(false);
   const [refreshingAuto, setRefreshingAuto] = useState(false);
+  // 새로고침 버튼을 누르면 바로 실행하지 않고, 먼저 이 확인 팝업을 띄워서
+  // "실제 데이터로 새로고침" / "직접 입력한 내용만 삭제" 중 선택하도록 합니다.
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
 
   const [statsModalOpen, setStatsModalOpen] = useState(false);
 
@@ -744,8 +799,11 @@ export default function ProfitLossPage() {
   const yyyymm = getYyyymm(year, month);
   const prevMonthKey = getPrevMonthKey(monthKey);
 
-  const statsMonthKey = getMonthKey(statsYear, statsMonth);
-  const statsYyyymm = getYyyymm(statsYear, statsMonth);
+  // "전체"(1년 전체) 선택 여부. 이 값이 true면 특정 월 하나가 아니라
+  // 1월~12월 전체를 합산한 통계를 보여줍니다.
+  const isStatsAllMonths = statsMonth === "all";
+  const statsMonthKey = isStatsAllMonths ? "" : getMonthKey(statsYear, statsMonth);
+  const statsYyyymm = isStatsAllMonths ? "" : getYyyymm(statsYear, statsMonth);
 
   useEffect(() => {
     const unsubs = [];
@@ -774,7 +832,6 @@ export default function ProfitLossPage() {
     listen(COLLECTIONS.profitLoss, setProfitRows);
     listen(COLLECTIONS.profitLossTop, setTopRows);
 
-    listen(COLLECTIONS.telco, setTelcoRows);
     listen(COLLECTIONS.elevator, setElevatorRows);
     listen(COLLECTIONS.fireSafety, setFireSafetyRows);
     listen(COLLECTIONS.electricSafety, setElectricSafetyRows);
@@ -806,7 +863,12 @@ export default function ProfitLossPage() {
   }, [yyyymm]);
 
   useEffect(() => {
-    if (!statsModalOpen) return undefined;
+    // "전체" 모드일 때는 특정 월 하나의 공용전기 실시간 구독이 필요 없습니다.
+    // 특정 월 상세 통계를 볼 때만 선택 월 데이터를 별도로 구독합니다.
+    if (!statsModalOpen || isStatsAllMonths) {
+      setStatsPeCalcRows([]);
+      return undefined;
+    }
 
     const unsub = onSnapshot(
       collection(db, "peCalcs", String(statsYyyymm), "rows"),
@@ -825,7 +887,58 @@ export default function ProfitLossPage() {
     );
 
     return () => unsub();
-  }, [statsModalOpen, statsYyyymm]);
+  }, [statsModalOpen, statsYyyymm, isStatsAllMonths]);
+
+  // 월별 수익 / 수익률 표는 상단 월 드롭다운(statsMonth)을 변경하더라도
+  // 각 월의 데이터가 바뀌면 안 됩니다.
+  //
+  // 기존에는 "현재 선택한 월"의 peCalc만 statsPeCalcMap에 들어가고,
+  // 나머지 월에는 빈 맵({})을 전달했습니다. 공용전기는 병합 과정에서
+  // 빈 맵을 전달받으면 0으로 계산되므로, 드롭다운에서 월을 바꿀 때마다
+  // 월별 총지출/부과수입/수익률이 함께 바뀌는 문제가 있었습니다.
+  //
+  // 이를 막기 위해 통계창이 열려 있는 동안 선택한 연도의 1~12월
+  // 공용전기 데이터를 각각 별도로 구독하여 월별로 고정해서 사용합니다.
+  useEffect(() => {
+    if (!statsModalOpen) {
+      setStatsYearPeCalcRows({});
+      return undefined;
+    }
+
+    setStatsYearPeCalcRows({});
+
+    const unsubs = MONTHS.map((m) => {
+      const targetMonthKey = getMonthKey(statsYear, m);
+      const targetYyyymm = getYyyymm(statsYear, m);
+
+      return onSnapshot(
+        collection(db, "peCalcs", String(targetYyyymm), "rows"),
+        (snap) => {
+          const rows = snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }));
+
+          setStatsYearPeCalcRows((prev) => ({
+            ...prev,
+            [targetMonthKey]: rows,
+          }));
+        },
+        (error) => {
+          console.error(`peCalcs/${targetYyyymm}/rows 통계용 불러오기 오류:`, error);
+
+          setStatsYearPeCalcRows((prev) => ({
+            ...prev,
+            [targetMonthKey]: [],
+          }));
+        }
+      );
+    });
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
+  }, [statsModalOpen, statsYear]);
 
 
 
@@ -886,8 +999,6 @@ export default function ProfitLossPage() {
     };
   }, [topPayments, draftTopCells, monthKey]);
 
-  const telcoMap = useMemo(() => makeIndexedMapByVilla(telcoRows), [telcoRows]);
-
   const elevatorMap = useMemo(
     () => makeIndexedMapByVilla(elevatorRows),
     [elevatorRows]
@@ -914,24 +1025,34 @@ export default function ProfitLossPage() {
     [statsPeCalcRows]
   );
 
+  const statsYearPeCalcMaps = useMemo(() => {
+    const maps = {};
+
+    MONTHS.forEach((m) => {
+      const targetMonthKey = getMonthKey(statsYear, m);
+      maps[targetMonthKey] = makePeCalcMap(
+        statsYearPeCalcRows[targetMonthKey] || []
+      );
+    });
+
+    return maps;
+  }, [statsYearPeCalcRows, statsYear]);
+
   const getAutoAmount = (baseRow, key, targetPeCalcMap = peCalcMap) => {
     const code = getCode(baseRow);
     const villaName = getVillaName(baseRow);
 
     if (key === "communicationFee") {
-      const source =
-        getSourceByVilla(telcoMap, code, villaName, baseRow.id) || baseRow;
+      // ⚠️ TelcoPage.js는 별도의 "telco" 컬렉션이 아니라 villas 문서 자체에
+      // telco(통신사명) / telcoAmount(금액) 필드로 직접 저장합니다.
+      // (예전에는 존재하지 않는 별도 "telco" 컬렉션을 참조하고 있어서
+      //  항상 매칭이 실패했습니다 — 이번에 고쳤습니다)
+      // TelcoPage는 telco 값이 있는 빌라만 화면에 보여주므로(where telco != ""),
+      // 손익계산에서도 telco 값이 없는 빌라는 인터넷비를 빈칸(0)으로 둡니다.
+      const telcoName = String(baseRow.telco ?? "").trim();
+      if (!telcoName) return 0;
 
-      return getAmountFromRow(source, [
-        "communicationFee",
-        "telcoAmount",
-        "internetFee",
-        "internetAmount",
-        "amount",
-        "fee",
-        "price",
-        "금액",
-      ]);
+      return parseNum(baseRow.telcoAmount);
     }
 
     if (key === "elevatorFee") {
@@ -1244,7 +1365,6 @@ export default function ProfitLossPage() {
     profitMap,
     profitCodeMap,
     monthKey,
-    telcoMap,
     elevatorMap,
     fireSafetyMap,
     electricSafetyMap,
@@ -1334,15 +1454,15 @@ export default function ProfitLossPage() {
   }, [savingDrafts]);
 
   const statsRows = useMemo(() => {
-    if (!statsModalOpen) return [];
+    if (!statsModalOpen || isStatsAllMonths) return [];
     return makeMergedRowsByMonth(statsMonthKey, statsPeCalcMap);
   }, [
     statsModalOpen,
+    isStatsAllMonths,
     villaRows,
     profitMap,
     profitCodeMap,
     statsMonthKey,
-    telcoMap,
     elevatorMap,
     fireSafetyMap,
     electricSafetyMap,
@@ -1351,7 +1471,7 @@ export default function ProfitLossPage() {
   ]);
 
   const statsColumnTotals = useMemo(() => {
-    if (!statsModalOpen) return getColumnTotals([], statsMonthKey);
+    if (!statsModalOpen || isStatsAllMonths) return getColumnTotals([], statsMonthKey);
     return getColumnTotals(statsRows, statsMonthKey);
   }, [statsModalOpen, statsRows, statsMonthKey]);
 
@@ -1375,49 +1495,50 @@ export default function ProfitLossPage() {
       };
     }
 
-    const villaStats = statsRows
-      .map((row) => {
-        const calc = getRowCalcByMonth(row, statsMonthKey);
+    // "전체"(1년) 모드일 때 빌라별로 12개월치를 합산해 담을 자료구조.
+    // (아래 monthlyStats를 만드는 김에 같은 루프 안에서 함께 집계합니다)
+    const villaYearMap = new Map();
 
-        return {
-          code: row.code,
-          villaName: row.villaName,
-          totalExpense: calc.totalExpense,
-          chargeIncome: calc.chargeIncome,
-          positiveChargeIncome: Math.max(0, calc.chargeIncome),
-        };
-      })
-      .sort((a, b) => b.positiveChargeIncome - a.positiveChargeIncome)
-      .slice(0, 18);
-
-    const minusRows = statsRows
-      .map((row) => {
-        const calc = getRowCalcByMonth(row, statsMonthKey);
-        const data = row.monthly?.[statsMonthKey] || {};
-
-        return {
-          code: row.code,
-          villaName: row.villaName,
-          chargeIncome: calc.chargeIncome,
-          minusReason: data.minusReason || "",
-        };
-      })
-      .filter((row) => row.chargeIncome < 0)
-      .sort((a, b) => a.chargeIncome - b.chargeIncome)
-      .slice(0, 10);
-
-    // 월별 통계는 "빌라별로 실제 집계된 부과관리비/총지출 합계"를 그대로 사용합니다.
-    // (이전에는 상단 테이블 수기입력값과의 "차액"을 총지출로 잘못 사용하고 있어서
-    //  실제 지출 합계와 다른 숫자가 나오는 버그가 있었습니다 — 이번에 고쳤습니다.)
     const monthlyStats = MONTHS.map((m) => {
       const mk = getMonthKey(statsYear, m);
-      const monthRows = makeMergedRowsByMonth(mk, mk === statsMonthKey ? statsPeCalcMap : {});
+      const monthRows = makeMergedRowsByMonth(
+        mk,
+        statsYearPeCalcMaps[mk] || {}
+      );
       const monthColumnTotals = getColumnTotals(monthRows, mk);
 
       const chargeFee = parseNum(monthColumnTotals.chargeFee);
       const totalExpense = parseNum(monthColumnTotals.totalExpense);
       const chargeIncome = chargeFee - totalExpense;
       const profitRate = getRate(chargeIncome, chargeFee);
+
+      // 수납률 수익 = 부과관리비 × 90% − 총지출
+      // (실제로는 부과관리비 전액이 다 걷히지 않는 점을 감안한 보수적인 수익 추정)
+      const collectionBase = chargeFee * COLLECTION_RATE;
+      const collectionProfit = collectionBase - totalExpense;
+      const collectionRate = getRate(collectionProfit, collectionBase);
+
+      if (isStatsAllMonths) {
+        monthRows.forEach((row) => {
+          const calc = getRowCalcByMonth(row, mk);
+          const villaKey = `${row.code}__${row.villaName}`;
+          const prev = villaYearMap.get(villaKey) || {
+            code: row.code,
+            villaName: row.villaName,
+            totalExpense: 0,
+            chargeIncome: 0,
+            lastMinusReason: "",
+          };
+
+          prev.totalExpense += calc.totalExpense;
+          prev.chargeIncome += calc.chargeIncome;
+
+          const data = row.monthly?.[mk] || {};
+          if (data.minusReason) prev.lastMinusReason = data.minusReason;
+
+          villaYearMap.set(villaKey, prev);
+        });
+      }
 
       return {
         month: m,
@@ -1426,8 +1547,47 @@ export default function ProfitLossPage() {
         totalExpense,
         chargeIncome,
         profitRate,
+        collectionProfit,
+        collectionRate,
       };
     });
+
+    // 빌라별 부과수입 TOP / 마이너스 빌라 목록
+    // - "전체" 모드: 위에서 12개월 합산해 둔 값 사용
+    // - 특정 월 모드: 그 달의 statsRows 기준
+    const villaStatsSource = isStatsAllMonths
+      ? Array.from(villaYearMap.values()).map((v) => ({
+          code: v.code,
+          villaName: v.villaName,
+          totalExpense: v.totalExpense,
+          chargeIncome: v.chargeIncome,
+          minusReason: v.lastMinusReason,
+        }))
+      : statsRows.map((row) => {
+          const calc = getRowCalcByMonth(row, statsMonthKey);
+          const data = row.monthly?.[statsMonthKey] || {};
+
+          return {
+            code: row.code,
+            villaName: row.villaName,
+            totalExpense: calc.totalExpense,
+            chargeIncome: calc.chargeIncome,
+            minusReason: data.minusReason || "",
+          };
+        });
+
+    const villaStats = villaStatsSource
+      .map((row) => ({
+        ...row,
+        positiveChargeIncome: Math.max(0, row.chargeIncome),
+      }))
+      .sort((a, b) => b.positiveChargeIncome - a.positiveChargeIncome)
+      .slice(0, 18);
+
+    const minusRows = villaStatsSource
+      .filter((row) => row.chargeIncome < 0)
+      .sort((a, b) => a.chargeIncome - b.chargeIncome)
+      .slice(0, 10);
 
     const yearlySummary = monthlyStats.reduce(
       (acc, row) => {
@@ -1456,15 +1616,16 @@ export default function ProfitLossPage() {
     };
   }, [
     statsModalOpen,
+    isStatsAllMonths,
     statsRows,
     statsMonthKey,
     statsYear,
     topRows,
     statsPeCalcMap,
+    statsYearPeCalcMaps,
     villaRows,
     profitMap,
     profitCodeMap,
-    telcoMap,
     elevatorMap,
     fireSafetyMap,
     electricSafetyMap,
@@ -2070,10 +2231,20 @@ export default function ProfitLossPage() {
     });
   }, [setCellDraft]);
 
-  // 새로고침: 저장 후 고정되어 있던 자동입력 항목(인터넷비/승강기/소방안전/
-  // 전기안전/청소비)과 빌라 목록을 지금 시점의 실제 데이터로 다시 채웁니다.
+  // 새로고침 버튼 클릭 → 먼저 확인 팝업을 띄웁니다.
+  const openRefreshConfirm = useCallback(() => {
+    setRefreshConfirmOpen(true);
+  }, []);
+
+  const closeRefreshConfirm = useCallback(() => {
+    setRefreshConfirmOpen(false);
+  }, []);
+
+  // 선택 1) 저장 후 고정되어 있던 자동입력 항목(인터넷비/승강기/소방안전/
+  // 전기안전/청소비)을 지금 시점의 실제 데이터로 다시 채웁니다.
   // (화면/임시 초안에만 반영되며, 최종 반영하려면 저장 버튼을 눌러야 합니다)
-  const refreshAutoData = useCallback(() => {
+  const refreshAutoDataToLive = useCallback(() => {
+    setRefreshConfirmOpen(false);
     setRefreshingAuto(true);
 
     try {
@@ -2096,6 +2267,101 @@ export default function ProfitLossPage() {
       setRefreshingAuto(false);
     }
   }, [monthKey, peCalcMap, setCellDraft]);
+
+  // 선택 2) 더블클릭으로 직접 입력(수정)해서 저장해 둔 자동입력 항목 값만
+  // 지우고, 다시 "실시간 자동 계산" 상태로 되돌립니다.
+  // (로컬 초안만 지우는 걸로는 이미 Firestore에 저장된 값이 남아있어
+  //  부족하므로, deleteField()로 해당 필드를 문서에서 완전히 삭제합니다.
+  //  이 작업은 저장 버튼 없이 즉시 반영됩니다)
+  const deleteManualAutoOverrides = useCallback(async () => {
+    setRefreshConfirmOpen(false);
+
+    const ok = window.confirm(
+      [
+        `${year}년 ${Number(month)}월 인터넷비/승강기/소방안전/전기안전/청소비에`,
+        "직접 입력(수정)해 둔 값을 모두 지우고 실시간 자동 계산 값으로 되돌립니다.",
+        "",
+        "저장 버튼 없이 즉시 적용되며, 되돌릴 수 없습니다. 계속하시겠습니까?",
+      ].join("\n")
+    );
+
+    if (!ok) return;
+
+    setRefreshingAuto(true);
+
+    try {
+      const freezeKeyList = Array.from(FREEZE_AUTO_KEYS);
+
+      const rowsWithOverride = profitRows.filter((row) => {
+        const monthData = row.monthly?.[monthKey];
+        if (!monthData) return false;
+        return freezeKeyList.some((key) => monthData[key] !== undefined);
+      });
+
+      if (!rowsWithOverride.length) {
+        alert("직접 입력되어 있던 값이 없습니다.");
+        return;
+      }
+
+      const batch = writeBatch(db);
+
+      rowsWithOverride.forEach((row) => {
+        const monthData = row.monthly[monthKey];
+        const patch = {};
+
+        freezeKeyList.forEach((key) => {
+          if (monthData[key] !== undefined) {
+            patch[`monthly.${monthKey}.${key}`] = deleteField();
+          }
+        });
+
+        batch.update(doc(db, COLLECTIONS.profitLoss, row.id), patch);
+      });
+
+      await batch.commit();
+
+      // 로컬 상태도 함께 정리 (다음 렌더에서 실시간 값으로 자동 대체됨)
+      setProfitRows((prev) =>
+        prev.map((row) => {
+          const monthData = row.monthly?.[monthKey];
+          if (!monthData) return row;
+
+          const hasOverride = freezeKeyList.some(
+            (key) => monthData[key] !== undefined
+          );
+          if (!hasOverride) return row;
+
+          const nextMonthData = { ...monthData };
+          freezeKeyList.forEach((key) => {
+            delete nextMonthData[key];
+          });
+
+          return {
+            ...row,
+            monthly: {
+              ...row.monthly,
+              [monthKey]: nextMonthData,
+            },
+          };
+        })
+      );
+
+      setDraftCells((prev) => {
+        if (!prev[monthKey]) return prev;
+        const next = { ...prev };
+        delete next[monthKey];
+        draftCellsRef.current = next;
+        return next;
+      });
+
+      alert(`${rowsWithOverride.length}개 빌라의 직접 입력 값을 지우고 실시간 자동 계산으로 되돌렸습니다.`);
+    } catch (error) {
+      console.error("자동입력 항목 초기화 오류:", error);
+      alert("처리 중 오류가 발생했습니다.");
+    } finally {
+      setRefreshingAuto(false);
+    }
+  }, [profitRows, monthKey, year, month]);
 
   const focusCell = useCallback((rowIndex, colIndex) => {
     const target = inputRefs.current[`${rowIndex}-${colIndex}`];
@@ -2189,7 +2455,8 @@ export default function ProfitLossPage() {
 
   const openStatsModal = () => {
     setStatsYear(year);
-    setStatsMonth(month);
+    // 통계창을 열 때마다 항상 "전체"(1년 전체 통계)를 기본으로 보여줍니다.
+    setStatsMonth("all");
     setStatsModalOpen(true);
   };
 
@@ -2197,6 +2464,21 @@ export default function ProfitLossPage() {
     ...statsData.villaStats.map((row) => Math.abs(row.positiveChargeIncome)),
     1
   );
+
+  // 통계창 상단 요약 카드에 표시할 값. "전체"(1년) 선택 시에는 12개월을
+  // 합산한 yearlySummary를, 특정 월 선택 시에는 그 달의 합계를 사용합니다.
+  const statsDisplayChargeFee = isStatsAllMonths
+    ? statsData.yearlySummary.chargeFee
+    : parseNum(statsColumnTotals.chargeFee);
+  const statsDisplayTotalExpense = isStatsAllMonths
+    ? statsData.yearlySummary.totalExpense
+    : parseNum(statsColumnTotals.totalExpense);
+  const statsDisplayChargeIncome = isStatsAllMonths
+    ? statsData.yearlySummary.chargeIncome
+    : statsChargeIncome;
+  const statsDisplayProfitRate = isStatsAllMonths
+    ? statsData.yearlySummary.profitRate
+    : getRate(statsChargeIncome, statsColumnTotals.chargeFee);
 
   return (
     <div className="pl-page">
@@ -2257,7 +2539,7 @@ export default function ProfitLossPage() {
           <button
             type="button"
             className="pl-btn pl-refresh-btn"
-            onClick={refreshAutoData}
+            onClick={openRefreshConfirm}
             disabled={refreshingAuto}
             title="인터넷비/승강기/소방안전/전기안전/청소비 자동입력 항목과 빌라 목록을 지금 실제 데이터로 다시 불러옵니다."
           >
@@ -2321,6 +2603,16 @@ export default function ProfitLossPage() {
 
       <div className="pl-table-wrap pl-top-table-wrap">
         <table className="pl-table pl-top-table">
+          <colgroup>
+            <col className="pl-col-g-no" />
+            <col className="pl-col-g-code" />
+            <col className="pl-col-g-villa" />
+            {ITEMS.map((item) => (
+              <col key={item.key} className="pl-col-g-item" />
+            ))}
+            <col className="pl-col-g-item" />
+            <col className="pl-col-g-item" />
+          </colgroup>
           <thead>
             <tr>
               <th rowSpan="2" colSpan="3" className="pl-top-month">
@@ -2328,7 +2620,9 @@ export default function ProfitLossPage() {
               </th>
 
               {ITEMS.map((item) => (
-                <th key={item.key}>{item.label}</th>
+                <th key={item.key} className={`pl-item-col pl-col-${item.key}`}>
+                  {item.label}
+                </th>
               ))}
 
               <th>총 지출</th>
@@ -2337,7 +2631,10 @@ export default function ProfitLossPage() {
 
             <tr>
               {ITEMS.map((item, colIndex) => (
-                <th key={item.key} className="pl-sub-th">
+                <th
+                  key={item.key}
+                  className={`pl-sub-th pl-item-col pl-col-${item.key}`}
+                >
                   <MoneyInput
                     inputRef={(el) => {
                       topInputRefs.current[colIndex] = el;
@@ -2361,7 +2658,10 @@ export default function ProfitLossPage() {
               <th colSpan="3">부과합계</th>
 
               {ITEMS.map((item) => (
-                <td key={item.key} className="pl-profit">
+                <td
+                  key={item.key}
+                  className={`pl-profit pl-item-col pl-col-${item.key}`}
+                >
                   {fmt(columnTotals[item.key]) || "-"}
                 </td>
               ))}
@@ -2386,11 +2686,11 @@ export default function ProfitLossPage() {
               {ITEMS.map((item) => (
                 <td
                   key={item.key}
-                  className={
+                  className={`pl-item-col pl-col-${item.key} ${
                     balanceCalc[item.key] >= 0
                       ? "pl-profit plus-text"
                       : "pl-profit minus-text"
-                  }
+                  }`}
                 >
                   {fmt(balanceCalc[item.key]) || "-"}
                 </td>
@@ -2410,6 +2710,7 @@ export default function ProfitLossPage() {
                   balanceCalc.chargeIncome >= 0
                     ? "pl-profit plus-text"
                     : "pl-profit minus-text"
+
                 }
               >
                 {fmt(balanceCalc.chargeIncome) || "-"}
@@ -2421,6 +2722,17 @@ export default function ProfitLossPage() {
 
       <div className="pl-table-wrap pl-main-table-wrap">
         <table className="pl-table pl-main-table">
+          <colgroup>
+            <col className="pl-col-g-no" />
+            <col className="pl-col-g-code" />
+            <col className="pl-col-g-villa" />
+            {ITEMS.map((item) => (
+              <col key={item.key} className="pl-col-g-item" />
+            ))}
+            <col className="pl-col-g-item" />
+            <col className="pl-col-g-item" />
+            <col className="pl-col-g-reason" />
+          </colgroup>
           <thead>
             <tr>
               <th rowSpan="2" className="pl-no-col">
@@ -2491,6 +2803,54 @@ export default function ProfitLossPage() {
           </tbody>
         </table>
       </div>
+
+      {refreshConfirmOpen && (
+        <div className="pl-modal">
+          <div className="pl-modal-backdrop" onClick={closeRefreshConfirm} />
+
+          <div className="pl-refresh-confirm-panel">
+            <div className="pl-refresh-confirm-icon">
+              <FiRefreshCw />
+            </div>
+
+            <h3>자동입력 항목 새로고침</h3>
+
+            <p>
+              {year}년 {Number(month)}월의 인터넷비·승강기·소방안전·전기안전·청소비는
+              한 번 저장되면 값이 고정되어, 실제 자료가 바뀌어도 자동으로
+              따라 바뀌지 않습니다. 아래 중 하나를 선택해 주세요.
+            </p>
+
+            <div className="pl-refresh-confirm-actions">
+              <button
+                type="button"
+                className="pl-refresh-confirm-btn pl-refresh-confirm-live"
+                onClick={refreshAutoDataToLive}
+              >
+                <strong>실제 데이터로 새로고침</strong>
+                <span>지금 실제 자료 값을 화면에 채웁니다 (저장 버튼을 눌러야 최종 반영)</span>
+              </button>
+
+              <button
+                type="button"
+                className="pl-refresh-confirm-btn pl-refresh-confirm-delete"
+                onClick={deleteManualAutoOverrides}
+              >
+                <strong>직접 입력한 내용만 삭제</strong>
+                <span>더블클릭으로 고쳐 저장해 둔 값만 지우고 자동 계산으로 되돌립니다 (즉시 적용)</span>
+              </button>
+
+              <button
+                type="button"
+                className="pl-refresh-confirm-cancel"
+                onClick={closeRefreshConfirm}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {etcNoteEditor &&
         createPortal(
@@ -2583,6 +2943,7 @@ export default function ProfitLossPage() {
                     value={statsMonth}
                     onChange={(e) => setStatsMonth(e.target.value)}
                   >
+                    <option value="all">전체</option>
                     {MONTHS.map((m) => (
                       <option key={m} value={m}>
                         {Number(m)}월
@@ -2603,23 +2964,13 @@ export default function ProfitLossPage() {
             </div>
 
             <div className="pl-stats-summary four">
-              <div className="pl-stat-card pl-stat-card-count">
-                <div className="pl-stat-icon">
-                  <FiUsers />
-                </div>
-                <div>
-                  <span>조회 빌라</span>
-                  <strong>{statsRows.length.toLocaleString()}개</strong>
-                </div>
-              </div>
-
               <div className="pl-stat-card pl-stat-card-charge">
                 <div className="pl-stat-icon">
                   <FiDollarSign />
                 </div>
                 <div>
                   <span>부과관리비 합계</span>
-                  <strong>{fmt(statsColumnTotals.chargeFee) || "0"}원</strong>
+                  <strong>{fmt(statsDisplayChargeFee) || "0"}원</strong>
                 </div>
               </div>
 
@@ -2629,7 +2980,7 @@ export default function ProfitLossPage() {
                 </div>
                 <div>
                   <span>총 지출 합계</span>
-                  <strong>{fmt(statsColumnTotals.totalExpense) || "0"}원</strong>
+                  <strong>{fmt(statsDisplayTotalExpense) || "0"}원</strong>
                 </div>
               </div>
 
@@ -2641,26 +2992,28 @@ export default function ProfitLossPage() {
                   <span>부과수입 (부과관리비 − 총지출)</span>
                   <strong
                     className={
-                      statsChargeIncome >= 0 ? "plus-text" : "minus-text"
+                      statsDisplayChargeIncome >= 0 ? "plus-text" : "minus-text"
                     }
                   >
-                    {fmt(statsChargeIncome) || "0"}원
+                    {fmt(statsDisplayChargeIncome) || "0"}원
                   </strong>
                 </div>
               </div>
-            </div>
 
-            <div className="pl-stats-profit-line">
-              <div>
-                <span>{statsYear}년 {Number(statsMonth)}월 수익률</span>
-                <strong
-                  className={
-                    statsChargeIncome >= 0 ? "plus-text" : "minus-text"
-                  }
-                >
-                  {getRate(statsChargeIncome, statsColumnTotals.chargeFee).toFixed(1)}
-                  %
-                </strong>
+              <div className="pl-stat-card pl-stat-card-rate">
+                <div className="pl-stat-icon">
+                  <FiTrendingUp />
+                </div>
+                <div>
+                  <span>수익률</span>
+                  <strong
+                    className={
+                      statsDisplayChargeIncome >= 0 ? "plus-text" : "minus-text"
+                    }
+                  >
+                    {statsDisplayProfitRate.toFixed(1)}%
+                  </strong>
+                </div>
               </div>
             </div>
 
@@ -2732,45 +3085,6 @@ export default function ProfitLossPage() {
               <div className="pl-stats-box pl-wide">
                 <h4>{statsYear}년 월별 수익 / 수익률</h4>
 
-                <div className="pl-year-summary">
-                  <div>
-                    <span>연간 부과관리비</span>
-                    <strong>
-                      {fmt(statsData.yearlySummary.chargeFee) || "0"}원
-                    </strong>
-                  </div>
-                  <div>
-                    <span>연간 총지출</span>
-                    <strong>
-                      {fmt(statsData.yearlySummary.totalExpense) || "0"}원
-                    </strong>
-                  </div>
-                  <div>
-                    <span>연간 부과수입</span>
-                    <strong
-                      className={
-                        statsData.yearlySummary.chargeIncome >= 0
-                          ? "plus-text"
-                          : "minus-text"
-                      }
-                    >
-                      {fmt(statsData.yearlySummary.chargeIncome) || "0"}원
-                    </strong>
-                  </div>
-                  <div>
-                    <span>연간 수익률</span>
-                    <strong
-                      className={
-                        statsData.yearlySummary.chargeIncome >= 0
-                          ? "plus-text"
-                          : "minus-text"
-                      }
-                    >
-                      {statsData.yearlySummary.profitRate.toFixed(1)}%
-                    </strong>
-                  </div>
-                </div>
-
                 <div className="pl-month-stat-table-wrap">
                   <table className="pl-month-stat-table">
                     <thead>
@@ -2780,6 +3094,7 @@ export default function ProfitLossPage() {
                         <th>총지출</th>
                         <th>부과수입</th>
                         <th>수익률</th>
+                        <th>수납률 수익 (90%)</th>
                       </tr>
                     </thead>
 
@@ -2811,6 +3126,16 @@ export default function ProfitLossPage() {
                             }
                           >
                             {row.profitRate.toFixed(1)}%
+                          </td>
+                          <td
+                            className={
+                              row.collectionProfit >= 0
+                                ? "plus-text pl-collection-cell"
+                                : "minus-text pl-collection-cell"
+                            }
+                          >
+                            <span>{fmt(row.collectionProfit) || "-"}</span>
+                            <em>{row.collectionRate.toFixed(1)}%</em>
                           </td>
                         </tr>
                       ))}

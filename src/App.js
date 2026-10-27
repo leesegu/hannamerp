@@ -90,6 +90,9 @@ import WaterMeterReadingPage from "./pages/WaterMeterReadingPage";
 /* 관리일지 */
 import ManagementLog from "./pages/ManagementLog";
 
+/* 소독관리 */
+import DisinfectionManagementPage from "./pages/DisinfectionManagementPage";
+
 import "./App.css";
 
 /* Firebase */
@@ -1200,6 +1203,27 @@ function AppRoutes({
             />
           ) : (
             <WaterMeterReadingPage />
+          )
+        }
+      />
+
+      {/* =====================================================
+          소독관리
+          ===================================================== */}
+      <Route
+        path="/addon/disinfection-management"
+        element={
+          !isLoggedInEffective ? (
+            <Navigate
+              to={
+                isMobile
+                  ? "/mobile/login"
+                  : "/login"
+              }
+              replace
+            />
+          ) : (
+            <DisinfectionManagementPage />
           )
         }
       />
